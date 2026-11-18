@@ -1,0 +1,541 @@
+package media
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+	"unicode/utf8"
+
+	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
+)
+
+type Service struct{ db *sql.DB }
+
+func NewService(db *sql.DB) *Service { return &Service{db} }
+
+type Filter struct {
+	Keyword     string   `json:"keyword"`
+	Tags        []string `json:"tags"`
+	TagMode     string   `json:"tagMode"`
+	Platforms   []string `json:"platforms"`
+	Authors     []string `json:"authors"`
+	CreatedFrom *int64   `json:"createdFrom"`
+	CreatedTo   *int64   `json:"createdTo"`
+}
+type ListRequest struct {
+	Limit         int    `json:"limit"`
+	Offset        int    `json:"offset"`
+	FavoritesOnly bool   `json:"favoritesOnly"`
+	Filter        Filter `json:"filter"`
+}
+type GetRequest struct {
+	MediaID    int64 `json:"mediaId"`
+	FileLimit  int   `json:"fileLimit"`
+	FileOffset int   `json:"fileOffset"`
+}
+type EditRequest struct {
+	MediaID          int64           `json:"mediaId"`
+	ExpectedRevision int64           `json:"expectedRevision"`
+	CustomTitle      json.RawMessage `json:"customTitle"`
+	Cover            *struct {
+		Mode   string `json:"mode"`
+		FileID int64  `json:"fileId"`
+	} `json:"cover"`
+	TagIDs    *[]int64 `json:"tagIds"`
+	TagChange *struct {
+		AddNames  []string `json:"addNames"`
+		RemoveIDs []int64  `json:"removeIds"`
+	} `json:"tagChange"`
+	IsFavorite *bool `json:"isFavorite"`
+}
+type UnregisterRequest struct {
+	MediaID          int64   `json:"mediaId"`
+	ExpectedRevision int64   `json:"expectedRevision"`
+	FileIDs          []int64 `json:"fileIds"`
+}
+type SuggestRequest struct {
+	Kind  string `json:"kind"`
+	Text  string `json:"text"`
+	Limit int    `json:"limit"`
+}
+type Object = map[string]any
+type queryer interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+type domainError string
+
+func (e domainError) Error() string { return string(e) }
+func failure(err error) api.Result {
+	code := "INTERNAL_ERROR"
+	message := "라이브러리 작업을 처리하지 못했습니다."
+	var d domainError
+	if errors.As(err, &d) {
+		code = string(d)
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		code = "NOT_FOUND"
+	}
+	switch code {
+	case "NOT_FOUND":
+		message = "등록된 묶음이나 파일을 찾을 수 없습니다."
+	case "REVISION_CONFLICT":
+		message = "묶음 정보가 변경되었습니다. 새로고침 후 다시 확인하세요."
+	case "INVALID_ARGUMENT":
+		message = "요청 값이나 목록 범위를 확인하세요."
+	case "INVALID_COVER":
+		message = "표지는 같은 묶음에 등록된 파일이어야 합니다."
+	case "JOB_ACTIVE":
+		message = "관련 작업이 진행 중입니다. 완료 후 다시 시도하세요."
+	}
+	return api.Failure(code, message)
+}
+func objects(ctx context.Context, q queryer, stmt string, args ...any) ([]Object, error) {
+	rows, err := q.QueryContext(ctx, stmt, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+	result := []Object{}
+	for rows.Next() {
+		values := make([]any, len(columns))
+		ptrs := make([]any, len(columns))
+		for i := range values {
+			ptrs[i] = &values[i]
+		}
+		if err = rows.Scan(ptrs...); err != nil {
+			return nil, err
+		}
+		obj := Object{}
+		for i, col := range columns {
+			if b, ok := values[i].([]byte); ok {
+				values[i] = string(b)
+			}
+			obj[col] = values[i]
+		}
+		result = append(result, obj)
+	}
+	return result, rows.Err()
+}
+
+const summarySQL = `SELECT m.id,m.source_kind AS sourceKind,u.url AS requestUrl,m.source_title AS sourceTitle,m.custom_title AS customTitle,coalesce(nullif(m.custom_title,''),nullif(m.source_title,''),'제목 없음') AS title,m.revision,m.cover_mode AS coverMode,m.created_at AS createdAt,m.updated_at AS updatedAt,(SELECT count(*) FROM media_file WHERE media_id=m.id) AS fileCount,EXISTS(SELECT 1 FROM favorite WHERE media_id=m.id) AS isFavorite FROM media m LEFT JOIN download_urls u ON u.id=m.request_url_id`
+
+func summary(ctx context.Context, q queryer, id int64) (Object, error) {
+	rows, err := objects(ctx, q, summarySQL+" WHERE m.id=?", id)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	obj := rows[0]
+	obj["isFavorite"] = obj["isFavorite"] == int64(1)
+	covers, err := objects(ctx, q, `SELECT f.id AS fileId,coalesce(f.thumbnail_path,f.preview_path,CASE WHEN f.kind='image' THEN f.filepath END) AS path,f.kind FROM media_file f JOIN media m ON m.id=f.media_id WHERE m.id=? ORDER BY CASE WHEN m.cover_file_id=f.id THEN 0 ELSE 1 END,CASE WHEN f.thumbnail_path IS NOT NULL OR f.kind='image' THEN 0 ELSE 1 END,f.position,f.id LIMIT 1`, id)
+	if err != nil {
+		return nil, err
+	}
+	obj["cover"] = nil
+	if len(covers) > 0 && covers[0]["path"] != nil {
+		obj["cover"] = covers[0]
+	}
+	return obj, nil
+}
+func pageBounds(limit, offset int) (int, error) {
+	if limit == 0 {
+		limit = 50
+	}
+	if limit < 1 || limit > 200 || offset < 0 {
+		return 0, domainError("INVALID_ARGUMENT")
+	}
+	return limit, nil
+}
+func placeholders(n int) string { return strings.TrimSuffix(strings.Repeat("?,", n), ",") }
+func filterSQL(req ListRequest) (string, []any, error) {
+	where := []string{"1=1"}
+	args := []any{}
+	f := req.Filter
+	if len(f.Tags) > 100 || len(f.Platforms) > 100 || len(f.Authors) > 100 || len(f.Keyword) > 2000 || (f.TagMode != "" && f.TagMode != "and" && f.TagMode != "or") || (f.CreatedFrom != nil && f.CreatedTo != nil && *f.CreatedFrom > *f.CreatedTo) {
+		return "", nil, domainError("INVALID_ARGUMENT")
+	}
+	if req.FavoritesOnly {
+		where = append(where, "EXISTS(SELECT 1 FROM favorite WHERE media_id=m.id)")
+	}
+	if f.Keyword != "" {
+		where = append(where, `(instr(lower(coalesce(m.custom_title,'')||' '||coalesce(m.source_title,'')),lower(?))>0 OR EXISTS(SELECT 1 FROM media_tag mt JOIN tag t ON t.id=mt.tag_id WHERE mt.media_id=m.id AND instr(lower(t.name),lower(?))>0) OR EXISTS(SELECT 1 FROM media_file f LEFT JOIN profiles p ON p.id=f.profile_id LEFT JOIN platform pl ON pl.id=f.platform_id WHERE f.media_id=m.id AND instr(lower(coalesce(f.title,'')||' '||coalesce(p.owner_name,'')||' '||coalesce(pl.name,'')),lower(?))>0))`)
+		args = append(args, f.Keyword, f.Keyword, f.Keyword)
+	}
+	if f.CreatedFrom != nil {
+		where = append(where, "m.created_at>=?")
+		args = append(args, *f.CreatedFrom)
+	}
+	if f.CreatedTo != nil {
+		where = append(where, "m.created_at<=?")
+		args = append(args, *f.CreatedTo)
+	}
+	if len(f.Tags) > 0 {
+		if f.TagMode == "or" {
+			where = append(where, "EXISTS(SELECT 1 FROM media_tag mt JOIN tag t ON t.id=mt.tag_id WHERE mt.media_id=m.id AND t.name IN ("+placeholders(len(f.Tags))+"))")
+			for _, v := range f.Tags {
+				args = append(args, v)
+			}
+		} else {
+			for _, v := range f.Tags {
+				where = append(where, "EXISTS(SELECT 1 FROM media_tag mt JOIN tag t ON t.id=mt.tag_id WHERE mt.media_id=m.id AND t.name=?)")
+				args = append(args, v)
+			}
+		}
+	}
+	for _, group := range []struct {
+		values []string
+		clause string
+	}{{f.Platforms, "EXISTS(SELECT 1 FROM media_file f JOIN platform p ON p.id=f.platform_id WHERE f.media_id=m.id AND p.name IN (%s))"}, {f.Authors, "EXISTS(SELECT 1 FROM media_file f JOIN profiles p ON p.id=f.profile_id WHERE f.media_id=m.id AND coalesce(p.owner_name,p.owner_id) IN (%s))"}} {
+		if len(group.values) > 0 {
+			where = append(where, fmt.Sprintf(group.clause, placeholders(len(group.values))))
+			for _, v := range group.values {
+				args = append(args, v)
+			}
+		}
+	}
+	return strings.Join(where, " AND "), args, nil
+}
+func (s *Service) List(ctx context.Context, req ListRequest) api.Result {
+	limit, err := pageBounds(req.Limit, req.Offset)
+	if err != nil {
+		return failure(err)
+	}
+	where, args, err := filterSQL(req)
+	if err != nil {
+		return failure(err)
+	}
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return failure(err)
+	}
+	defer tx.Rollback()
+	var total int64
+	if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM media m WHERE "+where, args...).Scan(&total); err != nil {
+		return failure(err)
+	}
+	ids, err := objects(ctx, tx, "SELECT m.id FROM media m WHERE "+where+" ORDER BY m.created_at DESC,m.id DESC LIMIT ? OFFSET ?", append(args, limit, req.Offset)...)
+	if err != nil {
+		return failure(err)
+	}
+	data := []Object{}
+	for _, row := range ids {
+		obj, e := summary(ctx, tx, row["id"].(int64))
+		if e != nil {
+			return failure(e)
+		}
+		data = append(data, obj)
+	}
+	return api.Success(Object{"data": data, "total": total, "hasNextPage": int64(req.Offset+len(data)) < total})
+}
+
+const fileSQL = `SELECT id,media_id AS mediaId,file_key AS fileKey,storage_kind AS storageKind,source_url AS sourceUrl,title,filepath,relative_path AS relativePath,kind,position,filesize,duration,detected_format AS detectedFormat,width,height,orientation,frame_count AS frameCount,page_count AS pageCount,primary_image_index AS primaryImageIndex,thumbnail_path AS thumbnailPath,thumbnail_origin AS thumbnailOrigin,preview_path AS previewPath,created_at AS createdAt FROM media_file`
+
+func (s *Service) Get(ctx context.Context, req GetRequest) api.Result {
+	limit, err := pageBounds(req.FileLimit, req.FileOffset)
+	if err != nil || req.MediaID <= 0 {
+		return failure(domainError("INVALID_ARGUMENT"))
+	}
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return failure(err)
+	}
+	defer tx.Rollback()
+	obj, err := summary(ctx, tx, req.MediaID)
+	if err != nil {
+		return failure(err)
+	}
+	files, err := objects(ctx, tx, fileSQL+" WHERE media_id=? ORDER BY position,id LIMIT ? OFFSET ?", req.MediaID, limit, req.FileOffset)
+	if err != nil {
+		return failure(err)
+	}
+	total := obj["fileCount"].(int64)
+	obj["files"] = Object{"data": files, "total": total, "hasNextPage": int64(req.FileOffset+len(files)) < total}
+	tags, err := objects(ctx, tx, "SELECT t.id,t.name FROM tag t JOIN media_tag mt ON mt.tag_id=t.id WHERE mt.media_id=? ORDER BY t.name,t.id", req.MediaID)
+	if err != nil {
+		return failure(err)
+	}
+	obj["tags"] = tags
+	favorites, err := objects(ctx, tx, "SELECT id,created_at AS createdAt FROM favorite WHERE media_id=?", req.MediaID)
+	if err != nil {
+		return failure(err)
+	}
+	obj["favorite"] = nil
+	if len(favorites) > 0 {
+		obj["favorite"] = favorites[0]
+	}
+	folders, err := objects(ctx, tx, "SELECT id,source_title AS sourceTitle,revision FROM local_folder WHERE media_id=?", req.MediaID)
+	if err != nil {
+		return failure(err)
+	}
+	obj["localFolder"] = nil
+	if len(folders) > 0 {
+		obj["localFolder"] = folders[0]
+	}
+	locations, err := objects(ctx, tx, "SELECT id,directory_path AS directoryPath,state FROM local_folder_location WHERE media_id=? ORDER BY id", req.MediaID)
+	if err != nil {
+		return failure(err)
+	}
+	obj["locations"] = locations
+	return api.Success(obj)
+}
+func checkWrite(ctx context.Context, tx *sql.Tx, id, expected int64) error {
+	if id <= 0 || expected < 0 {
+		return domainError("INVALID_ARGUMENT")
+	}
+	var revision int64
+	if err := tx.QueryRowContext(ctx, "SELECT revision FROM media WHERE id=?", id).Scan(&revision); err != nil {
+		return err
+	}
+	if revision != expected {
+		return domainError("REVISION_CONFLICT")
+	}
+	var active int
+	if err := tx.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM download_queue WHERE target_media_id=? AND (state IN ('pending','running') OR cleanup_required=1))+(SELECT count(*) FROM local_import_folder f JOIN local_folder l ON l.id=f.local_folder_id WHERE l.media_id=? AND (f.state IN ('pending','running') OR f.cleanup_required=1))`, id, id).Scan(&active); err != nil {
+		return err
+	}
+	if active > 0 {
+		return domainError("JOB_ACTIVE")
+	}
+	return nil
+}
+func (s *Service) Edit(ctx context.Context, req EditRequest) api.Result {
+	if req.TagIDs != nil && req.TagChange != nil {
+		return failure(domainError("INVALID_ARGUMENT"))
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return failure(err)
+	}
+	defer tx.Rollback()
+	if err = checkWrite(ctx, tx, req.MediaID, req.ExpectedRevision); err != nil {
+		return failure(err)
+	}
+	now := time.Now().UnixMilli()
+	if len(req.CustomTitle) > 0 {
+		var title *string
+		if json.Unmarshal(req.CustomTitle, &title) != nil {
+			return failure(domainError("INVALID_ARGUMENT"))
+		}
+		if title != nil {
+			value := strings.TrimSpace(*title)
+			if utf8.RuneCountInString(value) > 1000 {
+				return failure(domainError("INVALID_ARGUMENT"))
+			}
+			if value == "" {
+				title = nil
+			} else {
+				title = &value
+			}
+		}
+		if _, err = tx.ExecContext(ctx, "UPDATE media SET custom_title=? WHERE id=?", title, req.MediaID); err != nil {
+			return failure(err)
+		}
+	}
+	if req.Cover != nil {
+		var fileID any
+		if req.Cover.Mode == "manual" {
+			var count int
+			if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM media_file WHERE media_id=? AND id=?", req.MediaID, req.Cover.FileID).Scan(&count); err != nil {
+				return failure(err)
+			}
+			if count != 1 {
+				return failure(domainError("INVALID_COVER"))
+			}
+			fileID = req.Cover.FileID
+		} else if req.Cover.Mode != "auto" {
+			return failure(domainError("INVALID_ARGUMENT"))
+		}
+		if _, err = tx.ExecContext(ctx, "UPDATE media SET cover_mode=?,cover_file_id=? WHERE id=?", req.Cover.Mode, fileID, req.MediaID); err != nil {
+			return failure(err)
+		}
+	}
+	if req.TagIDs != nil {
+		if len(*req.TagIDs) > 100 {
+			return failure(domainError("INVALID_ARGUMENT"))
+		}
+		if _, err = tx.ExecContext(ctx, "DELETE FROM media_tag WHERE media_id=?", req.MediaID); err != nil {
+			return failure(err)
+		}
+		for _, id := range *req.TagIDs {
+			var n int
+			if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM tag WHERE id=?", id).Scan(&n); err != nil {
+				return failure(err)
+			}
+			if n != 1 {
+				return failure(domainError("INVALID_ARGUMENT"))
+			}
+			if _, err = tx.ExecContext(ctx, "INSERT INTO media_tag(media_id,tag_id) VALUES(?,?) ON CONFLICT DO NOTHING", req.MediaID, id); err != nil {
+				return failure(err)
+			}
+		}
+	}
+	if req.TagChange != nil {
+		if len(req.TagChange.AddNames)+len(req.TagChange.RemoveIDs) > 100 {
+			return failure(domainError("INVALID_ARGUMENT"))
+		}
+		for _, id := range req.TagChange.RemoveIDs {
+			if _, err = tx.ExecContext(ctx, "DELETE FROM media_tag WHERE media_id=? AND tag_id=?", req.MediaID, id); err != nil {
+				return failure(err)
+			}
+		}
+		for _, name := range req.TagChange.AddNames {
+			name = strings.TrimSpace(name)
+			if name == "" || utf8.RuneCountInString(name) > 100 {
+				return failure(domainError("INVALID_ARGUMENT"))
+			}
+			if _, err = tx.ExecContext(ctx, "INSERT INTO tag(name,updated_at) VALUES(?,?) ON CONFLICT(name) DO UPDATE SET updated_at=excluded.updated_at", name, now); err != nil {
+				return failure(err)
+			}
+			if _, err = tx.ExecContext(ctx, "INSERT INTO media_tag(media_id,tag_id) SELECT ?,id FROM tag WHERE name=? ON CONFLICT DO NOTHING", req.MediaID, name); err != nil {
+				return failure(err)
+			}
+		}
+	}
+	if req.IsFavorite != nil {
+		if *req.IsFavorite {
+			_, err = tx.ExecContext(ctx, "INSERT INTO favorite(media_id,created_at) VALUES(?,?) ON CONFLICT(media_id) DO NOTHING", req.MediaID, now)
+		} else {
+			_, err = tx.ExecContext(ctx, "DELETE FROM favorite WHERE media_id=?", req.MediaID)
+		}
+		if err != nil {
+			return failure(err)
+		}
+	}
+	if _, err = tx.ExecContext(ctx, "UPDATE media SET revision=revision+1,updated_at=? WHERE id=?", now, req.MediaID); err != nil {
+		return failure(err)
+	}
+	obj, err := summary(ctx, tx, req.MediaID)
+	if err != nil {
+		return failure(err)
+	}
+	if err = tx.Commit(); err != nil {
+		return failure(err)
+	}
+	return api.Success(obj)
+}
+func (s *Service) UnregisterMedia(ctx context.Context, req UnregisterRequest) api.Result {
+	return s.unregister(ctx, req, true)
+}
+func (s *Service) UnregisterFiles(ctx context.Context, req UnregisterRequest) api.Result {
+	return s.unregister(ctx, req, false)
+}
+func (s *Service) unregister(ctx context.Context, req UnregisterRequest, all bool) api.Result {
+	if !all && (len(req.FileIDs) == 0 || len(req.FileIDs) > 200) {
+		return failure(domainError("INVALID_ARGUMENT"))
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return failure(err)
+	}
+	defer tx.Rollback()
+	if err = checkWrite(ctx, tx, req.MediaID, req.ExpectedRevision); err != nil {
+		return failure(err)
+	}
+	clause := "media_id=?"
+	args := []any{req.MediaID}
+	if !all {
+		clause += " AND id IN (" + placeholders(len(req.FileIDs)) + ")"
+		seen := map[int64]bool{}
+		for _, id := range req.FileIDs {
+			if seen[id] || id <= 0 {
+				return failure(domainError("INVALID_ARGUMENT"))
+			}
+			seen[id] = true
+			args = append(args, id)
+		}
+	}
+	rows, err := objects(ctx, tx, "SELECT id,filepath,storage_kind AS storageKind FROM media_file WHERE "+clause, args...)
+	if err != nil {
+		return failure(err)
+	}
+	if !all && len(rows) != len(req.FileIDs) {
+		return failure(sql.ErrNoRows)
+	}
+	paths := []string{}
+	for _, row := range rows {
+		if row["storageKind"] == "app_managed" {
+			paths = append(paths, row["filepath"].(string))
+		}
+	}
+	var taskID any
+	if len(paths) > 0 {
+		var id string
+		if err = tx.QueryRowContext(ctx, "SELECT lower(hex(randomblob(16)))").Scan(&id); err != nil {
+			return failure(err)
+		}
+		taskID = id
+		b, _ := json.Marshal(Object{"paths": paths})
+		now := time.Now().UnixMilli()
+		if _, err = tx.ExecContext(ctx, `INSERT INTO maintenance_task(id,kind,state,owner_kind,payload_json,created_at,updated_at) VALUES(?,'deletion_cleanup','pending','system',?,?,?)`, id, string(b), now, now); err != nil {
+			return failure(err)
+		}
+	}
+	// Clear the composite cover FK before removing its file.
+	if _, err = tx.ExecContext(ctx, "UPDATE media SET cover_mode='auto',cover_file_id=NULL WHERE id=? AND cover_file_id IN (SELECT id FROM media_file WHERE "+clause+")", append([]any{req.MediaID}, args...)...); err != nil {
+		return failure(err)
+	}
+	if _, err = tx.ExecContext(ctx, "DELETE FROM media_file WHERE "+clause, args...); err != nil {
+		return failure(err)
+	}
+	var count int
+	if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM media_file WHERE media_id=?", req.MediaID).Scan(&count); err != nil {
+		return failure(err)
+	}
+	removed := all || count == 0
+	var revision any
+	if removed {
+		// The attempt -> media and media -> attempt composite link is detached first.
+		if _, err = tx.ExecContext(ctx, "UPDATE media SET last_download_commit_attempt_id=NULL WHERE id=?", req.MediaID); err != nil {
+			return failure(err)
+		}
+		if _, err = tx.ExecContext(ctx, "DELETE FROM media WHERE id=?", req.MediaID); err != nil {
+			return failure(err)
+		}
+	} else {
+		revision = req.ExpectedRevision + 1
+		if _, err = tx.ExecContext(ctx, "UPDATE media SET revision=revision+1,updated_at=? WHERE id=?", time.Now().UnixMilli(), req.MediaID); err != nil {
+			return failure(err)
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		return failure(err)
+	}
+	return api.Success(Object{"mediaId": req.MediaID, "parentRemoved": removed, "revision": revision, "cleanupTaskId": taskID})
+}
+func (s *Service) Suggest(ctx context.Context, req SuggestRequest) api.Result {
+	limit, err := pageBounds(req.Limit, 0)
+	if err != nil || len(req.Text) > 1000 {
+		return failure(domainError("INVALID_ARGUMENT"))
+	}
+	stmt := ""
+	switch req.Kind {
+	case "tag":
+		stmt = "SELECT name FROM tag"
+	case "platform":
+		stmt = "SELECT name FROM platform"
+	case "author":
+		stmt = "SELECT DISTINCT coalesce(owner_name,owner_id) AS name FROM profiles"
+	default:
+		return failure(domainError("INVALID_ARGUMENT"))
+	}
+	rows, err := objects(ctx, s.db, "SELECT name FROM ("+stmt+") WHERE instr(lower(name),lower(?))>0 ORDER BY name LIMIT ?", req.Text, limit)
+	if err != nil {
+		return failure(err)
+	}
+	values := []string{}
+	for _, row := range rows {
+		values = append(values, row["name"].(string))
+	}
+	return api.Success(values)
+}

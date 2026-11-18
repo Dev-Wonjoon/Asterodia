@@ -1,0 +1,580 @@
+package engine
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
+	"net/url"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"time"
+
+	whatwgurl "github.com/nlnwa/whatwg-url/url"
+)
+
+type Ytdlp struct {
+	Executable     string
+	JSRuntime      string
+	FFmpegLocation string
+	CookieBrowser  string
+	CookieFile     string
+	NoPlaylist     bool
+	runner         ProcessRunner
+}
+
+// Discover는 Select에서 검증한 원본 URL을 받아 yt-dlp의 조회 결과를 반환한다.
+func (y *Ytdlp) Discover(
+	ctx context.Context,
+	originalURL string,
+	workDir string,
+) (json.RawMessage, error) {
+	args := []string{
+		"--ignore-config",
+		"--no-plugin-dirs",
+		"--no-cache-dir",
+		"--no-cookies",
+		"--no-cookies-from-browser",
+		"--no-js-runtimes",
+		"--no-remote-components",
+		"--encoding", "utf-8",
+		"--abort-on-error",
+		"--simulate",
+		"--dump-single-json",
+	}
+
+	if y.JSRuntime != "" {
+		args = append(args, "--js-runtimes", y.JSRuntime)
+	}
+	auth, err := authArguments(y.CookieBrowser, y.CookieFile, workDir)
+	if err != nil {
+		return nil, err
+	}
+	if y.CookieFile != "" {
+		defer os.Remove(filepath.Join(workDir, "cookies.txt"))
+	}
+	args = append(args, auth...)
+	if y.NoPlaylist {
+		args = append(args, "--no-playlist")
+	}
+	args = append(args, "--", originalURL)
+
+	result, err := y.runner.Run(ctx, ProcessRequest{
+		Executable: y.Executable,
+		Arguments:  args,
+		Directory:  workDir,
+		Timeout:    2 * time.Minute,
+	})
+
+	if err != nil {
+		if stderr := strings.TrimSpace(result.Stderr); stderr != "" {
+			return nil, fmt.Errorf("yt-dlp 대상 조회 실패: %w\n%s", err, stderr)
+		}
+		return nil, fmt.Errorf("yt-dlp 대상 조회 실패: %w", err)
+	}
+
+	output := bytes.TrimSpace([]byte(result.Stdout))
+	if len(output) == 0 || output[0] != '{' || !json.Valid(output) {
+		return nil, fmt.Errorf("yt-dlp 조회 결과가 올바른 JSON 객체가 아닙니다")
+	}
+
+	return json.RawMessage(output), nil
+}
+
+func selectYtdlpFormats(
+	formats []ytdlpDirectFormat,
+	audio bool,
+	maxHeight int,
+	canMerge bool,
+) ([]ytdlpDirectFormat, string, error) {
+	var videoOnly, audioOnly, combined *ytdlpDirectFormat
+	for i := range formats {
+		format := &formats[i]
+		if format.Ext == "m4a" {
+			audioOnly = format
+			continue
+		}
+		if !audio && maxHeight > 0 &&
+			(format.Height <= 0 || format.Height > maxHeight) {
+			continue
+		}
+		if format.AudioCodec == "none" {
+			videoOnly = format
+		} else {
+			combined = format
+		}
+	}
+
+	switch {
+	case audio && audioOnly != nil:
+		return []ytdlpDirectFormat{*audioOnly}, "bestaudio", nil
+	case !audio && videoOnly != nil && audioOnly != nil && canMerge:
+		return []ytdlpDirectFormat{*videoOnly, *audioOnly}, "bestvideo+bestaudio", nil
+	case combined != nil:
+		return []ytdlpDirectFormat{*combined}, "best", nil
+	case !audio && videoOnly != nil && audioOnly != nil:
+		return nil, "", fmt.Errorf("분리 포맷을 병합하려면 FFmpeg 절대 경로가 필요합니다")
+	default:
+		return nil, "", fmt.Errorf("요청 옵션에 맞는 HTTP(S) 포맷이 없습니다")
+	}
+}
+
+func (y *Ytdlp) DownloadSingle(
+	ctx context.Context,
+	target YtdlpTarget,
+	stageDir string,
+	options Options,
+) (string, error) {
+	switch options.Type {
+	case "", "video", "audio":
+	default:
+		return "", fmt.Errorf("지원하지 않는 다운로드 유형: %q", options.Type)
+	}
+
+	maxHeight, ok := map[string]int{
+		"": 0, "best": 0, "audio": 0,
+		"480": 480, "720": 720, "1080": 1080,
+		"2k": 1440, "4k": 2160, "8k": 4320,
+	}[options.Quality]
+	if !ok {
+		return "", fmt.Errorf("지원하지 않는 화질 옵션: %q", options.Quality)
+	}
+
+	audio := options.Type == "audio" || options.Quality == "audio"
+	extension := "mp4"
+	if audio {
+		extension = "mp3"
+		if !filepath.IsAbs(y.FFmpegLocation) {
+			return "", fmt.Errorf("MP3 추출에는 FFmpeg 절대 경로가 필요합니다")
+		}
+	}
+	if !audio && options.Extension == "mkv" {
+		extension = "mkv"
+	}
+	if options.Extension != "" && options.Extension != extension {
+		return "", fmt.Errorf("이 다운로드 유형은 %s 확장자를 사용합니다", extension)
+	}
+
+	if target.downloadInfo == "" {
+		return "", fmt.Errorf("다운로드할 수 있는 HTTP(S) 포맷이 없습니다")
+	}
+
+	var info ytdlpDownloadInfo
+	if err := json.Unmarshal([]byte(target.downloadInfo), &info); err != nil {
+		return "", fmt.Errorf("확정한 포맷 정보 해석 실패: %w", err)
+	}
+
+	selected, selector, err := selectYtdlpFormats(
+		info.Formats, audio, maxHeight, filepath.IsAbs(y.FFmpegLocation),
+	)
+	if err != nil {
+		return "", err
+	}
+
+	info.Formats = selected
+	payload, err := json.Marshal(info)
+	if err != nil {
+		return "", fmt.Errorf("확정한 포맷 정보 구성 실패: %w", err)
+	}
+	expectedFormatID := selected[0].ID
+	merge := len(selected) == 2
+	if merge {
+		expectedFormatID += "+" + selected[1].ID
+	}
+
+	if !filepath.IsAbs(stageDir) {
+		return "", fmt.Errorf("작업 폴더는 절대 경로여야 합니다")
+	}
+	entries, err := os.ReadDir(stageDir)
+	if err != nil {
+		return "", fmt.Errorf("작업 폴더 읽기 실패: %w", err)
+	}
+	if len(entries) != 0 {
+		return "", fmt.Errorf("작업 폴더가 비어 있어야 합니다")
+	}
+
+	request := ProcessRequest{
+		Executable: y.Executable,
+		Directory:  stageDir,
+		Timeout:    10 * time.Minute,
+		Stdin:      string(payload),
+		Arguments: []string{
+			"--ignore-config", "--no-plugin-dirs", "--no-cache-dir",
+			"--no-cookies", "--no-cookies-from-browser",
+			"--no-js-runtimes", "--no-remote-components",
+			"--encoding", "utf-8", "--abort-on-error",
+			"--no-simulate", "--no-progress", "--fixup", "never",
+			"--paths", "home:" + stageDir,
+			"--paths", "temp:" + stageDir,
+			"--output", "media.%(ext)s",
+			"--format", selector,
+			"--print", "after_move:%(.{id,format_id,filepath})j",
+		},
+	}
+
+	if audio || merge {
+		request.Arguments = append(request.Arguments,
+			"--ffmpeg-location", y.FFmpegLocation,
+		)
+	}
+	if audio {
+		request.Arguments = append(request.Arguments,
+			"--extract-audio", "--audio-format", "mp3", "--no-keep-video",
+		)
+	}
+	if merge {
+		request.Arguments = append(request.Arguments, "--merge-output-format", extension)
+	}
+	if !audio && extension == "mkv" && !merge {
+		if !filepath.IsAbs(y.FFmpegLocation) {
+			return "", fmt.Errorf("MKV 변환에는 FFmpeg 절대 경로가 필요합니다")
+		}
+		request.Arguments = append(request.Arguments, "--ffmpeg-location", y.FFmpegLocation, "--remux-video", "mkv")
+	}
+
+	auth, err := authArguments(y.CookieBrowser, y.CookieFile, stageDir)
+	if err != nil {
+		return "", err
+	}
+	if y.CookieFile != "" {
+		defer os.Remove(filepath.Join(stageDir, "cookies.txt"))
+	}
+	request.Arguments = append(request.Arguments, auth...)
+	request.Arguments = append(request.Arguments, "--load-info-json", "-")
+
+	result, err := y.runner.Run(ctx, request)
+	if err != nil {
+		return "", fmt.Errorf("yt-dlp 다운로드 실패: %w", err)
+	}
+	if y.CookieFile != "" {
+		if err = os.Remove(filepath.Join(stageDir, "cookies.txt")); err != nil && !os.IsNotExist(err) {
+			return "", err
+		}
+	}
+
+	var saved struct {
+		ID       string `json:"id"`
+		FormatID string `json:"format_id"`
+		Filepath string `json:"filepath"`
+	}
+	if err := json.Unmarshal([]byte(result.Stdout), &saved); err != nil {
+		return "", fmt.Errorf("yt-dlp 저장 결과 해석 실패: %w", err)
+	}
+	if saved.ID != target.ID || saved.FormatID != expectedFormatID {
+		return "", fmt.Errorf("저장 결과가 확정한 영상 또는 포맷과 다릅니다")
+	}
+
+	filename := "media." + extension
+	relative, err := filepath.Rel(stageDir, saved.Filepath)
+	if err != nil || !filepath.IsAbs(saved.Filepath) || relative != filename {
+		return "", fmt.Errorf("yt-dlp가 예상한 저장 경로를 반환하지 않았습니다")
+	}
+
+	path := filepath.Join(stageDir, filename)
+	fileInfo, err := os.Lstat(path)
+	if err != nil {
+		return "", fmt.Errorf("저장 파일 확인 실패: %w", err)
+	}
+	if !fileInfo.Mode().IsRegular() || fileInfo.Size() <= 0 {
+		return "", fmt.Errorf("저장 결과가 크기 0 초과의 일반 파일이어야 합니다")
+	}
+
+	entries, err = os.ReadDir(stageDir)
+	if err != nil {
+		return "", fmt.Errorf("저장 결과 목록 확인 실패: %w", err)
+	}
+	if len(entries) != 1 || entries[0].Name() != filename {
+		return "", fmt.Errorf("작업 폴더에는 %s 한 개만 있어야 합니다", filename)
+	}
+
+	return path, nil
+}
+
+type YtdlpTarget struct {
+	OwnerID      string   `json:"uploader_id"`
+	OwnerName    string   `json:"uploader"`
+	Duration     *float64 `json:"duration"`
+	ID           string   `json:"id"`
+	ExtractorKey string   `json:"extractor_key"`
+	Title        string   `json:"title"`
+	WebpageURL   string   `json:"webpage_url"`
+	TargetKey    string   `json:"-"`
+	downloadInfo string
+}
+
+type ytdlpDirectFormat struct {
+	ID          string            `json:"format_id"`
+	URL         string            `json:"url"`
+	Protocol    string            `json:"protocol"`
+	Ext         string            `json:"ext"`
+	Height      int               `json:"height,omitempty"`
+	VideoCodec  string            `json:"vcodec,omitempty"`
+	AudioCodec  string            `json:"acodec,omitempty"`
+	HTTPHeaders map[string]string `json:"http_headers,omitempty"`
+}
+
+type ytdlpDownloadInfo struct {
+	Type         string              `json:"_type"`
+	ID           string              `json:"id"`
+	Title        string              `json:"title"`
+	Extractor    string              `json:"extractor,omitempty"`
+	ExtractorKey string              `json:"extractor_key"`
+	Formats      []ytdlpDirectFormat `json:"formats"`
+}
+
+func buildYtdlpDownloadInfo(raw json.RawMessage, target YtdlpTarget) (string, error) {
+	var source struct {
+		Extractor      string            `json:"extractor"`
+		Formats        []json.RawMessage `json:"formats"`
+		SectionStart   *float64          `json:"section_start"`
+		SectionEnd     *float64          `json:"section_end"`
+		AdditionalURLs json.RawMessage   `json:"additional_urls"`
+	}
+	if err := json.Unmarshal(raw, &source); err != nil {
+		return "", err
+	}
+	if source.SectionStart != nil || source.SectionEnd != nil ||
+		(len(source.AdditionalURLs) > 0 && string(source.AdditionalURLs) != "null") {
+		return "", nil
+	}
+
+	candidates := source.Formats
+	if len(candidates) == 0 {
+		// 단일 직접 URL 결과는 포맷 필드가 영상 객체 자체에 있을 수 있다.
+		candidates = []json.RawMessage{raw}
+	}
+
+	// yt-dlp가 정렬한 목록의 뒤쪽부터 적합한 포맷 하나를 고른다.
+	var formats []ytdlpDirectFormat
+	for i, rawFormat := range candidates {
+		var candidate struct {
+			ytdlpDirectFormat
+			HasDRM    json.RawMessage   `json:"has_drm"`
+			Fragments []json.RawMessage `json:"fragments"`
+		}
+		if err := json.Unmarshal(rawFormat, &candidate); err != nil {
+			return "", fmt.Errorf("yt-dlp 포맷 %d 해석 실패: %w", i+1, err)
+		}
+
+		format := candidate.ytdlpDirectFormat
+		drm := string(candidate.HasDRM)
+		hasVideo := format.Ext == "mp4" && format.VideoCodec != "none"
+		audioOnly := format.Ext == "m4a" && format.VideoCodec == "none" &&
+			format.AudioCodec != "none"
+
+		if format.ID == "" || (!hasVideo && !audioOnly) ||
+			len(candidate.Fragments) > 0 ||
+			(drm != "" && drm != "null" && drm != "false") {
+			continue
+		}
+
+		mediaURL, err := url.Parse(format.URL)
+		if err != nil || mediaURL.Hostname() == "" || mediaURL.User != nil ||
+			(mediaURL.Scheme != "http" && mediaURL.Scheme != "https") {
+			continue
+		}
+		if format.Protocol == "" {
+			format.Protocol = mediaURL.Scheme
+		}
+		if format.Protocol != "http" && format.Protocol != "https" {
+			continue
+		}
+
+		format.HTTPHeaders = make(map[string]string)
+		for name, value := range candidate.HTTPHeaders {
+			if strings.ContainsAny(value, "\r\n\x00") {
+				continue
+			}
+			switch strings.ToLower(name) {
+			case "user-agent", "referer", "origin", "accept", "accept-language":
+				format.HTTPHeaders[name] = value
+			}
+		}
+
+		formats = append(formats, format)
+	}
+	if len(formats) == 0 {
+		return "", nil
+	}
+
+	payload, err := json.Marshal(ytdlpDownloadInfo{
+		Type:         "video",
+		ID:           target.ID,
+		Title:        target.Title,
+		Extractor:    source.Extractor,
+		ExtractorKey: target.ExtractorKey,
+		Formats:      formats,
+	})
+	return string(payload), err
+}
+
+func ParseYtdlpTargets(
+	raw json.RawMessage,
+	originalURL string,
+) ([]YtdlpTarget, error) {
+	var targets []YtdlpTarget
+	if err := collectYtdlpTargets(raw, 0, &targets); err != nil {
+		return nil, err
+	}
+
+	// 기존 단일 영상의 URL 대체 규칙을 유지한다.
+	if len(targets) == 1 && targets[0].WebpageURL == "" {
+		var root struct {
+			Entries    json.RawMessage `json:"entries"`
+			WebpageURL *string         `json:"webpage_url"`
+		}
+		if err := json.Unmarshal(raw, &root); err != nil {
+			return nil, err
+		}
+		if root.Entries == nil && root.WebpageURL == nil {
+			targets[0].WebpageURL = originalURL
+		}
+	}
+
+	seen := make(map[string]struct{}, len(targets))
+	for i := range targets {
+		key, err := ytdlpTargetKey(targets[i])
+		if err != nil {
+			return nil, fmt.Errorf("yt-dlp %d번째 대상 식별 실패: %w", i+1, err)
+		}
+		if _, exists := seen[key]; exists {
+			return nil, fmt.Errorf("yt-dlp 대상 키가 중복됩니다: %s", key)
+		}
+		seen[key] = struct{}{}
+		targets[i].TargetKey = key
+	}
+
+	return targets, nil
+}
+
+var youtubeVideoID = regexp.MustCompile(`^[A-Za-z0-9_-]{11}$`)
+
+// JSON.stringify는 U+2028과 U+2029를 그대로 쓴다.
+// 리터럴 역슬래시는 쌍으로 보존한다.
+var ytdlpJSONEscapes = strings.NewReplacer(
+	`\\`, `\\`,
+	`\u2028`, "\u2028",
+	`\u2029`, "\u2029",
+)
+
+func ytdlpTargetKey(target YtdlpTarget) (string, error) {
+	hasControl := func(r rune) bool { return r < 0x20 || r == 0x7f }
+	if strings.ContainsFunc(target.ID, hasControl) ||
+		strings.ContainsFunc(target.ExtractorKey, hasControl) {
+		return "", fmt.Errorf("대상 식별 정보에 제어 문자가 있습니다")
+	}
+
+	if strings.ContainsFunc(target.WebpageURL, func(r rune) bool {
+		return r <= 0x20 || r == 0x7f
+	}) {
+		return "", ErrInvalidURL
+	}
+
+	page, err := whatwgurl.Parse(target.WebpageURL)
+	if err != nil || (page.Scheme() != "http" && page.Scheme() != "https") ||
+		page.Host() == "" || page.Username() != "" || page.Password() != "" {
+		return "", ErrInvalidURL
+	}
+
+	name := strings.ToLower(target.ExtractorKey)
+	if name == "youtube" {
+		if !youtubeVideoID.MatchString(target.ID) {
+			return "", fmt.Errorf("YouTube 영상 ID가 올바르지 않습니다")
+		}
+		return "youtube:" + target.ID, nil
+	}
+
+	origin := page.Scheme() + "://" + page.Host()
+	identity := [4]any{name, origin, target.ID, nil}
+	if name == "generic" {
+		identity[3] = page.Href(false)
+	}
+
+	var payload bytes.Buffer
+	encoder := json.NewEncoder(&payload)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(identity); err != nil {
+		return "", err
+	}
+
+	encoded := ytdlpJSONEscapes.Replace(strings.TrimSuffix(payload.String(), "\n"))
+	return fmt.Sprintf("ytdlp:v1:%x", sha256.Sum256([]byte(encoded))), nil
+}
+
+func collectYtdlpTargets(
+	raw json.RawMessage,
+	depth int,
+	targets *[]YtdlpTarget,
+) error {
+	if depth > 16 || len(*targets) >= 5000 {
+		return fmt.Errorf("yt-dlp 조회 결과가 처리 한도를 초과했습니다")
+	}
+
+	var row struct {
+		YtdlpTarget
+		Type          string          `json:"_type"`
+		Entries       json.RawMessage `json:"entries"`
+		PlaylistCount *int            `json:"playlist_count"`
+		EntryCount    *int            `json:"n_entries"`
+		IsLive        bool            `json:"is_live"`
+		IsUpcoming    bool            `json:"is_upcoming"`
+		HasDRM        bool            `json:"has_drm"`
+		LiveStatus    string          `json:"live_status"`
+	}
+
+	if err := json.Unmarshal(raw, &row); err != nil {
+		return fmt.Errorf("yt-dlp 대상 해석 실패: %w", err)
+	}
+
+	switch row.Type {
+	case "playlist", "multi_video":
+		var entries []json.RawMessage
+		if err := json.Unmarshal(row.Entries, &entries); err != nil {
+			return fmt.Errorf("yt-dlp 대상 목록 해석 실패: %w", err)
+		}
+		if len(entries) == 0 {
+			return fmt.Errorf("yt-dlp 대상 목록이 비어 있습니다")
+		}
+
+		for _, count := range []*int{row.PlaylistCount, row.EntryCount} {
+			if count != nil && *count != len(entries) {
+				return fmt.Errorf("yt-dlp 대상 목록이 불완전합니다")
+			}
+		}
+
+		for i, entry := range entries {
+			if err := collectYtdlpTargets(entry, depth+1, targets); err != nil {
+				return fmt.Errorf("yt-dlp 목록의 %d번째 항목: %w", i+1, err)
+			}
+		}
+		return nil
+
+	case "", "video":
+		if row.Entries != nil ||
+			strings.TrimSpace(row.ID) == "" ||
+			strings.TrimSpace(row.ExtractorKey) == "" {
+			return fmt.Errorf("yt-dlp 대상의 식별 정보가 올바르지 않습니다")
+		}
+		if row.IsLive || row.IsUpcoming || row.HasDRM ||
+			(row.LiveStatus != "" && row.LiveStatus != "not_live" && row.LiveStatus != "was_live") {
+			return fmt.Errorf("현재 다운로드할 수 없는 yt-dlp 대상입니다")
+		}
+
+		if row.Title == "" {
+			row.Title = row.ID
+		}
+		downloadInfo, err := buildYtdlpDownloadInfo(raw, row.YtdlpTarget)
+		if err != nil {
+			return fmt.Errorf("yt-dlp 다운로드 정보 구성 실패: %w", err)
+		}
+		row.downloadInfo = downloadInfo
+		*targets = append(*targets, row.YtdlpTarget)
+		return nil
+
+	default:
+		return fmt.Errorf("지원하지 않는 yt-dlp 결과 유형 %q", row.Type)
+	}
+}

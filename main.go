@@ -1,0 +1,68 @@
+package main
+
+import (
+	"embed"
+	"os"
+	"path/filepath"
+
+	"log"
+
+	"github.com/Dev-Wonjoon/StorageBucket/internal/desktop"
+	"github.com/wailsapp/wails/v3/pkg/application"
+)
+
+//go:embed all:frontend/dist
+var assets embed.FS
+
+func main() {
+	paths, err := desktop.ResolvePaths(
+		os.Getenv("STORAGEBUCKET_DATA_DIR"),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	services, middleware, closeAll, err := applicationServices(paths)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer closeAll()
+	app := application.New(application.Options{
+		Name:        "StorageBucket",
+		Description: "미디어 다운로드 및 로컬 라이브러리 관리",
+		Services:    services,
+		OnShutdown:  closeAll,
+		Assets: application.AssetOptions{
+			Handler:    application.AssetFileServerFS(assets),
+			Middleware: middleware,
+		},
+		Mac: application.MacOptions{
+			ApplicationShouldTerminateAfterLastWindowClosed: true,
+		},
+		Windows: application.WindowsOptions{
+			WebviewUserDataPath: filepath.Join(paths.Cache, "webview"),
+		},
+	})
+
+	app.Window.NewWithOptions(application.WebviewWindowOptions{
+		Title: "StorageBucket",
+		// Window sized to the golden ratio (1000 / 618 ≈ 1.618).
+		Width:  1000,
+		Height: 618,
+		Mac: application.MacWindow{
+			InvisibleTitleBarHeight: 50,
+			Backdrop:                application.MacBackdropTranslucent,
+			TitleBar:                application.MacTitleBarHiddenInset,
+		},
+		BackgroundColour: application.NewRGB(6, 7, 15),
+		URL:              "/",
+	})
+
+	// Run the application. This blocks until the application has been exited.
+	err = app.Run()
+
+	// If an error occurred while running the application, log it and exit.
+	if err != nil {
+		log.Fatal(err)
+	}
+}
