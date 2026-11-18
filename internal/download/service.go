@@ -26,6 +26,7 @@ type Service struct {
 	active       map[string]context.CancelFunc
 	closed       bool
 	wg           sync.WaitGroup
+	logWarnings  sync.Map
 }
 
 //wails:ignore
@@ -38,6 +39,7 @@ func NewService(db *sql.DB, path func() string, factory func(string, engine.Opti
 }
 
 type Job struct {
+	HistoryOnly      bool            `json:"historyOnly"`
 	ID               string          `json:"id"`
 	URL              string          `json:"url"`
 	Title            *string         `json:"title"`
@@ -48,6 +50,7 @@ type Job struct {
 	CleanupRequired  bool            `json:"cleanupRequired"`
 	CurrentAttemptID *string         `json:"currentAttemptId"`
 	ErrorCode        *string         `json:"errorCode"`
+	ErrorMessage     *string         `json:"errorMessage"`
 }
 type JobRequest struct {
 	JobID string `json:"jobId"`
@@ -86,22 +89,33 @@ func fail(err error) api.Result {
 		code = "REVISION_CONFLICT"
 	case errors.Is(err, engine.ErrInvalidURL):
 		code = "INVALID_ARGUMENT"
+	case errors.Is(err, engine.ErrInstagramURL):
+		code = "UNSUPPORTED_INSTAGRAM_URL"
+	case errors.Is(err, engine.ErrInstagramOptions):
+		code = "UNSUPPORTED_INSTAGRAM_OPTIONS"
 	case errors.Is(err, ErrUnsupportedTargetDiscovery):
 		code = "UNSUPPORTED_TARGET_DISCOVERY"
+	case errors.Is(err, engine.ErrUnsupportedMediaFormat):
+		code = "UNSUPPORTED_MEDIA_FORMAT"
 	case errors.Is(err, engine.ErrStopUnconfirmed):
 		code = "ENGINE_STOP_UNCONFIRMED"
 	}
 	return api.Failure(code, err.Error())
 }
 
-const jobSelect = `SELECT q.id,q.original_url,q.title,q.state,a.phase,q.progress,q.options_json,q.cleanup_required,q.current_attempt_id,q.error_code FROM download_queue q LEFT JOIN download_attempt a ON a.id=q.current_attempt_id`
+const jobSelect = `SELECT q.id,q.original_url,q.title,q.state,a.phase,q.progress,q.options_json,q.cleanup_required,q.current_attempt_id,q.error_code,q.error_message FROM download_queue q LEFT JOIN download_attempt a ON a.id=q.current_attempt_id`
 
 func scanJob(row interface{ Scan(...any) error }) (Job, error) {
 	var j Job
 	var opts string
-	err := row.Scan(&j.ID, &j.URL, &j.Title, &j.State, &j.Phase, &j.Progress, &opts, &j.CleanupRequired, &j.CurrentAttemptID, &j.ErrorCode)
+	err := row.Scan(&j.ID, &j.URL, &j.Title, &j.State, &j.Phase, &j.Progress, &opts, &j.CleanupRequired, &j.CurrentAttemptID, &j.ErrorCode, &j.ErrorMessage)
 	var options engine.Options
-	if json.Unmarshal([]byte(opts), &options) == nil {
+	var flags struct {
+		Imported bool `json:"_importedHistory"`
+	}
+	_ = json.Unmarshal([]byte(opts), &flags)
+	j.HistoryOnly = flags.Imported
+	if !flags.Imported && json.Unmarshal([]byte(opts), &options) == nil {
 		if _, e := initialOptionsJSON(options); e == nil {
 			j.Options = &options
 		}
@@ -201,6 +215,15 @@ func (s *Service) Run(ctx context.Context, req RunRequest) api.Result {
 		s.mu.Unlock()
 		return fail(ErrAlreadyProcessing)
 	}
+	var imported bool
+	if err := s.db.QueryRowContext(ctx, "SELECT coalesce(json_extract(options_json,'$._importedHistory'),0) FROM download_queue WHERE id=?", req.JobID).Scan(&imported); err != nil {
+		s.mu.Unlock()
+		return fail(err)
+	}
+	if imported {
+		s.mu.Unlock()
+		return api.Failure("IMPORTED_HISTORY", "가져오거나 이관한 작업은 보존된 이력입니다. 다시 다운로드하려면 URL을 새로 등록하세요")
+	}
 	if req.Trigger != "manual_initial" {
 		if err := s.retry(ctx, req.JobID, req.Trigger); err != nil {
 			s.mu.Unlock()
@@ -228,16 +251,22 @@ func (s *Service) Run(ctx context.Context, req RunRequest) api.Result {
 	s.wg.Add(1)
 	s.mu.Unlock()
 	defer func() { cancel(); s.mu.Lock(); delete(s.active, req.JobID); s.mu.Unlock(); s.wg.Done() }()
+	journal := newLogRecorder(NewStore(s.db), req.JobID, attempt, func(e error) { s.logWarning(req.JobID, e) })
+	defer journal.close()
+	journal.note("실행 시도 시작 · 엔진 실행 순서를 기다립니다")
+	workCtx = engine.WithOutputObserver(workCtx, journal.write)
 	select {
 	case s.runSlot <- struct{}{}:
 		defer func() { <-s.runSlot }()
 		if workCtx.Err() != nil {
 			err = workCtx.Err()
 		} else {
+			journal.note("다운로드 대상 조회 시작")
 			runner := s.factory(root, opts)
 			discovery, e := runner.DiscoverAttempt(workCtx, req.JobID, attempt, url, opts)
 			err = e
 			if err == nil {
+				journal.note("대상 확정 · 파일 다운로드 시작")
 				_, err = runner.FreezeAndStageAttempt(workCtx, NewStore(s.db), discovery)
 			}
 		}
@@ -255,10 +284,12 @@ func (s *Service) Run(ctx context.Context, req RunRequest) api.Result {
 		}
 		s.mu.Unlock()
 		if err == nil {
-			mediaID, err = s.commit(context.Background(), req.JobID, attempt, root)
+			journal.note("다운로드 결과 검증 및 저장 시작")
+			mediaID, err = s.commit(engine.WithOutputObserver(context.Background(), journal.write), req.JobID, attempt, root)
 		}
 	}
 	if err != nil {
+		journal.note("실행 실패: " + err.Error())
 		code := "DOWNLOAD_ENGINE_FAILED"
 		outcome := "failed"
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
@@ -274,6 +305,18 @@ func (s *Service) Run(ctx context.Context, req RunRequest) api.Result {
 		if errors.Is(err, engine.ErrStopUnconfirmed) {
 			code = "ENGINE_STOP_UNCONFIRMED"
 		}
+		switch {
+		case errors.Is(err, engine.ErrUnsupportedMediaFormat):
+			code = "UNSUPPORTED_MEDIA_FORMAT"
+		case errors.Is(err, engine.ErrAuthenticationRequired):
+			code = "AUTHENTICATION_REQUIRED"
+		case errors.Is(err, engine.ErrAccessDenied):
+			code = "ACCESS_DENIED"
+		case errors.Is(err, engine.ErrMediaUnavailable):
+			code = "MEDIA_UNAVAILABLE"
+		case errors.Is(err, engine.ErrRateLimited):
+			code = "RATE_LIMITED"
+		}
 		if e := s.abort(req.JobID, attempt, root, outcome, code, err.Error(), errors.Is(err, engine.ErrStopUnconfirmed)); e != nil {
 			return api.Failure("CLEANUP_REQUIRED", e.Error())
 		}
@@ -282,6 +325,7 @@ func (s *Service) Run(ctx context.Context, req RunRequest) api.Result {
 	if s.afterCommit != nil {
 		s.afterCommit(mediaID)
 	}
+	journal.note(fmt.Sprintf("다운로드 및 DB 등록 완료 (미디어 %d)", mediaID))
 	return api.Success(map[string]any{"status": "committed", "jobId": req.JobID, "attemptId": attempt, "mediaIdSnapshot": mediaID})
 }
 func (s *Service) Cancel(ctx context.Context, req JobRequest) api.Result {

@@ -1,4 +1,6 @@
 import type { AppApi } from "@contracts/api";
+import { Service as WebServerService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/webserver";
+import { Service as LocalImportService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/localimport";
 import { Service as DownloadService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/download";
 import { Manager as EngineManager } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/engine";
 import type { EngineStatus } from "@contracts/types";
@@ -6,7 +8,7 @@ import { Events } from "@wailsio/runtime";
 import { Service as MediaService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/media";
 import { Service as ThumbnailService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/thumbnail";
 import { Service as SettingsService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/settings";
-import { SystemService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/desktop";
+import { SystemService, Service as DesktopService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/desktop";
 import type { Result } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/api/models";
 
 // The Go bindings describe optional JSON fields as required zero values. Keep
@@ -21,7 +23,26 @@ async function response<T>(pending: Promise<Result>): Promise<T> {
 }
 
 const api: AppApi = {
+    webServer: {
+        status: () => response(WebServerService.Status()),
+        start: () => response(WebServerService.Start()),
+        stop: () => response(WebServerService.Stop()),
+    },
+    localImport: {
+        choose: () => response(LocalImportService.Choose()),
+        get: (request = {}) => response(LocalImportService.Get(wire(request))),
+        run: (request) => response(LocalImportService.Run(wire(request))),
+        cancel: (request) => response(LocalImportService.Cancel(wire(request))),
+        rescan: (request) => response(LocalImportService.Rescan(wire(request))),
+        pause: (request) => response(LocalImportService.Pause(wire(request))),
+        resume: (request) => response(LocalImportService.Resume(wire(request))),
+        files: (request) => response(LocalImportService.Files(wire(request))),
+        retry: (request) => response(LocalImportService.Retry(wire(request))),
+        exclude: (request) => response(LocalImportService.Exclude(wire(request))),
+    },
+    database: { import: () => response(DesktopService.ImportDatabase()) },
     media: {
+        directories: (request = {}) => response(MediaService.Directories(wire(request))),
         list: (request = {}) => response(MediaService.List(wire(request))),
         get: (request) => response(MediaService.Get(wire(request))),
         edit: (request) => response(MediaService.Edit(wire(request))),
@@ -30,6 +51,8 @@ const api: AppApi = {
         suggest: (request) => response(MediaService.Suggest(wire(request))),
     },
     downloads: {
+        remove: (request) => response(DownloadService.Delete(request)),
+        logs: (request) => response(DownloadService.Logs(wire(request))),
         async previewEngine(url, options = {}) {
             const kind = await DownloadService.PreviewEngine(url, {
                 type: options.type ?? "",

@@ -299,7 +299,8 @@ func TestRunnerFreezeAndStageAttempt(t *testing.T) {
 							return nil, fmt.Errorf("yt-dlp 요청 URL 불일치: %q", rawURL)
 						}
 						return json.RawMessage(fmt.Sprintf(`{
-							"id":"BaW_jenozKc","extractor_key":"Youtube","webpage_url":%q
+							"id":"BaW_jenozKc","extractor_key":"Youtube","webpage_url":%q,
+							"format_id":"http","url":"https://cdn.invalid/video.mp4","ext":"mp4","vcodec":"h264","acodec":"aac"
 						}`, youtubeSource)), nil
 					},
 					save: func(target engine.YtdlpTarget, dir string) (string, error) {
@@ -363,5 +364,74 @@ func TestRunnerFreezeAndStageAttempt(t *testing.T) {
 			}
 		})
 
+	}
+}
+
+func TestRunnerGenericPreflight(t *testing.T) {
+	root := downloadTestRoot(t)
+	for _, mode := range []string{"direct", "second-hls", "second-empty", "embedded-hls", "freeze-fails"} {
+		t.Run(mode, func(t *testing.T) {
+			db := openStoreTestDB(t)
+			store := download.NewStore(db)
+			page := "https://example.invalid/page?view=fixture"
+			job, e := store.CreateInitialAttempt(t.Context(), download.InitialAttemptInput{OriginalURL: page, StorageRoot: root})
+			if e != nil {
+				t.Fatal(e)
+			}
+			if mode == "freeze-fails" {
+				execStoreTestSQL(t, db, `CREATE TRIGGER reject_generic BEFORE INSERT ON download_target WHEN NEW.position=1 BEGIN SELECT RAISE(ABORT,'generic fixture'); END`)
+			}
+			var stageCalls int
+			runner := download.Runner{Storage: download.Storage{Root: root}, Ytdlp: stagingYtdlp{
+				ytdlpDiscoverFunc: func(context.Context, string, string) (json.RawMessage, error) {
+					entries := []any{}
+					for i, id := range []string{"one", "two"} {
+						row := map[string]any{"id": id, "extractor_key": "Generic", "webpage_url": page, "format_id": "http", "url": "https://cdn.invalid/" + id + ".mp4", "ext": "mp4", "protocol": "https", "vcodec": "h264", "acodec": "aac"}
+						if mode == "embedded-hls" {
+							row["extractor_key"] = "HTML5MediaEmbed"
+						}
+						if i == 1 && (mode == "second-hls" || mode == "embedded-hls") {
+							row["protocol"] = "m3u8_native"
+						}
+						if i == 1 && mode == "second-empty" {
+							delete(row, "format_id")
+						}
+						entries = append(entries, row)
+					}
+					raw, _ := json.Marshal(map[string]any{"_type": "playlist", "entries": entries, "n_entries": 2})
+					return raw, nil
+				},
+				save: func(target engine.YtdlpTarget, dir string) (string, error) {
+					stageCalls++
+					var frozen int
+					if e := db.QueryRow("SELECT count(*) FROM download_target WHERE attempt_id=?", job.AttemptID).Scan(&frozen); e != nil || frozen != 2 {
+						return "", fmt.Errorf("저장 전 전체 대상 미확정: %d %v", frozen, e)
+					}
+					path := filepath.Join(dir, "media.mp4")
+					return path, os.WriteFile(path, []byte("fixture "+target.ID), 0600)
+				},
+			}}
+			attempt, e := runner.DiscoverAttempt(t.Context(), job.JobID, job.AttemptID, page, engine.Options{})
+			if e != nil {
+				t.Fatal(e)
+			}
+			files, e := runner.FreezeAndStageAttempt(t.Context(), store, attempt)
+			if mode == "direct" {
+				if e != nil || stageCalls != 2 || len(files) != 2 {
+					t.Fatalf("Generic 저장 실패: %v %d %v", files, stageCalls, e)
+				}
+				return
+			}
+			if e == nil || stageCalls != 0 || len(files) != 0 {
+				t.Fatalf("사전 검증 실패 후 저장 실행: %v %d %v", files, stageCalls, e)
+			}
+			if mode != "freeze-fails" && !errors.Is(e, engine.ErrUnsupportedMediaFormat) {
+				t.Fatalf("형식 오류 분류: %v", e)
+			}
+			var count int
+			if e := db.QueryRow("SELECT count(*) FROM download_target WHERE attempt_id=?", job.AttemptID).Scan(&count); e != nil || count != 0 {
+				t.Fatalf("부분 대상 확정: %d %v", count, e)
+			}
+		})
 	}
 }

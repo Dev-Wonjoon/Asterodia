@@ -55,3 +55,11 @@ export function canCancelDownload(job: DownloadJobDto): boolean {
         !job.cleanupRequired
     )
 }
+
+export function canDeleteDownload(job: DownloadJobDto): boolean {
+    return (job.state === 'failed' || job.state === 'cancelled') && !job.cleanupRequired
+}
+
+export function canRetryDownload(job: DownloadJobDto): boolean {
+    return canDeleteDownload(job) && !job.historyOnly && job.options !== null
+}

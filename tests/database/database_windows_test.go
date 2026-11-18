@@ -34,10 +34,10 @@ func TestOpenExisting(t *testing.T) {
 		t.Fatal("실행별 테스트 폴더는 .test-data/database-open 아래에 있어야 합니다")
 	}
 
-	t.Run("v3-connection", func(t *testing.T) {
+	t.Run("v5-connection", func(t *testing.T) {
 		ctx := t.Context()
 		filename := filepath.Join(root, "fixture #한글.sqlite")
-		createSQLiteFixture(t, filename, "PRAGMA user_version = 3",
+		createSQLiteFixture(t, filename, "PRAGMA user_version = 6",
 			"CREATE TABLE parent (id INTEGER PRIMARY KEY)",
 			"CREATE TABLE child (parent_id INTEGER REFERENCES parent(id))",
 			"INSERT INTO parent (id) VALUES (1)",

@@ -1,8 +1,10 @@
 import { DOWNLOAD_PAGE_SIZE } from '../downloadStore'
 import { useDownloadViewModel } from '../useDownloadViewModel'
-import { downloadPlatform, downloadStatus, visibleProgress } from '../downloadPresentation'
+import { canDeleteDownload, downloadPlatform, downloadStatus, visibleProgress } from '../downloadPresentation'
+import { X } from 'lucide-react'
 import { DownloadJobActions } from './DownloadJobActions'
 import { DownloadThumbnail } from './DownloadThumbnail'
+import { ProgressBar } from '@renderer/shared/components/ui/ProgressBar'
 
 export function DownloadQueue(): React.JSX.Element {
     const vm = useDownloadViewModel()
@@ -26,7 +28,7 @@ export function DownloadQueue(): React.JSX.Element {
                         <li
                             key={job.id}
                             className={
-                                'flex items-start gap-4 rounded-xl border bg-[var(--bg-sidebar)] p-4 ' +
+                                'relative flex items-start gap-4 rounded-xl border bg-[var(--bg-sidebar)] p-4 ' +
                                 (selected
                                     ? 'border-[var(--color-primary)]'
                                     : 'border-[var(--border-line)]')
@@ -36,7 +38,7 @@ export function DownloadQueue(): React.JSX.Element {
                                 url={job.url}
                                 title={job.title || '다운로드 썸네일'}
                             />
-                            <div className="min-w-0 flex-1 space-y-2">
+                            <div className={'min-w-0 flex-1 space-y-2' + (canDeleteDownload(job) ? ' pr-7' : '')}>
                                 <p className="truncate text-sm font-medium" title={job.url}>
                                     {job.url}
                                 </p>
@@ -52,13 +54,8 @@ export function DownloadQueue(): React.JSX.Element {
                                     {job.cleanupRequired ? ' · 정리 필요' : ''}
                                     {job.options === null ? ' · 이전 옵션 확인 필요' : ''}
                                 </p>
-                                {progress !== null && (
-                                    <progress
-                                        aria-label="다운로드 진행률"
-                                        value={progress}
-                                        max={100}
-                                        className="h-1.5 w-full accent-[var(--color-primary)]"
-                                    />
+                                {job.state === 'running' && job.phase !== 'finished' && (
+                                    <ProgressBar label="다운로드 진행률" value={progress ?? undefined} />
                                 )}
                                 <div className="flex flex-wrap gap-2">
                                     <button
@@ -80,6 +77,12 @@ export function DownloadQueue(): React.JSX.Element {
                                     </p>
                                 )}
                             </div>
+                            {canDeleteDownload(job) && <button type="button" title="요청 기록 삭제" aria-label="요청 기록 삭제"
+                                disabled={Boolean(vm.deletingIds?.includes(job.id)) || vm.requestedIds.includes(job.id) || vm.cancellingIds.includes(job.id) || vm.batchRetry?.running}
+                                onClick={() => void vm.deleteJob(job.id)}
+                                className="absolute right-2 top-2 rounded-md p-2 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] disabled:opacity-40">
+                                <X className="size-4" aria-hidden="true" />
+                            </button>}
                         </li>
                     )
                 })}

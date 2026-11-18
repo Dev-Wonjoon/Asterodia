@@ -3,6 +3,7 @@ import { useDownloadViewModel } from '../useDownloadViewModel'
 import { downloadPlatform, downloadStatus, visibleProgress } from '../downloadPresentation'
 import { DownloadJobActions } from './DownloadJobActions'
 import { DownloadThumbnail } from './DownloadThumbnail'
+import { DownloadLogPane } from './DownloadLogPane'
 
 export function DownloadDetailPane(): React.JSX.Element | null {
     const vm = useDownloadViewModel()
@@ -52,7 +53,8 @@ export function DownloadDetailPane(): React.JSX.Element | null {
                         임시 파일 정리가 필요합니다. 아래의 정리 버튼으로 처리한 뒤 다시 실행하세요.
                     </p>
                 )}
-                {job.options === null && (
+                {job.historyOnly && <p className="text-sm">가져오거나 이관한 작업 이력입니다. 새 다운로드는 위 URL 입력란에서 등록하세요.</p>}
+                {job.options === null && !job.historyOnly && (
                     <p className="text-sm">
                         이전 다운로드 옵션을 확인해야 다시 실행할 수 있습니다.
                     </p>
@@ -64,7 +66,12 @@ export function DownloadDetailPane(): React.JSX.Element | null {
                         <span className="text-[var(--text-muted)]">오류 코드: {job.errorCode}</span>
                     </p>
                 )}
+                {job.errorMessage && <div className="space-y-1 text-sm">
+                    <p className="font-medium">실제 오류</p>
+                    <pre className="max-h-52 overflow-auto whitespace-pre-wrap break-all rounded bg-[var(--bg-app)] p-3 font-mono text-xs">{job.errorMessage}</pre>
+                </div>}
             </div>
+            <DownloadLogPane key={job.id} jobId={job.id} />
             <div className="flex flex-wrap gap-2">
                 <DownloadJobActions job={job} />
             </div>

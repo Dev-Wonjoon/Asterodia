@@ -3,6 +3,7 @@ package engine
 import (
 	"archive/zip"
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 )
@@ -28,10 +30,14 @@ type binaryDefinition struct {
 	versionArgs     []string
 	downloadURL     string
 	archive         bool
+	sevenZip        bool
+	sha256          string
 }
 
 func binaryDefinitions() []binaryDefinition {
 	return []binaryDefinition{
+		{name: "ffprobe", filename: "ffprobe.exe", versionArgs: []string{"-version"}, downloadURL: "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip", archive: true},
+		{name: "imagemagick", filename: "imagemagick/magick.exe", versionArgs: []string{"-version"}, downloadURL: "https://github.com/ImageMagick/ImageMagick/releases/download/7.1.2-34/ImageMagick-7.1.2-34-portable-Q16-x64.7z", archive: true, sevenZip: true, sha256: "52cc6a441c7884f5ff4274b410c9b90c4b7d54245dcdf4d32988bb4e4df4e5d1"},
 		{
 			name:            "yt-dlp",
 			filename:        "yt-dlp.exe",
@@ -302,7 +308,11 @@ func (m *Manager) Install(
 
 	if definition.archive {
 		report("extracting", 0, nil, "")
-		if err := extractEngineBinary(
+		if definition.sevenZip {
+			if err := extractImageEngine(ctx, downloadPath, filepath.Dir(stagedBinary), definition.sha256); err != nil {
+				return false, err
+			}
+		} else if err := extractEngineBinary(
 			downloadPath,
 			stagedBinary,
 			definition.filename,
@@ -327,6 +337,25 @@ func (m *Manager) Install(
 	}
 
 	report("committing", 0, nil, "")
+	if definition.sevenZip {
+		current := filepath.Dir(destination)
+		previous := filepath.Join(staging, "previous")
+		if info, e := os.Lstat(current); e == nil {
+			if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+				return false, fmt.Errorf("이미지 엔진 경로가 일반 폴더가 아닙니다")
+			}
+			if e = os.Rename(current, previous); e != nil {
+				return false, e
+			}
+		} else if !os.IsNotExist(e) {
+			return false, e
+		}
+		if e := os.Rename(filepath.Dir(stagedBinary), current); e != nil {
+			_ = os.Rename(previous, current)
+			return false, e
+		}
+		return true, nil
+	}
 	if err := replaceEngineBinary(
 		stagedBinary, destination,
 	); err != nil {
@@ -334,6 +363,38 @@ func (m *Manager) Install(
 	}
 
 	return true, nil
+}
+
+func extractImageEngine(ctx context.Context, archive, destination, digest string) error {
+	f, err := os.Open(archive)
+	if err != nil {
+		return err
+	}
+	hash := sha256.New()
+	_, err = io.Copy(hash, f)
+	f.Close()
+	if err != nil {
+		return err
+	}
+	if fmt.Sprintf("%x", hash.Sum(nil)) != digest {
+		return fmt.Errorf("ImageMagick 배포 파일의 SHA-256이 다릅니다")
+	}
+	if err = os.MkdirAll(destination, 0700); err != nil {
+		return err
+	}
+	tar := filepath.Join(os.Getenv("SystemRoot"), "System32", "tar.exe")
+	result, err := new(ProcessRunner).Run(ctx, ProcessRequest{Executable: tar, Directory: destination, Timeout: time.Minute, Arguments: []string{"-tf", archive}})
+	if err != nil {
+		return fmt.Errorf("Windows 압축 도구 확인 실패: %w", err)
+	}
+	for _, name := range strings.Split(result.Stdout, "\n") {
+		name = strings.TrimSpace(name)
+		if name != "" && !filepath.IsLocal(filepath.FromSlash(name)) {
+			return fmt.Errorf("이미지 엔진 압축 경로가 올바르지 않습니다")
+		}
+	}
+	_, err = new(ProcessRunner).Run(ctx, ProcessRequest{Executable: tar, Directory: destination, Timeout: time.Minute, Arguments: []string{"-xf", archive, "-C", destination}})
+	return err
 }
 
 func downloadEngineAsset(

@@ -2,10 +2,16 @@ import type { EngineStatus, EngineInstallProgress, LicenseInfo } from "./types";
 import type { MediaApi } from "./media-api";
 import type { DownloadApi } from "./download-api";
 import type { ThumbnailApi } from "./thumbnail-api";
+import type { DatabaseApi } from "./database-api";
+import type { LocalImportApi } from "./local-import-api";
+import type { WebServerApi } from "./webserver-api";
 
 export type Unsubscribe = () => void;
 
 export interface AppApi {
+    webServer: WebServerApi;
+    localImport: LocalImportApi;
+    database: DatabaseApi;
     media: MediaApi;
     downloads: DownloadApi;
     thumbnails: ThumbnailApi;

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
@@ -84,8 +85,8 @@ func verifyFile(path string, metadata TargetMetadata) (verifiedFile, error) {
 	return v, nil
 }
 
-// A publication intent is recorded before the atomic directory rename. A crash
-// before the DB transaction commits is rolled back from these deterministic paths.
+// Verified work stays private until publication. Each friendly destination is
+// recorded durably before its exclusive move and before the DB commit.
 func (s *Service) commit(ctx context.Context, job, attempt, storage string) (int64, error) {
 	stageRel, finalRel := workPaths(job, attempt)
 	base, err := filepath.EvalSymlinks(storage)
@@ -188,6 +189,32 @@ func (s *Service) commit(ctx context.Context, job, attempt, storage string) (int
 			}
 		}
 	}
+	previousPaths := make([]string, len(files))
+	for i := range files {
+		previousPaths[i] = files[i].final
+	}
+	files, err = (Storage{Root: base}).publish(root, job, attempt, files)
+	if err != nil {
+		return 0, err
+	}
+	tx, err = s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	for i, v := range files {
+		if err = requireOne(tx.ExecContext(ctx, "UPDATE download_target SET final_path=? WHERE id=? AND attempt_id=? AND state='verified' AND final_path=?", v.final, v.id, attempt, previousPaths[i])); err != nil {
+			tx.Rollback()
+			return 0, err
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		return 0, err
+	}
+	release, err := holdPublished(root, job, attempt, files)
+	if err != nil {
+		return 0, err
+	}
+	defer release()
 	return s.register(ctx, job, attempt, files)
 }
 func (s *Service) register(ctx context.Context, job, attempt string, files []verifiedFile) (int64, error) {
@@ -248,6 +275,14 @@ func (s *Service) register(ctx context.Context, job, attempt string, files []ver
 	}
 	for _, v := range files {
 		var platformID any
+		directoryPath, directoryKey, e := media.CanonicalPath(filepath.Dir(v.final))
+		if e != nil {
+			return 0, e
+		}
+		directoryID, e := media.NewStore(tx).EnsureDirectory(ctx, directoryPath, directoryKey, 1, false)
+		if e != nil {
+			return 0, e
+		}
 		if v.metadata.PlatformName != "" {
 			if _, err = tx.ExecContext(ctx, "INSERT INTO platform(name) VALUES(?) ON CONFLICT(name) DO NOTHING", v.metadata.PlatformName); err != nil {
 				return 0, err
@@ -269,7 +304,7 @@ func (s *Service) register(ctx context.Context, job, attempt string, files []ver
 			}
 			profileID = id
 		}
-		if _, err = tx.ExecContext(ctx, `INSERT INTO media_file(media_id,file_key,storage_kind,source_url,external_id,platform_id,profile_id,title,filepath,filesize,mtime_ns,hash_algorithm,content_hash,kind,position,duration,detected_format,width,height,created_at) VALUES(?,?,'app_managed',?,?,?,?,?,?,?,?, 'sha256',?,?,?,?,?,?,?,?)`, mediaID, v.key, v.source, v.metadata.ExternalID, platformID, profileID, v.metadata.Title, v.final, v.size, fmt.Sprint(v.mtime), v.hash, v.metadata.Kind, v.position, v.metadata.Duration, v.format, v.width, v.height, now); err != nil {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO media_file(media_id,file_key,storage_kind,directory_id,source_url,external_id,platform_id,profile_id,title,filepath,filesize,mtime_ns,hash_algorithm,content_hash,kind,position,duration,detected_format,width,height,created_at) VALUES(?,?,'app_managed',?,?,?,?,?,?,?,?,?, 'sha256',?,?,?,?,?,?,?,?)`, mediaID, v.key, directoryID, v.source, v.metadata.ExternalID, platformID, profileID, v.metadata.Title, v.final, v.size, fmt.Sprint(v.mtime), v.hash, v.metadata.Kind, v.position, v.metadata.Duration, v.format, v.width, v.height, now); err != nil {
 			return 0, err
 		}
 	}
@@ -362,6 +397,9 @@ func removeWorkspace(storage, job, attempt string) error {
 		return err
 	}
 	defer root.Close()
+	if err = (Storage{Root: storage}).removePublished(root, job, attempt, ""); err != nil {
+		return err
+	}
 	stage, final := workPaths(job, attempt)
 	for _, rel := range []string{stage, final} {
 		// Reject changed parent paths instead of following a reparse point.

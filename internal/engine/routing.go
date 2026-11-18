@@ -51,6 +51,15 @@ func Select(rawURL string, options Options) (Kind, error) {
 			return "", ErrInvalidURL
 		}
 	}
+	if host == "instagram.com" || strings.HasSuffix(host, ".instagram.com") {
+		if _, err := instagramShortcode(rawURL); err != nil {
+			return "", err
+		}
+		if (options.Type != "" && options.Type != "video") || (options.Quality != "" && options.Quality != "best") || options.Extension != "" {
+			return "", ErrInstagramOptions
+		}
+		return KindGalleryDL, nil
+	}
 
 	if options.Type == "audio" ||
 		options.Quality == "audio" ||

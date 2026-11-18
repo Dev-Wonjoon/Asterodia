@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { getApi } from '@renderer/shared/api'
 import { useToast } from '@renderer/shared/hooks/useToast'
 import { MediaPreview } from '@renderer/shared/components/media/MediaPreview'
+import { MediaPlayer } from '@renderer/shared/components/media/MediaPlayer'
 import { MEDIA_PAGE_SIZE, type GallerySnapshot, type GalleryStore } from './galleryStore'
 import { MediaThumbnailStatus } from './MediaThumbnailStatus'
 
@@ -390,6 +391,7 @@ export function MediaDetailPane({
                                 key={file.id}
                                 className="flex flex-col gap-3 rounded-lg border border-[var(--border-line)] p-3"
                             >
+                                {(file.kind === 'video' || file.kind === 'audio') && <MediaPlayer key={`${file.id}:${data.revision}`} path={file.filepath} kind={file.kind} title={file.title ?? file.fileKey} poster={file.thumbnailPath} />}
                                 <MediaPreview
                                     path={
                                         file.thumbnailPath ??
@@ -400,9 +402,7 @@ export function MediaDetailPane({
                                     className="aspect-video w-full rounded bg-[var(--bg-active)] object-contain"
                                 />
 
-                                {data.sourceKind === 'download' &&
-                                    file.storageKind === 'app_managed' &&
-                                    (file.kind === 'video' || file.kind === 'audio') &&
+                                {(file.kind === 'video' || file.kind === 'image') &&
                                     file.thumbnailPath === null && (
                                         <MediaThumbnailStatus
                                             key={`${data.id}:${file.id}:${data.revision}`}

@@ -105,6 +105,9 @@ export interface MediaFileDto {
     id: number
     mediaId: number
     fileKey: string
+    fileUuid: string
+    filenameToken: string
+    directoryId: number | null
     storageKind: MediaStorageKind
     sourceUrl: string | null
     title: string | null
@@ -125,6 +128,20 @@ export interface MediaFileDto {
     thumbnailOrigin: 'none' | 'app_generated' | 'unverified_legacy'
     previewPath: string | null
     createdAt: number
+}
+
+export interface MediaDirectoryDto {
+    id: number
+    directoryPath: string
+    keyVersion: 0 | 1
+    importMediaId: number | null
+    fileCount: number
+    mediaCount: number
+}
+export interface MediaDirectoryListRequest {
+    limit?: number
+    offset?: number
+    keyword?: string
 }
 
 export interface MediaPage<T> {

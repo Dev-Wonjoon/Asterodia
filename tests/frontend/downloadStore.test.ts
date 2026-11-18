@@ -70,6 +70,12 @@ function fixture() {
   let serial = 0
 
   const api = {
+    remove: vi.fn<DownloadApi['remove']>(async ({ jobId }) => {
+      const index = rows.findIndex(row => row.id === jobId)
+      if (index < 0) return fail('NOT_FOUND')
+      rows.splice(index, 1)
+      return ok({ accepted: true })
+    }),
     enqueue: vi.fn<DownloadApi['enqueue']>(
       async (request) => {
         const row = {
@@ -888,4 +894,128 @@ describe('download detail selection', () => {
         await read
         expect(store.getSnapshot()).toBe(snapshot)
     })
+})
+
+describe('download history deletion and bulk retry', () => {
+  it('deletes once, closes its detail and moves back from an empty last page', async () => {
+    const f = fixture()
+    f.rows.push(...Array.from({ length: 51 }, (_, i) => job(String(i), 'failed')))
+    const { store } = open(f); await flush(); await store.refresh(50); await store.openDetail('50')
+    const pending = deferred<DownloadResponse<{ accepted: true }>>()
+    f.api.remove.mockImplementationOnce(() => pending.promise)
+    const deleting = store.deleteJob('50'); await store.deleteJob('50'); await store.runJob('50', 'manual_retry')
+    expect(f.api.remove).toHaveBeenCalledTimes(1); expect(f.api.run).not.toHaveBeenCalled()
+    expect(store.getSnapshot().deletingIds).toEqual(['50'])
+    f.rows.pop(); pending.resolve(ok({ accepted: true })); await deleting
+    expect(store.getSnapshot().offset).toBe(0); expect(store.getSnapshot().queue).toHaveLength(50)
+    expect(store.getSnapshot().detail.jobId).toBeNull(); expect(store.getSnapshot().deletingIds).toEqual([])
+  })
+
+  it('keeps history on a rejection/transport error and ignores a stale list after deletion', async () => {
+    const f = fixture(); f.rows.push(job('one', 'cancelled'))
+    const { store, notices } = open(f); await flush(); await store.openDetail('one')
+    f.api.remove.mockResolvedValueOnce(fail('CLEANUP_REQUIRED')); await store.deleteJob('one')
+    expect(store.getSnapshot().detail.jobId).toBe('one'); expect(notices.at(-1)?.message).toBe('CLEANUP_REQUIRED')
+    f.api.remove.mockRejectedValueOnce(new Error('offline')); await store.deleteJob('one')
+    expect(store.getSnapshot().queue).toHaveLength(1); expect(store.getSnapshot().deletingIds).toEqual([])
+    const pending = deferred<DownloadResponse<DownloadPageDto>>(); f.api.list.mockReturnValueOnce(pending.promise)
+    const stale = store.refresh(); await store.deleteJob('one')
+    pending.resolve(ok({ data: [job('one', 'cancelled')], limit: 50, offset: 0, hasNextPage: false })); await stale
+    expect(store.getSnapshot().queue).toEqual([]); expect(store.getSnapshot().detail.jobId).toBeNull()
+  })
+
+  it('retries failed/cancelled requests across pages with the correct trigger and skips ineligible history', async () => {
+    const f = fixture()
+    f.rows.push(...Array.from({ length: 205 }, (_, i) => job(String(i), i % 2 ? 'failed' : 'cancelled')))
+    f.rows[0].cleanupRequired = true; f.rows[1].historyOnly = true; f.rows[2].options = null
+    f.rows[3].state = 'interrupted'; f.rows[4].state = 'completed'
+    const { store, notices } = open(f); await flush(); await store.retryAll()
+    expect(f.api.list).toHaveBeenCalledWith({ limit: 200, offset: 200 })
+    expect(f.api.run).toHaveBeenCalledTimes(200)
+    expect(f.api.run).toHaveBeenCalledWith({ jobId: '5', trigger: 'manual_retry' })
+    expect(f.api.run).toHaveBeenCalledWith({ jobId: '204', trigger: 'manual_restart' })
+    expect(store.getSnapshot().batchRetry).toEqual({ running: false, total: 200, processed: 200, failed: 0, skipped: 3 })
+    expect(notices.filter(n => n.type === 'success')).toHaveLength(0)
+  })
+
+  it('runs sequentially once per snapshot, blocks duplicate actions and continues after a normal download failure', async () => {
+    const f = fixture(); f.rows.push(job('first', 'failed'), job('second', 'cancelled'))
+    const pending = deferred<DownloadResponse<DownloadRunDto>>(); f.api.run.mockReturnValueOnce(pending.promise)
+    const { store } = open(f); await flush()
+    const batch = store.retryAll(); await flush()
+    expect(store.getSnapshot().requestedIds).toEqual(expect.arrayContaining(['first', 'second']))
+    await store.retryAll(); await store.runJob('second', 'manual_restart'); await store.deleteJob('first'); await store.deleteJob('second')
+    expect(f.api.run).toHaveBeenCalledTimes(1); expect(f.api.remove).not.toHaveBeenCalled()
+    pending.resolve(fail('DOWNLOAD_ENGINE_FAILED')); await batch
+    expect(f.api.run).toHaveBeenCalledTimes(2)
+    expect(store.getSnapshot().batchRetry).toEqual({ running: false, total: 2, processed: 2, failed: 1, skipped: 0 })
+    expect(store.getSnapshot().requestedIds).toEqual([])
+    expect(f.rows[0].state).toBe('failed')
+  })
+
+  it('stops on unknown execution state and releases the remaining reservations', async () => {
+    const f = fixture(); f.rows.push(job('first', 'failed'), job('second', 'failed'))
+    f.api.run.mockRejectedValueOnce(new Error('unknown response'))
+    const { store } = open(f); await flush(); await store.retryAll()
+    expect(f.api.run).toHaveBeenCalledTimes(1); expect(store.getSnapshot().halted).not.toBeNull()
+    expect(store.getSnapshot().requestedIds).toEqual([]); expect(store.getSnapshot().batchRetry?.running).toBe(false)
+    await store.retryAll(); expect(f.api.run).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not execute a partial snapshot when paging fails and handles zero eligible requests', async () => {
+    const f = fixture(); f.rows.push(job('first', 'failed'))
+    const { store } = open(f); await flush()
+    f.api.list.mockResolvedValueOnce(ok({ data: [job('first', 'failed')], limit: 200, offset: 0, hasNextPage: true })).mockResolvedValueOnce(fail('DATABASE_ERROR'))
+    await store.retryAll(); expect(f.api.run).not.toHaveBeenCalled(); expect(store.getSnapshot().batchRetry?.running).toBe(false)
+    f.api.list.mockRejectedValueOnce(new Error('offline')); await store.retryAll(); expect(f.api.run).not.toHaveBeenCalled()
+    f.api.list.mockResolvedValueOnce(ok({ data: [], limit: 200, offset: 0, hasNextPage: true })); await store.retryAll(); expect(f.api.run).not.toHaveBeenCalled()
+    f.rows[0].state = 'completed'; await store.retryAll()
+    expect(store.getSnapshot().batchRetry).toEqual({ running: false, total: 0, processed: 0, failed: 0, skipped: 0 })
+  })
+
+  it('deduplicates overlapping pages and skips requests already being executed', async () => {
+    const f = fixture(); f.rows.push(job('active', 'failed'), job('other', 'failed'))
+    const pending = deferred<DownloadResponse<DownloadRunDto>>(); f.api.run.mockReturnValueOnce(pending.promise)
+    const { store } = open(f); await flush(); const manual = store.runJob('active', 'manual_retry')
+    f.api.list.mockResolvedValueOnce(ok({ data: [job('active', 'failed'), job('other', 'failed')], limit: 200, offset: 0, hasNextPage: true })).mockResolvedValueOnce(ok({ data: [job('other', 'failed')], limit: 200, offset: 2, hasNextPage: false }))
+    await store.retryAll()
+    expect(f.api.run).toHaveBeenCalledTimes(2); expect(store.getSnapshot().batchRetry?.skipped).toBe(1)
+    pending.resolve(fail('DOWNLOAD_ENGINE_FAILED')); await manual
+  })
+
+  it('clears an interrupted collection on disconnect and permits a new batch after reconnect', async () => {
+    const f = fixture(); f.rows.push(job('one', 'failed'))
+    const { store, stop } = open(f); await flush()
+    const pending = deferred<DownloadResponse<DownloadPageDto>>(); f.api.list.mockReturnValueOnce(pending.promise)
+    const batch = store.retryAll(); stop()
+    expect(store.getSnapshot().batchRetry?.running).toBe(false)
+    const stopAgain = store.connect(() => {}); stops.push(stopAgain); await flush()
+    await store.retryAll(); pending.resolve(ok({ data: [job('one', 'failed')], limit: 200, offset: 0, hasNextPage: false })); await batch
+    expect(f.api.run).toHaveBeenCalledTimes(1); expect(store.getSnapshot().requestedIds).toEqual([])
+  })
+
+  it('does not start the next request when the provider disconnects during execution', async () => {
+    const f = fixture(); f.rows.push(job('first', 'failed'), job('second', 'failed'))
+    const pending = deferred<DownloadResponse<DownloadRunDto>>(); f.api.run.mockReturnValueOnce(pending.promise)
+    const { store, stop } = open(f); await flush(); const batch = store.retryAll(); await flush()
+    stop(); pending.resolve(ok({ status: 'committed', jobId: 'first', attemptId: 'new-first', mediaIdSnapshot: 1 })); await batch
+    expect(f.api.run).toHaveBeenCalledTimes(1); expect(store.getSnapshot().requestedIds).toEqual([])
+    expect(store.getSnapshot().batchRetry?.running).toBe(false)
+    await store.deleteJob('second'); expect(f.api.remove).not.toHaveBeenCalled()
+  })
+
+  it('does not reserve a request while its deletion or cancellation response is pending', async () => {
+    for (const operation of ['delete', 'cancel'] as const) {
+      const f = fixture(); f.rows.push(job('busy', 'failed'), job('other', 'cancelled'))
+      const pending = deferred<DownloadResponse<{ accepted: true }>>()
+      if (operation === 'delete') f.api.remove.mockReturnValueOnce(pending.promise)
+      else f.api.cancel.mockReturnValueOnce(pending.promise)
+      const { store } = open(f); await flush()
+      const request = operation === 'delete' ? store.deleteJob('busy') : store.cancelDownload('busy')
+      await store.retryAll()
+      expect(f.api.run).toHaveBeenCalledTimes(1); expect(f.api.run).toHaveBeenCalledWith({ jobId: 'other', trigger: 'manual_restart' })
+      expect(store.getSnapshot().batchRetry?.skipped).toBe(1)
+      pending.resolve(ok({ accepted: true })); await request
+    }
+  })
 })

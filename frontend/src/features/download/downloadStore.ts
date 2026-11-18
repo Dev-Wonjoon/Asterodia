@@ -6,6 +6,7 @@ import type {
     ManualDownloadTrigger
 } from '@contracts/download-api'
 import type { DownloadJobOptions } from '@contracts/download-api'
+import { canRetryDownload, downloadTrigger } from './downloadPresentation'
 
 export const DOWNLOAD_PAGE_SIZE = 50
 
@@ -27,6 +28,8 @@ export interface DownloadSnapshot {
     hasNextPage: boolean
     requestedIds: string[]
     cancellingIds: string[]
+    deletingIds: string[]
+    batchRetry: { running: boolean; total: number; processed: number; failed: number; skipped: number } | null
     detail: {
         jobId: string | null
         data: DownloadJobDto | null
@@ -43,6 +46,8 @@ export interface DownloadStore {
     startDownload(url: string, options?: DownloadJobOptions): Promise<DownloadResponse<DownloadJobDto>>
     runJob(jobId: string, trigger: ManualDownloadTrigger): Promise<void>
     cancelDownload(jobId: string): Promise<void>
+    deleteJob(jobId: string): Promise<void>
+    retryAll(): Promise<void>
     openDetail(jobId: string): Promise<void>
     closeDetail(): void
 }
@@ -66,12 +71,16 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000): DownloadSt
         hasNextPage: false,
         requestedIds: [],
         cancellingIds: [],
+        deletingIds: [],
+        batchRetry: null,
         detail: { jobId: null, data: null, loading: false, error: null }
     }
 
     const listeners = new Set<() => void>()
     const requested = new Set<string>()
     const cancelling = new Set<string>()
+    const deleting = new Set<string>()
+    const batchPending = new Set<string>()
     const completed = new Set<string>()
 
     const observed = new Map<
@@ -99,6 +108,10 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000): DownloadSt
                 // 다른 구독자에게 계속 전달한다.
             }
         }
+    }
+
+    function publishRequested() {
+        publish({ requestedIds: [...new Set([...requested, ...batchPending])] })
     }
 
     function notice(message: string, type: DownloadNotice['type']) {
@@ -241,6 +254,10 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000): DownloadSt
             }
 
             const page = structuredClone(result.data)
+            if (page.data.length === 0 && page.offset > 0) {
+                await refresh(Math.max(0, page.offset - DOWNLOAD_PAGE_SIZE))
+                return
+            }
 
             for (const job of page.data) {
                 observe(job)
@@ -249,6 +266,7 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000): DownloadSt
             const keep = new Set([
                 ...page.data.map((job) => job.id),
                 ...requested,
+                ...batchPending,
                 ...(snapshot.detail.jobId ? [snapshot.detail.jobId] : [])
             ])
 
@@ -289,13 +307,13 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000): DownloadSt
         notice(message, 'error')
     }
 
-    async function runJob(jobId: string, trigger: ManualDownloadTrigger) {
-        if (!connected || !snapshot.ready || snapshot.halted || requested.has(jobId)) {
+    async function executeJob(jobId: string, trigger: ManualDownloadTrigger, quiet: boolean) {
+        if (!connected || !snapshot.ready || snapshot.halted || requested.has(jobId) || batchPending.has(jobId) || deleting.has(jobId) || cancelling.has(jobId)) {
             return
         }
 
         requested.add(jobId)
-        publish({ requestedIds: [...requested] })
+        publishRequested()
 
         try {
             // 순차 실행은 main의 DownloadService가 소유한다.
@@ -311,7 +329,7 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000): DownloadSt
                     ].includes(result.error.code)
                 ) {
                     halt('실행 상태를 확인해야 하므로 추가 실행 요청을 보류했습니다.')
-                } else {
+                } else if (!quiet) {
                     notice(result.error.message, 'error')
                 }
             } else if (result.data.status === 'blocked') {
@@ -319,15 +337,96 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000): DownloadSt
             } else if (result.data.status === 'committed') {
                 commit(result.data.jobId, result.data.attemptId)
 
-                notice('다운로드 등록이 완료되었습니다.', 'success')
-            } else {
+                if (!quiet) notice('다운로드 등록이 완료되었습니다.', 'success')
+            } else if (!quiet) {
                 notice('이번 실행은 정리가 필요합니다. 작업 목록을 확인하세요.', 'info')
             }
+            return result.ok && result.data.status === 'committed'
         } catch {
             halt('실행 응답을 받지 못했습니다. 결과 확인 전까지 추가 실행 요청을 보류합니다.')
+            return false
         } finally {
             requested.delete(jobId)
-            publish({ requestedIds: [...requested] })
+            publishRequested()
+            await refresh()
+        }
+    }
+
+    async function runJob(jobId: string, trigger: ManualDownloadTrigger) {
+        await executeJob(jobId, trigger, false)
+    }
+
+    async function retryAll() {
+        if (!connected || !snapshot.ready || snapshot.halted || snapshot.batchRetry?.running) return
+        const ownGeneration = generation
+        const targets: { id: string; trigger: ManualDownloadTrigger }[] = []
+        const seen = new Set<string>()
+        const counts = { total: 0, processed: 0, failed: 0, skipped: 0 }
+        publish({ batchRetry: { running: true, ...counts } })
+        try {
+            // Take one snapshot before running: failures are never added back to this batch.
+            for (let offset = 0; ; ) {
+                const result = await api.list({ limit: 200, offset })
+                if (!connected || generation !== ownGeneration) return
+                if (!result.ok) { notice(result.error.message, 'error'); return }
+                for (const job of result.data.data) {
+                    if (seen.has(job.id)) continue
+                    seen.add(job.id)
+                    if (job.state !== 'failed' && job.state !== 'cancelled') continue
+                    if (!canRetryDownload(job) || requested.has(job.id) || cancelling.has(job.id) || deleting.has(job.id)) {
+                        counts.skipped++
+                        continue
+                    }
+                    targets.push({ id: job.id, trigger: downloadTrigger(job)! })
+                }
+                if (!result.data.hasNextPage) break
+                if (result.data.data.length === 0) throw new Error('empty retry page')
+                offset += result.data.data.length
+            }
+            counts.total = targets.length
+            for (const target of targets) batchPending.add(target.id)
+            publishRequested()
+            publish({ batchRetry: { running: true, ...counts } })
+            for (const target of targets) {
+                if (!connected || generation !== ownGeneration || !snapshot.ready || snapshot.halted) break
+                batchPending.delete(target.id)
+                const success = await executeJob(target.id, target.trigger, true)
+                if (!connected || generation !== ownGeneration) return
+                counts.processed++
+                if (success === false) counts.failed++
+                if (success === undefined) counts.skipped++
+                publish({ batchRetry: { running: true, ...counts } })
+            }
+            notice(`일괄 재시도 ${counts.processed}/${counts.total}건 처리 · 실패 ${counts.failed}건 · 제외 ${counts.skipped}건`, counts.failed || snapshot.halted ? 'error' : 'info')
+        } catch {
+            if (connected && generation === ownGeneration) notice('일괄 재시도 대상을 확인하지 못했습니다. 작업 목록을 새로고침해 주세요.', 'error')
+        } finally {
+            if (generation === ownGeneration) {
+                batchPending.clear()
+                publishRequested()
+                publish({ batchRetry: { running: false, ...counts } })
+            }
+        }
+    }
+
+    async function deleteJob(jobId: string) {
+        if (!connected || deleting.has(jobId) || requested.has(jobId) || cancelling.has(jobId) || snapshot.batchRetry?.running) return
+        deleting.add(jobId)
+        ++readSerial
+        publish({ deletingIds: [...deleting] })
+        try {
+            const result = await api.remove({ jobId })
+            if (!result.ok) { notice(result.error.message, 'error'); return }
+            ++readSerial
+            if (snapshot.detail.jobId === jobId) closeDetail()
+            observed.delete(jobId)
+            publish({ queue: snapshot.queue.filter(job => job.id !== jobId) })
+            notice('요청 기록을 삭제했습니다.', 'info')
+        } catch {
+            notice('삭제 응답을 받지 못했습니다. 작업 목록을 다시 확인하세요.', 'error')
+        } finally {
+            deleting.delete(jobId)
+            publish({ deletingIds: [...deleting] })
             await refresh()
         }
     }
@@ -462,6 +561,9 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000): DownloadSt
                 }
 
                 timer = undefined
+                batchPending.clear()
+                if (snapshot.batchRetry) publish({ batchRetry: { ...snapshot.batchRetry, running: false } })
+                publishRequested()
 
                 publish({
                     ready: false,
@@ -474,6 +576,8 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000): DownloadSt
         startDownload,
         runJob,
         cancelDownload,
+        deleteJob,
+        retryAll,
         openDetail,
         closeDetail
     }

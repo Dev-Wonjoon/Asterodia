@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"strings"
 
@@ -151,8 +152,10 @@ func (a AttemptDiscovery) targetInputs() ([]TargetInput, error) {
 
 		targets := make([]TargetInput, 0, len(a.YtdlpTargets))
 		for _, target := range a.YtdlpTargets {
-			if strings.EqualFold(target.ExtractorKey, "generic") {
-				return nil, fmt.Errorf("%w: yt-dlp Generic", ErrUnsupportedTargetDiscovery)
+			// Generic can delegate HTML pages to an embedded-media extractor.
+			// Validate the entire resolved list before freezing or saving any entry.
+			if err := target.ValidateDirectDownload(a.Options); err != nil {
+				return nil, err
 			}
 			targets = append(targets, TargetInput{
 				TargetKey: target.TargetKey,
@@ -171,38 +174,16 @@ func (a AttemptDiscovery) targetInputs() ([]TargetInput, error) {
 		return targets, nil
 
 	case engine.KindGalleryDL:
-		key, err := a.GalleryResult.InstagramTargetKey(a.OriginalURL)
+		media, err := a.GalleryResult.InstagramTargets(a.OriginalURL)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %v", ErrUnsupportedTargetDiscovery, err)
 		}
 
-		var file struct {
-			TypeName  string `json:"typename"`
-			Shortcode string `json:"post_shortcode"`
-			Extension string `json:"extension"`
+		targets := make([]TargetInput, 0, len(media))
+		for _, item := range media {
+			targets = append(targets, TargetInput{TargetKey: item.TargetKey, SourceURL: a.OriginalURL, Metadata: TargetMetadata{Kind: item.Kind, Title: item.Title, ExternalID: item.MediaID, PlatformName: "Instagram", OwnerID: item.OwnerID, OwnerName: item.OwnerName}})
 		}
-		if err := json.Unmarshal(a.GalleryResult.Files[0].Metadata, &file); err != nil {
-			return nil, fmt.Errorf("gallery-dl 대상 메타데이터 해석 실패: %w", err)
-		}
-		extension := strings.ToLower(file.Extension)
-		if file.TypeName != "GraphImage" ||
-			(extension != "jpg" && extension != "jpeg" && extension != "png") {
-			return nil, fmt.Errorf("%w: gallery-dl 단일 JPEG 또는 PNG 이미지가 필요합니다",
-				ErrUnsupportedTargetDiscovery)
-		}
-
-		// InstagramTargetKey가 검증한 instagram:<post_id>:<media_id>의 마지막 필드입니다.
-		mediaID := key[strings.LastIndexByte(key, ':')+1:]
-		return []TargetInput{{
-			TargetKey: key,
-			SourceURL: a.OriginalURL,
-			Metadata: TargetMetadata{
-				Kind:         "image",
-				Title:        "Instagram " + file.Shortcode,
-				ExternalID:   mediaID,
-				PlatformName: "Instagram",
-			},
-		}}, nil
+		return targets, nil
 
 	default:
 		return nil, fmt.Errorf("%w: %q", ErrUnsupportedTargetDiscovery, a.Engine)
@@ -245,11 +226,23 @@ func (r Runner) StageAttempt(ctx context.Context, attempt AttemptDiscovery) ([]S
 
 	case engine.KindGalleryDL:
 		var err error
-		paths, err = attempt.GalleryResult.SaveImages(ctx, attempt.stageDir)
+		discovery := attempt.GalleryResult
+		if parsed, e := url.Parse(attempt.OriginalURL); e == nil && (strings.EqualFold(parsed.Hostname(), "instagram.com") || strings.EqualFold(parsed.Hostname(), "www.instagram.com")) {
+			targets, e := discovery.InstagramTargets(attempt.OriginalURL)
+			if e != nil {
+				return nil, e
+			}
+			files := make([]engine.GalleryDLFile, 0, len(targets))
+			for _, target := range targets {
+				files = append(files, discovery.Files[target.FileIndex])
+			}
+			discovery.Files = files
+		}
+		paths, err = discovery.SaveMedia(ctx, attempt.stageDir)
 		if err != nil {
 			return nil, err
 		}
-		if len(paths) != len(attempt.GalleryResult.Files) {
+		if len(paths) != len(discovery.Files) {
 			return nil, fmt.Errorf("gallery-dl 저장 결과 수가 조회 대상 수와 다릅니다")
 		}
 

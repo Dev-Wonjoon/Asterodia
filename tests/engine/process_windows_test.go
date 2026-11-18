@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -177,6 +178,13 @@ func TestProcessFixture(t *testing.T) {
 		}
 
 		time.Sleep(time.Minute)
+	case "stream-success":
+		chunk := strings.Repeat("x", 64<<10)
+		for i := 0; i < 300; i++ {
+			fmt.Println(chunk)
+		}
+		fmt.Println("last-stream-line")
+		fmt.Fprintln(os.Stderr, "stream diagnostic tail")
 
 	case "parent":
 		child := exec.Command(
@@ -227,6 +235,33 @@ func TestProcessFixture(t *testing.T) {
 	}
 
 	os.Exit(0)
+}
+
+func TestProcessStreamsDiagnosticsWithBoundedCapture(t *testing.T) {
+	req := processRequestForTest(t, "stream-success")
+	req.StreamOutput = true
+	var mu sync.Mutex
+	var bytes int
+	var stderr bool
+	ctx := engine.WithOutputObserver(t.Context(), func(output engine.Output) {
+		mu.Lock()
+		defer mu.Unlock()
+		if output.Stream == "stdout" {
+			bytes += len(output.Text)
+		}
+		if output.Stream == "stderr" && output.Text == "stream diagnostic tail" {
+			stderr = true
+		}
+	})
+	result, err := new(engine.ProcessRunner).Run(ctx, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if bytes < 16<<20 || !stderr || len(result.Stdout) > 64<<10 || !strings.Contains(result.Stdout, "last-stream-line") || !strings.Contains(result.Stderr, "stream diagnostic tail") {
+		t.Fatalf("스트리밍/보관 한도 오류: bytes=%d captured=%d stderr=%v", bytes, len(result.Stdout), stderr)
+	}
 }
 
 func TestProcessRunnerResults(t *testing.T) {

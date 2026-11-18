@@ -68,6 +68,12 @@ func (r *ProcessRunner) ReadVersion(
 		!strings.HasPrefix(version, "ffmpeg version ") {
 		return "", fmt.Errorf("FFmpeg 버전 응답이 올바르지 않습니다")
 	}
+	if name == "ffprobe" && !strings.HasPrefix(version, "ffprobe version ") {
+		return "", fmt.Errorf("FFprobe 버전 응답이 올바르지 않습니다")
+	}
+	if name == "imagemagick" && !strings.HasPrefix(version, "Version: ImageMagick 7.1.2-34 ") {
+		return "", fmt.Errorf("ImageMagick 7.1.2-34가 필요합니다")
+	}
 
 	if definition.expectedVersion != "" &&
 		version != definition.expectedVersion {
@@ -122,7 +128,29 @@ func (r *ProcessRunner) Run(
 
 	ctx, cancel := context.WithTimeout(ctx, request.Timeout)
 	defer cancel()
-
+	observer, _ := ctx.Value(outputKey{}).(func(Output))
+	if observer != nil {
+		name := strings.TrimSuffix(strings.ToLower(filepath.Base(request.Executable)), ".exe")
+		wrap := func(stream string, next func(string) error) func(string) error {
+			return func(line string) error {
+				observer(Output{Engine: name, Stream: stream, Text: line})
+				if next != nil {
+					return next(line)
+				}
+				return nil
+			}
+		}
+		request.OnStdoutLine = wrap("stdout", request.OnStdoutLine)
+		request.OnStderrLine = wrap("stderr", request.OnStderrLine)
+		observer(Output{Engine: name, Stream: "system", Text: "프로세스 실행 시작"})
+		result, err := runWindowsProcess(ctx, request)
+		message := fmt.Sprintf("프로세스 종료 (코드 %d)", result.ExitCode)
+		if err != nil {
+			message += " · " + err.Error()
+		}
+		observer(Output{Engine: name, Stream: "system", Text: message})
+		return result, err
+	}
 	return runWindowsProcess(ctx, request)
 }
 
@@ -171,4 +199,29 @@ func readProcessOutput(
 	}
 
 	return output.String(), scanner.Err()
+}
+
+func readStreamingOutput(reader io.Reader, onLine func(string) error) (string, error) {
+	const tailLimit = 64 << 10
+	scanner := bufio.NewScanner(reader)
+	scanner.Buffer(make([]byte, 64<<10), 1<<20)
+	var tail string
+	for scanner.Scan() {
+		line := scanner.Text()
+		if onLine != nil {
+			if err := onLine(line); err != nil {
+				return tail, err
+			}
+		}
+		// Keep memory bounded even for a long-running download's diagnostics.
+		if len(line) >= tailLimit {
+			tail = line[len(line)-tailLimit:]
+		} else {
+			if extra := len(tail) + len(line) + 1 - tailLimit; extra > 0 {
+				tail = tail[extra:]
+			}
+			tail += line + "\n"
+		}
+	}
+	return strings.ToValidUTF8(tail, "�"), scanner.Err()
 }

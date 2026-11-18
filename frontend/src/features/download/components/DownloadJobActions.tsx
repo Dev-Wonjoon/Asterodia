@@ -13,7 +13,7 @@ export function DownloadJobActions({ job }: { job: DownloadJobDto }): React.JSX.
         'rounded-lg border border-[var(--border-line)] bg-[var(--bg-sidebar)] px-3 py-2 text-sm hover:bg-[var(--bg-hover)] disabled:opacity-40'
     return (
         <>
-            {job.cleanupRequired && <button type="button" className={button} disabled={cleaning || executing} onClick={() => {
+            {job.cleanupRequired && <button type="button" className={button} disabled={cleaning || executing || vm.deletingIds?.includes(job.id) || vm.batchRetry?.running} onClick={() => {
                 setCleaning(true)
                 void vm.cleanupDownload(job.id).finally(() => setCleaning(false))
             }}>{cleaning ? '정리 중…' : '임시 파일 정리'}</button>}
@@ -26,6 +26,8 @@ export function DownloadJobActions({ job }: { job: DownloadJobDto }): React.JSX.
                         Boolean(vm.halted) ||
                         executing ||
                         cancelling ||
+                        Boolean(vm.deletingIds?.includes(job.id)) ||
+                        Boolean(vm.batchRetry?.running) ||
                         job.cleanupRequired ||
                         job.options === null
                     }

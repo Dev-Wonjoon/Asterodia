@@ -29,17 +29,18 @@ type Status struct {
 	CanRetry bool    `json:"canRetry"`
 }
 type Service struct {
-	preview       func(context.Context, string, string) (json.RawMessage, error)
-	previewMu     sync.Mutex
-	db            *sql.DB
-	cache, ffmpeg string
-	notify        func(int64)
-	mu            sync.Mutex
-	ctx           context.Context
-	cancel        context.CancelFunc
-	wake          chan struct{}
-	wg            sync.WaitGroup
-	closed        bool
+	preview        func(context.Context, string, string) (json.RawMessage, error)
+	previewMu      sync.Mutex
+	db             *sql.DB
+	cache, ffmpeg  string
+	imageInspector *engine.LocalInspector
+	notify         func(int64)
+	mu             sync.Mutex
+	ctx            context.Context
+	cancel         context.CancelFunc
+	wake           chan struct{}
+	wg             sync.WaitGroup
+	closed         bool
 }
 
 func NewService(db *sql.DB, cache, ffmpeg string, notify func(int64)) *Service {
@@ -47,6 +48,9 @@ func NewService(db *sql.DB, cache, ffmpeg string, notify func(int64)) *Service {
 	s := &Service{db: db, cache: cache, ffmpeg: ffmpeg, notify: notify, ctx: ctx, cancel: cancel, wake: make(chan struct{}, 1)}
 	return s
 }
+
+//wails:ignore
+func (s *Service) ConfigureImages(inspector engine.LocalInspector) { s.imageInspector = &inspector }
 
 //wails:ignore
 func (s *Service) Start(ctx context.Context) error {
@@ -232,6 +236,13 @@ func (s *Service) generate(ctx context.Context, req Request) error {
 	defer os.Remove(tmp)
 	switch kind {
 	case "image":
+		_, imageEngineError := os.Stat(s.imageInspectorPath())
+		if s.imageInspector != nil && imageEngineError == nil {
+			if e := s.imageInspector.ImagePreview(ctx, path, tmp); e != nil {
+				return e
+			}
+			break
+		}
 		f, e := os.Open(path)
 		if e != nil {
 			return e
@@ -292,7 +303,7 @@ func (s *Service) generate(ctx context.Context, req Request) error {
 			return closeErr
 		}
 	case "video":
-		_, err = new(engine.ProcessRunner).Run(ctx, engine.ProcessRequest{Executable: s.ffmpeg, Directory: s.cache, Timeout: time.Minute, Arguments: []string{"-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", path, "-frames:v", "1", "-vf", "scale=480:480:force_original_aspect_ratio=decrease", "-update", "1", tmp}})
+		_, err = new(engine.ProcessRunner).Run(ctx, engine.ProcessRequest{Executable: s.ffmpeg, Directory: s.cache, Timeout: time.Minute, Arguments: []string{"-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-protocol_whitelist", "file,pipe", "-i", path, "-frames:v", "1", "-vf", "scale=480:480:force_original_aspect_ratio=decrease", "-update", "1", tmp}})
 		if err != nil {
 			return err
 		}
@@ -328,4 +339,11 @@ func (s *Service) generate(ctx context.Context, req Request) error {
 		return fmt.Errorf("등록된 원본 정보가 변경되었습니다")
 	}
 	return nil
+}
+
+func (s *Service) imageInspectorPath() string {
+	if s.imageInspector == nil {
+		return ""
+	}
+	return s.imageInspector.ImageMagick
 }

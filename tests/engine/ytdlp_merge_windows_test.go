@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -70,7 +71,20 @@ func TestYtdlpDownloadMerge(t *testing.T) {
 		"-vn", "-c:a", "aac", "audio.m4a",
 	)
 
-	server := httptest.NewServer(http.FileServer(http.Dir(sourceDir)))
+	var requireRange atomic.Bool
+	var rangedRequests atomic.Int32
+	files := http.FileServer(http.Dir(sourceDir))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if requireRange.Load() && r.Method == http.MethodGet {
+			var start, end int64
+			if n, _ := fmt.Sscanf(r.Header.Get("Range"), "bytes=%d-%d", &start, &end); n != 2 || start < 0 || end < start || end-start+1 > 1024 {
+				http.Error(w, "bounded Range request required", http.StatusBadRequest)
+				return
+			}
+			rangedRequests.Add(1)
+		}
+		files.ServeHTTP(w, r)
+	}))
 	defer server.Close()
 
 	originalURL := server.URL + "/watch?id=merge"
@@ -88,23 +102,45 @@ func TestYtdlpDownloadMerge(t *testing.T) {
 }`, originalURL, server.URL+"/audio.m4a",
 		server.URL+"/video-480.mp4", server.URL+"/video-720.mp4"))
 
-	targets, err := engine.ParseYtdlpTargets(raw, originalURL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(targets) != 1 {
-		t.Fatalf("대상 수: %d, 기대값: 1", len(targets))
-	}
-
 	ytdlp := engine.Ytdlp{Executable: ytdlpPath, FFmpegLocation: ffmpegDir}
 	for _, tc := range []struct {
-		quality    string
-		wantHeight int
+		name              string
+		quality           string
+		wantHeight        int
+		chunked           bool
+		downloaderOptions string
 	}{
-		{quality: "best", wantHeight: 720},
-		{quality: "480", wantHeight: 480},
+		{name: "best", quality: "best", wantHeight: 720},
+		{name: "480", quality: "480", wantHeight: 480},
+		{name: "chunked", quality: "best", wantHeight: 720, chunked: true, downloaderOptions: `{"http_chunk_size":1024}`},
+		{name: "zero-chunk", quality: "best", wantHeight: 720, downloaderOptions: `{"http_chunk_size":0}`},
+		{name: "negative-chunk", quality: "best", wantHeight: 720, downloaderOptions: `{"http_chunk_size":-1}`},
+		{name: "null-options", quality: "best", wantHeight: 720, downloaderOptions: `null`},
 	} {
-		t.Run(tc.quality, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
+			requireRange.Store(tc.chunked)
+			rangedRequests.Store(0)
+			input := raw
+			if tc.downloaderOptions != "" {
+				var info map[string]any
+				if err := json.Unmarshal(raw, &info); err != nil {
+					t.Fatal(err)
+				}
+				for _, row := range info["formats"].([]any) {
+					row.(map[string]any)["downloader_options"] = json.RawMessage(tc.downloaderOptions)
+				}
+				input, err = json.Marshal(info)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			targets, err := engine.ParseYtdlpTargets(input, originalURL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(targets) != 1 {
+				t.Fatalf("대상 수: %d, 기대값: 1", len(targets))
+			}
 			stageDir, err := os.MkdirTemp(root, "merge-stage-")
 			if err != nil {
 				t.Fatal(err)
@@ -113,6 +149,9 @@ func TestYtdlpDownloadMerge(t *testing.T) {
 				engine.Options{Quality: tc.quality})
 			if err != nil {
 				t.Fatalf("병합 실패: %v", err)
+			}
+			if tc.chunked && rangedRequests.Load() < 4 {
+				t.Fatalf("영상·오디오 분할 요청 누락: %d회", rangedRequests.Load())
 			}
 
 			output := run(t, ffprobePath,

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { DownloadJobDto } from '@contracts/download-api'
+import { downloadFailure, type DownloadJobDto } from '@contracts/download-api'
 import {
     canCancelDownload,
+    canDeleteDownload,
+    canRetryDownload,
     downloadPlatform,
     downloadStatus,
     downloadTrigger,
@@ -21,6 +23,36 @@ const job: DownloadJobDto = {
 }
 
 describe('download presentation', () => {
+    it('only finished failed/cancelled requests can be deleted or included in bulk retry', () => {
+        for (const state of ['failed', 'cancelled'] as const) {
+            const target = { ...job, state }
+            expect(canDeleteDownload(target)).toBe(true)
+            expect(canRetryDownload(target)).toBe(true)
+            expect(canDeleteDownload({ ...target, cleanupRequired: true })).toBe(false)
+            expect(canRetryDownload({ ...target, cleanupRequired: true })).toBe(false)
+            expect(canRetryDownload({ ...target, historyOnly: true })).toBe(false)
+            expect(canRetryDownload({ ...target, options: null })).toBe(false)
+        }
+        for (const state of ['pending', 'running', 'completed', 'interrupted'] as const) {
+            expect(canDeleteDownload({ ...job, state })).toBe(false)
+            expect(canRetryDownload({ ...job, state })).toBe(false)
+        }
+    })
+    it('미지원 다운로드 형식은 엔진 설치 오류와 구분해 안내한다', () => {
+        const result = downloadFailure('UNSUPPORTED_MEDIA_FORMAT')
+        expect(result.ok).toBe(false)
+        if (!result.ok) {
+            expect(result.error.message).toContain('MP4·M4A')
+            expect(result.error.message).toContain('HLS·DASH')
+        }
+    })
+    it('Instagram 인증·접근 제한·요청 제한의 안내를 구분한다', () => {
+        for (const [code, text] of [['AUTHENTICATION_REQUIRED','쿠키'],['ACCESS_DENIED','열람 권한'],['MEDIA_UNAVAILABLE','삭제'],['RATE_LIMITED','잠시 후'],['UNSUPPORTED_INSTAGRAM_OPTIONS','최고 화질'],['UNSUPPORTED_INSTAGRAM_URL','릴스']]) {
+            const result = downloadFailure(code)
+            expect(result.ok).toBe(false)
+            if (!result.ok) expect(result.error.message).toContain(text)
+        }
+    })
     it('실제 다운로드 수치만 표시하고 검증·커밋을 완료로 오인하지 않는다', () => {
         expect(visibleProgress(job)).toBeNull()
         expect(visibleProgress({ ...job, progress: 42 })).toBe(42)

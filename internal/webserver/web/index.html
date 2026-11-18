@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>StorageBucket</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body>
+<header class="top"><div class="brand"><span class="mark" aria-hidden="true">S</span><div><strong>StorageBucket</strong><small>나의 미디어 라이브러리</small></div></div><span class="badge">읽기 전용</span></header>
+<main>
+<section class="heading"><div><h1>갤러리</h1><p id="count">라이브러리를 확인하고 있습니다.</p></div><button id="refresh" type="button">새로고침</button></section>
+<form id="search" role="search"><label class="sr-only" for="keyword">미디어 검색</label><input id="keyword" type="search" maxlength="200" placeholder="제목·태그·작성자로 검색" autocomplete="off"><button type="submit" class="primary">검색</button></form>
+<p id="message" role="status"></p><section id="gallery" aria-label="미디어 목록" class="gallery" aria-busy="false"></section>
+<nav aria-label="갤러리 페이지" class="paging"><button id="previous" type="button">이전</button><span id="page"></span><button id="next" type="button">다음</button></nav>
+</main>
+<dialog id="detail" aria-labelledby="detail-title"><header class="detail-heading"><h2 id="detail-title"></h2><button id="close" type="button" aria-label="상세 닫기">닫기</button></header><p id="detail-message" role="status"></p><section id="files" aria-label="게시글 미디어"></section><nav aria-label="게시글 파일 페이지" class="paging"><button id="file-previous" type="button">이전 파일</button><span id="file-page"></span><button id="file-next" type="button">다음 파일</button></nav></dialog>
+<footer>StorageBucket · 로컬 라이브러리</footer>
+</body></html>

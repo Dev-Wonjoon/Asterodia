@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useContext } from 'react'
+import { LeaveGuardContext } from '@renderer/shared/hooks/leaveGuardContext'
 import { GeneralSettings } from '@renderer/features/settings/GeneralSettings'
 import { EngineSettings } from '@renderer/features/settings/EngineSettings'
 import { LicenseSettings } from '@renderer/features/settings/LicenseSettings'
@@ -93,6 +94,7 @@ const SETTINGS_TABS = [
 ]
 
 export const SettingsPage = (): React.JSX.Element => {
+    const leaveGuard = useContext(LeaveGuardContext)
     const [activeTab, setActiveTab] = useState('general')
 
     const renderContent = (): React.JSX.Element => {
@@ -116,7 +118,11 @@ export const SettingsPage = (): React.JSX.Element => {
                 {SETTINGS_TABS.map((tab) => (
                     <button
                         key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
+                        onClick={() => {
+                            if (tab.id !== activeTab && (!leaveGuard?.current || leaveGuard.current())) {
+                                setActiveTab(tab.id)
+                            }
+                        }}
                         className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors
                             ${
                                 activeTab === tab.id

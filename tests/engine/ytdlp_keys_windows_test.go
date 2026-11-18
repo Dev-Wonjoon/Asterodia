@@ -2,6 +2,7 @@ package engine_test
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
@@ -82,4 +83,83 @@ func TestYtdlpTargetKeyCompatibility(t *testing.T) {
 			}
 		})
 	}
+	t.Run("Generic 직접 파일과 미지원 스트리밍 판정", func(t *testing.T) {
+		for _, tc := range []struct {
+			name, ext, protocol                  string
+			audio, silent, fragment, empty, want bool
+		}{
+			{name: "direct-mp4", ext: "mp4", protocol: "https", want: true},
+			{name: "silent-mp4", ext: "mp4", protocol: "https", silent: true, want: true},
+			{name: "direct-m4a", ext: "m4a", protocol: "https", audio: true, want: true},
+			{name: "hls", ext: "mp4", protocol: "m3u8_native"},
+			{name: "dash", ext: "mp4", protocol: "http_dash_segments", fragment: true},
+			{name: "fragmented-http", ext: "mp4", protocol: "https", fragment: true},
+			{name: "unsupported-webm", ext: "webm", protocol: "https"},
+			{name: "missing-formats", empty: true},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				row := map[string]any{"id": "one", "extractor_key": "Generic", "webpage_url": "https://example.invalid/page"}
+				if !tc.empty {
+					row["format_id"], row["url"], row["ext"], row["protocol"], row["height"], row["vcodec"], row["acodec"] = "source", "https://cdn.invalid/media?signature=fresh", tc.ext, tc.protocol, 720, "h264", "aac"
+					if tc.audio {
+						row["vcodec"] = "none"
+					}
+					if tc.silent {
+						row["acodec"] = "none"
+					}
+					if tc.fragment {
+						row["fragments"] = []map[string]string{{"url": "https://cdn.invalid/segment"}}
+					}
+				}
+				raw, _ := json.Marshal(row)
+				targets, e := engine.ParseYtdlpTargets(raw, "https://example.invalid/page")
+				if e != nil {
+					t.Fatal(e)
+				}
+				options := engine.Options{}
+				if tc.audio {
+					options.Type = "audio"
+				}
+				e = targets[0].ValidateDirectDownload(options)
+				if tc.want {
+					if e != nil {
+						t.Fatal(e)
+					}
+				} else if !errors.Is(e, engine.ErrUnsupportedMediaFormat) {
+					t.Fatalf("미지원 형식 오류 누락: %v", e)
+				}
+			})
+		}
+	})
+	t.Run("Generic 여러 항목의 ID와 완전성", func(t *testing.T) {
+		for _, mode := range []string{"valid", "duplicate", "missing", "incomplete"} {
+			t.Run(mode, func(t *testing.T) {
+				entry := func(id string) map[string]string {
+					return map[string]string{"id": id, "extractor_key": "Generic", "webpage_url": "https://example.invalid/page?view=one"}
+				}
+				entries := []any{entry("one"), entry("two")}
+				switch mode {
+				case "duplicate":
+					entries[1] = entry("one")
+				case "missing":
+					entries[1] = nil
+				}
+				row := map[string]any{"_type": "playlist", "entries": entries, "n_entries": 2}
+				if mode == "incomplete" {
+					row["n_entries"] = 3
+				}
+				raw, _ := json.Marshal(row)
+				targets, e := engine.ParseYtdlpTargets(raw, "https://example.invalid/page?view=one")
+				if mode != "valid" {
+					if e == nil || len(targets) != 0 {
+						t.Fatal("불완전하거나 중복된 대상을 허용했습니다")
+					}
+					return
+				}
+				if e != nil || len(targets) != 2 || targets[0].TargetKey == targets[1].TargetKey {
+					t.Fatalf("여러 대상 식별 실패: %+v %v", targets, e)
+				}
+			})
+		}
+	})
 }

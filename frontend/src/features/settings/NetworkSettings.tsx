@@ -4,6 +4,7 @@ import { SettingSection } from '@renderer/shared/components/ui/SettingSection'
 import { SettingRow } from '@renderer/shared/components/ui/SettingRow'
 import { Button } from '@renderer/shared/components/ui/Button'
 import { useToast } from '@renderer/shared/hooks/useToast'
+import { WebServerSettings } from './WebServerSettings'
 
 const BROWSER_OPTIONS = [
     { value: '', label: '사용 안 함' },
@@ -46,6 +47,8 @@ export const NetworkSettings = (): React.JSX.Element => {
     }
 
     return (
+        <div className="space-y-6">
+        <WebServerSettings />
         <SettingSection
             title="네트워크 설정"
             description="다운로드 시 사용되는 네트워크 관련 설정입니다."
@@ -85,5 +88,6 @@ export const NetworkSettings = (): React.JSX.Element => {
                 }
             />
         </SettingSection>
+        </div>
     )
 }

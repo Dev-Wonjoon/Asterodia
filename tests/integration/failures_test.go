@@ -96,6 +96,10 @@ func TestReplacementCommitFailureKeepsOldLibrary(t *testing.T) {
 			if _, err := os.Stat(oldPath); err != nil {
 				t.Fatal("실패한 교체가 기존 파일을 삭제했습니다")
 			}
+			publicFiles, err := os.ReadDir(filepath.Dir(oldPath))
+			if err != nil || len(publicFiles) != 1 || publicFiles[0].Name() != filepath.Base(oldPath) {
+				t.Fatalf("롤백된 새 다운로드 파일이 남았습니다: %v %v", publicFiles, err)
+			}
 			entries, err := os.ReadDir(filepath.Join(f.root, "downloads", ".storagebucket", "files"))
 			if err != nil || len(entries) != 1 {
 				t.Fatalf("실패 시 새 최종 폴더가 남음: %d %v", len(entries), err)

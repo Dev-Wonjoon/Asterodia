@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -402,7 +403,7 @@ func runWindowsProcess(
 	}()
 
 	var stdin, stdinWriter *os.File
-	if request.Stdin == "" {
+	if request.Stdin == "" && request.Input == nil {
 		stdin, err = os.Open(os.DevNull)
 	} else {
 		stdin, stdinWriter, err = os.Pipe()
@@ -515,11 +516,17 @@ func runWindowsProcess(
 	pending = 2
 
 	go func() {
-		text, err := readProcessOutput(
-			stdoutReader,
-			16<<20,
-			request.OnStdoutLine,
-		)
+		var text string
+		var err error
+		if request.StreamOutput {
+			text, err = readStreamingOutput(stdoutReader, request.OnStdoutLine)
+		} else {
+			text, err = readProcessOutput(
+				stdoutReader,
+				16<<20,
+				request.OnStdoutLine,
+			)
+		}
 		outputs <- processOutputResult{
 			text: text,
 			err:  err,
@@ -527,11 +534,17 @@ func runWindowsProcess(
 	}()
 
 	go func() {
-		text, err := readProcessOutput(
-			stderrReader,
-			4<<20,
-			nil,
-		)
+		var text string
+		var err error
+		if request.StreamOutput {
+			text, err = readStreamingOutput(stderrReader, request.OnStderrLine)
+		} else {
+			text, err = readProcessOutput(
+				stderrReader,
+				4<<20,
+				request.OnStderrLine,
+			)
+		}
 		outputs <- processOutputResult{
 			isStderr: true,
 			text:     text,
@@ -555,7 +568,12 @@ func runWindowsProcess(
 		done := make(chan error, 1)
 		inputDone = done
 		go func() {
-			_, writeErr := writer.WriteString(request.Stdin)
+			var writeErr error
+			if request.Input != nil {
+				_, writeErr = io.Copy(writer, request.Input)
+			} else {
+				_, writeErr = writer.WriteString(request.Stdin)
+			}
 			done <- errors.Join(writeErr, writer.Close())
 		}()
 	}
@@ -656,6 +674,9 @@ func runWindowsProcess(
 
 		case err := <-inputDone:
 			inputDone = nil
+			if request.Input != nil && (errors.Is(err, windows.ERROR_BROKEN_PIPE) || errors.Is(err, windows.ERROR_NO_DATA)) {
+				err = nil
+			}
 			if err != nil {
 				return result, fmt.Errorf("엔진 표준 입력 쓰기: %w", err)
 			}

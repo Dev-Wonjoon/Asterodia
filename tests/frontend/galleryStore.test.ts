@@ -57,6 +57,9 @@ function file(id: number): MediaFileDto {
         id,
         mediaId: 1,
         fileKey: 'file-' + id,
+        fileUuid: `00000000-0000-4000-8000-${String(id).padStart(12, '0')}`,
+        filenameToken: id.toString(16).padStart(8, '0'),
+        directoryId: null,
         storageKind: 'unverified_legacy',
         sourceUrl: null,
         title: null,
@@ -117,6 +120,7 @@ function fixture(overrides: Partial<MediaApi> = {}) {
     let removed = false
 
     const implementation: MediaApi = {
+        directories: async () => ok({ data: [], total: 0, hasNextPage: false }),
         suggest: async () => ok([]),
         list: async () =>
             ok({
@@ -168,6 +172,7 @@ function fixture(overrides: Partial<MediaApi> = {}) {
     }
 
     const api: MediaApi = {
+        directories: (request) => implementation.directories(request),
         suggest: (request) => implementation.suggest(request),
         list: (request) => {
             calls.list.push(request?.offset ?? 0)

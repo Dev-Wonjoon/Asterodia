@@ -17,7 +17,7 @@ export function useDownloadViewModel() {
     const { showToast } = useToast()
 
     const previewEngine = useCallback(
-        (url: string) => getApi().downloads.previewEngine(url),
+        (url: string, options?: DownloadJobOptions) => getApi().downloads.previewEngine(url, options),
         []
     )
 
@@ -69,6 +69,8 @@ export function useDownloadViewModel() {
         runJob,
         cancelDownload,
         cleanupDownload,
+        deleteJob: store.deleteJob,
+        retryAll: store.retryAll,
         refresh: store.refresh,
         openDetail: store.openDetail,
         closeDetail: store.closeDetail

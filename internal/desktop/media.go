@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -49,7 +50,10 @@ func MediaMiddleware(db *sql.DB, previewCache string) func(http.Handler) http.Ha
 			}
 			w.Header().Set("X-Content-Type-Options", "nosniff")
 			w.Header().Set("Content-Security-Policy", "sandbox")
-			w.Header().Set("Cache-Control", "private, max-age=60")
+			// External originals can change at the same path after a rescan. Use
+			// nanosecond validators instead of replaying a cached old file for 60s.
+			w.Header().Set("Cache-Control", "private, no-cache")
+			w.Header().Set("ETag", fmt.Sprintf(`"%x-%x"`, info.Size(), info.ModTime().UnixNano()))
 			http.ServeFile(w, r, path)
 		})
 	}

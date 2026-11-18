@@ -13,6 +13,7 @@ import type { DownloadJobOptions } from '@contracts/download-api'
 
 interface EnginePreview {
     url: string
+    optionsKey: string
     text: string
     error: boolean
 }
@@ -28,7 +29,8 @@ export function DownloadBar(): React.JSX.Element {
         useDownloadViewModel()
 
     const currentURL = url.trim()
-    const currentPreview = preview?.url === currentURL ? preview : null
+    const optionsKey = JSON.stringify(options)
+    const currentPreview = preview?.url === currentURL && preview.optionsKey === optionsKey ? preview : null
 
     useEffect(() => {
         if (!currentURL) return
@@ -36,12 +38,13 @@ export function DownloadBar(): React.JSX.Element {
         let disposed = false
 
         const timer = setTimeout(() => {
-            void previewEngine(currentURL)
+            void previewEngine(currentURL, options)
                 .then((kind) => {
                     if (disposed) return
 
                     setPreview({
                         url: currentURL,
+                        optionsKey,
                         text: `엔진: ${kind}`,
                         error: false
                     })
@@ -51,6 +54,7 @@ export function DownloadBar(): React.JSX.Element {
 
                     setPreview({
                         url: currentURL,
+                        optionsKey,
                         text:
                             error instanceof Error
                                 ? error.message
@@ -64,7 +68,7 @@ export function DownloadBar(): React.JSX.Element {
             disposed = true
             clearTimeout(timer)
         }
-    }, [currentURL, previewEngine])
+    }, [currentURL, previewEngine, options, optionsKey])
 
     const submit = async (value: string): Promise<void> => {
         const trimmed = value.trim()
@@ -109,6 +113,7 @@ export function DownloadBar(): React.JSX.Element {
             <details className="shrink-0">
                 <summary className="cursor-pointer rounded-xl border border-[var(--border-line)] px-3 py-2.5 text-sm" aria-label="다운로드 옵션">옵션</summary>
                 <div className="absolute left-0 top-full z-30 mt-2 w-64 space-y-3 rounded-xl border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-4 shadow-xl">
+                    <p className="text-xs text-[var(--text-muted)]">Instagram은 영상 · 최고 화질 · 자동 형식에서 사진과 영상을 원래 순서대로 함께 저장합니다.</p>
                     <label className="block text-sm">종류
                         <select aria-label="다운로드 종류" value={options.type} onChange={(event) => {
                             const audio = event.target.value === 'audio'

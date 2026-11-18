@@ -11,7 +11,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const schemaVersion = 3
+const schemaVersion = 6
 
 func OpenExisting(ctx context.Context, filename string) (*sql.DB, error) {
 	if !filepath.IsAbs(filename) || strings.ContainsRune(filename, '\x00') {

@@ -1,7 +1,9 @@
 package engine
 
 import (
+	"context"
 	"errors"
+	"io"
 	"time"
 )
 
@@ -51,9 +53,26 @@ type ProcessRequest struct {
 	Directory  string
 	Timeout    time.Duration
 	Stdin      string
+	Input      io.Reader
 
 	// 진행률 해석 등에 사용한다. 콜백은 빠르게 반환해야 한다.
 	OnStdoutLine func(string) error
+	OnStderrLine func(string) error
+	// Streaming diagnostics keep only a bounded tail in ProcessResult.
+	StreamOutput bool
+}
+
+type Output struct {
+	Engine string
+	Stream string
+	Text   string
+}
+type outputKey struct{}
+
+// WithOutputObserver attaches a fast diagnostic sink to this operation and
+// child engine calls without coupling process execution to a database.
+func WithOutputObserver(ctx context.Context, observer func(Output)) context.Context {
+	return context.WithValue(ctx, outputKey{}, observer)
 }
 
 type ProcessResult struct {

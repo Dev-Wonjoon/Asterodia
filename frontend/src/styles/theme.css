@@ -40,11 +40,6 @@ body {
     background-color: var(--bg-app);
     color: var(--text-main);
 
-    transition:
-        background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-        color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-        border-color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-
     font-family:
         Inter,
         -apple-system,
@@ -61,4 +56,27 @@ body {
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+}
+
+/* One document transition owns the theme change, including portals and icons. */
+:root.theme-switching,
+:root.theme-switching *,
+:root.theme-switching *::before,
+:root.theme-switching *::after,
+:root.theme-switching *::placeholder {
+    transition: none !important;
+}
+
+:root.theme-switching::view-transition-group(root),
+:root.theme-switching::view-transition-old(root),
+:root.theme-switching::view-transition-new(root) {
+    animation-duration: 200ms;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root.theme-switching::view-transition-old(root),
+    :root.theme-switching::view-transition-new(root) {
+        animation: none;
+    }
 }

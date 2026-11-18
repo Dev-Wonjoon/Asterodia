@@ -239,7 +239,7 @@ func (s *Service) List(ctx context.Context, req ListRequest) api.Result {
 	return api.Success(Object{"data": data, "total": total, "hasNextPage": int64(req.Offset+len(data)) < total})
 }
 
-const fileSQL = `SELECT id,media_id AS mediaId,file_key AS fileKey,storage_kind AS storageKind,source_url AS sourceUrl,title,filepath,relative_path AS relativePath,kind,position,filesize,duration,detected_format AS detectedFormat,width,height,orientation,frame_count AS frameCount,page_count AS pageCount,primary_image_index AS primaryImageIndex,thumbnail_path AS thumbnailPath,thumbnail_origin AS thumbnailOrigin,preview_path AS previewPath,created_at AS createdAt FROM media_file`
+const fileSQL = `SELECT id,media_id AS mediaId,file_key AS fileKey,file_uuid AS fileUuid,filename_token AS filenameToken,directory_id AS directoryId,storage_kind AS storageKind,source_url AS sourceUrl,title,filepath,relative_path AS relativePath,kind,position,filesize,duration,detected_format AS detectedFormat,width,height,orientation,frame_count AS frameCount,page_count AS pageCount,primary_image_index AS primaryImageIndex,thumbnail_path AS thumbnailPath,thumbnail_origin AS thumbnailOrigin,preview_path AS previewPath,created_at AS createdAt FROM media_file`
 
 func (s *Service) Get(ctx context.Context, req GetRequest) api.Result {
 	limit, err := pageBounds(req.FileLimit, req.FileOffset)
@@ -282,9 +282,15 @@ func (s *Service) Get(ctx context.Context, req GetRequest) api.Result {
 	if len(folders) > 0 {
 		obj["localFolder"] = folders[0]
 	}
-	locations, err := objects(ctx, tx, "SELECT id,directory_path AS directoryPath,state FROM local_folder_location WHERE media_id=? ORDER BY id", req.MediaID)
+	locations, err := objects(ctx, tx, "SELECT d.id,d.directory_path AS directoryPath,'active' AS state FROM media_directory d WHERE EXISTS(SELECT 1 FROM media_file f WHERE f.media_id=? AND f.directory_id=d.id) ORDER BY d.id", req.MediaID)
 	if err != nil {
 		return failure(err)
+	}
+	if len(locations) == 0 {
+		locations, err = objects(ctx, tx, "SELECT id,directory_path AS directoryPath,state FROM local_folder_location WHERE media_id=? ORDER BY id", req.MediaID)
+		if err != nil {
+			return failure(err)
+		}
 	}
 	obj["locations"] = locations
 	return api.Success(obj)
@@ -301,13 +307,46 @@ func checkWrite(ctx context.Context, tx *sql.Tx, id, expected int64) error {
 		return domainError("REVISION_CONFLICT")
 	}
 	var active int
-	if err := tx.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM download_queue WHERE target_media_id=? AND (state IN ('pending','running') OR cleanup_required=1))+(SELECT count(*) FROM local_import_folder f JOIN local_folder l ON l.id=f.local_folder_id WHERE l.media_id=? AND (f.state IN ('pending','running') OR f.cleanup_required=1))`, id, id).Scan(&active); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM download_queue WHERE target_media_id=? AND (state IN ('pending','running') OR cleanup_required=1))+(SELECT count(*) FROM local_import_folder f JOIN local_folder l ON l.id=f.local_folder_id JOIN local_import_job j ON j.id=f.job_id WHERE l.media_id=? AND ((j.state='running' AND f.state IN ('pending','running','interrupted')) OR f.cleanup_required=1))`, id, id).Scan(&active); err != nil {
+		return err
+	}
+	if active > 0 {
+		return domainError("JOB_ACTIVE")
+	}
+	if err := tx.QueryRowContext(ctx, "SELECT count(*) FROM file_move_item WHERE media_id=? AND state IN ('pending','copying','verified','committed','cleanup_pending')", id).Scan(&active); err != nil {
 		return err
 	}
 	if active > 0 {
 		return domainError("JOB_ACTIVE")
 	}
 	return nil
+}
+
+type DirectoryListRequest struct {
+	Limit   int    `json:"limit"`
+	Offset  int    `json:"offset"`
+	Keyword string `json:"keyword"`
+}
+
+func (s *Service) Directories(ctx context.Context, req DirectoryListRequest) api.Result {
+	limit, err := pageBounds(req.Limit, req.Offset)
+	if err != nil || len(req.Keyword) > 1000 {
+		return failure(domainError("INVALID_ARGUMENT"))
+	}
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return failure(err)
+	}
+	defer tx.Rollback()
+	var total int64
+	if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM media_directory WHERE registered=1 AND instr(lower(directory_path),lower(?))>0", req.Keyword).Scan(&total); err != nil {
+		return failure(err)
+	}
+	rows, err := objects(ctx, tx, `SELECT d.id,d.directory_path AS directoryPath,d.key_version AS keyVersion,d.import_media_id AS importMediaId,(SELECT count(*) FROM media_file f WHERE f.directory_id=d.id) AS fileCount,(SELECT count(DISTINCT f.media_id) FROM media_file f WHERE f.directory_id=d.id) AS mediaCount FROM media_directory d WHERE d.registered=1 AND instr(lower(d.directory_path),lower(?))>0 ORDER BY d.id LIMIT ? OFFSET ?`, req.Keyword, limit, req.Offset)
+	if err != nil {
+		return failure(err)
+	}
+	return api.Success(Object{"data": rows, "total": total, "hasNextPage": int64(req.Offset+len(rows)) < total})
 }
 func (s *Service) Edit(ctx context.Context, req EditRequest) api.Result {
 	if req.TagIDs != nil && req.TagChange != nil {

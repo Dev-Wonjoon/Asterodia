@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
 )
 
 type Cleaner struct {
@@ -45,7 +47,7 @@ func (s *Cleaner) Close() { s.cancel(); s.wg.Wait() }
 func (s *Cleaner) RunOnce(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	rows, err := s.db.QueryContext(ctx, `SELECT id,payload_json FROM maintenance_task WHERE kind IN ('deletion_cleanup','obsolete_file_cleanup') AND (state IN ('pending','running') OR (state='failed' AND try_count<3)) ORDER BY created_at LIMIT 100`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,payload_json FROM maintenance_task WHERE kind IN ('deletion_cleanup','obsolete_file_cleanup') AND (state IN ('pending','running') OR (state='failed' AND try_count<3)) AND NOT EXISTS(SELECT 1 FROM legacy_record WHERE table_name='migration-v2:maintenance_task' AND row_key=maintenance_task.id) ORDER BY created_at LIMIT 100`)
 	if err != nil {
 		return err
 	}
@@ -113,6 +115,36 @@ func (s *Cleaner) removeOwnedFile(ctx context.Context, path string) error {
 	}
 	if registered {
 		return fmt.Errorf("등록된 파일은 삭제할 수 없습니다")
+	}
+	// Human-readable paths are authorized by the exact publication record, not
+	// by their name. Never infer ownership from site/user/title alone.
+	publications, err := s.db.QueryContext(ctx, `SELECT q.id,a.id,st.storage_root FROM download_target t JOIN download_attempt a ON a.id=t.attempt_id JOIN download_queue q ON q.id=a.job_id JOIN download_job_storage st ON st.job_id=q.id WHERE t.final_path=? AND a.committed_at IS NOT NULL ORDER BY a.started_at DESC`, path)
+	if err != nil {
+		return err
+	}
+	type owner struct{ job, attempt, root string }
+	owners := []owner{}
+	for publications.Next() {
+		var item owner
+		if err = publications.Scan(&item.job, &item.attempt, &item.root); err != nil {
+			break
+		}
+		owners = append(owners, item)
+	}
+	if err == nil {
+		err = publications.Err()
+	}
+	publications.Close()
+	if err != nil {
+		return err
+	}
+	for _, item := range owners {
+		rel, e := filepath.Rel(item.root, path)
+		if e == nil && filepath.IsLocal(rel) && len(strings.Split(rel, string(filepath.Separator))) == 3 {
+			if e = (download.Storage{Root: item.root}).RemovePublishedFile(item.job, item.attempt, path); e == nil {
+				return nil
+			}
+		}
 	}
 	// Only roots recorded for real jobs and this runtime's generated layout qualify.
 	rows, err := s.db.QueryContext(ctx, "SELECT DISTINCT storage_root FROM download_job_storage")

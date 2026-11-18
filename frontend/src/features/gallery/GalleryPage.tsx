@@ -9,6 +9,7 @@ import { GalleryCardActions } from './GalleryCardActions'
 import { useGalleryViewModel } from './useGalleryViewModel'
 import type { MediaFilter } from '@contracts/media-v2'
 import { getApi } from '@renderer/shared/api'
+import { LocalImportPanel } from '@renderer/features/localimport/LocalImportPanel'
 
 export const GalleryPage = ({
     favoritesOnly = false,
@@ -172,6 +173,7 @@ export const GalleryPage = ({
             }
         >
             <div className="space-y-5 pb-6">
+                {!favoritesOnly && <LocalImportPanel disabled={draftDirty || state.busy} onComplete={() => { thumbnailRefreshPending.current = true; refreshThumbnails() }} />}
                 <header className="flex flex-wrap items-center justify-between gap-3">
                     <h1 className="text-lg font-semibold">{title}</h1>
 

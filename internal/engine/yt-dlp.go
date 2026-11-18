@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -26,6 +27,34 @@ type Ytdlp struct {
 	runner         ProcessRunner
 }
 
+var ErrUnsupportedMediaFormat = errors.New("지원하는 HTTP(S) MP4·M4A 포맷이 없습니다. HLS·DASH 등 분할 스트리밍은 아직 지원하지 않습니다")
+
+func ytdlpMaxHeight(quality string) (int, error) {
+	height, ok := map[string]int{"": 0, "best": 0, "audio": 0, "480": 480, "720": 720, "1080": 1080, "2k": 1440, "4k": 2160, "8k": 4320}[quality]
+	if !ok {
+		return 0, fmt.Errorf("지원하지 않는 화질 옵션: %q", quality)
+	}
+	return height, nil
+}
+
+// ValidateDirectDownload checks each resolved entry before any target is staged.
+// The identity parser remains independent of format availability for compatibility.
+func (target YtdlpTarget) ValidateDirectDownload(options Options) error {
+	if target.downloadInfo == "" {
+		return ErrUnsupportedMediaFormat
+	}
+	var info ytdlpDownloadInfo
+	if err := json.Unmarshal([]byte(target.downloadInfo), &info); err != nil {
+		return fmt.Errorf("확정한 포맷 정보 해석 실패: %w", err)
+	}
+	height, err := ytdlpMaxHeight(options.Quality)
+	if err != nil {
+		return err
+	}
+	_, _, err = selectYtdlpFormats(info.Formats, options.Type == "audio" || options.Quality == "audio", height, true)
+	return err
+}
+
 // Discover는 Select에서 검증한 원본 URL을 받아 yt-dlp의 조회 결과를 반환한다.
 func (y *Ytdlp) Discover(
 	ctx context.Context,
@@ -44,6 +73,7 @@ func (y *Ytdlp) Discover(
 		"--abort-on-error",
 		"--simulate",
 		"--dump-single-json",
+		"--no-quiet",
 	}
 
 	if y.JSRuntime != "" {
@@ -62,11 +92,18 @@ func (y *Ytdlp) Discover(
 	}
 	args = append(args, "--", originalURL)
 
+	var discoveryJSON string
 	result, err := y.runner.Run(ctx, ProcessRequest{
 		Executable: y.Executable,
 		Arguments:  args,
 		Directory:  workDir,
 		Timeout:    2 * time.Minute,
+		OnStdoutLine: func(line string) error {
+			if strings.HasPrefix(strings.TrimSpace(line), "{") && json.Valid([]byte(line)) {
+				discoveryJSON = line
+			}
+			return nil
+		},
 	})
 
 	if err != nil {
@@ -76,7 +113,7 @@ func (y *Ytdlp) Discover(
 		return nil, fmt.Errorf("yt-dlp 대상 조회 실패: %w", err)
 	}
 
-	output := bytes.TrimSpace([]byte(result.Stdout))
+	output := bytes.TrimSpace([]byte(discoveryJSON))
 	if len(output) == 0 || output[0] != '{' || !json.Valid(output) {
 		return nil, fmt.Errorf("yt-dlp 조회 결과가 올바른 JSON 객체가 아닙니다")
 	}
@@ -117,8 +154,10 @@ func selectYtdlpFormats(
 		return []ytdlpDirectFormat{*combined}, "best", nil
 	case !audio && videoOnly != nil && audioOnly != nil:
 		return nil, "", fmt.Errorf("분리 포맷을 병합하려면 FFmpeg 절대 경로가 필요합니다")
+	case !audio && videoOnly != nil:
+		return []ytdlpDirectFormat{*videoOnly}, "bestvideo", nil
 	default:
-		return nil, "", fmt.Errorf("요청 옵션에 맞는 HTTP(S) 포맷이 없습니다")
+		return nil, "", fmt.Errorf("%w. 요청한 종류·화질에 맞는 직접 파일이 필요합니다", ErrUnsupportedMediaFormat)
 	}
 }
 
@@ -134,13 +173,9 @@ func (y *Ytdlp) DownloadSingle(
 		return "", fmt.Errorf("지원하지 않는 다운로드 유형: %q", options.Type)
 	}
 
-	maxHeight, ok := map[string]int{
-		"": 0, "best": 0, "audio": 0,
-		"480": 480, "720": 720, "1080": 1080,
-		"2k": 1440, "4k": 2160, "8k": 4320,
-	}[options.Quality]
-	if !ok {
-		return "", fmt.Errorf("지원하지 않는 화질 옵션: %q", options.Quality)
+	maxHeight, err := ytdlpMaxHeight(options.Quality)
+	if err != nil {
+		return "", err
 	}
 
 	audio := options.Type == "audio" || options.Quality == "audio"
@@ -159,7 +194,7 @@ func (y *Ytdlp) DownloadSingle(
 	}
 
 	if target.downloadInfo == "" {
-		return "", fmt.Errorf("다운로드할 수 있는 HTTP(S) 포맷이 없습니다")
+		return "", ErrUnsupportedMediaFormat
 	}
 
 	var info ytdlpDownloadInfo
@@ -197,21 +232,22 @@ func (y *Ytdlp) DownloadSingle(
 	}
 
 	request := ProcessRequest{
-		Executable: y.Executable,
-		Directory:  stageDir,
-		Timeout:    10 * time.Minute,
-		Stdin:      string(payload),
+		Executable:   y.Executable,
+		Directory:    stageDir,
+		Timeout:      10 * time.Minute,
+		Stdin:        string(payload),
+		StreamOutput: true,
 		Arguments: []string{
 			"--ignore-config", "--no-plugin-dirs", "--no-cache-dir",
 			"--no-cookies", "--no-cookies-from-browser",
 			"--no-js-runtimes", "--no-remote-components",
 			"--encoding", "utf-8", "--abort-on-error",
-			"--no-simulate", "--no-progress", "--fixup", "never",
+			"--no-simulate", "--no-quiet", "--progress", "--newline", "--progress-delta", "0.5", "--fixup", "never",
 			"--paths", "home:" + stageDir,
 			"--paths", "temp:" + stageDir,
 			"--output", "media.%(ext)s",
 			"--format", selector,
-			"--print", "after_move:%(.{id,format_id,filepath})j",
+			"--print", "after_move:" + resultPrefix + "%(.{id,format_id,filepath})j",
 		},
 	}
 
@@ -244,9 +280,19 @@ func (y *Ytdlp) DownloadSingle(
 	}
 	request.Arguments = append(request.Arguments, auth...)
 	request.Arguments = append(request.Arguments, "--load-info-json", "-")
+	var savedJSON string
+	request.OnStdoutLine = func(line string) error {
+		if strings.HasPrefix(line, resultPrefix) {
+			savedJSON = strings.TrimPrefix(line, resultPrefix)
+		}
+		return nil
+	}
 
 	result, err := y.runner.Run(ctx, request)
 	if err != nil {
+		if stderr := strings.TrimSpace(result.Stderr); stderr != "" {
+			return "", fmt.Errorf("yt-dlp 다운로드 실패: %w\n%s", err, stderr)
+		}
 		return "", fmt.Errorf("yt-dlp 다운로드 실패: %w", err)
 	}
 	if y.CookieFile != "" {
@@ -260,7 +306,7 @@ func (y *Ytdlp) DownloadSingle(
 		FormatID string `json:"format_id"`
 		Filepath string `json:"filepath"`
 	}
-	if err := json.Unmarshal([]byte(result.Stdout), &saved); err != nil {
+	if err := json.Unmarshal([]byte(savedJSON), &saved); err != nil {
 		return "", fmt.Errorf("yt-dlp 저장 결과 해석 실패: %w", err)
 	}
 	if saved.ID != target.ID || saved.FormatID != expectedFormatID {
@@ -293,6 +339,8 @@ func (y *Ytdlp) DownloadSingle(
 	return path, nil
 }
 
+const resultPrefix = "__STORAGEBUCKET_RESULT__:"
+
 type YtdlpTarget struct {
 	OwnerID      string   `json:"uploader_id"`
 	OwnerName    string   `json:"uploader"`
@@ -306,14 +354,19 @@ type YtdlpTarget struct {
 }
 
 type ytdlpDirectFormat struct {
-	ID          string            `json:"format_id"`
-	URL         string            `json:"url"`
-	Protocol    string            `json:"protocol"`
-	Ext         string            `json:"ext"`
-	Height      int               `json:"height,omitempty"`
-	VideoCodec  string            `json:"vcodec,omitempty"`
-	AudioCodec  string            `json:"acodec,omitempty"`
-	HTTPHeaders map[string]string `json:"http_headers,omitempty"`
+	ID                string                  `json:"format_id"`
+	URL               string                  `json:"url"`
+	Protocol          string                  `json:"protocol"`
+	Ext               string                  `json:"ext"`
+	Height            int                     `json:"height,omitempty"`
+	VideoCodec        string                  `json:"vcodec,omitempty"`
+	AudioCodec        string                  `json:"acodec,omitempty"`
+	HTTPHeaders       map[string]string       `json:"http_headers,omitempty"`
+	DownloaderOptions *ytdlpDownloaderOptions `json:"downloader_options,omitempty"`
+}
+
+type ytdlpDownloaderOptions struct {
+	HTTPChunkSize int64 `json:"http_chunk_size,omitempty"`
 }
 
 type ytdlpDownloadInfo struct {
@@ -381,6 +434,10 @@ func buildYtdlpDownloadInfo(raw json.RawMessage, target YtdlpTarget) (string, er
 		}
 		if format.Protocol != "http" && format.Protocol != "https" {
 			continue
+		}
+		// Preserve the extractor's bounded Range requests when freezing formats.
+		if format.DownloaderOptions != nil && format.DownloaderOptions.HTTPChunkSize <= 0 {
+			format.DownloaderOptions = nil
 		}
 
 		format.HTTPHeaders = make(map[string]string)
@@ -558,11 +615,6 @@ func collectYtdlpTargets(
 			strings.TrimSpace(row.ExtractorKey) == "" {
 			return fmt.Errorf("yt-dlp 대상의 식별 정보가 올바르지 않습니다")
 		}
-		if row.IsLive || row.IsUpcoming || row.HasDRM ||
-			(row.LiveStatus != "" && row.LiveStatus != "not_live" && row.LiveStatus != "was_live") {
-			return fmt.Errorf("현재 다운로드할 수 없는 yt-dlp 대상입니다")
-		}
-
 		if row.Title == "" {
 			row.Title = row.ID
 		}
@@ -570,6 +622,14 @@ func collectYtdlpTargets(
 		if err != nil {
 			return fmt.Errorf("yt-dlp 다운로드 정보 구성 실패: %w", err)
 		}
+		if row.IsLive || row.IsUpcoming || row.HasDRM ||
+			(row.LiveStatus != "" && row.LiveStatus != "not_live" && row.LiveStatus != "was_live") {
+			if downloadInfo == "" {
+				return fmt.Errorf("%w. 라이브·예약·보호된 영상도 현재 지원하지 않습니다", ErrUnsupportedMediaFormat)
+			}
+			return fmt.Errorf("현재 다운로드할 수 없는 yt-dlp 대상입니다")
+		}
+
 		row.downloadInfo = downloadInfo
 		*targets = append(*targets, row.YtdlpTarget)
 		return nil

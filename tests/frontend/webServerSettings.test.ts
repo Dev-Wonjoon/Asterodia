@@ -1,0 +1,70 @@
+// @vitest-environment happy-dom
+import { act, createElement as h } from 'react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { WebServerStatus, WebServerResult } from '@contracts/webserver-api'
+import { WebServerSettings } from '@renderer/features/settings/WebServerSettings'
+import { cleanupReact, clickButton, deferred, mount } from './reactHarness'
+
+const api = vi.hoisted(() => ({ status: vi.fn(), start: vi.fn(), stop: vi.fn() }))
+vi.mock('@renderer/shared/api', () => ({ getApi: () => ({ webServer: api }) }))
+const state = (running = false, error: string | null = null): WebServerStatus => ({ running, url: 'http://127.0.0.1:9246', error })
+const ok = (data: WebServerStatus): WebServerResult<WebServerStatus> => ({ ok: true, data })
+const fail = { ok: false, error: { code: 'SERVER_START_FAILED', message: '포트를 사용할 수 없습니다.' } }
+const button = (label: string) => [...document.querySelectorAll('button')].find(b => b.textContent === label)!
+beforeEach(() => { vi.resetAllMocks(); api.status.mockResolvedValue(ok(state())); api.start.mockResolvedValue(ok(state(true))); api.stop.mockResolvedValue(ok(state())) })
+afterEach(async () => { await cleanupReact(); vi.useRealTimers() })
+
+describe('localhost web server controls', () => {
+    it('starts disabled, displays the local proxy target, starts/stops and polls only while running', async () => {
+        vi.useFakeTimers()
+        const first = deferred<WebServerResult<WebServerStatus>>(); api.status.mockReturnValueOnce(first.promise)
+        await mount(h(WebServerSettings)); expect(button('서버 시작').disabled).toBe(true)
+        await act(async () => { first.resolve(ok(state())) }); expect(document.body.textContent).toContain('꺼짐')
+        expect(document.body.textContent).toContain('tailscale serve --bg http://127.0.0.1:9246')
+        await act(async () => { await vi.advanceTimersByTimeAsync(4000) }); expect(api.status).toHaveBeenCalledTimes(1)
+        await clickButton('서버 시작'); expect(document.body.textContent).toContain('실행 중')
+        api.status.mockResolvedValue(ok(state(true)))
+        await act(async () => { await vi.advanceTimersByTimeAsync(2000) }); expect(api.status).toHaveBeenCalledTimes(2)
+        await clickButton('서버 종료'); expect(document.body.textContent).toContain('꺼짐')
+        await act(async () => { await vi.advanceTimersByTimeAsync(5000) }); expect(api.status).toHaveBeenCalledTimes(2)
+    })
+    it('serializes toggle requests and ignores stale status reads after Stop', async () => {
+        vi.useFakeTimers(); api.status.mockResolvedValue(ok(state(true)))
+        await mount(h(WebServerSettings))
+        const old = deferred<WebServerResult<WebServerStatus>>(); api.status.mockReturnValueOnce(old.promise)
+        await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+        await act(async () => { await vi.advanceTimersByTimeAsync(4000) }); expect(api.status).toHaveBeenCalledTimes(2)
+        const stop = deferred<WebServerResult<WebServerStatus>>(); api.stop.mockReturnValue(stop.promise)
+        const target = button('서버 종료'); await act(async () => { target.click(); target.click() })
+        expect(api.stop).toHaveBeenCalledTimes(1); expect(button('처리 중…').disabled).toBe(true)
+        await act(async () => { stop.resolve(ok(state())); old.resolve(ok(state(true))) })
+        expect(document.body.textContent).toContain('꺼짐'); expect(button('서버 시작').disabled).toBe(false)
+    })
+    it('shows status failures and supports retry without starting the server', async () => {
+        api.status.mockResolvedValueOnce(fail)
+        await mount(h(WebServerSettings)); expect(document.body.textContent).toContain('포트를 사용할 수 없습니다.')
+        await clickButton('다시 확인'); expect(document.body.textContent).toContain('꺼짐'); expect(api.start).not.toHaveBeenCalled()
+        await cleanupReact(); api.status.mockRejectedValueOnce(new Error('offline'))
+        await mount(h(WebServerSettings)); expect(document.body.textContent).toContain('웹 서버 상태를 확인하지 못했습니다.')
+    })
+    it('keeps native start/stop failures visible and permits a retry', async () => {
+        await mount(h(WebServerSettings)); api.start.mockResolvedValueOnce(fail)
+        await clickButton('서버 시작'); expect(document.body.textContent).toContain('포트를 사용할 수 없습니다.')
+        await clickButton('서버 시작'); expect(button('서버 종료')).toBeTruthy()
+        api.stop.mockRejectedValueOnce(new Error('offline')); await clickButton('서버 종료')
+        expect(document.body.textContent).toContain('요청 결과를 받지 못했습니다')
+        api.status.mockResolvedValue(ok(state(true, '연결 오류'))); await clickButton('다시 확인')
+        expect(document.body.textContent).toContain('연결 오류')
+    })
+    it('releases subscriptions on unmount and never stops the backend just for leaving settings', async () => {
+        vi.useFakeTimers(); api.status.mockResolvedValue(ok(state(true)))
+        const unmount = await mount(h(WebServerSettings)); const pending = deferred<WebServerResult<WebServerStatus>>()
+        api.status.mockReturnValueOnce(pending.promise); await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+        await unmount(); await act(async () => { pending.resolve(ok(state())) ; await vi.advanceTimersByTimeAsync(5000) })
+        expect(api.stop).not.toHaveBeenCalled(); expect(api.status).toHaveBeenCalledTimes(2)
+        api.status.mockResolvedValue(ok(state())); const unmountAgain = await mount(h(WebServerSettings))
+        const start = deferred<WebServerResult<WebServerStatus>>(); api.start.mockReturnValueOnce(start.promise)
+        await clickButton('서버 시작'); await unmountAgain(); await act(async () => { start.resolve(ok(state(true))) })
+        expect(api.stop).not.toHaveBeenCalled()
+    })
+})

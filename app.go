@@ -13,10 +13,12 @@ import (
 	"github.com/Dev-Wonjoon/StorageBucket/internal/desktop"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/StorageBucket/internal/localimport"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/maintenance"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/settings"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/thumbnail"
+	"github.com/Dev-Wonjoon/StorageBucket/internal/webserver"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -30,11 +32,6 @@ func applicationServices(
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	db, err := database.Open(context.Background(), filepath.Join(paths.Root, "storagebucket.db"))
-	if err != nil {
-		unlock()
-		return nil, nil, nil, err
-	}
 	config, err := settings.New(filepath.Join(paths.Data, "config.json"), paths.Downloads, settings.Dialogs{
 		Directory: func(current string) (string, error) {
 			return application.Get().Dialog.OpenFile().CanChooseFiles(false).CanChooseDirectories(true).CanCreateDirectories(true).SetDirectory(current).SetTitle("다운로드 폴더 선택").PromptForSingleSelection()
@@ -45,11 +42,29 @@ func applicationServices(
 		Reveal: func(path string) error { return application.Get().Env.OpenFileManager(path, true) },
 	})
 	if err != nil {
-		db.Close()
 		unlock()
 		return nil, nil, nil, err
 	}
+	databasePath := filepath.Join(paths.Root, "storagebucket.db")
+	db, err := database.OpenWithOptions(context.Background(), databasePath, database.MigrationOptions{BackupDirectory: filepath.Join(paths.Root, "backups"), LegacyStorageRoot: config.GetDownloadPath()})
+	if err != nil {
+		unlock()
+		return nil, nil, nil, err
+	}
+	databaseImporter := database.NewImporter(db, databasePath, filepath.Join(paths.Root, "backups"))
+	catalog := media.NewService(db)
+	web := webserver.NewService(catalog, webserver.DefaultAddress)
 	thumb := thumbnail.NewService(db, filepath.Join(paths.Cache, "thumbnails"), filepath.Join(paths.Bin, "ffmpeg.exe"), func(id int64) {
+		if app := application.Get(); app != nil {
+			app.Event.Emit("media:thumbnail-updated", id)
+		}
+	})
+	inspector := engine.LocalInspector{FFprobe: filepath.Join(paths.Bin, "ffprobe.exe"), FFmpeg: filepath.Join(paths.Bin, "ffmpeg.exe"), ImageMagick: filepath.Join(paths.Bin, "imagemagick", "magick.exe"), Cache: paths.Cache}
+	thumb.ConfigureImages(inspector)
+	localImporter := localimport.NewService(db, inspector, func() (string, error) {
+		return application.Get().Dialog.OpenFile().CanChooseFiles(false).CanChooseDirectories(true).SetTitle("라이브러리에 가져올 폴더 선택").PromptForSingleSelection()
+	}, func(id int64) {
+		thumb.ScheduleMedia(id)
 		if app := application.Get(); app != nil {
 			app.Event.Emit("media:thumbnail-updated", id)
 		}
@@ -75,7 +90,21 @@ func applicationServices(
 	})
 	var once sync.Once
 	cleaner := maintenance.NewCleaner(db)
-	closeAll := func() { once.Do(func() { downloader.Close(); thumb.Close(); cleaner.Close(); db.Close(); unlock() }) }
+	closeAll := func() {
+		once.Do(func() {
+			web.Close()
+			localImporter.Close()
+			downloader.Close()
+			thumb.Close()
+			cleaner.Close()
+			db.Close()
+			unlock()
+		})
+	}
+	if err = localImporter.Recover(context.Background()); err != nil {
+		closeAll()
+		return nil, nil, nil, err
+	}
 	if err = downloader.Recover(context.Background()); err != nil {
 		closeAll()
 		return nil, nil, nil, err
@@ -101,12 +130,17 @@ func applicationServices(
 	}
 
 	return []application.Service{
+		application.NewService(localImporter),
 		application.NewService(downloader),
 		application.NewService(manager),
-		application.NewService(media.NewService(db)),
+		application.NewService(catalog),
+		application.NewService(web),
 		application.NewService(config),
 		application.NewService(thumb),
 		application.NewService(&desktop.SystemService{}),
+		application.NewService(desktop.NewService(databaseImporter, func() (string, error) {
+			return application.Get().Dialog.OpenFile().CanChooseFiles(true).CanChooseDirectories(false).AddFilter("StorageBucket 데이터베이스", "*.db;*.sqlite;*.sqlite3").SetTitle("병합할 데이터베이스 선택").PromptForSingleSelection()
+		})),
 	}, desktop.MediaMiddleware(db, filepath.Join(paths.Cache, "previews")), closeAll, nil
 }
 
