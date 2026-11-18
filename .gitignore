@@ -93,3 +93,5 @@ cache/
 # Local backups and download workspaces
 /backups/
 .storagebucket/
+VERIFICATION.md
+diff.txt
