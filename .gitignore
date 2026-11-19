@@ -5,7 +5,6 @@ node_modules/
 # Build Output (Electron & Vite)
 dist/
 out/
-build/
 release/
 
 # Environment Variables & Secrets
@@ -60,8 +59,42 @@ Thumbs.db
 *.txt
 bin/
 data/
-drizzle/
-resources/
 downloads/
 thumbnails/
 ui-prototype.html
+cache/
+.test-data/
+
+# Wails generated files
+/.task/
+/bin/
+/dist/
+/frontend/dist/
+/frontend/node_modules/
+/frontend/bindings/
+*.syso
+
+/build/linux/appimage/build/
+/build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
+/build/ios/xcode/overlay.json
+/build/ios/xcode/gen/
+/build/android/overlay.json
+/build/android/gen/
+
+# Android build cache and local configuration
+/build/android/.gradle/
+/build/android/**/build/
+/build/android/local.properties
+
+# SQLite shared-memory files
+*.db-shm
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+
+# Local backups and download workspaces
+/backups/
+.storagebucket/
+VERIFICATION.md
+diff.txt

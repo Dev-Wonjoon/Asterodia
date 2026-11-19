@@ -1,0 +1,56 @@
+param([switch]$Race, [switch]$Live)
+$ErrorActionPreference = 'Stop'
+$repositoryPath = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$runId = [Guid]::NewGuid().ToString('N')
+$testFlags = @()
+if ($Race) { $testFlags += '-race' }
+function Invoke-TestGroup {
+    param([string]$Category, [string]$Package, [string]$Pattern = '.')
+    $env:STORAGEBUCKET_TEST_ROOT = Join-Path $repositoryPath ".test-data/$Category/$runId"
+    New-Item -ItemType Directory -Force -Path $env:STORAGEBUCKET_TEST_ROOT | Out-Null
+    $binaryPath = Join-Path $env:STORAGEBUCKET_TEST_ROOT 'suite.test.exe'
+    & go test $Package '-c' '-o' $binaryPath @testFlags
+    if ($LASTEXITCODE -ne 0) { throw "Test compilation failed: $Category" }
+    Push-Location (Join-Path $repositoryPath $Package.Substring(2))
+    try { & $binaryPath "-test.run=$Pattern" '-test.count=1' '-test.timeout=5m' } finally { Pop-Location }
+    if ($LASTEXITCODE -ne 0) { throw "Test group failed: $Category" }
+}
+Push-Location $repositoryPath
+$oldRoot = $env:STORAGEBUCKET_TEST_ROOT
+$oldLive = $env:STORAGEBUCKET_LIVE_TESTS
+$oldYtdlp = $env:STORAGEBUCKET_TEST_YTDLP_EXE
+$oldGallery = $env:STORAGEBUCKET_TEST_GALLERYDL_EXE
+$oldProbe = $env:STORAGEBUCKET_TEST_FFPROBE_EXE
+if (-not $oldYtdlp -and -not $oldProbe) {
+    $probeCommand = Get-Command ffprobe -ErrorAction SilentlyContinue
+    $localYtdlp = Join-Path $repositoryPath 'bin/yt-dlp.exe'
+    if ($probeCommand -and (Test-Path -LiteralPath $localYtdlp)) {
+        $env:STORAGEBUCKET_TEST_YTDLP_EXE = $localYtdlp
+        $env:STORAGEBUCKET_TEST_FFPROBE_EXE = $probeCommand.Source
+    }
+}
+if (-not $oldGallery -and (Test-Path -LiteralPath (Join-Path $repositoryPath 'bin/gallery-dl.exe'))) {
+    $env:STORAGEBUCKET_TEST_GALLERYDL_EXE = Join-Path $repositoryPath 'bin/gallery-dl.exe'
+}
+if ($Live) { $env:STORAGEBUCKET_LIVE_TESTS = '1' } else { $env:STORAGEBUCKET_LIVE_TESTS = '0' }
+try {
+    Invoke-TestGroup 'database-open' './tests/database'
+    Invoke-TestGroup 'local-import' './tests/localimport'
+    Invoke-TestGroup 'download-storage' './tests/download'
+    Invoke-TestGroup 'engine-process' './tests/engine' '^TestProcess'
+    Invoke-TestGroup 'gallerydl-download' './tests/engine' '^TestGalleryDLSaveImages$'
+    Invoke-TestGroup 'gallerydl-discovery' './tests/engine' '^TestGalleryDLDiscoverBluesky$'
+    Invoke-TestGroup 'ytdlp-download' './tests/engine' '^TestYtdlpDownload'
+    Invoke-TestGroup 'engine-parsers' './tests/engine' '^Test(ParseGalleryDLDiscovery|GalleryDLInstagramTargetKey|YtdlpTargetKeyCompatibility)$'
+    Invoke-TestGroup 'integration' './tests/integration'
+    Invoke-TestGroup 'webserver' './tests/webserver'
+    & go vet . ./internal/... ./tests/...
+    if ($LASTEXITCODE -ne 0) { throw 'go vet failed' }
+} finally {
+    $env:STORAGEBUCKET_TEST_ROOT = $oldRoot
+    $env:STORAGEBUCKET_LIVE_TESTS = $oldLive
+    $env:STORAGEBUCKET_TEST_YTDLP_EXE = $oldYtdlp
+    $env:STORAGEBUCKET_TEST_GALLERYDL_EXE = $oldGallery
+    $env:STORAGEBUCKET_TEST_FFPROBE_EXE = $oldProbe
+    Pop-Location
+}

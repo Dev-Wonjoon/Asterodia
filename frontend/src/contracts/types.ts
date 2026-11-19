@@ -1,0 +1,126 @@
+export interface Media {
+    id: number
+    title: string
+    filepath: string
+    author?: string | null
+    platform?: string | null
+    url?: string | null
+    filesize?: number | null
+    thumbnailPath?: string | null
+    duration?: number | null
+    isFavorite?: boolean
+
+    platformId: number | null
+    profileId: number | null
+
+    createdAt: Date
+    updatedAt: Date
+}
+
+export type VideoQuality = 'best' | '8k' | '4k' | '2k' | '1080' | '720' | '480' | 'audio'
+
+export interface DownloadOptions {
+    type?: 'video' | 'audio'
+    quality?: VideoQuality
+    playlist?: boolean
+    extension?: 'mp4' | 'mp3' | 'mkv'
+    skipExisting?: boolean
+    excludeIds?: string[]
+}
+
+export interface DownloadJob {
+    id: string
+    url: string
+    options: DownloadOptions
+    status: 'pending' | 'downloading' | 'completed' | 'failed'
+    progress?: number
+    title?: string
+    thumbnail?: string
+}
+
+export interface VideoInfo {
+    id: string
+    title: string
+    thumbnail: string
+    duration: number
+    uploader: string
+    webpage_url?: string
+}
+
+export interface MediaSearchRequest {
+    page: number
+    limit: number
+
+    keyword?: string
+    title?: string
+    tags?: string | string[]
+    tagMode?: 'and' | 'or'
+    author?: string | string[]
+    platform?: string | string[]
+
+    startDate?: string
+    endDate?: string
+}
+
+export interface MediaSearchResult {
+    data: Media[]
+    total: number
+
+    hasNextPage?: boolean
+}
+
+export interface TaskCallbacks {
+    onProgress: (progress: number, extra?: Record<string, unknown>) => void
+}
+
+export interface TaskHandle {
+    promise: Promise<DownloadResult>
+    abort: () => void
+}
+
+export interface DownloadResult {
+    success: boolean
+    multiple: boolean
+    items?: DownloadResultItem[]
+    metadata: DownloadResultMetadata | null
+    videoPath: string
+    thumbnailPath: string | null
+}
+
+export interface DownloadResultItem {
+    metadata: DownloadResultMetadata
+    videoPath: string
+    thumbnailPath: string | null
+}
+
+export interface DownloadResultMetadata {
+    id: string
+    title: string
+    extractor_key: string
+    filename: string
+    duration?: number
+    uploader?: string
+    webpage_url: string
+    thumbnail?: string
+}
+
+export interface EngineStatus {
+    installed: boolean
+    version: string | null
+    error?: string
+}
+
+export interface LicenseInfo {
+    name: string
+    url: string
+    notice: string
+}
+
+export interface EngineInstallProgress {
+    installId: string
+    engine: string
+    phase: string
+    downloaded: number
+    total: number | null
+    error?: string
+}

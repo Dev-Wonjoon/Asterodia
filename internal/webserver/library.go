@@ -1,0 +1,80 @@
+package webserver
+
+import (
+	"context"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
+	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
+)
+
+func publicSummary(row map[string]any) map[string]any {
+	result := map[string]any{"id": row["id"], "title": row["title"], "fileCount": row["fileCount"], "createdAt": row["createdAt"], "cover": nil}
+	if cover, ok := row["cover"].(map[string]any); ok {
+		result["cover"] = map[string]any{"fileId": cover["fileId"], "kind": cover["kind"]}
+	}
+	return result
+}
+
+func apiError(w http.ResponseWriter, r *http.Request, result api.Result) bool {
+	if result.OK {
+		return false
+	}
+	status := 500
+	if result.Error.Code == "INVALID_ARGUMENT" {
+		status = 400
+	}
+	if result.Error.Code == "NOT_FOUND" {
+		status = 404
+	}
+	http.Error(w, "라이브러리를 읽지 못했습니다", status)
+	return true
+}
+
+func (s *Service) list(w http.ResponseWriter, r *http.Request) {
+	limit, e1 := integer(r, "limit", 24)
+	offset, e2 := integer(r, "offset", 0)
+	q := r.URL.Query().Get("q")
+	if e1 != nil || e2 != nil || limit < 1 || limit > 100 || offset < 0 || len(q) > 1000 {
+		http.Error(w, "조회 범위를 확인하세요", 400)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	result := s.library.List(ctx, media.ListRequest{Limit: limit, Offset: offset, Filter: media.Filter{Keyword: q}})
+	if apiError(w, r, result) {
+		return
+	}
+	page := result.Data.(map[string]any)
+	items := []map[string]any{}
+	for _, row := range page["data"].([]media.Object) {
+		items = append(items, publicSummary(row))
+	}
+	respond(w, r, map[string]any{"data": items, "total": page["total"], "hasNextPage": page["hasNextPage"]})
+}
+
+func (s *Service) detail(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	offset, e2 := integer(r, "fileOffset", 0)
+	if err != nil || e2 != nil || id <= 0 || offset < 0 {
+		http.Error(w, "조회 범위를 확인하세요", 400)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	result := s.library.Get(ctx, media.GetRequest{MediaID: id, FileOffset: offset, FileLimit: 24})
+	if apiError(w, r, result) {
+		return
+	}
+	row := result.Data.(map[string]any)
+	detail := publicSummary(row)
+	page := row["files"].(media.Object)
+	files := []map[string]any{}
+	for _, file := range page["data"].([]media.Object) {
+		files = append(files, map[string]any{"id": file["id"], "title": file["title"], "kind": file["kind"], "width": file["width"], "height": file["height"], "duration": file["duration"]})
+	}
+	detail["files"] = map[string]any{"data": files, "total": page["total"], "hasNextPage": page["hasNextPage"]}
+	respond(w, r, detail)
+}
