@@ -330,7 +330,11 @@ func TestRealVideoAudioAndMKVPublication(t *testing.T) {
 			if e != nil || int64(len(entries)) != queryInt(t, f.db, "SELECT count(*) FROM media_file") {
 				t.Fatal("쿠키 작업 사본이나 임시 파일이 최종 미디어에 남았습니다")
 			}
-			if path != filepath.Join(f.root, "downloads", "youtube", "fixture-owner", "Local video fixture."+tc.extension) {
+			var token string
+			if err = f.db.QueryRow("SELECT filename_token FROM media_file WHERE media_id=?", id).Scan(&token); err != nil {
+				t.Fatal(err)
+			}
+			if path != filepath.Join(f.root, "downloads", "youtube", "fixture-owner", "Local video fixture_"+token+"."+tc.extension) {
 				t.Fatalf("다운로드 파일명 규칙 불일치: %s", path)
 			}
 			assertFK(t, f.db)

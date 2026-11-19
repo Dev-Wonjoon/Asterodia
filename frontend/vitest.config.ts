@@ -34,6 +34,10 @@ export default defineConfig({
             reportsDirectory: path.join(runDirectory, 'coverage'),
             reporter: ['text-summary', 'json-summary', 'html'],
             thresholds: {
+                'frontend/src/app/providers/ConfirmProvider.tsx': { branches: 90, functions: 90, lines: 90, statements: 90 },
+                'frontend/src/shared/components/ui/ConfirmDialog.tsx': { branches: 90, functions: 90, lines: 90, statements: 90 },
+                'frontend/src/shared/hooks/useLeaveGuard.ts': { branches: 90, functions: 90, lines: 90, statements: 90 },
+                'frontend/src/features/gallery/FileMovePanel.tsx': { branches: 90, functions: 90, lines: 90, statements: 90 },
                 'frontend/src/features/settings/WebServerSettings.tsx': { branches: 90, functions: 90, lines: 90, statements: 90 },
                 'frontend/src/features/settings/useWebServerSettings.ts': { branches: 90, functions: 90, lines: 90, statements: 90 },
                 'frontend/src/features/download/downloadStore.ts': { branches: 90, functions: 90, lines: 90, statements: 90 },

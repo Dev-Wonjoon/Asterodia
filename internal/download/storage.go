@@ -11,9 +11,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"unicode"
-	"unicode/utf16"
 
+	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
 	"github.com/google/uuid"
 )
 
@@ -131,43 +130,10 @@ type publicationRecord struct {
 var fileHashPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 func pathComponent(value, fallback string, limit int) string {
-	value = strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) || strings.ContainsRune(`<>:"/\|?*`, r) {
-			return '_'
-		}
-		return r
-	}, value)
-	value = strings.Trim(strings.Join(strings.Fields(value), " "), " .")
-	if value == "" {
-		value = fallback
-	}
-	var out strings.Builder
-	units := 0
-	for _, r := range value {
-		n := utf16.RuneLen(r)
-		if n < 0 {
-			n = 1
-		}
-		if units+n > limit {
-			break
-		}
-		out.WriteRune(r)
-		units += n
-	}
-	value = strings.TrimRight(out.String(), " .")
-	if value == "" {
-		value = fallback
-	}
-	base, _, _ := strings.Cut(strings.ToUpper(value), ".")
-	base = strings.TrimSpace(base)
-	characters := []rune(base)
-	if base == "CON" || base == "PRN" || base == "AUX" || base == "NUL" || base == "CONIN$" || base == "CONOUT$" || (len(characters) == 4 && (strings.HasPrefix(base, "COM") || strings.HasPrefix(base, "LPT")) && strings.ContainsRune("123456789¹²³", characters[3])) {
-		value = "_" + value
-	}
-	return value
+	return media.PathComponent(value, fallback, limit)
 }
 
-func publicationName(file verifiedFile, suffix int) string {
+func publicationName(file verifiedFile) string {
 	site := strings.ToLower(file.metadata.PlatformName)
 	if site == "" || site == "generic" || site == "html5mediaembed" {
 		if page, e := url.Parse(file.source); e == nil {
@@ -175,12 +141,8 @@ func publicationName(file verifiedFile, suffix int) string {
 		}
 	}
 	owner := pathComponent(file.metadata.OwnerID, "unknown", 64)
-	title := pathComponent(file.metadata.Title, pathComponent(file.metadata.ExternalID, "untitled", 100), 120)
-	if suffix > 1 {
-		title += fmt.Sprintf(" (%d)", suffix)
-	}
-	ext := strings.ToLower(filepath.Ext(file.final))
-	return filepath.Join(pathComponent(site, "unknown", 60), owner, title+ext)
+	name, _ := media.Filename(file.metadata.Title, file.metadata.ExternalID, filepath.Ext(file.final), file.token)
+	return filepath.Join(pathComponent(site, "unknown", 60), owner, name)
 }
 
 func publicationPath(job, attempt string) string {
@@ -298,8 +260,12 @@ func (s Storage) publish(root *os.Root, job, attempt string, files []verifiedFil
 		}
 		record.Files = append(record.Files, entry)
 		moved := false
-		for suffix := 1; suffix <= 10000; suffix++ {
-			path := publicationName(*file, suffix)
+		for trial := 0; trial < 100; trial++ {
+			file.token, e = media.NewFilenameToken()
+			if e != nil {
+				break
+			}
+			path := publicationName(*file)
 			if e = checkPublicationParents(root, path, true); e != nil {
 				break
 			}

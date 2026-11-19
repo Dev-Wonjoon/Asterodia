@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react'
+import { useConfirm } from '@renderer/shared/hooks/useConfirm'
+import { useEffect, useRef, useState } from 'react'
 import { Sidebar } from './layouts/Sidebar'
 import { DownloadBar } from '@renderer/features/download/components/DownloadBar'
 import { GalleryPage } from '@renderer/features/gallery/GalleryPage'
@@ -16,10 +17,14 @@ import { LeaveGuardProvider } from './providers/LeaveGuardProvider'
 export default function App(): React.JSX.Element {
     const [activeMenu, setActiveMenu] = useState<AppMenu>('gallery')
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-    const leaveGuard = useRef<(() => boolean) | null>(null)
+    const leaveGuard = useRef<(() => boolean | Promise<boolean>) | null>(null)
     const { startDownload } = useDownloadViewModel()
+    const { isOpen: confirming } = useConfirm()
+    const navigating = useRef(false)
+    const alive = useRef(true)
+    useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
     const { showSetup, closeSetup } = useEngineSetup()
-    useGlobalPaste(startDownload)
+    useGlobalPaste(async url => !confirming && await startDownload(url))
 
     const pages: Record<AppMenu, React.JSX.Element> = {
         gallery: <GalleryPage />,
@@ -42,10 +47,13 @@ export default function App(): React.JSX.Element {
             >
                 <Sidebar
                     activeMenu={activeMenu}
-                    onMenuClick={(menu) => {
-                        if (menu === activeMenu || (leaveGuard.current && !leaveGuard.current()))
-                            return
-                        setActiveMenu(menu)
+                    onMenuClick={async (menu) => {
+                        if (menu === activeMenu || navigating.current || confirming) return
+                        navigating.current = true
+                        try {
+                            if (leaveGuard.current && !await leaveGuard.current()) return
+                            if (alive.current) setActiveMenu(menu)
+                        } finally { navigating.current = false }
                     }}
                     collapsed={sidebarCollapsed}
                     onToggle={() => setSidebarCollapsed((previous) => !previous)}

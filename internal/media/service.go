@@ -578,3 +578,8 @@ func (s *Service) Suggest(ctx context.Context, req SuggestRequest) api.Result {
 	}
 	return api.Success(values)
 }
+
+// CheckWrite applies the catalog revision and active-work guards to file moves.
+func CheckWrite(ctx context.Context, tx *sql.Tx, id, expected int64) error {
+	return checkWrite(ctx, tx, id, expected)
+}

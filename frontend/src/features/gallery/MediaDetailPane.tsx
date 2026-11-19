@@ -1,3 +1,4 @@
+import { useConfirm } from '@renderer/shared/hooks/useConfirm'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { getApi } from '@renderer/shared/api'
 import { useToast } from '@renderer/shared/hooks/useToast'
@@ -24,6 +25,13 @@ export function MediaDetailPane({
     focusRequest?: MediaDetailFocusRequest | null
 }) {
     const { showToast } = useToast()
+    const { confirm } = useConfirm()
+    const alive = useRef(true)
+    useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+    function canContinue() {
+        const current = store.getSnapshot()
+        return alive.current && !current.busy && !current.needsRefresh && current.detail.data?.id === data?.id && current.detail.data?.revision === data?.revision
+    }
     const detail = state.detail
     const data = detail.data
 
@@ -122,16 +130,17 @@ export function MediaDetailPane({
         }
     }
 
-    function resetDraft() {
+    async function resetDraft() {
         if (!data || state.busy) return
 
         if (
             draft?.dirty &&
-            !window.confirm('작성 중인 제목을 버리고 현재 저장된 제목을 불러올까요?')
+            !await confirm({ title: '저장된 제목 불러오기', message: '작성 중인 제목을 버리고 현재 저장된 제목을 불러올까요?', confirmLabel: '불러오기' })
         ) {
             return
         }
 
+        if (!canContinue()) return
         setDraft({
             title: data.customTitle ?? '',
             revision: data.revision,
@@ -281,16 +290,15 @@ export function MediaDetailPane({
                                 type="button"
                                 className={button}
                                 disabled={disabled}
-                                onClick={() => {
+                                onClick={async () => {
                                     if (
                                         draft?.dirty &&
-                                        !window.confirm(
-                                            '작성 중인 제목을 버리고 원본 제목으로 되돌릴까요?'
-                                        )
+                                        !await confirm({ title: '원본 제목으로 되돌리기', message: '작성 중인 제목을 버리고 원본 제목으로 되돌릴까요?', confirmLabel: '되돌리기' })
                                     ) {
                                         return
                                     }
 
+                                    if (!canContinue()) return
                                     void store
                                         .edit({
                                             mediaId: data.id,
@@ -298,7 +306,7 @@ export function MediaDetailPane({
                                             customTitle: null
                                         })
                                         .then((saved) => {
-                                            if (!saved) return
+                                            if (!saved || !alive.current) return
 
                                             const current = store.getSnapshot().detail.data
 
@@ -465,24 +473,9 @@ export function MediaDetailPane({
                                         type="button"
                                         className={button}
                                         disabled={disabled}
-                                        onClick={() => {
-                                            if (
-                                                !window.confirm(
-                                                    '이 파일의 등록을 해제할까요? 외부 원본과 보관 방식 미확인 원본은 삭제하지 않습니다. 앱 관리 파일의 정리는 별도로 처리합니다.'
-                                                )
-                                            ) {
-                                                return
-                                            }
-
-                                            if (
-                                                hasDraft &&
-                                                !window.confirm(
-                                                    '파일 등록 해제로 묶음이 제거되면 작성 중인 제목·태그도 닫힙니다. 계속할까요?'
-                                                )
-                                            ) {
-                                                return
-                                            }
-
+                                        onClick={async () => {
+                                            const warning = hasDraft ? '\n\n파일 등록 해제로 묶음이 제거되면 작성 중인 제목·태그도 닫힙니다.' : ''
+                                            if (!await confirm({ title: '파일 등록 해제', message: '이 파일의 등록을 해제할까요? 외부 원본과 보관 방식 미확인 원본은 삭제하지 않습니다. 앱 관리 파일의 정리는 별도로 처리합니다.' + warning, confirmLabel: '등록 해제', danger: true }) || !canContinue()) return
                                             void store.unregisterFiles({
                                                 mediaId: data.id,
                                                 expectedRevision: data.revision,
@@ -532,22 +525,9 @@ export function MediaDetailPane({
                         type="button"
                         className={button + ' text-red-500'}
                         disabled={disabled}
-                        onClick={() => {
-                            if (
-                                !window.confirm(
-                                    '묶음의 등록을 해제할까요? 외부 원본과 보관 방식 미확인 원본은 삭제하지 않습니다. 앱 관리 파일의 정리는 별도로 처리합니다.'
-                                )
-                            ) {
-                                return
-                            }
-
-                            if (
-                                hasDraft &&
-                                !window.confirm('작성 중인 제목·태그가 닫힙니다. 계속할까요?')
-                            ) {
-                                return
-                            }
-
+                        onClick={async () => {
+                            const warning = hasDraft ? '\n\n작성 중인 제목·태그도 닫힙니다.' : ''
+                            if (!await confirm({ title: '묶음 등록 해제', message: '묶음의 등록을 해제할까요? 외부 원본과 보관 방식 미확인 원본은 삭제하지 않습니다. 앱 관리 파일의 정리는 별도로 처리합니다.' + warning, confirmLabel: '등록 해제', danger: true }) || !canContinue()) return
                             void store.unregisterMedia({
                                 mediaId: data.id,
                                 expectedRevision: data.revision

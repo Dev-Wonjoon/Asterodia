@@ -6,10 +6,9 @@ const row: DownloadJobDto = { id: 'new', url: 'https://example.test/item', title
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
 
 describe('confirmed replacement requests', () => {
-    async function fixture(confirmed: boolean) {
+    async function fixture(confirmed: boolean | Promise<boolean>) {
         vi.useFakeTimers()
-        const confirm = vi.fn(() => confirmed)
-        vi.stubGlobal('window', { confirm })
+        const confirm = vi.fn(async () => confirmed)
         const enqueue = vi.fn<DownloadApi['enqueue']>()
             .mockResolvedValueOnce({ ok: false, error: { code: 'REDOWNLOAD_CONFIRMATION_REQUIRED', message: 'exists', context: { mediaId: 17, expectedRevision: 8 } } })
             .mockResolvedValue({ ok: true, data: row })
@@ -21,7 +20,7 @@ describe('confirmed replacement requests', () => {
             cancel: vi.fn(async () => ({ ok: true, data: { accepted: true } })),
             previewEngine: vi.fn(async () => 'yt-dlp')
         }
-        const store = createDownloadStore(api)
+        const store = createDownloadStore(api, 2000, confirm)
         const stop = store.connect(() => {})
         await store.refresh()
         return { api, store, stop, confirm }
@@ -42,4 +41,14 @@ describe('confirmed replacement requests', () => {
             expect(f.api.run).not.toHaveBeenCalled()
         } finally { f.stop() }
     })
+})
+
+it('does not send a confirmed replacement after the store disconnects',async()=>{
+ vi.useFakeTimers()
+ let answer!:(value:boolean)=>void
+ const confirm=vi.fn(()=>new Promise<boolean>(resolve=>{answer=resolve}))
+ const enqueue=vi.fn().mockResolvedValue({ok:false,error:{code:'REDOWNLOAD_CONFIRMATION_REQUIRED',message:'exists',context:{mediaId:17,expectedRevision:8}}})
+ const api={enqueue,list:vi.fn(async()=>({ok:true,data:{data:[],limit:50,offset:0,hasNextPage:false}}))} as unknown as DownloadApi
+ const store=createDownloadStore(api,2000,confirm);const stop=store.connect(()=>{});await store.refresh()
+ const pending=store.startDownload(row.url);await Promise.resolve();expect(confirm).toHaveBeenCalledOnce();stop();answer(true);await pending;expect(enqueue).toHaveBeenCalledOnce()
 })

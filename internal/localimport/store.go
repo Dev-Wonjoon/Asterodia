@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
@@ -239,6 +240,24 @@ func (s *Service) commitTarget(ctx context.Context, job, root string, t *target)
 	}
 	if current != t.existing || (current != 0 && currentUUID != t.fileUUID) {
 		return fileError(fmt.Errorf("검사 중 파일 등록 정보가 변경되었습니다"))
+	}
+	{
+		var reserved int
+		if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM file_move_item WHERE state IN ('pending','copying','verified','committed','cleanup_pending') AND target_key=?", "move:"+strings.ToLower(t.state.Path)).Scan(&reserved); err != nil {
+			return err
+		}
+		if reserved > 0 {
+			return fileError(fmt.Errorf("파일 이동이 진행 중인 경로입니다"))
+		}
+	}
+	if t.existing != 0 {
+		var moving int
+		if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM file_move_item WHERE file_id=? AND state IN ('pending','copying','verified','committed','cleanup_pending')", t.existing).Scan(&moving); err != nil {
+			return err
+		}
+		if moving > 0 {
+			return fileError(fmt.Errorf("파일 이동이 진행 중입니다"))
+		}
 	}
 	now := time.Now().UnixMilli()
 	resultKind := "unchanged"

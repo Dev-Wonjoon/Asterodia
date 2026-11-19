@@ -19,11 +19,11 @@ import (
 )
 
 type verifiedFile struct {
-	id, key, source, staged, final, hash, format string
-	position                                     int
-	size, mtime                                  int64
-	width, height                                *int
-	metadata                                     TargetMetadata
+	id, key, source, staged, final, hash, format, token string
+	position                                            int
+	size, mtime                                         int64
+	width, height                                       *int
+	metadata                                            TargetMetadata
 }
 
 func workPaths(job, attempt string) (string, string) {
@@ -304,7 +304,7 @@ func (s *Service) register(ctx context.Context, job, attempt string, files []ver
 			}
 			profileID = id
 		}
-		if _, err = tx.ExecContext(ctx, `INSERT INTO media_file(media_id,file_key,storage_kind,directory_id,source_url,external_id,platform_id,profile_id,title,filepath,filesize,mtime_ns,hash_algorithm,content_hash,kind,position,duration,detected_format,width,height,created_at) VALUES(?,?,'app_managed',?,?,?,?,?,?,?,?,?, 'sha256',?,?,?,?,?,?,?,?)`, mediaID, v.key, directoryID, v.source, v.metadata.ExternalID, platformID, profileID, v.metadata.Title, v.final, v.size, fmt.Sprint(v.mtime), v.hash, v.metadata.Kind, v.position, v.metadata.Duration, v.format, v.width, v.height, now); err != nil {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO media_file(media_id,file_key,filename_token,storage_kind,directory_id,source_url,external_id,platform_id,profile_id,title,filepath,filesize,mtime_ns,hash_algorithm,content_hash,kind,position,duration,detected_format,width,height,created_at) VALUES(?,?,?,'app_managed',?,?,?,?,?,?,?,?,?, 'sha256',?,?,?,?,?,?,?,?)`, mediaID, v.key, v.token, directoryID, v.source, v.metadata.ExternalID, platformID, profileID, v.metadata.Title, v.final, v.size, fmt.Sprint(v.mtime), v.hash, v.metadata.Kind, v.position, v.metadata.Duration, v.format, v.width, v.height, now); err != nil {
 			return 0, err
 		}
 	}

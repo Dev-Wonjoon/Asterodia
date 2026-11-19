@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 
 interface BaseModalProps {
+    layer?: number
     onClose?: () => void
     closeOnOverlay?: boolean
     position?: 'center' | { x: number; y: number }
@@ -11,6 +12,7 @@ interface BaseModalProps {
 }
 
 export const BaseModal = ({
+    layer = 99998,
     onClose,
     closeOnOverlay = true,
     position = 'center',
@@ -35,11 +37,12 @@ export const BaseModal = ({
             {/* 오버레이 */}
             <div
                 className={`fixed inset-0 z-[99998] ${overlayClassName}`}
+                style={{ zIndex: layer }}
                 onClick={closeOnOverlay ? onClose : undefined}
             />
             {/* 컨테이너 */}
             {isCenter ? (
-                <div className="fixed inset-0 z-[99999] flex items-center justify-center pointer-events-none">
+                <div style={{ zIndex: layer + 1 }} className="fixed inset-0 z-[99999] flex items-center justify-center pointer-events-none">
                     <div
                         className="pointer-events-auto bg-[var(--bg-popup)] shadow-[0_8px_32px_rgba(0,0,0,0.4)] rounded-2xl overflow-hidden"
                         onClick={(e) => e.stopPropagation()}
@@ -52,6 +55,7 @@ export const BaseModal = ({
                     ref={containerRef}
                     className="fixed z-[99999] bg-[var(--bg-popup)] shadow-[0_8px_32px_rgba(0,0,0,0.4)] rounded-lg"
                     style={{
+                        zIndex: layer + 1,
                         left: (position as { x: number; y: number }).x,
                         top: (position as { x: number; y: number }).y
                     }}

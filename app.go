@@ -13,6 +13,7 @@ import (
 	"github.com/Dev-Wonjoon/StorageBucket/internal/desktop"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/StorageBucket/internal/filemove"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/localimport"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/maintenance"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
@@ -88,11 +89,19 @@ func applicationServices(
 	downloader.ConfigureVerification(func(ctx context.Context, path, kind string) error {
 		return engine.VerifyMedia(ctx, filepath.Join(paths.Bin, "ffmpeg.exe"), path, kind)
 	})
+	mover := filemove.NewService(db, func(id int64) {
+		thumb.ScheduleMedia(id)
+		if app := application.Get(); app != nil {
+			app.Event.Emit("media:thumbnail-updated", id)
+		}
+	})
+	mover.ConfigureInspector(inspector)
 	var once sync.Once
 	cleaner := maintenance.NewCleaner(db)
 	closeAll := func() {
 		once.Do(func() {
 			web.Close()
+			mover.Close()
 			localImporter.Close()
 			downloader.Close()
 			thumb.Close()
@@ -100,6 +109,10 @@ func applicationServices(
 			db.Close()
 			unlock()
 		})
+	}
+	if err = mover.Recover(context.Background()); err != nil {
+		closeAll()
+		return nil, nil, nil, err
 	}
 	if err = localImporter.Recover(context.Background()); err != nil {
 		closeAll()
@@ -130,6 +143,7 @@ func applicationServices(
 	}
 
 	return []application.Service{
+		application.NewService(mover),
 		application.NewService(localImporter),
 		application.NewService(downloader),
 		application.NewService(manager),

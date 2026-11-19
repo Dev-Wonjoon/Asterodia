@@ -1,3 +1,4 @@
+import { Service as FileMoveService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/filemove";
 import type { AppApi } from "@contracts/api";
 import { Service as WebServerService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/webserver";
 import { Service as LocalImportService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/localimport";
@@ -23,6 +24,13 @@ async function response<T>(pending: Promise<Result>): Promise<T> {
 }
 
 const api: AppApi = {
+ fileMove: {
+  create: request => response(FileMoveService.Create(wire(request))),
+  get: (request = {}) => response(FileMoveService.Get(wire(request))),
+  run: request => response(FileMoveService.Run(wire(request))),
+  pause: request => response(FileMoveService.Pause(wire(request))),
+  retry: request => response(FileMoveService.Retry(wire(request))),
+ },
     webServer: {
         status: () => response(WebServerService.Status()),
         start: () => response(WebServerService.Start()),

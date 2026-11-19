@@ -1,3 +1,4 @@
+import type { Confirm } from '@renderer/shared/hooks/confirmContext'
 import type { Unsubscribe } from '@contracts/api'
 import type {
     DownloadApi,
@@ -59,7 +60,7 @@ function failure(code: string, message: string): DownloadResponse<never> {
     }
 }
 
-export function createDownloadStore(api: DownloadApi, pollMs = 2000): DownloadStore {
+export function createDownloadStore(api: DownloadApi, pollMs = 2000, confirm: Confirm = async () => false): DownloadStore {
     let snapshot: DownloadSnapshot = {
         queue: [],
         mediaRevision: 0,
@@ -452,7 +453,7 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000): DownloadSt
             if (!result.ok && result.error.code === 'REDOWNLOAD_CONFIRMATION_REQUIRED') {
                 const { mediaId, expectedRevision } = result.error.context
                 if (Number.isSafeInteger(mediaId) && mediaId > 0 && Number.isSafeInteger(expectedRevision) &&
-                    window.confirm('이미 등록된 묶음입니다. 다시 다운로드해 파일을 교체할까요? 사용자 제목·태그·즐겨찾기는 유지됩니다.')) {
+                    await confirm({ title: '파일 교체', message: '이미 등록된 묶음입니다. 다시 다운로드해 파일을 교체할까요? 사용자 제목·태그·즐겨찾기는 유지됩니다.', confirmLabel: '다시 다운로드', danger: true }) && connected && generation === ownGeneration) {
                     result = await api.enqueue({ mode: 'replace', url: url.trim(), options, mediaId, expectedRevision })
                 }
             }

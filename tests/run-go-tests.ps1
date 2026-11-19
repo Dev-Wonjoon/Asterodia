@@ -1,19 +1,34 @@
-param([switch]$Race, [switch]$Live)
+param([switch]$Race, [switch]$Live, [string[]]$Groups = @())
 $ErrorActionPreference = 'Stop'
 $repositoryPath = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $runId = [Guid]::NewGuid().ToString('N')
 $testFlags = @()
 if ($Race) { $testFlags += '-race' }
 function Invoke-TestGroup {
-    param([string]$Category, [string]$Package, [string]$Pattern = '.')
+    param([string]$Category, [string]$Package, [string]$Pattern = '.', [string]$CoverPackage = '')
+    if ($Groups.Count -gt 0 -and $Category -notin $Groups) { return }
+    Write-Output "[$Category]"
     $env:STORAGEBUCKET_TEST_ROOT = Join-Path $repositoryPath ".test-data/$Category/$runId"
     New-Item -ItemType Directory -Force -Path $env:STORAGEBUCKET_TEST_ROOT | Out-Null
     $binaryPath = Join-Path $env:STORAGEBUCKET_TEST_ROOT 'suite.test.exe'
-    & go test $Package '-c' '-o' $binaryPath @testFlags
+    $coverFlags = @()
+    $runtimeFlags = @()
+    if ($CoverPackage) {
+        $coverFlags = @('-cover', "-coverpkg=$CoverPackage")
+        $profilePath = Join-Path $env:STORAGEBUCKET_TEST_ROOT 'coverage.out'
+        $runtimeFlags = @("-test.coverprofile=$profilePath")
+    }
+    & go test $Package '-c' '-o' $binaryPath @testFlags @coverFlags
     if ($LASTEXITCODE -ne 0) { throw "Test compilation failed: $Category" }
     Push-Location (Join-Path $repositoryPath $Package.Substring(2))
-    try { & $binaryPath "-test.run=$Pattern" '-test.count=1' '-test.timeout=5m' } finally { Pop-Location }
+    try { & $binaryPath "-test.run=$Pattern" '-test.count=1' '-test.timeout=5m' @runtimeFlags } finally { Pop-Location }
     if ($LASTEXITCODE -ne 0) { throw "Test group failed: $Category" }
+    if ($CoverPackage) {
+        $coverage = (& go tool cover "-func=$profilePath" | Select-Object -Last 1)
+        Write-Output $coverage
+        if ($coverage -notmatch '([0-9]+(?:[.][0-9]+)?)%') { throw 'Coverage result missing' }
+        if ([double]::Parse($Matches[1], [Globalization.CultureInfo]::InvariantCulture) -lt 75) { throw 'File-move statement coverage must be at least 75%' }
+    }
 }
 Push-Location $repositoryPath
 $oldRoot = $env:STORAGEBUCKET_TEST_ROOT
@@ -44,6 +59,7 @@ try {
     Invoke-TestGroup 'engine-parsers' './tests/engine' '^Test(ParseGalleryDLDiscovery|GalleryDLInstagramTargetKey|YtdlpTargetKeyCompatibility)$'
     Invoke-TestGroup 'integration' './tests/integration'
     Invoke-TestGroup 'webserver' './tests/webserver'
+    Invoke-TestGroup 'filemove' './tests/filemove' -CoverPackage './internal/filemove'
     & go vet . ./internal/... ./tests/...
     if ($LASTEXITCODE -ne 0) { throw 'go vet failed' }
 } finally {

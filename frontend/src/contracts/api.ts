@@ -8,7 +8,10 @@ import type { WebServerApi } from "./webserver-api";
 
 export type Unsubscribe = () => void;
 
+import type { FileMoveApi } from "./file-move-api";
+
 export interface AppApi {
+    fileMove: FileMoveApi;
     webServer: WebServerApi;
     localImport: LocalImportApi;
     database: DatabaseApi;

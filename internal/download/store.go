@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
 	"github.com/google/uuid"
 	whatwgurl "github.com/nlnwa/whatwg-url/url"
 )
@@ -110,6 +111,9 @@ func (s *Store) CreateInitialAttempt(
 		var revision, urlID int64
 		if err := tx.QueryRowContext(ctx, "SELECT revision,request_url_id FROM media WHERE id=? AND source_kind='download'", *input.ReplaceMediaID).Scan(&revision, &urlID); err != nil || revision != *input.ExpectedRevision || urlID != record.RequestURLID {
 			return InitialAttempt{}, ErrRevisionConflict
+		}
+		if err := media.CheckWrite(ctx, tx, *input.ReplaceMediaID, *input.ExpectedRevision); err != nil {
+			return InitialAttempt{}, err
 		}
 		var value map[string]any
 		_ = json.Unmarshal([]byte(options), &value)

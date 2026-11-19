@@ -6,10 +6,10 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/Dev-Wonjoon/StorageBucket/internal/database"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
 	_ "modernc.org/sqlite"
@@ -399,65 +399,16 @@ func openStoreTestDB(t *testing.T) *sql.DB {
 	t.Cleanup(func() { _ = db.Close() })
 	db.SetMaxOpenConns(1)
 
-	// go test는 테스트 패키지의 소스 디렉터리에서 바이너리를 실행합니다.
-	sourceDir := filepath.Join("..", "..", "legacy", "electron", "src", "database")
-	read := func(name string) string {
-		t.Helper()
-		source, err := os.ReadFile(filepath.Join(sourceDir, name))
-		if err != nil {
-			t.Fatal(err)
-		}
-		return string(source)
+	// Use the application-owned current schema, independently of archived Electron paths.
+	if err := database.Initialize(t.Context(), db); err != nil {
+		t.Fatal(err)
 	}
-	templates := regexp.MustCompile("(?s)`([^`]*)`")
-	apply := func(source string, want int, expand *strings.Replacer) {
-		t.Helper()
-		statements := templates.FindAllStringSubmatch(source, -1)
-		if len(statements) != want {
-			t.Fatalf("Electron DDL 템플릿 수: %d, 기대값: %d", len(statements), want)
-		}
-		for _, match := range statements {
-			statement := match[1]
-			if expand != nil {
-				statement = expand.Replace(statement)
-			}
-			if strings.Contains(statement, "${") {
-				t.Fatalf("펼치지 못한 DDL 템플릿: %s", statement)
-			}
-			execStoreTestSQL(t, db, statement)
-		}
-	}
-
-	apply(read("schema-v2.sql.ts"), 51, nil)
-
-	guardTemplates, staticGuards, ok := strings.Cut(read("schema-v2.guards.ts"), "]),")
-	if !ok {
-		t.Fatal("v2 보호 트리거의 이벤트 템플릿 경계를 찾지 못했습니다")
-	}
-	for _, event := range []string{"INSERT", "UPDATE"} {
-		apply(guardTemplates, 3, strings.NewReplacer(
-			"${event.toLowerCase()}", strings.ToLower(event),
-			"${event}", event,
-		))
-	}
-	apply(staticGuards, 3, nil)
-
-	_, migration, ok := strings.Cut(read("migrate.ts"), "export const downloadStorageSql = [")
-	if !ok {
-		t.Fatal("v3 downloadStorageSql 시작을 찾지 못했습니다")
-	}
-	storageDDL, _, ok := strings.Cut(migration, "] as const")
-	if !ok {
-		t.Fatal("v3 downloadStorageSql 끝을 찾지 못했습니다")
-	}
-	apply(storageDDL, 3, nil)
-	execStoreTestSQL(t, db, "PRAGMA user_version = 3")
 
 	var fk, version int
 	err = db.QueryRow(`
 		SELECT foreign_keys, user_version FROM pragma_foreign_keys(), pragma_user_version()
 	`).Scan(&fk, &version)
-	if err != nil || fk != 1 || version != 3 {
+	if err != nil || fk != 1 || version != 6 {
 		t.Fatalf("테스트 DB: foreign_keys=%d, user_version=%d, 오류=%v", fk, version, err)
 	}
 	return db

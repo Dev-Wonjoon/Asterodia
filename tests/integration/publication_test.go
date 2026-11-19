@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"unicode/utf16"
@@ -90,11 +91,21 @@ func TestPublicationPaths(t *testing.T) {
 			if err != nil || !filepath.IsLocal(rel) || len(strings.Split(rel, string(filepath.Separator))) != 3 {
 				t.Fatalf("저장 경로 탈출: %q %v", path, err)
 			}
-			if tc.expected != "" && filepath.ToSlash(rel) != tc.expected {
+			var token string
+			if err = f.db.QueryRow("SELECT filename_token FROM media_file WHERE filepath=?", path).Scan(&token); err != nil {
+				t.Fatal(err)
+			}
+			normalized := strings.TrimSuffix(path, filepath.Ext(path))
+			if !strings.HasSuffix(normalized, "_"+token) {
+				t.Fatal("파일명과 DB 토큰 불일치", path, token)
+			}
+			normalized = strings.TrimSuffix(normalized, "_"+token) + filepath.Ext(path)
+			expectedRel, _ := filepath.Rel(filepath.Join(f.root, "downloads"), normalized)
+			if tc.expected != "" && filepath.ToSlash(expectedRel) != tc.expected {
 				t.Fatalf("경로: %q, 기대: %q", rel, tc.expected)
 			}
 			name := filepath.Base(path)
-			if strings.ContainsAny(name, "<>:\"/\\|?*\x01") || strings.HasSuffix(name, " ") || len(utf16.Encode([]rune(name))) > 125 {
+			if strings.ContainsAny(name, "<>:\"/\\|?*\x01") || strings.HasSuffix(name, " ") || len(utf16.Encode([]rune(name))) > 135 {
 				t.Fatalf("안전하지 않은 파일명: %q", name)
 			}
 			if _, err = os.Stat(path); err != nil {
@@ -127,7 +138,7 @@ func TestPublicationCollisionAndMultipleFiles(t *testing.T) {
 		if err = rows.Scan(&path); err != nil {
 			t.Fatal(err)
 		}
-		if filepath.Base(path) != fmt.Sprintf("게시물 (%d).png", i) {
+		if !regexp.MustCompile(`^게시물_[0-9a-f]{8}\.png$`).MatchString(filepath.Base(path)) {
 			t.Fatal(path)
 		}
 		i++
@@ -306,7 +317,7 @@ func TestPublicationCrashRecovery(t *testing.T) {
 	if err = db.QueryRow("SELECT a.job_id,t.final_path FROM download_target t JOIN download_attempt a ON a.id=t.attempt_id").Scan(&job, &path); err != nil {
 		t.Fatal(err)
 	}
-	if filepath.Base(path) != "Instagram Fixture (2).png" {
+	if !regexp.MustCompile(`^Instagram Fixture_[0-9a-f]{8}\.png$`).MatchString(filepath.Base(path)) {
 		t.Fatalf("최종 경로 배치 전에 종료됐습니다: %s", path)
 	}
 	if _, err = os.Stat(path); err != nil {

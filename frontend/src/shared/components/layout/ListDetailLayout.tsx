@@ -14,10 +14,12 @@ export function ListDetailLayout({
     detail?: ReactNode
     detailKey?: string | number | null
     detailLabel: string
-    onClose: () => boolean | void
+    onClose: () => boolean | void | Promise<boolean | void>
     closeDisabled?: boolean
     listRef?: Ref<HTMLDivElement>
 }): React.JSX.Element {
+    const closing = useRef(false)
+    const [replayTarget, setReplayTarget] = useState<HTMLElement | null>(null)
     const root = useRef<HTMLDivElement>(null)
     const panel = useRef<HTMLElement>(null)
     const restoreFocus = useRef(true)
@@ -48,9 +50,17 @@ export function ListDetailLayout({
     }, [open])
 
     useEffect(() => {
+        if (!replayTarget || open) return
+        setReplayTarget(null)
+        closing.current = false
+        if (root.current && replayTarget.isConnected) { replayTarget.focus({ preventScroll: true }); replayTarget.click() }
+    }, [open, replayTarget])
+
+    useEffect(() => {
         if (!open) return
         const closeOutside = (event: MouseEvent): void => {
-            if (event.button !== 0 || event.defaultPrevented || closeDisabled) return
+            if (event.button !== 0 || event.defaultPrevented || closeDisabled || document.querySelector('[data-confirm-dialog]')) return
+            if (closing.current) { event.preventDefault(); event.stopPropagation(); return }
             const target = event.target
             if (!(target instanceof Node) || panel.current?.contains(target)) return
             if (target instanceof Element && target.closest('[data-detail-trigger]')) return
@@ -58,14 +68,20 @@ export function ListDetailLayout({
             // Commit the close before the clicked control runs its own handler.
             // This clears the navigation guard once, without a second prompt.
             restoreFocus.current = false
-            const result = { accepted: true }
-            flushSync(() => {
-                result.accepted = onClose() !== false
-            })
-            if (!result.accepted) {
+            let result: boolean | void | Promise<boolean | void>
+            flushSync(() => { result = onClose() })
+            if (result! instanceof Promise) {
+                closing.current = true
+                event.preventDefault(); event.stopPropagation()
+                const control = target instanceof Element ? target.closest<HTMLElement>('button,a,input,select,textarea,[role="button"]') : null
+                void result.then(accepted => {
+                    if (accepted === false) { restoreFocus.current = true; return }
+                    // Replay only after React commits the detail close and removes its guard.
+                    if (root.current && control?.isConnected) setReplayTarget(control)
+                }).finally(() => { closing.current = false })
+            } else if (result! === false) {
                 restoreFocus.current = true
-                event.preventDefault()
-                event.stopPropagation()
+                event.preventDefault(); event.stopPropagation()
             }
         }
         document.addEventListener('click', closeOutside, true)

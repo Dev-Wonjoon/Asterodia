@@ -1,3 +1,6 @@
+import { useConfirm } from '@renderer/shared/hooks/useConfirm'
+import { FileMovePanel } from "./FileMovePanel"
+import type { MoveSelection } from "@contracts/file-move-api"
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useInfiniteScroll } from '@renderer/shared/hooks/useInfiniteScroll'
 import { ListDetailLayout } from '@renderer/shared/components/layout/ListDetailLayout'
@@ -22,8 +25,12 @@ export const GalleryPage = ({
     filter?: MediaFilter
     emptyMessage?: string
 } = {}): React.JSX.Element => {
+    const { confirm } = useConfirm()
+    const generation = useRef(0)
     const { store, snapshot: state, openInFolder } = useGalleryViewModel(favoritesOnly, filter)
 
+    useEffect(() => { ++generation.current; return () => { ++generation.current } }, [store])
+    const [selection, setSelection] = useState<MoveSelection[]>([])
     const [draftDirty, setDraftDirty] = useState(false)
     const dirtyRef = useRef(false)
     const onDirtyChange = useCallback((dirty: boolean) => {
@@ -86,6 +93,16 @@ export const GalleryPage = ({
 
     const list = state.list
 
+    useEffect(() => {
+        setSelection(previous => {
+            const next = previous.filter(item => {
+                const visible = list.page.data.find(media => media.id === item.mediaId)
+                return !visible || visible.revision === item.revision
+            })
+            return next.length === previous.length ? previous : next
+        })
+    }, [list.page])
+
     useInfiniteScroll({
         rootRef: listScrollRef,
         targetRef: sentinelRef,
@@ -101,18 +118,22 @@ export const GalleryPage = ({
         onLoadMore: store.loadMore
     })
 
-    function selectDetail(mediaId: number): boolean {
-        const current = store.getSnapshot()
+    function selectDetail(mediaId: number): boolean | Promise<boolean> {
+        const current = store.getSnapshot(), own = generation.current
         if (current.busy) return false
         if (current.detail.mediaId === mediaId) return true
-        if (!confirmDiscard(dirtyRef.current)) return false
-        setEditFocus(null)
-        void store.openDetail(mediaId)
-        return true
+        const apply = (accepted: boolean) => {
+            const latest = store.getSnapshot()
+            if (!accepted || generation.current !== own || latest.busy || latest.detail.mediaId !== current.detail.mediaId) return false
+            setEditFocus(null)
+            void store.openDetail(mediaId)
+            return true
+        }
+        const answer = confirmDiscard(dirtyRef.current, confirm)
+        return typeof answer === 'boolean' ? apply(answer) : answer.then(apply)
     }
-    function editDetail(mediaId: number, field: 'title' | 'tags'): void {
-        if (selectDetail(mediaId))
-            setEditFocus({ mediaId, field, sequence: ++editSequence.current })
+    async function editDetail(mediaId: number, field: 'title' | 'tags'): Promise<void> {
+        if (await selectDetail(mediaId)) setEditFocus({ mediaId, field, sequence: ++editSequence.current })
     }
     function toggleFavorite(mediaId: number): void {
         const current = store.getSnapshot()
@@ -125,25 +146,27 @@ export const GalleryPage = ({
             isFavorite: !media.isFavorite
         })
     }
-    function unregisterMedia(mediaId: number): void {
-        const current = store.getSnapshot()
+    async function unregisterMedia(mediaId: number): Promise<void> {
+        const current = store.getSnapshot(), own = generation.current
         if (current.busy || current.needsRefresh) return
-        const media = current.list.page.data.find((item) => item.id === mediaId)
+        const media = current.list.page.data.find(item => item.id === mediaId)
         if (!media) return
-        if (current.detail.mediaId === mediaId && !confirmDiscard(dirtyRef.current)) return
-        if (
-            !window.confirm(
-                '묶음의 등록을 해제할까요? 외부 원본과 보관 방식 미확인 원본은 삭제하지 않습니다. 앱 관리 파일의 정리는 별도로 처리합니다.'
-            )
-        )
-            return
+        const draftWarning = current.detail.mediaId === mediaId && dirtyRef.current ? '\n\n작성 중인 제목·태그도 닫힙니다.' : ''
+        if (!await confirm({ title: '묶음 등록 해제', message: '묶음의 등록을 해제할까요? 외부 원본과 보관 방식 미확인 원본은 삭제하지 않습니다. 앱 관리 파일의 정리는 별도로 처리합니다.' + draftWarning, confirmLabel: '등록 해제', danger: true })) return
+        const latest = store.getSnapshot()
+        if (generation.current !== own || latest.busy || latest.needsRefresh || latest.detail.mediaId !== current.detail.mediaId || latest.list.page.data.find(item => item.id === mediaId)?.revision !== media.revision) return
         void store.unregisterMedia({ mediaId, expectedRevision: media.revision })
     }
-    function closeDetail(): boolean {
-        if (store.getSnapshot().busy || !confirmDiscard(dirtyRef.current)) return false
-        setEditFocus(null)
-        store.closeDetail()
-        return true
+    function closeDetail(): boolean | Promise<boolean> {
+        const current = store.getSnapshot(), own = generation.current
+        if (current.busy) return false
+        const apply = (accepted: boolean) => {
+            const latest = store.getSnapshot()
+            if (!accepted || generation.current !== own || latest.busy || latest.detail.mediaId !== current.detail.mediaId) return false
+            setEditFocus(null); store.closeDetail(); return true
+        }
+        const answer = confirmDiscard(dirtyRef.current, confirm)
+        return typeof answer === 'boolean' ? apply(answer) : answer.then(apply)
     }
 
     const disabled = state.busy || list.status !== 'ready'
@@ -174,6 +197,7 @@ export const GalleryPage = ({
         >
             <div className="space-y-5 pb-6">
                 {!favoritesOnly && <LocalImportPanel disabled={draftDirty || state.busy} onComplete={() => { thumbnailRefreshPending.current = true; refreshThumbnails() }} />}
+                <FileMovePanel selection={selection} disabled={draftDirty || state.busy || state.needsRefresh} onCreated={() => setSelection([])} onChanged={() => { thumbnailRefreshPending.current = true; refreshThumbnails() }} />
                 <header className="flex flex-wrap items-center justify-between gap-3">
                     <h1 className="text-lg font-semibold">{title}</h1>
 
@@ -240,6 +264,9 @@ export const GalleryPage = ({
                                     : 'border-[var(--border-line)]')
                             }
                         >
+                            <label className="absolute left-2 top-2 z-10 flex items-center gap-2 rounded bg-[var(--bg-sidebar)] p-2 text-xs" onClick={event => event.stopPropagation()}>
+                                <input type="checkbox" aria-label={media.title + ' 이동 선택'} checked={selection.some(item => item.mediaId === media.id)} disabled={disabled || draftDirty || state.needsRefresh} onChange={event => setSelection(previous => event.target.checked ? [...previous.filter(item => item.mediaId !== media.id), { mediaId: media.id, revision: media.revision }] : previous.filter(item => item.mediaId !== media.id))} />선택
+                            </label>
                             <button
                                 type="button"
                                 disabled={disabled}
