@@ -5,40 +5,61 @@ import { toMediaUrl } from '@renderer/shared/utils/media'
 
 export function DownloadThumbnail({
     url,
+    localPath,
+    completed = false,
     title = '다운로드 썸네일'
 }: {
     url: string
+    localPath?: string | null
+    completed?: boolean
     title?: string
 }): React.JSX.Element {
     const [result, setResult] = useState<{
         url: string
+        hint: string | null | undefined
         path: string | null
         loading: boolean
     }>({
         url,
-        path: null,
-        loading: true
+        hint: localPath,
+        path: localPath ?? null,
+        loading: !localPath
     })
 
     const [failedSrc, setFailedSrc] = useState<string | null>(null)
     const [reload, setReload] = useState(0)
 
     useEffect(() => {
+        if (!completed) return
+        return getApi().onMediaThumbnailUpdated(() => setReload((value) => value + 1))
+    }, [completed])
+
+    useEffect(() => {
         let disposed = false
 
-        setResult({ url, path: null, loading: true })
         setFailedSrc(null)
+        if (localPath && reload === 0) {
+            setResult({ url, hint: localPath, path: localPath, loading: false })
+            return
+        }
+        setResult((previous) => ({
+            url, hint: localPath,
+            path: localPath ?? (previous.url === url ? previous.path : null), loading: true
+        }))
 
         void (async () => {
             try {
                 const path = await getApi().getDownloadPreview(url)
 
                 if (!disposed) {
-                    setResult({ url, path, loading: false })
+                    setResult({ url, hint: localPath, path, loading: false })
                 }
             } catch {
                 if (!disposed) {
-                    setResult({ url, path: null, loading: false })
+                    setResult((previous) => {
+                        const path = previous.url === url ? previous.path : (localPath ?? null)
+                        return { url, hint: localPath, path: toMediaUrl(path) === failedSrc ? null : path, loading: false }
+                    })
                 }
             }
         })()
@@ -46,11 +67,11 @@ export function DownloadThumbnail({
         return () => {
             disposed = true
         }
-    }, [url, reload])
+    }, [url, reload, completed, localPath])
 
-    const current = result.url === url ? result : null
-    const src = toMediaUrl(current?.path)
-    const loading = current === null || current.loading
+    const current = result.url === url && result.hint === localPath ? result : null
+    const src = toMediaUrl(current ? current.path : localPath)
+    const loading = current ? current.loading : !localPath
 
     return (
         <div className="flex aspect-video w-28 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--bg-hover)] text-[var(--text-muted)] sm:w-36">

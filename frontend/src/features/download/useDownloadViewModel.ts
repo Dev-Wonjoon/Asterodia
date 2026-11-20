@@ -32,10 +32,6 @@ export function useDownloadViewModel() {
 
             showToast('다운로드 대기열에 등록했습니다.', 'info')
 
-            void Promise.resolve()
-                .then(() => getApi().getDownloadPreview(url))
-                .catch(() => {})
-
             return true
         },
         [store, showToast]

@@ -10,6 +10,8 @@ import (
 	"image/color"
 	"image/jpeg"
 	"image/png"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -23,6 +25,254 @@ import (
 	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/thumbnail"
 )
+
+func previewJob(t *testing.T, f *fixture, url, job string, mediaID int64) {
+	t.Helper()
+	execSQL(t, f.db, `INSERT OR IGNORE INTO download_urls(url,normalized_url,normalization_version,created_at) VALUES(?,?,1,0)`, url, url)
+	if mediaID > 0 {
+		execSQL(t, f.db, `UPDATE media SET source_kind='download',request_url_id=(SELECT id FROM download_urls WHERE normalized_url=?) WHERE id=?`, url, mediaID)
+	}
+	execSQL(t, f.db, `INSERT INTO download_queue(id,request_url_id,original_url,mode,state,options_json) SELECT ?,id,?,'create','cancelled','{}' FROM download_urls WHERE normalized_url=?`, job, url, url)
+}
+
+func cachedPreview(t *testing.T, f *fixture, url string) string {
+	t.Helper()
+	dir := filepath.Join(f.root, "previews")
+	must(t, os.MkdirAll(dir, 0700))
+	path := filepath.Join(dir, fmt.Sprintf("%x.jpg", sha256.Sum256([]byte(url))))
+	writeImage(t, path)
+	return path
+}
+
+func TestLocalDownloadPreviewsBypassBlockedWebDiscovery(t *testing.T) {
+	f := newFixture(t, "")
+	slowURL := "https://example.invalid/slow"
+	previewJob(t, f, slowURL, "slow", 0)
+	entered, release, done := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	defer close(release)
+	f.service.ConfigurePreview(func(ctx context.Context, url, dir string) (json.RawMessage, error) {
+		if url != slowURL {
+			return nil, fmt.Errorf("로컬 요청에서 웹 조회: %s", url)
+		}
+		close(entered)
+		select {
+		case <-release:
+		case <-ctx.Done():
+		}
+		return nil, nil
+	})
+	go func() { defer close(done); f.service.GetDownloadPreview(t.Context(), slowURL) }()
+	select {
+	case <-entered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("웹 조회 미시작")
+	}
+	url := "https://example.invalid/cached"
+	previewJob(t, f, url, "cache", 0)
+	cache := cachedPreview(t, f, url)
+	libraryURL := "https://example.invalid/library"
+	cover := filepath.Join(f.root, "cover.png")
+	writeImage(t, cover)
+	req := seed(t, f.db, filepath.Join(f.root, "offline.png"), "image", cover)
+	previewJob(t, f, libraryURL, "library", req.MediaID)
+	for _, tc := range []struct{ url, path string }{{url, cache}, {libraryURL, cover}} {
+		for _, lookup := range []func(context.Context, string) (*string, error){f.service.GetDownloadPreview, f.service.CachedDownloadPreview} {
+			returned := make(chan struct{}, 1)
+			var got *string
+			var err error
+			go func() { got, err = lookup(t.Context(), tc.url); returned <- struct{}{} }()
+			select {
+			case <-returned:
+				must(t, err)
+				if got == nil || *got != tc.path {
+					t.Fatal("로컬 미리보기 누락", got)
+				}
+			case <-time.After(time.Second):
+				t.Fatal("로컬 조회가 웹 잠금을 기다립니다")
+			}
+		}
+	}
+	if got, err := f.service.CachedDownloadPreview(t.Context(), slowURL); err != nil || got != nil {
+		t.Fatal(got, err)
+	}
+	select {
+	case <-done:
+		t.Fatal("차단한 웹 조회가 먼저 종료됐습니다")
+	default:
+	}
+}
+
+func TestDownloadPreviewReusesOldCacheWithoutDiscovery(t *testing.T) {
+	f := newFixture(t, "")
+	url := "https://example.invalid/old-cache"
+	previewJob(t, f, url, "job", 0)
+	cache := cachedPreview(t, f, url)
+	old := time.Now().Add(-365 * 24 * time.Hour)
+	must(t, os.Chtimes(cache, old, old))
+	f.service.ConfigurePreview(func(context.Context, string, string) (json.RawMessage, error) {
+		t.Fatal("유효한 캐시가 있는데 웹 조회")
+		return nil, nil
+	})
+	for range 2 {
+		got, err := f.service.GetDownloadPreview(t.Context(), url)
+		must(t, err)
+		if got == nil || *got != cache {
+			t.Fatal(got)
+		}
+	}
+	info, err := os.Stat(cache)
+	must(t, err)
+	if !info.ModTime().Equal(old) {
+		t.Fatal("캐시를 다시 썼습니다")
+	}
+}
+
+func TestDownloadPreviewPrefersLibraryAndRegeneratesLocally(t *testing.T) {
+	f := newFixture(t, "")
+	url := "https://example.invalid/local"
+	original := filepath.Join(f.root, "source.png")
+	writeImage(t, original)
+	req := seed(t, f.db, original, "unknown", nil)
+	previewJob(t, f, url, "job", req.MediaID)
+	cache := cachedPreview(t, f, url)
+	f.service.ConfigurePreview(func(context.Context, string, string) (json.RawMessage, error) {
+		t.Fatal("원본이 있는데 웹 조회")
+		return nil, nil
+	})
+	got, err := f.service.GetDownloadPreview(t.Context(), url)
+	must(t, err)
+	if got == nil || *got != cache {
+		t.Fatal("생성 중 캐시 미사용", got)
+	}
+	must(t, os.Remove(cache))
+	got, err = f.service.GetDownloadPreview(t.Context(), url)
+	must(t, err)
+	if got != nil {
+		t.Fatal(got)
+	}
+	if n := queryCount(t, f.db, "SELECT count(*) FROM maintenance_task"); n != 1 {
+		t.Fatal("중복 예약", n)
+	}
+	must(t, f.service.Start(t.Context()))
+	wait(t, f, req, "registered")
+	generated := thumbnailPath(t, f, req)
+	cache = cachedPreview(t, f, url)
+	got, err = f.service.GetDownloadPreview(t.Context(), url)
+	must(t, err)
+	if got == nil || *got != generated || *got == cache {
+		t.Fatal("로컬 썸네일 우선순위", got)
+	}
+	// A valid thumbnail remains usable even when the source is offline.
+	must(t, os.Remove(original))
+	got, err = f.service.GetDownloadPreview(t.Context(), url)
+	must(t, err)
+	if got == nil || *got != generated {
+		t.Fatal(got)
+	}
+}
+
+func queryCount(t *testing.T, db *sql.DB, query string) int {
+	t.Helper()
+	var count int
+	must(t, db.QueryRow(query).Scan(&count))
+	return count
+}
+
+func TestDownloadPreviewFetchesOnlyWhenLocalFilesAreMissing(t *testing.T) {
+	f := newFixture(t, "")
+	imagePath := filepath.Join(f.root, "remote.png")
+	writeImage(t, imagePath)
+	payload, err := os.ReadFile(imagePath)
+	must(t, err)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write(payload)
+	}))
+	defer server.Close()
+	url := "https://example.invalid/missing"
+	req := seed(t, f.db, filepath.Join(f.root, "absent.mp4"), "video", nil)
+	previewJob(t, f, url, "job", req.MediaID)
+	calls := 0
+	f.service.ConfigurePreview(func(context.Context, string, string) (json.RawMessage, error) {
+		calls++
+		return json.Marshal(map[string]string{"thumbnail": server.URL})
+	})
+	for range 2 {
+		got, err := f.service.GetDownloadPreview(t.Context(), url)
+		must(t, err)
+		if got == nil {
+			t.Fatal("미리보기 누락")
+		}
+		file, err := os.Open(*got)
+		must(t, err)
+		_, err = jpeg.DecodeConfig(file)
+		file.Close()
+		must(t, err)
+	}
+	if calls != 1 {
+		t.Fatal("중복 웹 조회", calls)
+	}
+	for _, invalid := range []string{"file:///source", "https://user:pass@example.invalid/a", "https://example.invalid/no-history"} {
+		got, err := f.service.GetDownloadPreview(t.Context(), invalid)
+		must(t, err)
+		if got != nil {
+			t.Fatal(got)
+		}
+	}
+	if calls != 1 {
+		t.Fatal("삭제되거나 잘못된 요청의 웹 조회", calls)
+	}
+}
+
+func TestDownloadPreviewCleanupPreservesSharedCacheAndLibrary(t *testing.T) {
+	f := newFixture(t, "")
+	url := "https://example.invalid/shared"
+	previewJob(t, f, url, "one", 0)
+	previewJob(t, f, url, "two", 0)
+	cache := cachedPreview(t, f, url)
+	execSQL(t, f.db, "DELETE FROM download_queue WHERE id='one'")
+	must(t, f.service.ReleaseDownloadPreview(t.Context(), url))
+	if _, err := os.Stat(cache); err != nil {
+		t.Fatal("공유 캐시 삭제", err)
+	}
+	execSQL(t, f.db, "DELETE FROM download_queue WHERE id='two'")
+	req := seed(t, f.db, filepath.Join(f.root, "source.png"), "image", cache)
+	must(t, f.service.ReleaseDownloadPreview(t.Context(), url))
+	if _, err := os.Stat(cache); err != nil {
+		t.Fatal("갤러리 썸네일 삭제", err)
+	}
+	execSQL(t, f.db, "UPDATE media_file SET thumbnail_path=NULL,thumbnail_origin='none' WHERE id=?", req.FileID)
+	must(t, f.service.ReleaseDownloadPreview(t.Context(), url))
+	if _, err := os.Stat(cache); !os.IsNotExist(err) {
+		t.Fatal("미사용 캐시 잔존", err)
+	}
+	must(t, f.service.ReleaseDownloadPreview(t.Context(), url))
+	got, err := f.service.GetDownloadPreview(t.Context(), url)
+	must(t, err)
+	if got != nil {
+		t.Fatal("이력 삭제 후 캐시 재생성", got)
+	}
+}
+
+func TestDownloadPreviewUsesLegacyAssociationAndManualCover(t *testing.T) {
+	f := newFixture(t, "")
+	url := "https://example.invalid/legacy"
+	previewJob(t, f, url, "legacy", 0)
+	execSQL(t, f.db, `UPDATE download_queue SET options_json='{"_importedHistory":true}' WHERE id='legacy'`)
+	first := filepath.Join(f.root, "first.png")
+	second := filepath.Join(f.root, "cover.png")
+	writeImage(t, first)
+	writeImage(t, second)
+	req := seed(t, f.db, filepath.Join(f.root, "absent.png"), "unknown", first)
+	execSQL(t, f.db, `UPDATE media_file SET legacy_url_id=(SELECT request_url_id FROM download_queue WHERE id='legacy') WHERE id=?`, req.FileID)
+	execSQL(t, f.db, `INSERT INTO media_file(media_id,file_key,storage_kind,filepath,kind,thumbnail_path,thumbnail_origin,position,created_at,legacy_url_id)
+		SELECT media_id,'cover','unverified_legacy',filepath,kind,?,'unverified_legacy',1,0,legacy_url_id FROM media_file WHERE id=?`, second, req.FileID)
+	execSQL(t, f.db, `UPDATE media SET cover_mode='manual',cover_file_id=(SELECT max(id) FROM media_file WHERE media_id=?) WHERE id=?`, req.MediaID, req.MediaID)
+	got, err := f.service.GetDownloadPreview(t.Context(), url)
+	must(t, err)
+	if got == nil || *got != second {
+		t.Fatal("구버전 연결/수동 커버 무시", got)
+	}
+}
 
 func TestMain(m *testing.M) {
 	if marker := os.Getenv("STORAGEBUCKET_HOLD_THUMBNAIL_ENGINE"); marker != "" {

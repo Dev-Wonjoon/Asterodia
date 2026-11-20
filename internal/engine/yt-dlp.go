@@ -354,13 +354,16 @@ type YtdlpTarget struct {
 }
 
 type ytdlpDirectFormat struct {
-	ID                string                  `json:"format_id"`
-	URL               string                  `json:"url"`
-	Protocol          string                  `json:"protocol"`
-	Ext               string                  `json:"ext"`
-	Height            int                     `json:"height,omitempty"`
-	VideoCodec        string                  `json:"vcodec,omitempty"`
-	AudioCodec        string                  `json:"acodec,omitempty"`
+	ID         string `json:"format_id"`
+	URL        string `json:"url"`
+	Protocol   string `json:"protocol"`
+	Ext        string `json:"ext"`
+	Height     int    `json:"height,omitempty"`
+	VideoCodec string `json:"vcodec,omitempty"`
+	AudioCodec string `json:"acodec,omitempty"`
+	// The extractor can require a short delay before its signed URL is usable.
+	// Let yt-dlp enforce this timestamp instead of immediately receiving a 403.
+	AvailableAt       *float64                `json:"available_at,omitempty"`
 	HTTPHeaders       map[string]string       `json:"http_headers,omitempty"`
 	DownloaderOptions *ytdlpDownloaderOptions `json:"downloader_options,omitempty"`
 }

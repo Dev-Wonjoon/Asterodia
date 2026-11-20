@@ -16,22 +16,40 @@ import (
 var ErrRevisionConflict = errors.New("묶음 정보가 변경되었습니다. 새로고침 후 다시 확인하세요")
 
 type Service struct {
-	runSlot      chan struct{}
-	verifyMedia  func(context.Context, string, string) error
-	db           *sql.DB
-	factory      func(string, engine.Options) Runner
-	downloadPath func() string
-	afterCommit  func(int64)
-	mu           sync.Mutex
-	active       map[string]context.CancelFunc
-	closed       bool
-	wg           sync.WaitGroup
-	logWarnings  sync.Map
+	runSlot        chan struct{}
+	verifyMedia    func(context.Context, string, string) error
+	db             *sql.DB
+	factory        func(string, engine.Options) Runner
+	downloadPath   func() string
+	afterCommit    func(int64)
+	previewCleanup func(context.Context, string)
+	previewLookup  func(context.Context, string) (*string, error)
+	mu             sync.Mutex
+	active         map[string]context.CancelFunc
+	closed         bool
+	wg             sync.WaitGroup
+	logWarnings    sync.Map
 }
 
 //wails:ignore
 func (s *Service) ConfigureVerification(verify func(context.Context, string, string) error) {
 	s.verifyMedia = verify
+}
+
+//wails:ignore
+func (s *Service) ConfigurePreviewCleanup(cleanup func(context.Context, string)) {
+	s.previewCleanup = cleanup
+}
+
+//wails:ignore
+func (s *Service) ConfigurePreviewLookup(lookup func(context.Context, string) (*string, error)) {
+	s.previewLookup = lookup
+}
+
+func (s *Service) attachPreview(ctx context.Context, job *Job) {
+	if s.previewLookup != nil {
+		job.ThumbnailPath, _ = s.previewLookup(ctx, job.URL)
+	}
 }
 
 func NewService(db *sql.DB, path func() string, factory func(string, engine.Options) Runner, afterCommit func(int64)) *Service {
@@ -42,6 +60,7 @@ type Job struct {
 	HistoryOnly      bool            `json:"historyOnly"`
 	ID               string          `json:"id"`
 	URL              string          `json:"url"`
+	ThumbnailPath    *string         `json:"thumbnailPath"`
 	Title            *string         `json:"title"`
 	State            string          `json:"state"`
 	Phase            *string         `json:"phase"`
@@ -171,6 +190,7 @@ func (s *Service) Get(ctx context.Context, req JobRequest) api.Result {
 	if err != nil {
 		return fail(err)
 	}
+	s.attachPreview(ctx, &j)
 	return api.Success(j)
 }
 func (s *Service) List(ctx context.Context, req ListRequest) api.Result {
@@ -196,9 +216,16 @@ func (s *Service) List(ctx context.Context, req ListRequest) api.Result {
 	if err = rows.Err(); err != nil {
 		return fail(err)
 	}
+	// Release the cursor before the local lookup uses the same database pool.
+	if err = rows.Close(); err != nil {
+		return fail(err)
+	}
 	hasNext := len(jobs) > req.Limit
 	if hasNext {
 		jobs = jobs[:req.Limit]
+	}
+	for i := range jobs {
+		s.attachPreview(ctx, &jobs[i])
 	}
 	return api.Success(map[string]any{"data": jobs, "limit": req.Limit, "offset": req.Offset, "hasNextPage": hasNext})
 }

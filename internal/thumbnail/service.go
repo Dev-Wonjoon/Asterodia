@@ -139,6 +139,15 @@ func (s *Service) schedule(ctx context.Context, req Request) error {
 	if s.closed {
 		return fmt.Errorf("앱을 종료하고 있습니다")
 	}
+	// Scheduling callers may hold an older scan snapshot. Serialize this fresh
+	// check with publication so a just-completed thumbnail is never requeued.
+	var thumb *string
+	if err := s.db.QueryRowContext(ctx, "SELECT thumbnail_path FROM media_file WHERE id=? AND media_id=?", req.FileID, req.MediaID).Scan(&thumb); err != nil {
+		return err
+	}
+	if thumbnailExists(thumb) {
+		return nil
+	}
 	payload, _ := json.Marshal(req)
 	now := time.Now().UnixMilli()
 	_, err := s.db.ExecContext(ctx, `INSERT INTO maintenance_task(id,kind,state,owner_kind,payload_json,created_at,updated_at) SELECT lower(hex(randomblob(16))),'preview_generation','pending','system',?,?,? WHERE NOT EXISTS(SELECT 1 FROM maintenance_task WHERE kind='preview_generation' AND state IN ('pending','running') AND json_extract(payload_json,'$.fileId')=? AND json_extract(payload_json,'$.mediaId')=?)`, string(payload), now, now, req.FileID, req.MediaID)
@@ -377,6 +386,8 @@ func (s *Service) generate(ctx context.Context, req Request) error {
 	if before.Size() != after.Size() || before.ModTime() != after.ModTime() || fingerprint != current {
 		return fmt.Errorf("썸네일 생성 중 원본이 변경되었습니다")
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}

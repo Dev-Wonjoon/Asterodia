@@ -47,6 +47,7 @@ export interface DownloadJobDto {
     historyOnly?: boolean
     id: string
     url: string
+    thumbnailPath?: string | null
     title: string | null
     state: DownloadState
     phase: DownloadPhase | null

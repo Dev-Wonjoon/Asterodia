@@ -2,13 +2,138 @@ package integration_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/StorageBucket/internal/thumbnail"
 )
+
+func TestDownloadJobsIncludeLocalPreviewWithoutRemoteLookup(t *testing.T) {
+	f := newFixture(t)
+	job := f.enqueue(t)
+	mediaID := f.run(t, job)
+	thumbs := thumbnail.NewService(f.db, filepath.Join(f.root, "cache", "thumbnails"), "", nil)
+	defer thumbs.Close()
+	thumbs.ConfigurePreview(func(context.Context, string, string) (json.RawMessage, error) {
+		t.Error("목록/상세 조회에서 웹 미리보기 호출")
+		return nil, nil
+	})
+	f.service.ConfigurePreviewLookup(thumbs.CachedDownloadPreview)
+	var source string
+	if err := f.db.QueryRow("SELECT filepath FROM media_file WHERE media_id=?", mediaID).Scan(&source); err != nil {
+		t.Fatal(err)
+	}
+	bytes, err := os.ReadFile(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cover := filepath.Join(f.root, "cover.png")
+	if err = os.WriteFile(cover, bytes, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = f.db.Exec("UPDATE media_file SET thumbnail_path=?,thumbnail_origin='app_generated' WHERE media_id=?", cover, mediaID); err != nil {
+		t.Fatal(err)
+	}
+	cachedJob := success(t, f.service.Enqueue(t.Context(), download.EnqueueRequest{Mode: "create", URL: postURL + "?preview=cache"})).(download.Job)
+	cache := filepath.Join(f.root, "cache", "previews", fmt.Sprintf("%x.jpg", sha256.Sum256([]byte(cachedJob.URL))))
+	if err = os.MkdirAll(filepath.Dir(cache), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(cache, bytes, 0600); err != nil {
+		t.Fatal(err)
+	}
+	// A list cursor must be closed before a callback queries this same pool.
+	f.db.SetMaxOpenConns(1)
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	data := success(t, f.service.List(ctx, download.ListRequest{})).(map[string]any)
+	jobs := data["data"].([]download.Job)
+	if len(jobs) != 2 {
+		t.Fatal(jobs)
+	}
+	expected := map[string]string{job.ID: cover, cachedJob.ID: cache}
+	for _, row := range jobs {
+		if row.ThumbnailPath == nil || *row.ThumbnailPath != expected[row.ID] {
+			t.Fatal("초기 목록 경로 누락", row)
+		}
+		detail := success(t, f.service.Get(ctx, download.JobRequest{JobID: row.ID})).(download.Job)
+		if detail.ThumbnailPath == nil || *detail.ThumbnailPath != expected[row.ID] {
+			t.Fatal("상세 경로 누락", detail)
+		}
+	}
+	if err = os.Remove(cover); err != nil {
+		t.Fatal(err)
+	}
+	missing := success(t, f.service.Get(ctx, download.JobRequest{JobID: job.ID})).(download.Job)
+	if missing.ThumbnailPath != nil {
+		t.Fatal("누락 파일 경로 반환", missing)
+	}
+	if err = os.WriteFile(cover, bytes, 0600); err != nil {
+		t.Fatal(err)
+	}
+	restored := success(t, f.service.Get(ctx, download.JobRequest{JobID: job.ID})).(download.Job)
+	if restored.ThumbnailPath == nil || *restored.ThumbnailPath != cover {
+		t.Fatal("복구 경로 미반영", restored)
+	}
+}
+
+func TestDeleteDownloadHistoryReleasesOnlyUnusedPreview(t *testing.T) {
+	f := newFixture(t)
+	thumbs := thumbnail.NewService(f.db, filepath.Join(f.root, "cache", "thumbnails"), "", nil)
+	defer thumbs.Close()
+	calls := 0
+	f.service.ConfigurePreviewCleanup(func(ctx context.Context, url string) {
+		calls++
+		if err := thumbs.ReleaseDownloadPreview(ctx, url); err != nil {
+			t.Error(err)
+		}
+	})
+	first := f.enqueue(t)
+	cache := filepath.Join(f.root, "cache", "previews", fmt.Sprintf("%x.jpg", sha256.Sum256([]byte(first.URL))))
+	if err := os.MkdirAll(filepath.Dir(cache), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(cache, []byte("fixture preview"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	errorCode(t, f.service.Delete(t.Context(), download.JobRequest{JobID: first.ID}), "CANNOT_DELETE_REQUEST")
+	if calls != 0 {
+		t.Fatal("차단된 삭제에서 캐시 정리")
+	}
+	success(t, f.service.Cancel(t.Context(), download.JobRequest{JobID: first.ID}))
+	second := f.enqueue(t)
+	success(t, f.service.Cancel(t.Context(), download.JobRequest{JobID: second.ID}))
+	if _, err := f.db.Exec(`CREATE TRIGGER reject_preview_history_delete BEFORE DELETE ON download_queue BEGIN SELECT RAISE(ABORT,'fixture'); END`); err != nil {
+		t.Fatal(err)
+	}
+	errorCode(t, f.service.Delete(t.Context(), download.JobRequest{JobID: first.ID}), "DATABASE_ERROR")
+	if calls != 0 {
+		t.Fatal("롤백된 삭제에서 캐시 정리")
+	}
+	if _, err := f.db.Exec(`DROP TRIGGER reject_preview_history_delete`); err != nil {
+		t.Fatal(err)
+	}
+	success(t, f.service.Delete(t.Context(), download.JobRequest{JobID: first.ID}))
+	if _, err := os.Stat(cache); err != nil {
+		t.Fatal("다른 요청의 캐시 삭제", err)
+	}
+	success(t, f.service.Delete(t.Context(), download.JobRequest{JobID: second.ID}))
+	if _, err := os.Stat(cache); !os.IsNotExist(err) {
+		t.Fatal("미사용 캐시 잔존", err)
+	}
+	if calls != 2 {
+		t.Fatal(calls)
+	}
+	assertFK(t, f.db)
+}
 
 func TestDeleteDownloadHistoryPreservesMedia(t *testing.T) {
 	for _, state := range []string{"failed", "cancelled"} {

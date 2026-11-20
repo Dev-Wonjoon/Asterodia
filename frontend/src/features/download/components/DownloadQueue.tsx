@@ -36,6 +36,8 @@ export function DownloadQueue(): React.JSX.Element {
                         >
                             <DownloadThumbnail
                                 url={job.url}
+                                localPath={job.thumbnailPath}
+                                completed={job.state === 'completed'}
                                 title={job.title || '다운로드 썸네일'}
                             />
                             <div className={'min-w-0 flex-1 space-y-2' + (canDeleteDownload(job) ? ' pr-7' : '')}>

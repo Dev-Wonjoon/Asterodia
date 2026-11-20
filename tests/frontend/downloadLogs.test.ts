@@ -9,7 +9,7 @@ import { ToastContext } from '@renderer/shared/context/toastContext'
 import { formatDownloadLog, pollDownloadLogs } from '@renderer/features/download/downloadLogs'
 import { cleanupReact, clickButton, deferred, mount } from './reactHarness'
 
-const api = vi.hoisted(() => ({ logs: vi.fn(), getEngineStatus: vi.fn(), installEngine: vi.fn(), onEngineInstallProgress: vi.fn(), getDownloadPreview: vi.fn() }))
+const api = vi.hoisted(() => ({ logs: vi.fn(), getEngineStatus: vi.fn(), installEngine: vi.fn(), onEngineInstallProgress: vi.fn(), getDownloadPreview: vi.fn(), onMediaThumbnailUpdated: vi.fn() }))
 const view = vi.hoisted(() => ({ value: {} as Record<string, unknown> }))
 vi.mock('@renderer/shared/api', () => ({ getApi: () => ({ ...api, downloads: { logs: api.logs } }) }))
 vi.mock('@renderer/features/download/useDownloadViewModel', () => ({ useDownloadViewModel: () => view.value }))
@@ -21,6 +21,7 @@ beforeEach(() => {
     vi.resetAllMocks()
     api.logs.mockResolvedValue({ ok: true, data: page() }); api.getEngineStatus.mockResolvedValue({ 'yt-dlp': { installed: true, version: '1' } })
     api.onEngineInstallProgress.mockReturnValue(vi.fn()); api.getDownloadPreview.mockResolvedValue(null)
+    api.onMediaThumbnailUpdated.mockReturnValue(vi.fn())
     view.value = { detail: { jobId: null, data: null, loading: false, error: null }, queue: [], ready: true, loading: false, error: null, halted: null, requestedIds: [], cancellingIds: [], deletingIds: [], batchRetry: null, retryAll: vi.fn(), deleteJob: vi.fn(), offset: 0, hasNextPage: false, closeDetail: vi.fn(), refresh: vi.fn(), openDetail: vi.fn() }
 })
 afterEach(async () => { await cleanupReact(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks() })

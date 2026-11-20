@@ -14,20 +14,32 @@ func (s *Service) Delete(ctx context.Context, req JobRequest) api.Result {
 		return api.Failure("INVALID_ARGUMENT", "작업 ID가 필요합니다")
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.closed {
+		s.mu.Unlock()
 		return api.Failure("NOT_READY", "앱을 종료하고 있습니다")
 	}
 	if _, active := s.active[req.JobID]; active {
+		s.mu.Unlock()
 		return fail(ErrAlreadyProcessing)
 	}
+	var rawURL string
+	if err := s.db.QueryRowContext(ctx, "SELECT original_url FROM download_queue WHERE id=?", req.JobID).Scan(&rawURL); err != nil {
+		s.mu.Unlock()
+		return fail(err)
+	}
 	if err := NewStore(s.db).deleteHistory(ctx, req.JobID); err != nil {
+		s.mu.Unlock()
 		if errors.Is(err, errDeleteState) {
 			return api.Failure("CANNOT_DELETE_REQUEST", err.Error())
 		}
 		return fail(err)
 	}
 	s.logWarnings.Delete(req.JobID)
+	cleanup := s.previewCleanup
+	s.mu.Unlock()
+	if cleanup != nil {
+		cleanup(ctx, rawURL)
+	}
 	return api.Success(map[string]bool{"accepted": true})
 }
 
