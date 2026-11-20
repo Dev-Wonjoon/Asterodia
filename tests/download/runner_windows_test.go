@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"image"
 	"image/png"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -34,6 +35,60 @@ func (f galleryDLDiscoverFunc) Discover(
 	ctx context.Context, rawURL, stageDir string,
 ) (engine.GalleryDLDiscovery, error) {
 	return f(ctx, rawURL, stageDir)
+}
+
+func (f galleryDLDiscoverFunc) Download(ctx context.Context, url string, d engine.GalleryDLDiscovery, dir string) ([]string, error) {
+	targets, err := d.Targets(url)
+	if err != nil {
+		return nil, err
+	}
+	paths := make([]string, 0, len(targets))
+	for i, target := range targets {
+		file := d.Files[target.FileIndex]
+		var meta struct {
+			Extension string            `json:"extension"`
+			Headers   map[string]string `json:"_http_headers"`
+		}
+		if err = json.Unmarshal(file.Metadata, &meta); err != nil {
+			return nil, err
+		}
+		item := filepath.Join(dir, fmt.Sprintf("item-%04d", i+1))
+		if err = os.Mkdir(item, 0700); err != nil {
+			return nil, err
+		}
+		req, e := http.NewRequestWithContext(ctx, "GET", file.URL, nil)
+		if e != nil {
+			return nil, e
+		}
+		for key, value := range meta.Headers {
+			req.Header.Set(key, value)
+		}
+		res, e := http.DefaultClient.Do(req)
+		if e != nil {
+			return nil, e
+		}
+		if res.StatusCode != 200 {
+			res.Body.Close()
+			if res.StatusCode == 404 {
+				return nil, fmt.Errorf("%w (HTTP 404)", engine.ErrMediaUnavailable)
+			}
+			return nil, fmt.Errorf("fixture HTTP %d", res.StatusCode)
+		}
+		path := filepath.Join(item, "media."+meta.Extension)
+		out, e := os.Create(path)
+		if e != nil {
+			res.Body.Close()
+			return nil, e
+		}
+		_, e = io.Copy(out, res.Body)
+		out.Close()
+		res.Body.Close()
+		if e != nil {
+			return nil, e
+		}
+		paths = append(paths, path)
+	}
+	return paths, nil
 }
 
 func TestRunnerDiscoverAttempt(t *testing.T) {
@@ -204,7 +259,7 @@ func TestRunnerFreezeAndStageAttempt(t *testing.T) {
 			rejectWrite: true,
 		},
 		{
-			name:    "unsupported-gallery-target-skips-stage",
+			name:    "unidentifiable-gallery-target-skips-stage",
 			url:     "https://bsky.app/profile/example.com/post/fixture?ref=test",
 			gallery: true, unsupported: true,
 		},
@@ -280,6 +335,9 @@ func TestRunnerFreezeAndStageAttempt(t *testing.T) {
 				) (engine.GalleryDLDiscovery, error) {
 					if rawURL != tc.url {
 						return engine.GalleryDLDiscovery{}, fmt.Errorf("gallery-dl 요청 URL 불일치: %q", rawURL)
+					}
+					if tc.unsupported {
+						return engine.ParseGalleryDLDiscovery([]byte(`[[2,{"category":"future-site"}],[3,"https://cdn.invalid/image.png",{"extension":"png"}]]`))
 					}
 					raw := fmt.Sprintf(`[
 						[2, {"category":"instagram","subcategory":"post","post_shortcode":"Fixture_123",
@@ -431,6 +489,70 @@ func TestRunnerGenericPreflight(t *testing.T) {
 			var count int
 			if e := db.QueryRow("SELECT count(*) FROM download_target WHERE attempt_id=?", job.AttemptID).Scan(&count); e != nil || count != 0 {
 				t.Fatalf("부분 대상 확정: %d %v", count, e)
+			}
+		})
+	}
+}
+
+func TestRunnerEngineFallback(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		primaryError error
+		galleryFirst bool
+		wantFallback bool
+	}{
+		{"gallery-unsupported", engine.ErrUnsupportedURL, true, true},
+		{"ytdlp-unsupported", engine.ErrUnsupportedURL, false, true},
+		{"login", engine.ErrAuthenticationRequired, true, false},
+		{"denied", engine.ErrAccessDenied, true, false},
+		{"rate-limit", engine.ErrRateLimited, true, false},
+		{"cancelled", context.Canceled, true, false},
+		{"network", errors.New("network failure"), true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root, err := os.MkdirTemp(downloadTestRoot(t), "fallback-")
+			if err != nil {
+				t.Fatal(err)
+			}
+			address := "https://example.invalid/post/1"
+			if tc.galleryFirst {
+				address = "https://x.com/user/status/123"
+			}
+			store := download.NewStore(openStoreTestDB(t))
+			job, err := store.CreateInitialAttempt(t.Context(), download.InitialAttemptInput{OriginalURL: address, StorageRoot: root})
+			if err != nil {
+				t.Fatal(err)
+			}
+			ytCalls, galleryCalls := 0, 0
+			runner := download.Runner{Storage: download.Storage{Root: root}, Ytdlp: ytdlpDiscoverFunc(func(ctx context.Context, rawURL, dir string) (json.RawMessage, error) {
+				ytCalls++
+				if rawURL != address {
+					t.Error("원본 URL 변경")
+				}
+				if !tc.galleryFirst {
+					return nil, tc.primaryError
+				}
+				return json.RawMessage(`{"id":"123","extractor_key":"Generic","webpage_url":"https://example.invalid/post/1","ext":"mp4","vcodec":"h264","acodec":"aac","url":"https://cdn.invalid/file.mp4"}`), nil
+			}), GalleryDL: galleryDLDiscoverFunc(func(ctx context.Context, rawURL, dir string) (engine.GalleryDLDiscovery, error) {
+				galleryCalls++
+				if rawURL != address {
+					t.Error("원본 URL 변경")
+				}
+				if tc.galleryFirst {
+					return engine.GalleryDLDiscovery{}, tc.primaryError
+				}
+				return engine.ParseGalleryDLDiscovery([]byte(`[[2,{"category":"future","post_id":"123"}],[3,"https://cdn.invalid/file.png",{"filename":"file","extension":"png"}]]`))
+			})}
+			attempt, err := runner.DiscoverAttempt(t.Context(), job.JobID, job.AttemptID, address, engine.Options{})
+			if tc.wantFallback {
+				if err != nil || ytCalls != 1 || galleryCalls != 1 {
+					t.Fatal(attempt, err, ytCalls, galleryCalls)
+				}
+				if (attempt.Engine == engine.KindYtdlp) != tc.galleryFirst {
+					t.Fatal("실제 선택 엔진 미반영", attempt.Engine)
+				}
+			} else if !errors.Is(err, tc.primaryError) || ytCalls != 0 || galleryCalls != 1 {
+				t.Fatal("지원하지 않음 이외의 실패에 폴백", err, ytCalls, galleryCalls)
 			}
 		})
 	}

@@ -73,11 +73,16 @@ func TestYtdlpDownloadMerge(t *testing.T) {
 	)
 
 	var requireRange atomic.Bool
+	var requireTransportHeader atomic.Bool
 	var rangedRequests atomic.Int32
 	var videoAvailable, audioAvailable atomic.Int64
 	var earlyRequests, mediaRequests atomic.Int32
 	files := http.FileServer(http.Dir(sourceDir))
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if requireTransportHeader.Load() && r.Header.Get("X-Extractor-Context") != "fixture-token" {
+			http.Error(w, "extractor context missing", http.StatusForbidden)
+			return
+		}
 		mediaRequests.Add(1)
 		available := videoAvailable.Load()
 		if r.URL.Path == "/audio.m4a" {
@@ -125,6 +130,7 @@ func TestYtdlpDownloadMerge(t *testing.T) {
 		availability      string
 		audioOnly         bool
 		omitAvailability  bool
+		transportHeader   bool
 	}{
 		{name: "best", quality: "best", wantHeight: 720},
 		{name: "480", quality: "480", wantHeight: 480},
@@ -132,6 +138,7 @@ func TestYtdlpDownloadMerge(t *testing.T) {
 		{name: "zero-chunk", quality: "best", wantHeight: 720, downloaderOptions: `{"http_chunk_size":0}`},
 		{name: "negative-chunk", quality: "best", wantHeight: 720, downloaderOptions: `{"http_chunk_size":-1}`},
 		{name: "null-options", quality: "best", wantHeight: 720, downloaderOptions: `null`},
+		{name: "extractor-transport-header", quality: "best", wantHeight: 720, transportHeader: true},
 		{name: "available-video", quality: "best", wantHeight: 720, availability: "video"},
 		{name: "available-audio-merge", quality: "best", wantHeight: 720, availability: "audio"},
 		{name: "available-audio-only", quality: "best", availability: "audio", audioOnly: true},
@@ -142,6 +149,7 @@ func TestYtdlpDownloadMerge(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			requireRange.Store(tc.chunked)
+			requireTransportHeader.Store(tc.transportHeader)
 			rangedRequests.Store(0)
 			earlyRequests.Store(0)
 			mediaRequests.Store(0)
@@ -158,13 +166,16 @@ func TestYtdlpDownloadMerge(t *testing.T) {
 				audioAvailable.Store(now + 60)
 			}
 			input := raw
-			if tc.downloaderOptions != "" || tc.availability != "" {
+			if tc.downloaderOptions != "" || tc.availability != "" || tc.transportHeader {
 				var info map[string]any
 				if err := json.Unmarshal(raw, &info); err != nil {
 					t.Fatal(err)
 				}
 				for _, row := range info["formats"].([]any) {
 					format := row.(map[string]any)
+					if tc.transportHeader {
+						format["http_headers"] = map[string]string{"X-Extractor-Context": "fixture-token"}
+					}
 					if tc.downloaderOptions != "" {
 						format["downloader_options"] = json.RawMessage(tc.downloaderOptions)
 					}

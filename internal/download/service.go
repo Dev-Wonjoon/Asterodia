@@ -15,9 +15,14 @@ import (
 
 var ErrRevisionConflict = errors.New("묶음 정보가 변경되었습니다. 새로고침 후 다시 확인하세요")
 
+type ImageInspector interface {
+	Inspect(context.Context, string, string) (engine.LocalMetadata, error)
+}
+
 type Service struct {
 	runSlot        chan struct{}
 	verifyMedia    func(context.Context, string, string) error
+	imageInspector ImageInspector
 	db             *sql.DB
 	factory        func(string, engine.Options) Runner
 	downloadPath   func() string
@@ -34,6 +39,11 @@ type Service struct {
 //wails:ignore
 func (s *Service) ConfigureVerification(verify func(context.Context, string, string) error) {
 	s.verifyMedia = verify
+}
+
+//wails:ignore
+func (s *Service) ConfigureImages(inspector ImageInspector) {
+	s.imageInspector = inspector
 }
 
 //wails:ignore
@@ -323,7 +333,7 @@ func (s *Service) Run(ctx context.Context, req RunRequest) api.Result {
 			outcome = "cancelled"
 			code = "CANCELLED"
 		}
-		if errors.Is(err, ErrUnsupportedTargetDiscovery) {
+		if errors.Is(err, ErrUnsupportedTargetDiscovery) || errors.Is(err, engine.ErrUnsupportedURL) {
 			code = "UNSUPPORTED_TARGET_DISCOVERY"
 		}
 		if errors.Is(err, ErrRevisionConflict) {

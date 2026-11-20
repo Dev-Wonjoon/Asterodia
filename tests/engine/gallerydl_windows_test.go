@@ -118,11 +118,12 @@ func TestGalleryDLDiscoverBluesky(t *testing.T) {
 	t.Logf("조회 확인: 게시물=%s 파일=%s 확장자=%s",
 		metadata.PostID, metadata.Filename, metadata.Extension)
 
-	savedPath, err := discovery.Files[0].SaveImage(t.Context(), workDir)
+	savedPaths, err := (&engine.GalleryDL{Executable: executable}).Download(t.Context(), originalURL, discovery, workDir)
 	if err != nil {
 		t.Fatalf("이미지 저장 실패: %v", err)
 	}
 
+	savedPath := savedPaths[0]
 	savedFile, err := os.Open(savedPath)
 	if err != nil {
 		t.Fatal(err)

@@ -10,6 +10,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -37,6 +38,62 @@ type discoverFunc func(context.Context, string, string) (engine.GalleryDLDiscove
 
 func (f discoverFunc) Discover(ctx context.Context, url, dir string) (engine.GalleryDLDiscovery, error) {
 	return f(ctx, url, dir)
+}
+
+// Only the service fixture transfers local bytes here. Engine tests exercise
+// the real gallery-dl process and its authenticated download behavior.
+func (f discoverFunc) Download(ctx context.Context, url string, d engine.GalleryDLDiscovery, dir string) ([]string, error) {
+	targets, err := d.Targets(url)
+	if err != nil {
+		return nil, err
+	}
+	paths := make([]string, 0, len(targets))
+	for i, target := range targets {
+		file := d.Files[target.FileIndex]
+		var meta struct {
+			Extension string            `json:"extension"`
+			Headers   map[string]string `json:"_http_headers"`
+		}
+		if err = json.Unmarshal(file.Metadata, &meta); err != nil {
+			return nil, err
+		}
+		item := filepath.Join(dir, fmt.Sprintf("item-%04d", i+1))
+		if err = os.Mkdir(item, 0700); err != nil {
+			return nil, err
+		}
+		req, e := http.NewRequestWithContext(ctx, "GET", file.URL, nil)
+		if e != nil {
+			return nil, e
+		}
+		for key, value := range meta.Headers {
+			req.Header.Set(key, value)
+		}
+		res, e := http.DefaultClient.Do(req)
+		if e != nil {
+			return nil, e
+		}
+		if res.StatusCode != 200 {
+			res.Body.Close()
+			if res.StatusCode == 404 {
+				return nil, fmt.Errorf("%w (HTTP 404)", engine.ErrMediaUnavailable)
+			}
+			return nil, fmt.Errorf("fixture HTTP %d", res.StatusCode)
+		}
+		path := filepath.Join(item, "media."+meta.Extension)
+		out, e := os.Create(path)
+		if e != nil {
+			res.Body.Close()
+			return nil, e
+		}
+		_, e = io.Copy(out, res.Body)
+		out.Close()
+		res.Body.Close()
+		if e != nil {
+			return nil, e
+		}
+		paths = append(paths, path)
+	}
+	return paths, nil
 }
 
 type fixture struct {

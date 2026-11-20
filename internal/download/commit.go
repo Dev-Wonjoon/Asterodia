@@ -7,8 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
 	"image"
+	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
@@ -16,6 +16,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
 )
 
 type verifiedFile struct {
@@ -33,7 +35,7 @@ func workPaths(job, attempt string) (string, string) {
 func (s *Service) beginCommit(ctx context.Context, job, attempt string) error {
 	return requireOne(s.db.ExecContext(ctx, `UPDATE download_attempt SET phase='committing' WHERE id=? AND job_id=? AND phase='verifying' AND outcome IS NULL AND cancel_requested_at IS NULL AND EXISTS (SELECT 1 FROM download_queue WHERE id=? AND current_attempt_id=? AND state='running' AND cleanup_required=0)`, attempt, job, job, attempt))
 }
-func verifyFile(path string, metadata TargetMetadata) (verifiedFile, error) {
+func (s *Service) verifyFile(ctx context.Context, path string, metadata TargetMetadata) (verifiedFile, error) {
 	var v verifiedFile
 	v.metadata = metadata
 	resolved, err := filepath.EvalSymlinks(path)
@@ -75,14 +77,61 @@ func verifyFile(path string, metadata TargetMetadata) (verifiedFile, error) {
 			return v, err
 		}
 		config, format, e := image.DecodeConfig(f)
-		if e != nil || config.Width <= 0 || config.Height <= 0 {
-			return v, fmt.Errorf("이미지 형식 검증 실패: %v", e)
+		if errors.Is(e, image.ErrFormat) {
+			if s.imageInspector == nil {
+				return v, fmt.Errorf("이미지 형식(%s) 검증 실패: 설정에서 ImageMagick을 설치하세요: %w", v.format, e)
+			}
+			inspected, inspectErr := s.imageInspector.Inspect(ctx, path, "image")
+			if inspectErr != nil {
+				return v, fmt.Errorf("이미지 형식(%s) 검증 실패: %w", v.format, inspectErr)
+			}
+			if inspected.Kind != "image" || inspected.Width == nil || inspected.Height == nil {
+				return v, fmt.Errorf("이미지 검사 결과에 크기 정보가 없습니다")
+			}
+			config.Width, config.Height, format = *inspected.Width, *inspected.Height, inspected.Format
+		} else if e != nil {
+			return v, fmt.Errorf("이미지 형식(%s) 검증 실패: %w", v.format, e)
+		}
+		if config.Width <= 0 || config.Height <= 0 || config.Width > 20000 || config.Height > 20000 || int64(config.Width)*int64(config.Height) > 40_000_000 {
+			return v, fmt.Errorf("이미지 크기가 처리 한도를 초과했습니다")
+		}
+		if imageFormat(v.format) != imageFormat(format) {
+			return v, fmt.Errorf("이미지 확장자(%s)와 실제 형식(%s)이 일치하지 않습니다", v.format, format)
+		}
+		if e == nil {
+			if _, err = f.Seek(0, 0); err != nil {
+				return v, err
+			}
+			if _, _, err = image.Decode(f); err != nil {
+				return v, fmt.Errorf("이미지 디코딩 검증 실패: %w", err)
+			}
 		}
 		v.width = &config.Width
 		v.height = &config.Height
 		v.format = format
 	}
+	current, err := os.Lstat(path)
+	if err != nil {
+		return v, err
+	}
+	if !os.SameFile(before, current) || before.Size() != current.Size() || before.ModTime() != current.ModTime() {
+		return v, fmt.Errorf("검증 중 파일이 변경되었습니다")
+	}
 	return v, nil
+}
+
+func imageFormat(format string) string {
+	switch format = strings.ToLower(format); format {
+	case "jpg", "jpeg":
+		return "jpeg"
+	case "heic", "heif":
+		return "heic"
+	case "tif", "tiff":
+		return "tiff"
+	case "bmp2", "bmp3":
+		return "bmp"
+	}
+	return format
 }
 
 // Verified work stays private until publication. Each friendly destination is
@@ -122,14 +171,26 @@ func (s *Service) commit(ctx context.Context, job, attempt, storage string) (int
 		if err = json.Unmarshal([]byte(raw), &v.metadata); err != nil {
 			break
 		}
+		files = append(files, v)
+	}
+	if err == nil {
+		err = rows.Err()
+	}
+	rows.Close()
+	if err != nil {
+		return 0, err
+	}
+	// Release the DB cursor before hashing or running an image decoder, so
+	// status queries and cancellation-boundary checks remain responsive.
+	for i := range files {
+		v := &files[i]
 		stageDir := filepath.Join(base, stageRel)
 		if err = verifyStagedFile(stageDir, v.position, v.staged); err != nil {
-			break
+			return 0, err
 		}
-		proof, e := verifyFile(v.staged, v.metadata)
+		proof, e := s.verifyFile(ctx, v.staged, v.metadata)
 		if e != nil {
-			err = e
-			break
+			return 0, e
 		}
 		v.size = proof.size
 		v.mtime = proof.mtime
@@ -139,18 +200,9 @@ func (s *Service) commit(ctx context.Context, job, attempt, storage string) (int
 		v.height = proof.height
 		rel, e := filepath.Rel(stageDir, v.staged)
 		if e != nil {
-			err = e
-			break
+			return 0, e
 		}
 		v.final = filepath.Join(base, finalRel, rel)
-		files = append(files, v)
-	}
-	if err == nil {
-		err = rows.Err()
-	}
-	rows.Close()
-	if err != nil {
-		return 0, err
 	}
 	if len(files) == 0 {
 		return 0, fmt.Errorf("검증할 파일이 없습니다")
@@ -176,7 +228,7 @@ func (s *Service) commit(ctx context.Context, job, attempt, storage string) (int
 		return 0, err
 	}
 	for _, v := range files {
-		proof, e := verifyFile(v.final, v.metadata)
+		proof, e := s.verifyFile(ctx, v.final, v.metadata)
 		if e != nil {
 			return 0, e
 		}

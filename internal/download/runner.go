@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
 	"path/filepath"
-	"strings"
 
 	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
 )
@@ -19,6 +17,7 @@ type YtdlpEngine interface {
 
 type GalleryDLDiscoverer interface {
 	Discover(context.Context, string, string) (engine.GalleryDLDiscovery, error)
+	Download(context.Context, string, engine.GalleryDLDiscovery, string) ([]string, error)
 }
 
 type Runner struct {
@@ -50,10 +49,6 @@ func (r Runner) DiscoverAttempt(
 	if err != nil {
 		return AttemptDiscovery{}, err
 	}
-	if (kind == engine.KindYtdlp && r.Ytdlp == nil) ||
-		(kind == engine.KindGalleryDL && r.GalleryDL == nil) {
-		return AttemptDiscovery{}, fmt.Errorf("%s 조회 엔진이 연결되지 않았습니다", kind)
-	}
 
 	stageDir, err := r.Storage.PrepareStage(jobID, attemptID)
 	if err != nil {
@@ -68,27 +63,38 @@ func (r Runner) DiscoverAttempt(
 		attemptID:   attemptID,
 	}
 
-	switch kind {
-	case engine.KindYtdlp:
-		raw, err := r.Ytdlp.Discover(ctx, originalURL, stageDir)
-		if err != nil {
-			return result, fmt.Errorf("yt-dlp 조회 실패: %w", err)
-		}
-		targets, err := engine.ParseYtdlpTargets(raw, originalURL)
-		if err != nil {
-			return result, fmt.Errorf("yt-dlp 대상 확정 실패: %w", err)
-		}
-		result.YtdlpTargets = targets
-
-	case engine.KindGalleryDL:
-		discovery, err := r.GalleryDL.Discover(ctx, originalURL, stageDir)
-		if err != nil {
-			return result, fmt.Errorf("gallery-dl 조회 실패: %w", err)
-		}
-		result.GalleryResult = discovery
+	other := engine.KindGalleryDL
+	if kind == engine.KindGalleryDL {
+		other = engine.KindYtdlp
 	}
-
-	return result, nil
+	for _, candidate := range []engine.Kind{kind, other} {
+		result.Engine = candidate
+		switch candidate {
+		case engine.KindYtdlp:
+			if r.Ytdlp == nil {
+				err = engine.ErrUnsupportedURL
+				break
+			}
+			var raw json.RawMessage
+			raw, err = r.Ytdlp.Discover(ctx, originalURL, stageDir)
+			if err == nil {
+				result.YtdlpTargets, err = engine.ParseYtdlpTargets(raw, originalURL)
+			}
+		case engine.KindGalleryDL:
+			if r.GalleryDL == nil {
+				err = engine.ErrUnsupportedURL
+				break
+			}
+			result.GalleryResult, err = r.GalleryDL.Discover(ctx, originalURL, stageDir)
+		}
+		if err == nil {
+			return result, nil
+		}
+		if !errors.Is(err, engine.ErrUnsupportedURL) {
+			return result, err
+		}
+	}
+	return result, err
 }
 
 func (a AttemptDiscovery) StageDir() string {
@@ -174,14 +180,17 @@ func (a AttemptDiscovery) targetInputs() ([]TargetInput, error) {
 		return targets, nil
 
 	case engine.KindGalleryDL:
-		media, err := a.GalleryResult.InstagramTargets(a.OriginalURL)
+		if a.Options.Type == "audio" || (a.Options.Quality != "" && a.Options.Quality != "best") || a.Options.Extension != "" {
+			return nil, fmt.Errorf("%w: 선택된 엔진은 요청한 변환 옵션을 처리하지 못합니다", engine.ErrUnsupportedMediaFormat)
+		}
+		media, err := a.GalleryResult.Targets(a.OriginalURL)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %v", ErrUnsupportedTargetDiscovery, err)
 		}
 
 		targets := make([]TargetInput, 0, len(media))
 		for _, item := range media {
-			targets = append(targets, TargetInput{TargetKey: item.TargetKey, SourceURL: a.OriginalURL, Metadata: TargetMetadata{Kind: item.Kind, Title: item.Title, ExternalID: item.MediaID, PlatformName: "Instagram", OwnerID: item.OwnerID, OwnerName: item.OwnerName}})
+			targets = append(targets, TargetInput{TargetKey: item.TargetKey, SourceURL: item.SourceURL, Metadata: TargetMetadata{Kind: item.Kind, Title: item.Title, ExternalID: item.ExternalID, PlatformName: item.PlatformName, OwnerID: item.OwnerID, OwnerName: item.OwnerName}})
 		}
 		return targets, nil
 
@@ -226,23 +235,18 @@ func (r Runner) StageAttempt(ctx context.Context, attempt AttemptDiscovery) ([]S
 
 	case engine.KindGalleryDL:
 		var err error
-		discovery := attempt.GalleryResult
-		if parsed, e := url.Parse(attempt.OriginalURL); e == nil && (strings.EqualFold(parsed.Hostname(), "instagram.com") || strings.EqualFold(parsed.Hostname(), "www.instagram.com")) {
-			targets, e := discovery.InstagramTargets(attempt.OriginalURL)
-			if e != nil {
-				return nil, e
-			}
-			files := make([]engine.GalleryDLFile, 0, len(targets))
-			for _, target := range targets {
-				files = append(files, discovery.Files[target.FileIndex])
-			}
-			discovery.Files = files
+		if r.GalleryDL == nil {
+			return nil, fmt.Errorf("gallery-dl 엔진이 연결되지 않았습니다")
 		}
-		paths, err = discovery.SaveMedia(ctx, attempt.stageDir)
+		paths, err = r.GalleryDL.Download(ctx, attempt.OriginalURL, attempt.GalleryResult, attempt.stageDir)
 		if err != nil {
 			return nil, err
 		}
-		if len(paths) != len(discovery.Files) {
+		targets, e := attempt.GalleryResult.Targets(attempt.OriginalURL)
+		if e != nil {
+			return nil, e
+		}
+		if len(paths) != len(targets) {
 			return nil, fmt.Errorf("gallery-dl 저장 결과 수가 조회 대상 수와 다릅니다")
 		}
 

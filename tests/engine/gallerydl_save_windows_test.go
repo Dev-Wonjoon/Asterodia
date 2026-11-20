@@ -2,7 +2,9 @@ package engine_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
 	"image"
 	"image/color"
 	"image/png"
@@ -12,96 +14,172 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"time"
 )
 
 func TestGalleryDLSaveImages(t *testing.T) {
-	root := engineTestRoot(t, "gallerydl-download")
-
-	makePNG := func(pixel color.NRGBA) []byte {
-		t.Helper()
-		img := image.NewNRGBA(image.Rect(0, 0, 1, 1))
-		img.SetNRGBA(0, 0, pixel)
-		var buffer bytes.Buffer
-		if err := png.Encode(&buffer, img); err != nil {
-			t.Fatal(err)
-		}
-		return buffer.Bytes()
+	exe := os.Getenv("STORAGEBUCKET_TEST_GALLERYDL_EXE")
+	if !filepath.IsAbs(exe) {
+		t.Skip("gallery-dl 실제 실행 파일이 필요합니다")
 	}
-	first := makePNG(color.NRGBA{R: 255, A: 255})
-	second := makePNG(color.NRGBA{B: 255, A: 255})
-
+	root := engineTestRoot(t, "gallerydl-download")
+	var data bytes.Buffer
+	img := image.NewNRGBA(image.Rect(0, 0, 8, 6))
+	img.SetNRGBA(0, 0, color.NRGBA{R: 255, A: 255})
+	if err := png.Encode(&data, img); err != nil {
+		t.Fatal(err)
+	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "image/png")
-		switch r.URL.RequestURI() {
-		case "/first.png?token=first":
-			_, _ = w.Write(first)
-		case "/second.png?token=second":
-			_, _ = w.Write(second)
-		default:
+		if r.URL.Path == "/missing.png" {
 			http.NotFound(w, r)
+			return
 		}
+		if r.URL.Path == "/blocked.png" {
+			<-r.Context().Done()
+			return
+		}
+		w.Header().Set("Content-Type", "image/png")
+		w.Write(data.Bytes())
 	}))
 	defer server.Close()
-
-	for _, tc := range []struct {
-		name       string
-		secondPath string
-		missing    bool
-	}{
-		{name: "two-files", secondPath: "/second.png?token=second"},
-		{name: "missing-second", secondPath: "/missing.png?token=second", missing: true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			stageDir, err := os.MkdirTemp(root, "stage-")
+	for _, mode := range []string{"normal", "missing", "changed-identity", "cancel"} {
+		t.Run(mode, func(t *testing.T) {
+			stage, err := os.MkdirTemp(root, "engine-stage-")
 			if err != nil {
 				t.Fatal(err)
 			}
-
-			metadata := map[string]string{"extension": "png"}
-			raw, err := json.Marshal([][]any{
-				{2, map[string]string{"category": "fixture"}},
-				{3, server.URL + "/first.png?token=first", metadata},
-				{3, server.URL + tc.secondPath, metadata},
-			})
+			g := engine.GalleryDL{Executable: exe}
+			address := server.URL + "/image.png?token=fixture"
+			if mode == "missing" {
+				address = server.URL + "/missing.png"
+			}
+			if mode == "cancel" {
+				address = server.URL + "/blocked.png"
+			}
+			d, err := g.Discover(t.Context(), address, stage)
 			if err != nil {
 				t.Fatal(err)
 			}
-			discovery, err := engine.ParseGalleryDLDiscovery(raw)
-			if err != nil {
-				t.Fatal(err)
+			if mode == "changed-identity" {
+				var meta map[string]any
+				json.Unmarshal(d.Files[0].Metadata, &meta)
+				meta["filename"] = "unexpected"
+				d.Files[0].Metadata, _ = json.Marshal(meta)
 			}
-
-			paths, err := discovery.SaveImages(t.Context(), stageDir)
-			if tc.missing {
-				if err == nil || !strings.Contains(err.Error(), "2번째") ||
-					!strings.Contains(err.Error(), "HTTP 404") || len(paths) != 0 {
-					t.Fatalf("두 번째 파일의 HTTP 404와 빈 결과를 기대했습니다: 경로=%v 오류=%v",
-						paths, err)
+			ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
+			defer cancel()
+			if mode == "cancel" {
+				ctx, cancel = context.WithTimeout(ctx, 800*time.Millisecond)
+				defer cancel()
+			}
+			paths, err := g.Download(ctx, address, d, stage)
+			if mode != "normal" {
+				if err == nil || len(paths) != 0 {
+					t.Fatalf("실패 파일 공개: paths=%v err=%v", paths, err)
 				}
-				missingPath := filepath.Join(stageDir, "item-0002", "media.png")
-				if _, err := os.Stat(missingPath); !os.IsNotExist(err) {
-					t.Fatalf("누락된 이미지의 파일이 없어야 합니다: %v", err)
+				if mode == "changed-identity" && !strings.Contains(err.Error(), "식별") {
+					t.Fatal(err)
+				}
+				if _, e := os.Stat(filepath.Join(stage, "item-0001")); !os.IsNotExist(e) {
+					t.Fatal("실패 결과가 최종 준비 폴더로 옮겨졌습니다", e)
 				}
 				return
 			}
+			if err != nil || len(paths) != 1 {
+				t.Fatalf("다운로드 실패: %v %v", paths, err)
+			}
+			got, err := os.ReadFile(paths[0])
+			if err != nil || !bytes.Equal(got, data.Bytes()) {
+				t.Fatal("원본 내용 불일치", err)
+			}
+			entries, err := os.ReadDir(stage)
+			if err != nil || len(entries) != 1 || entries[0].Name() != "item-0001" {
+				t.Fatal("임시 메타데이터 미정리", entries, err)
+			}
+		})
+	}
+}
+
+func TestGalleryDLDownloadResults(t *testing.T) {
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := engineTestRoot(t, "gallerydl-download")
+	t.Setenv("STORAGEBUCKET_GALLERYDL_FIXTURE", "1")
+	for _, mode := range []string{"ordered", "reordered", "extension-alias", "generic-id-schema", "partial", "changed-id", "changed-post", "extra-file", "instagram"} {
+		t.Run(mode, func(t *testing.T) {
+			stage, err := os.MkdirTemp(root, "results-")
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(paths) != 2 {
-				t.Fatalf("저장 결과 %d건, 기대값 2건", len(paths))
+			address := "https://x.com/fixture/status/123"
+			base := map[string]any{"category": "twitter", "subcategory": "tweet", "tweet_id": "123", "count": 2, "content": "fixture"}
+			first := map[string]any{"category": "twitter", "tweet_id": "123", "filename": "one", "extension": "jpg", "num": 1}
+			second := map[string]any{"category": "twitter", "tweet_id": "123", "filename": "two", "extension": "mp4", "num": 2}
+			if mode == "generic-id-schema" {
+				base = map[string]any{"category": "future", "id": "parent", "count": 2}
+				first = map[string]any{"category": "future", "id": "media-1", "extension": "jpg", "num": 1}
+				second = map[string]any{"category": "future", "id": "media-2", "extension": "mp4", "num": 2}
 			}
-			if filepath.Dir(paths[0]) == filepath.Dir(paths[1]) {
-				t.Fatal("두 이미지가 서로 다른 작업 폴더에 있어야 합니다")
-			}
-			for i, want := range [][]byte{first, second} {
-				got, err := os.ReadFile(paths[i])
-				if err != nil {
-					t.Fatal(err)
+			if mode == "instagram" {
+				address = "https://www.instagram.com/p/Fixture_123/"
+				base = map[string]any{"category": "instagram", "subcategory": "post", "post_shortcode": "Fixture_123", "post_id": "123", "typename": "GraphSidecar", "count": 2}
+				first = map[string]any{}
+				second = map[string]any{}
+				for key, value := range base {
+					first[key] = value
+					second[key] = value
 				}
-				if !bytes.Equal(got, want) {
-					t.Fatalf("%d번째 저장 파일이 조회 대상의 원본과 다릅니다", i+1)
+				first["media_id"], first["extension"], first["num"] = "124", "jpg", 1
+				second["media_id"], second["extension"], second["num"] = "125", "mp4", 2
+			}
+			if mode == "extension-alias" {
+				first["extension"] = "jpeg"
+			}
+			raw, _ := json.Marshal([][]any{{2, base}, {3, "https://cdn.invalid/one.jpg", first}, {3, "https://cdn.invalid/two.mp4", second}})
+			d, err := engine.ParseGalleryDLDiscovery(raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if mode == "changed-id" {
+				second["filename"] = "different"
+			}
+			if mode == "extension-alias" {
+				first["extension"] = "jpg"
+			}
+			if mode == "changed-post" {
+				second["tweet_id"] = "999"
+			}
+			// Output filename ordering deliberately differs from extractor order.
+			a, _ := json.Marshal(first)
+			b, _ := json.Marshal(second)
+			records := []map[string]any{{"Name": "z-first.jpg", "Metadata": json.RawMessage(a), "Payload": "first media"}, {"Name": "a-second.mp4", "Metadata": json.RawMessage(b), "Payload": "second media"}}
+			if mode == "reordered" {
+				records[0], records[1] = records[1], records[0]
+			}
+			if mode == "partial" {
+				records = records[:1]
+			}
+			if mode == "extra-file" {
+				records = append(records, map[string]any{"Name": "unreported.txt", "Payload": "extra"})
+			}
+			payload, _ := json.Marshal(records)
+			t.Setenv("STORAGEBUCKET_GALLERYDL_DOWNLOAD_RESULTS", string(payload))
+			paths, err := (&engine.GalleryDL{Executable: exe}).Download(t.Context(), address, d, stage)
+			if mode != "ordered" && mode != "reordered" && mode != "extension-alias" && mode != "generic-id-schema" && mode != "instagram" {
+				if err == nil || len(paths) != 0 {
+					t.Fatal("다른 결과를 공개했습니다", paths, err)
+				}
+				return
+			}
+			if err != nil || len(paths) != 2 {
+				t.Fatal(paths, err)
+			}
+			for i, want := range []string{"first media", "second media"} {
+				got, e := os.ReadFile(paths[i])
+				if e != nil || string(got) != want {
+					t.Fatal("추출 순서와 파일 매칭 실패", i, string(got), e)
 				}
 			}
 		})

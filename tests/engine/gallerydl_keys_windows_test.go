@@ -31,6 +31,38 @@ func TestMain(m *testing.M) {
 				}
 			}
 		}
+		if raw := os.Getenv("STORAGEBUCKET_GALLERYDL_DOWNLOAD_RESULTS"); raw != "" {
+			var records []struct {
+				Name     string
+				Metadata json.RawMessage
+				Payload  string
+			}
+			if json.Unmarshal([]byte(raw), &records) != nil {
+				os.Exit(2)
+			}
+			out := ""
+			for i, arg := range os.Args {
+				if arg == "-D" && i+1 < len(os.Args) {
+					out = os.Args[i+1]
+				}
+			}
+			rel, err := filepath.Rel(os.Getenv("STORAGEBUCKET_TEST_ROOT"), out)
+			if err != nil || !filepath.IsLocal(rel) || out == "" {
+				os.Exit(2)
+			}
+			for _, record := range records {
+				if filepath.Base(record.Name) != record.Name {
+					os.Exit(2)
+				}
+				if os.WriteFile(filepath.Join(out, record.Name), []byte(record.Payload), 0600) != nil {
+					os.Exit(2)
+				}
+				if len(record.Metadata) > 0 && os.WriteFile(filepath.Join(out, record.Name+".info.json"), record.Metadata, 0600) != nil {
+					os.Exit(2)
+				}
+			}
+			os.Exit(0)
+		}
 		fmt.Print(os.Getenv("STORAGEBUCKET_GALLERYDL_FIXTURE_RESPONSE"))
 		fmt.Fprint(os.Stderr, os.Getenv("STORAGEBUCKET_GALLERYDL_FIXTURE_STDERR"))
 		os.Exit(0)
@@ -92,13 +124,13 @@ func TestGalleryDLInstagramTargetKey(t *testing.T) {
 			}
 		}
 		for _, option := range []engine.Options{{Type: "audio"}, {Quality: "720"}, {Extension: "mp4"}} {
-			if _, err := engine.Select(originalURL, option); !errors.Is(err, engine.ErrInstagramOptions) {
-				t.Fatalf("지원하지 않는 옵션: %v", err)
+			if kind, err := engine.Select(originalURL, option); err != nil || kind != engine.KindYtdlp {
+				t.Fatalf("변환 옵션의 엔진 우선순위: %v %v", kind, err)
 			}
 		}
 		for _, url := range []string{"https://www.instagram.com/author/", "https://www.instagram.com/stories/author/1/", "https://www.instagram.com/share/abc/"} {
-			if _, err := engine.Select(url, engine.Options{}); !errors.Is(err, engine.ErrInstagramURL) {
-				t.Fatalf("지원하지 않는 주소: %v", err)
+			if kind, err := engine.Select(url, engine.Options{}); err != nil || kind != engine.KindGalleryDL {
+				t.Fatalf("주소 지원 여부는 추출 엔진이 판단해야 합니다: %v %v", kind, err)
 			}
 		}
 	})
@@ -193,6 +225,7 @@ func TestGalleryDLInstagramTargetKey(t *testing.T) {
 			want              error
 		}{
 			{"valid", fmt.Sprintf(`[[2,%s],[3,"https://cdn.invalid/photo.jpg",%s]]`, directory, file), "", nil},
+			{"warning-success", fmt.Sprintf(`[[2,%s],[3,"https://cdn.invalid/photo.jpg",%s]]`, directory, file), "WARNING: optional metadata missing", nil},
 			{"auth", `[[-1,{"error":"AuthRequired","message":"cookies needed"}]]`, "", engine.ErrAuthenticationRequired},
 			{"private", `[[-1,{"error":"AuthorizationError","message":"private"}]]`, "", engine.ErrAccessDenied},
 			{"missing", `[[-1,{"error":"NotFoundError","message":"post"}]]`, "", engine.ErrMediaUnavailable},
@@ -222,4 +255,70 @@ func TestGalleryDLInstagramTargetKey(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestGalleryDLCommonTargets(t *testing.T) {
+	for _, category := range []string{"twitter", "bluesky", "future-site"} {
+		t.Run(category, func(t *testing.T) {
+			address := "https://example.invalid/post/123"
+			directory := map[string]any{"category": category, "subcategory": "post", "post_id": json.Number("2123674605651108081"), "content": "공통 게시글", "author": map[string]any{"id": json.Number("2123674605651108000"), "name": "작성자"}}
+			messages := [][]any{{2, directory}, {3, "https://cdn.invalid/one.jpg?expires=1", map[string]any{"filename": "one", "extension": "jpg", "num": 1}}, {3, "https://cdn.invalid/two.mp4?expires=1", map[string]any{"filename": "two", "extension": "mp4", "num": 2}}}
+			raw, _ := json.Marshal(messages)
+			d, err := engine.ParseGalleryDLDiscovery(raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			targets, err := d.Targets(address)
+			if err != nil || len(targets) != 2 {
+				t.Fatal(targets, err)
+			}
+			if targets[0].Kind != "image" || targets[1].Kind != "video" || targets[0].Title != "공통 게시글" || targets[0].OwnerID != "2123674605651108000" || targets[0].OwnerName != "작성자" || targets[0].PostKey != category+":2123674605651108081" {
+				t.Fatal(targets)
+			}
+			d.Files[0], d.Files[1] = d.Files[1], d.Files[0]
+			again, err := d.Targets(address)
+			if err != nil || again[1].TargetKey != targets[0].TargetKey || again[0].TargetKey != targets[1].TargetKey {
+				t.Fatal("파일 순서에 따라 식별자가 바뀌었습니다", again, err)
+			}
+			messages = append(messages, []any{2, directory})
+			raw, _ = json.Marshal(messages)
+			d, _ = engine.ParseGalleryDLDiscovery(raw)
+			if _, err = d.Targets(address); err == nil {
+				t.Fatal("프로필·여러 게시글을 한 묶음으로 허용")
+			}
+		})
+	}
+	for _, tc := range []struct {
+		metadata string
+		fail     bool
+	}{
+		{`{"category":"future","filename":"image","extension":"png"}`, false},
+		{`{"category":"future","filename":"image","extension":"png","author":{"name":"표시 이름"}}`, false},
+		{`{"category":"future","extension":"jpg"}`, true},
+		{`{"filename":"image","extension":"png"}`, true},
+		{`{"category":"future","filename":"image","extension":"exe"}`, true},
+	} {
+		d := engine.GalleryDLDiscovery{Files: []engine.GalleryDLFile{{Metadata: json.RawMessage(tc.metadata)}}}
+		targets, err := d.Targets("https://example.invalid/post/1")
+		if (err != nil) != tc.fail {
+			t.Fatal(tc, targets, err)
+		}
+		if !tc.fail && (targets[0].Title == "" || targets[0].OwnerID != "") {
+			t.Fatal(targets)
+		}
+	}
+
+	instagramRaw := []byte(`[[2,{"category":"instagram","subcategory":"post","post_shortcode":"Resolved","typename":"GraphImage","post_id":"123","count":1}],[3,"https://cdn.invalid/image.jpg",{"category":"instagram","subcategory":"post","post_shortcode":"Resolved","typename":"GraphImage","post_id":"123","media_id":"123","count":1,"extension":"jpg"}]]`)
+	d, err := engine.ParseGalleryDLDiscovery(instagramRaw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targets, err := d.Targets("https://www.instagram.com/share/arbitrary")
+	if err != nil || len(targets) != 1 || targets[0].SourceURL != "https://www.instagram.com/share/arbitrary" {
+		t.Fatal("추출기의 판별 결과 대신 입력 주소를 재판별했습니다", targets, err)
+	}
+	raw := []byte(`[[-1,{"error":"NoExtractorError","message":"unsupported URL"}]]`)
+	if _, err := engine.ParseGalleryDLDiscovery(raw); !errors.Is(err, engine.ErrUnsupportedURL) {
+		t.Fatal(err)
+	}
 }

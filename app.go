@@ -86,6 +86,7 @@ func applicationServices(
 		}
 		return download.Runner{Storage: download.Storage{Root: root}, Ytdlp: &engine.Ytdlp{Executable: filepath.Join(paths.Bin, "yt-dlp.exe"), JSRuntime: jsRuntime, FFmpegLocation: filepath.Join(paths.Bin, "ffmpeg.exe"), CookieBrowser: snapshot.CookieBrowser, CookieFile: snapshot.CookieFilePath, NoPlaylist: options.Playlist == nil || !*options.Playlist}, GalleryDL: &engine.GalleryDL{Executable: filepath.Join(paths.Bin, "gallery-dl.exe"), CookieBrowser: snapshot.CookieBrowser, CookieFile: snapshot.CookieFilePath}}
 	}, thumb.ScheduleMedia)
+	downloader.ConfigureImages(inspector)
 	downloader.ConfigurePreviewLookup(thumb.CachedDownloadPreview)
 	downloader.ConfigurePreviewCleanup(func(ctx context.Context, url string) {
 		_ = thumb.ReleaseDownloadPreview(ctx, url)

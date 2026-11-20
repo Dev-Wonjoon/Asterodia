@@ -107,7 +107,13 @@ func (y *Ytdlp) Discover(
 	})
 
 	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, ErrStopUnconfirmed) || errors.Is(err, ErrOutputLimit) {
+			return nil, fmt.Errorf("yt-dlp 대상 조회 실패: %w", err)
+		}
 		if stderr := strings.TrimSpace(result.Stderr); stderr != "" {
+			if errors.Is(galleryDLFailure("", stderr), ErrUnsupportedURL) {
+				return nil, ErrUnsupportedURL
+			}
 			return nil, fmt.Errorf("yt-dlp 대상 조회 실패: %w\n%s", err, stderr)
 		}
 		return nil, fmt.Errorf("yt-dlp 대상 조회 실패: %w", err)
@@ -354,6 +360,7 @@ type YtdlpTarget struct {
 }
 
 type ytdlpDirectFormat struct {
+	raw        map[string]json.RawMessage
 	ID         string `json:"format_id"`
 	URL        string `json:"url"`
 	Protocol   string `json:"protocol"`
@@ -369,10 +376,12 @@ type ytdlpDirectFormat struct {
 }
 
 type ytdlpDownloaderOptions struct {
+	raw           map[string]json.RawMessage
 	HTTPChunkSize int64 `json:"http_chunk_size,omitempty"`
 }
 
 type ytdlpDownloadInfo struct {
+	raw          map[string]json.RawMessage
 	Type         string              `json:"_type"`
 	ID           string              `json:"id"`
 	Title        string              `json:"title"`
@@ -405,9 +414,10 @@ func buildYtdlpDownloadInfo(raw json.RawMessage, target YtdlpTarget) (string, er
 
 	// yt-dlp가 정렬한 목록의 뒤쪽부터 적합한 포맷 하나를 고른다.
 	var formats []ytdlpDirectFormat
+	type plainFormat ytdlpDirectFormat
 	for i, rawFormat := range candidates {
 		var candidate struct {
-			ytdlpDirectFormat
+			plainFormat
 			HasDRM    json.RawMessage   `json:"has_drm"`
 			Fragments []json.RawMessage `json:"fragments"`
 		}
@@ -415,7 +425,8 @@ func buildYtdlpDownloadInfo(raw json.RawMessage, target YtdlpTarget) (string, er
 			return "", fmt.Errorf("yt-dlp 포맷 %d 해석 실패: %w", i+1, err)
 		}
 
-		format := candidate.ytdlpDirectFormat
+		format := ytdlpDirectFormat(candidate.plainFormat)
+		format.raw = decodeMetadata(rawFormat)
 		drm := string(candidate.HasDRM)
 		hasVideo := format.Ext == "mp4" && format.VideoCodec != "none"
 		audioOnly := format.Ext == "m4a" && format.VideoCodec == "none" &&
@@ -439,8 +450,8 @@ func buildYtdlpDownloadInfo(raw json.RawMessage, target YtdlpTarget) (string, er
 			continue
 		}
 		// Preserve the extractor's bounded Range requests when freezing formats.
-		if format.DownloaderOptions != nil && format.DownloaderOptions.HTTPChunkSize <= 0 {
-			format.DownloaderOptions = nil
+		if format.DownloaderOptions != nil && format.DownloaderOptions.HTTPChunkSize < 0 {
+			format.DownloaderOptions.HTTPChunkSize = 0
 		}
 
 		format.HTTPHeaders = make(map[string]string)
@@ -448,8 +459,7 @@ func buildYtdlpDownloadInfo(raw json.RawMessage, target YtdlpTarget) (string, er
 			if strings.ContainsAny(value, "\r\n\x00") {
 				continue
 			}
-			switch strings.ToLower(name) {
-			case "user-agent", "referer", "origin", "accept", "accept-language":
+			if name != "" && !strings.ContainsAny(name, ":\r\n\x00 \t") {
 				format.HTTPHeaders[name] = value
 			}
 		}
@@ -461,6 +471,7 @@ func buildYtdlpDownloadInfo(raw json.RawMessage, target YtdlpTarget) (string, er
 	}
 
 	payload, err := json.Marshal(ytdlpDownloadInfo{
+		raw:          decodeMetadata(raw),
 		Type:         "video",
 		ID:           target.ID,
 		Title:        target.Title,
