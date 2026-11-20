@@ -1,5 +1,5 @@
 import { useConfirm } from '@renderer/shared/hooks/useConfirm'
-import { FileMovePanel } from "./FileMovePanel"
+import { FileMovePanel, type FileMoveControls } from "./FileMovePanel"
 import type { MoveSelection } from "@contracts/file-move-api"
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useInfiniteScroll } from '@renderer/shared/hooks/useInfiniteScroll'
@@ -12,7 +12,10 @@ import { GalleryCardActions } from './GalleryCardActions'
 import { useGalleryViewModel } from './useGalleryViewModel'
 import type { MediaFilter } from '@contracts/media-v2'
 import { getApi } from '@renderer/shared/api'
-import { LocalImportPanel } from '@renderer/features/localimport/LocalImportPanel'
+import { LocalImportPanel, type LocalImportControls } from '@renderer/features/localimport/LocalImportPanel'
+import { GalleryToolbar } from './GalleryToolbar'
+import { GalleryBulkDialog } from './GalleryBulkDialog'
+import { useGalleryBulkActions, type BulkCommand } from './useGalleryBulkActions'
 
 export const GalleryPage = ({
     favoritesOnly = false,
@@ -31,13 +34,20 @@ export const GalleryPage = ({
 
     useEffect(() => { ++generation.current; return () => { ++generation.current } }, [store])
     const [selection, setSelection] = useState<MoveSelection[]>([])
+    const [tagCommand, setTagCommand] = useState<'addTags' | 'removeTags' | null>(null)
+    const importControls = useRef<LocalImportControls>(null)
+    const moveControls = useRef<FileMoveControls>(null)
+    const [importBusy, setImportBusy] = useState(false)
+    const [hasImportResult, setHasImportResult] = useState(false)
+    const [moveBusy, setMoveBusy] = useState(false)
+    const bulk = useGalleryBulkActions(store, selection, ids => setSelection(previous => previous.filter(item => !ids.includes(item.mediaId))))
     const [draftDirty, setDraftDirty] = useState(false)
     const dirtyRef = useRef(false)
     const onDirtyChange = useCallback((dirty: boolean) => {
         dirtyRef.current = dirty
         setDraftDirty(dirty)
     }, [])
-    useLeaveGuard(draftDirty, state.busy)
+    useLeaveGuard(draftDirty, state.busy || bulk.busy || moveBusy)
 
     const thumbnailRefreshPending = useRef(false)
 
@@ -89,19 +99,10 @@ export const GalleryPage = ({
 
     useEffect(() => {
         listScrollRef.current?.scrollTo({ top: 0 })
+        setSelection([]); setTagCommand(null)
     }, [filterKey, favoritesOnly])
 
     const list = state.list
-
-    useEffect(() => {
-        setSelection(previous => {
-            const next = previous.filter(item => {
-                const visible = list.page.data.find(media => media.id === item.mediaId)
-                return !visible || visible.revision === item.revision
-            })
-            return next.length === previous.length ? previous : next
-        })
-    }, [list.page])
 
     useInfiniteScroll({
         rootRef: listScrollRef,
@@ -113,7 +114,7 @@ export const GalleryPage = ({
             !list.loadingMore &&
             !list.error &&
             !list.moreError &&
-            !state.busy &&
+            !state.busy && !bulk.busy &&
             !state.needsRefresh,
         onLoadMore: store.loadMore
     })
@@ -169,7 +170,13 @@ export const GalleryPage = ({
         return typeof answer === 'boolean' ? apply(answer) : answer.then(apply)
     }
 
-    const disabled = state.busy || list.status !== 'ready'
+    const disabled = state.busy || bulk.busy || list.status !== 'ready'
+    const toolbarDisabled = disabled || moveBusy || draftDirty || state.needsRefresh
+    const onBulk = (command: BulkCommand) => {
+        if (toolbarDisabled) return
+        if (command === 'addTags' || command === 'removeTags') setTagCommand(command)
+        else void bulk.run(command)
+    }
 
     const button =
         'rounded-lg border border-[var(--border-line)] px-3 py-2 text-sm disabled:opacity-40'
@@ -180,7 +187,7 @@ export const GalleryPage = ({
             detailKey={state.detail.mediaId}
             onClose={closeDetail}
             listRef={listScrollRef}
-            closeDisabled={state.busy}
+            closeDisabled={state.busy || bulk.busy || moveBusy || tagCommand !== null}
             detail={
                 state.detail.mediaId !== null ? (
                     <MediaDetailPane
@@ -196,28 +203,24 @@ export const GalleryPage = ({
             }
         >
             <div className="space-y-5 pb-6">
-                {!favoritesOnly && <LocalImportPanel disabled={draftDirty || state.busy} onComplete={() => { thumbnailRefreshPending.current = true; refreshThumbnails() }} />}
-                <FileMovePanel selection={selection} disabled={draftDirty || state.busy || state.needsRefresh} onCreated={() => setSelection([])} onChanged={() => { thumbnailRefreshPending.current = true; refreshThumbnails() }} />
                 <header className="flex flex-wrap items-center justify-between gap-3">
                     <h1 className="text-lg font-semibold">{title}</h1>
 
-                    <div className="flex items-center gap-3">
-                        {list.status === 'ready' && (
-                            <span className="text-sm text-[var(--text-muted)]">
-                                총 {list.page.total}개 묶음
-                            </span>
-                        )}
-
-                        <button
-                            type="button"
-                            className={button}
-                            disabled={state.busy}
-                            onClick={() => void store.refresh()}
-                        >
-                            새로고침
-                        </button>
-                    </div>
+                    <GalleryToolbar total={list.status === 'ready' ? list.page.total : null} count={selection.length} disabled={state.busy || bulk.busy || moveBusy || draftDirty} actionDisabled={state.needsRefresh || list.status !== 'ready'} importDisabled={importBusy || state.needsRefresh} canImport={!favoritesOnly} hasImportResult={hasImportResult}
+                        onImport={() => importControls.current?.choose()} onRecentImport={() => importControls.current?.reopen()}
+                        onSelectAll={() => { if (!toolbarDisabled) setSelection(list.page.data.map(media => ({ mediaId: media.id, revision: media.revision }))) }}
+                        onClear={() => setSelection([])} onRefresh={() => { setSelection([]); void store.refresh() }}
+                        onMove={() => { if (!toolbarDisabled) moveControls.current?.choose() }} onBulk={onBulk} />
                 </header>
+
+                {!favoritesOnly && <LocalImportPanel compact controlRef={importControls} onBusyChange={setImportBusy} onHasResultChange={setHasImportResult} disabled={draftDirty || state.busy || bulk.busy || moveBusy} onComplete={() => { thumbnailRefreshPending.current = true; refreshThumbnails() }} />}
+                <FileMovePanel compact controlRef={moveControls} onBusyChange={setMoveBusy} selection={selection} disabled={draftDirty || state.busy || bulk.busy || state.needsRefresh} onCreated={() => setSelection([])} onChanged={() => { thumbnailRefreshPending.current = true; refreshThumbnails() }} />
+                {bulk.progress && <p role="status" className="text-sm">일괄 처리 중 · {bulk.progress.done} / {bulk.progress.total}개</p>}
+                {bulk.result && <section aria-label="일괄 처리 결과" className="rounded-lg border border-[var(--border-line)] p-3 text-sm">
+                    <p role="status">성공 {bulk.result.succeeded.length}개 · 실패 {bulk.result.failed.length}개</p>
+                    {bulk.result.failed.length > 0 && <><p className="mt-1 text-[var(--text-muted)]">실패 항목은 선택을 유지합니다. 변경 충돌이 있으면 새로고침 후 다시 선택하세요.</p><ul className="mt-2 max-h-40 overflow-auto">{bulk.result.failed.map(item => <li key={item.mediaId}>게시글 #{item.mediaId}: {item.message}</li>)}</ul></>}
+                </section>}
+                {tagCommand && <GalleryBulkDialog count={selection.length} remove={tagCommand === 'removeTags'} onClose={() => setTagCommand(null)} onApply={names => { const command = tagCommand; setTagCommand(null); if (!toolbarDisabled) void bulk.run(command, names) }} />}
 
                 {state.notice && (
                     <p role="status" className="text-sm">
@@ -252,20 +255,21 @@ export const GalleryPage = ({
                     <p className="py-16 text-center text-[var(--text-muted)]">{emptyMessage}</p>
                 )}
 
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,220px),1fr))] gap-5">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,200px),1fr))] gap-4">
                     {list.page.data.map((media) => (
                         <article
                             key={media.id}
+                            data-selected={selection.some(item => item.mediaId === media.id) || undefined}
                             data-detail-trigger
                             className={
-                                'relative rounded-xl border bg-[var(--bg-sidebar)] text-left ' +
+                                'motion-card relative rounded-xl border bg-[var(--bg-sidebar)] text-left ' +
                                 (state.detail.mediaId === media.id
                                     ? 'border-[var(--color-primary)]'
                                     : 'border-[var(--border-line)]')
                             }
                         >
-                            <label className="absolute left-2 top-2 z-10 flex items-center gap-2 rounded bg-[var(--bg-sidebar)] p-2 text-xs" onClick={event => event.stopPropagation()}>
-                                <input type="checkbox" aria-label={media.title + ' 이동 선택'} checked={selection.some(item => item.mediaId === media.id)} disabled={disabled || draftDirty || state.needsRefresh} onChange={event => setSelection(previous => event.target.checked ? [...previous.filter(item => item.mediaId !== media.id), { mediaId: media.id, revision: media.revision }] : previous.filter(item => item.mediaId !== media.id))} />선택
+                            <label className="absolute right-2 top-2 z-10 flex size-7 items-center justify-center rounded bg-[var(--bg-sidebar)] shadow-sm" onClick={event => event.stopPropagation()}>
+                                <input type="checkbox" className="size-4 accent-[var(--color-primary)]" aria-label={media.title + ' 선택'} checked={selection.some(item => item.mediaId === media.id)} disabled={toolbarDisabled} onChange={event => setSelection(previous => event.target.checked ? [...previous.filter(item => item.mediaId !== media.id), { mediaId: media.id, revision: media.revision }] : previous.filter(item => item.mediaId !== media.id))} />
                             </label>
                             <button
                                 type="button"

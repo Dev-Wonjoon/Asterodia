@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"image"
+	_ "image/gif"
 	"image/jpeg"
 	_ "image/png"
 	"io"
@@ -41,6 +42,8 @@ type Service struct {
 	wake           chan struct{}
 	wg             sync.WaitGroup
 	closed         bool
+	started        bool
+	scanRequested  bool
 }
 
 func NewService(db *sql.DB, cache, ffmpeg string, notify func(int64)) *Service {
@@ -54,11 +57,21 @@ func (s *Service) ConfigureImages(inspector engine.LocalInspector) { s.imageInsp
 
 //wails:ignore
 func (s *Service) Start(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return fmt.Errorf("앱을 종료하고 있습니다")
+	}
+	if s.started {
+		return nil
+	}
 	// Interrupted generation never reuses a partial image.
 	if _, err := s.db.ExecContext(ctx, "UPDATE maintenance_task SET state='pending' WHERE kind='preview_generation' AND state='running'"); err != nil {
 		return err
 	}
 	s.wg.Add(1)
+	s.started = true
+	s.scanRequested = true
 	go s.worker()
 	s.signal()
 	return nil
@@ -84,16 +97,11 @@ func (s *Service) Get(ctx context.Context, req Request) api.Result {
 		}
 		return api.Failure("INTERNAL_ERROR", "썸네일 상태를 읽지 못했습니다")
 	}
-	if thumb != nil {
-		if info, err := os.Stat(*thumb); err == nil && info.Mode().IsRegular() && info.Size() > 0 {
-			return api.Success(Status{State: "registered"})
-		}
+	if thumbnailExists(thumb) {
+		return api.Success(Status{State: "registered"})
 	}
-	if kind != "image" && kind != "video" {
+	if thumbnailKind(kind, path) == "" {
 		return api.Success(Status{State: "unsupported"})
-	}
-	if info, err := os.Stat(path); err != nil || !info.Mode().IsRegular() {
-		return api.Success(Status{State: "missing"})
 	}
 	var id, state string
 	err := s.db.QueryRowContext(ctx, `SELECT id,state FROM maintenance_task WHERE kind='preview_generation' AND json_extract(payload_json,'$.fileId')=? AND json_extract(payload_json,'$.mediaId')=? ORDER BY created_at DESC,rowid DESC LIMIT 1`, req.FileID, req.MediaID).Scan(&id, &state)
@@ -142,14 +150,16 @@ func (s *Service) schedule(ctx context.Context, req Request) error {
 
 //wails:ignore
 func (s *Service) ScheduleMedia(mediaID int64) {
-	rows, err := s.db.Query("SELECT id FROM media_file WHERE media_id=? AND kind IN ('image','video') AND thumbnail_path IS NULL", mediaID)
+	rows, err := s.db.Query("SELECT id,kind,filepath,thumbnail_path FROM media_file WHERE media_id=? AND kind IN ('image','video','unknown')", mediaID)
 	if err != nil {
 		return
 	}
 	ids := []int64{}
 	for rows.Next() {
 		var id int64
-		if rows.Scan(&id) == nil {
+		var kind, path string
+		var thumb *string
+		if rows.Scan(&id, &kind, &path, &thumb) == nil && thumbnailKind(kind, path) != "" && !thumbnailExists(thumb) {
 			ids = append(ids, id)
 		}
 	}
@@ -160,6 +170,8 @@ func (s *Service) ScheduleMedia(mediaID int64) {
 }
 func (s *Service) worker() {
 	defer s.wg.Done()
+	var cursor int64
+	scanning := false
 	for {
 		select {
 		case <-s.ctx.Done():
@@ -167,9 +179,21 @@ func (s *Service) worker() {
 		case <-s.wake:
 		}
 		for s.ctx.Err() == nil {
+			if !scanning && s.takeScanRequest() {
+				scanning = true
+				cursor = 0
+			}
 			var id, payload string
 			err := s.db.QueryRowContext(s.ctx, "SELECT id,payload_json FROM maintenance_task WHERE kind='preview_generation' AND state='pending' ORDER BY created_at,rowid LIMIT 1").Scan(&id, &payload)
 			if err != nil {
+				if err == sql.ErrNoRows && scanning {
+					var more bool
+					cursor, more, err = s.backfillBatch(s.ctx, cursor)
+					scanning = more && err == nil
+					if err == nil {
+						continue
+					}
+				}
 				break
 			}
 			if _, err = s.db.ExecContext(s.ctx, "UPDATE maintenance_task SET state='running',try_count=try_count+1,updated_at=? WHERE id=?", time.Now().UnixMilli(), id); err != nil {
@@ -185,6 +209,10 @@ func (s *Service) worker() {
 			if err != nil {
 				state = "failed"
 				message = err.Error()
+				if s.ctx.Err() != nil {
+					state = "pending"
+					message = nil
+				}
 			}
 			_, _ = s.db.ExecContext(context.Background(), "UPDATE maintenance_task SET state=?,last_error=?,updated_at=? WHERE id=?", state, message, time.Now().UnixMilli(), id)
 			if s.notify != nil {
@@ -193,15 +221,26 @@ func (s *Service) worker() {
 		}
 	}
 }
-func sourceHash(path string) (string, error) {
+func sourceHash(ctx context.Context, path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return "", err
 	}
 	defer f.Close()
 	h := sha256.New()
-	if _, err = io.Copy(h, f); err != nil {
-		return "", err
+	buffer := make([]byte, 1024*1024)
+	for {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
+		n, readErr := f.Read(buffer)
+		_, _ = h.Write(buffer[:n])
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			return "", readErr
+		}
 	}
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
@@ -211,11 +250,19 @@ func (s *Service) generate(ctx context.Context, req Request) error {
 	if err := s.db.QueryRowContext(ctx, "SELECT filepath,kind,content_hash FROM media_file WHERE id=? AND media_id=?", req.FileID, req.MediaID).Scan(&path, &kind, &hash); err != nil {
 		return err
 	}
+	storedKind := kind
+	kind = thumbnailKind(kind, path)
+	if kind == "" {
+		return fmt.Errorf("썸네일을 지원하지 않는 파일입니다")
+	}
 	before, err := os.Stat(path)
 	if err != nil {
 		return err
 	}
-	fingerprint, err := sourceHash(path)
+	if !before.Mode().IsRegular() {
+		return fmt.Errorf("원본이 일반 파일이 아닙니다")
+	}
+	fingerprint, err := sourceHash(ctx, path)
 	if err != nil {
 		return err
 	}
@@ -310,11 +357,20 @@ func (s *Service) generate(ctx context.Context, req Request) error {
 	default:
 		return fmt.Errorf("썸네일을 지원하지 않는 파일입니다")
 	}
+	preview, err := os.Open(tmp)
+	if err != nil {
+		return err
+	}
+	previewSize, _, decodeErr := image.DecodeConfig(preview)
+	preview.Close()
+	if decodeErr != nil || previewSize.Width < 1 || previewSize.Height < 1 || previewSize.Width > 480 || previewSize.Height > 480 {
+		return fmt.Errorf("생성된 썸네일 이미지를 확인할 수 없습니다")
+	}
 	after, err := os.Stat(path)
 	if err != nil {
 		return err
 	}
-	current, err := sourceHash(path)
+	current, err := sourceHash(ctx, path)
 	if err != nil {
 		return err
 	}
@@ -327,7 +383,7 @@ func (s *Service) generate(ctx context.Context, req Request) error {
 	if err = os.Rename(tmp, dest); err != nil {
 		return err
 	}
-	result, err := s.db.ExecContext(ctx, "UPDATE media_file SET thumbnail_path=?,thumbnail_origin='app_generated' WHERE id=? AND media_id=? AND filepath=? AND content_hash IS ?", dest, req.FileID, req.MediaID, path, hash)
+	result, err := s.db.ExecContext(ctx, "UPDATE media_file SET thumbnail_path=?,thumbnail_origin='app_generated',kind=? WHERE id=? AND media_id=? AND filepath=? AND content_hash IS ? AND kind=?", dest, kind, req.FileID, req.MediaID, path, hash, storedKind)
 	if err != nil {
 		return err
 	}

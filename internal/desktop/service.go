@@ -12,10 +12,15 @@ type Service struct {
 	mu             sync.Mutex
 	importer       *database.Importer
 	selectDatabase func() (string, error)
+	onImported     func()
 }
 
-func NewService(importer *database.Importer, selectDatabase func() (string, error)) *Service {
-	return &Service{importer: importer, selectDatabase: selectDatabase}
+func NewService(importer *database.Importer, selectDatabase func() (string, error), onImported ...func()) *Service {
+	s := &Service{importer: importer, selectDatabase: selectDatabase}
+	if len(onImported) > 0 {
+		s.onImported = onImported[0]
+	}
+	return s
 }
 func (s *Service) ImportDatabase(ctx context.Context) api.Result {
 	if !s.mu.TryLock() {
@@ -35,6 +40,9 @@ func (s *Service) ImportDatabase(ctx context.Context) api.Result {
 	result, err := s.importer.Import(ctx, path)
 	if err != nil {
 		return api.Failure("DATABASE_IMPORT_FAILED", err.Error())
+	}
+	if s.onImported != nil {
+		s.onImported()
 	}
 	return api.Success(result)
 }

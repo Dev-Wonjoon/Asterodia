@@ -1,13 +1,67 @@
-@keyframes slide-up {
-    from {
-        opacity: 0;
-        transform: translateY(12px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+:root {
+    --motion-fast: 120ms;
+    --motion-menu: 160ms;
+    --motion-page: 180ms;
+    --motion-panel: 220ms;
+    --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.animate-slide-up {
-    animation: slide-up 0.2s ease-out;
+
+@keyframes motion-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes motion-menu {
+    from { opacity: 0; transform: translateY(var(--motion-offset, -4px)) scale(0.98); }
+    to { opacity: 1; transform: none; }
+}
+@keyframes motion-modal {
+    from { opacity: 0; transform: translateY(6px) scale(0.985); }
+    to { opacity: 1; transform: none; }
+}
+@keyframes motion-panel {
+    from { opacity: 0; transform: translateX(10px); }
+    to { opacity: 1; transform: none; }
+}
+@keyframes slide-up {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* Limit transitions to visual feedback; layout and polling remain immediate. */
+:where(button), .motion-control {
+    transition-property: background-color, color, border-color, box-shadow, opacity, transform;
+    transition-duration: var(--motion-fast);
+    transition-timing-function: var(--motion-ease);
+}
+:where(button):enabled:active { transform: scale(0.98); }
+.motion-card {
+    transition: border-color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease);
+}
+.motion-card[data-selected="true"] {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 1px var(--color-primary);
+}
+@media (hover: hover) {
+    .motion-card:hover { box-shadow: 0 3px 12px rgb(0 0 0 / 0.12); }
+    .motion-card[data-selected="true"]:hover { box-shadow: 0 0 0 1px var(--color-primary), 0 3px 12px rgb(0 0 0 / 0.12); }
+}
+.motion-page { animation: motion-fade var(--motion-page) var(--motion-ease); }
+.motion-backdrop { animation: motion-fade var(--motion-menu) var(--motion-ease); }
+.motion-menu {
+    transform-origin: top right;
+    animation: motion-menu var(--motion-menu) var(--motion-ease);
+}
+.motion-menu-up { --motion-offset: 4px; transform-origin: bottom right; }
+.motion-modal { animation: motion-modal var(--motion-page) var(--motion-ease); }
+.motion-panel { animation: motion-panel var(--motion-panel) var(--motion-ease); }
+.motion-selection { animation: slide-up var(--motion-menu) var(--motion-ease); }
+.animate-slide-up { animation: slide-up var(--motion-page) var(--motion-ease); }
+.motion-sidebar { transition: width var(--motion-panel) var(--motion-ease); }
+.motion-progress { transition: width var(--motion-panel) linear; }
+
+@media (prefers-reduced-motion: reduce) {
+    .motion-page, .motion-backdrop, .motion-menu, .motion-modal,
+    .motion-panel, .motion-selection, .animate-slide-up { animation: none; }
+    :where(button), .motion-control, .motion-card, .motion-sidebar, .motion-progress { transition: none; }
+    :where(button):enabled:active { transform: none; }
 }

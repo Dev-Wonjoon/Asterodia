@@ -1,4 +1,5 @@
 import type { MediaApi } from '@contracts/media-api'
+import type { MoveSelection } from '@contracts/file-move-api'
 import type {
     MediaDetailDto,
     MediaEditRequest,
@@ -43,6 +44,17 @@ export interface GallerySnapshot {
 }
 
 export const MEDIA_PAGE_SIZE = 50
+
+export type GalleryBulkAction =
+    | { kind: 'favorite'; value: boolean }
+    | { kind: 'tags'; names: string[]; remove: boolean }
+    | { kind: 'unregister' }
+    | { kind: 'openFolders'; open: (path: string) => Promise<void> }
+
+export interface GalleryBulkResult {
+    succeeded: number[]
+    failed: { mediaId: number; message: string }[]
+}
 
 const transportError: MediaViewError = {
     code: 'TRANSPORT_ERROR',
@@ -494,6 +506,70 @@ export function createGalleryStore(
         }
     }
 
+    async function bulk(selection: MoveSelection[], action: GalleryBulkAction, progress: (done: number, total: number) => void): Promise<GalleryBulkResult | null> {
+        if (snapshot.busy || snapshot.needsRefresh || !selection.length) return null
+        const targets = [...new Map(selection.map(item => [item.mediaId, { ...item }])).values()]
+        cancelReads()
+        const own = session
+        const operationFilter = filter
+        const result: GalleryBulkResult = { succeeded: [], failed: [] }
+        const folders = new Set<string>()
+        let uncertain = false
+        publish({ ...snapshot, busy: true, writeError: null, notice: null })
+        try {
+            for (const target of targets) {
+                if (own !== session || operationFilter !== filter || uncertain) {
+                    result.failed.push({ mediaId: target.mediaId, message: uncertain ? '이전 요청 결과를 확인한 뒤 다시 실행하세요.' : '화면이 변경되어 실행하지 않았습니다.' })
+                    continue
+                }
+                const outcome = await request(async (): Promise<MediaResult<true>> => {
+                    // Read the current revision without silently replacing the user's selection revision.
+                    const current = await api.get({ mediaId: target.mediaId, fileLimit: 1, fileOffset: 0 })
+                    if (!current.ok) return current
+                    if (current.data.revision !== target.revision) return { ok: false, error: { code: 'REVISION_CONFLICT', message: '선택한 뒤 변경된 게시글입니다. 새로고침 후 다시 선택하세요.', context: {} } }
+                    if (own !== session || operationFilter !== filter) throw new Error('화면이 변경됐습니다')
+                    if (action.kind === 'openFolders') {
+                        const path = current.data.files.data[0]?.filepath
+                        if (!path) return { ok: false, error: { code: 'NOT_FOUND', message: '등록된 파일 경로가 없습니다.', context: {} } }
+                        const normalized = path.replace(/\\/g, '/')
+                        const folder = normalized.slice(0, normalized.lastIndexOf('/'))
+                        const key = /^[a-z]:\//i.test(normalized) || normalized.startsWith('//') ? folder.toLowerCase() : folder
+                        if (!folders.has(key)) { await action.open(path); folders.add(key) }
+                    } else if (action.kind === 'unregister') {
+                        const response = await api.unregisterMedia({ mediaId: target.mediaId, expectedRevision: target.revision })
+                        if (!response.ok) return response
+                        if (own === session) removed(response.data)
+                    } else {
+                        const response = await api.edit({ mediaId: target.mediaId, expectedRevision: target.revision,
+                            ...(action.kind === 'favorite' ? { isFavorite: action.value } : {
+                                tagChange: action.remove
+                                    ? { removeIds: current.data.tags.filter(tag => action.names.includes(tag.name)).map(tag => tag.id) }
+                                    : { addNames: action.names }
+                            }) })
+                        if (!response.ok) return response
+                        if (own === session) edited(response.data)
+                    }
+                    return { ok: true, data: true }
+                })
+                if (outcome.ok) result.succeeded.push(target.mediaId)
+                else {
+                    result.failed.push({ mediaId: target.mediaId, message: outcome.error.message })
+                    uncertain = outcome.error.code === 'TRANSPORT_ERROR'
+                }
+                if (own === session) progress(result.succeeded.length + result.failed.length, targets.length)
+            }
+            if (own === session && action.kind !== 'openFolders') {
+                const loaded = await refresh(true)
+                if (own === session) publish({ ...snapshot, needsRefresh: !loaded || uncertain })
+            }
+            return result
+        } finally {
+            if (own === session) publish({ ...snapshot, busy: false })
+            else publish({ ...snapshot, busy: false, needsRefresh: true })
+            if (refreshQueued) { refreshQueued = false; void refresh() }
+        }
+    }
+
     return {
         getSnapshot: () => snapshot,
 
@@ -505,6 +581,7 @@ export function createGalleryStore(
         },
 
         cancelReads,
+        bulk,
 
         setFilter(next: MediaFilter = {}) {
             const copied = structuredClone(next)

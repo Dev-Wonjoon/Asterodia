@@ -147,8 +147,8 @@ export function GalleryCardActions({
                     role="menu"
                     aria-label={title + ' 카드 메뉴'}
                     className={
-                        'absolute right-2 z-20 w-48 rounded-lg border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-1 shadow-xl ' +
-                        (opensUp ? 'bottom-full mb-1' : 'top-full mt-1')
+                        'motion-menu absolute right-2 z-20 w-48 rounded-lg border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-1 shadow-xl ' +
+                        (opensUp ? 'motion-menu-up bottom-full mb-1' : 'top-full mt-1')
                     }
                 >
                     <button

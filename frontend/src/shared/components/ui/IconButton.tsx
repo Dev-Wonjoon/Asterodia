@@ -24,7 +24,7 @@ export const IconButton = ({
     return (
         <button
             type="button"
-            className={`inline-grid place-items-center rounded-lg border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${sizes[size]} ${state} ${className}`}
+            className={`motion-control inline-grid place-items-center rounded-lg border disabled:cursor-not-allowed disabled:opacity-50 ${sizes[size]} ${state} ${className}`}
             {...props}
         >
             {children}

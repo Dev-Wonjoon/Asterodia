@@ -20,7 +20,7 @@ export function Button({
     return (
         <button
             type={type}
-            className={`rounded-lg border border-[var(--btn-border)] font-medium transition-colors
+            className={`motion-control rounded-lg border border-[var(--btn-border)] font-medium
         disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${className}`}
             {...props}
         >

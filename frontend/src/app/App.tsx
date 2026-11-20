@@ -41,7 +41,7 @@ export default function App(): React.JSX.Element {
     return (
         <div className="flex h-screen w-full bg-[var(--bg-app)] text-[var(--text-main)] overflow-hidden font-sans transition-colors duration-200">
             <div
-                className={`h-full shrink-0 transition-[width] duration-200 motion-reduce:transition-none ${
+                className={`motion-sidebar h-full shrink-0 ${
                     sidebarCollapsed ? 'w-20' : 'w-64'
                 }`}
             >
@@ -64,7 +64,9 @@ export default function App(): React.JSX.Element {
                     <DownloadBar />
                 </div>
                 <main className="min-h-0 flex-1 overflow-hidden">
-                    <LeaveGuardProvider guard={leaveGuard}>{pages[activeMenu]}</LeaveGuardProvider>
+                    <div key={activeMenu} className="motion-page h-full min-h-0">
+                        <LeaveGuardProvider guard={leaveGuard}>{pages[activeMenu]}</LeaveGuardProvider>
+                    </div>
                 </main>
             </div>
             {showSetup && <EngineSetupModal onComplete={closeSetup} />}

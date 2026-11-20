@@ -4,8 +4,11 @@ import { useLocalImportViewModel } from './useLocalImportViewModel'
 import { X } from 'lucide-react'
 import { formatBytes } from '@renderer/shared/utils/formatBytes'
 import { ProgressBar } from '@renderer/shared/components/ui/ProgressBar'
+import { useEffect, useImperativeHandle, type Ref } from 'react'
 
-export function LocalImportPanel({ disabled, onComplete }: { disabled: boolean; onComplete: () => void }) {
+export interface LocalImportControls { choose: () => void; reopen: () => void }
+
+export function LocalImportPanel({ disabled, onComplete, compact = false, controlRef, onBusyChange, onHasResultChange }: { disabled: boolean; onComplete: () => void; compact?: boolean; controlRef?: Ref<LocalImportControls>; onBusyChange?: (busy: boolean) => void; onHasResultChange?: (available: boolean) => void }) {
     const vm = useLocalImportViewModel(onComplete)
     const job = vm.page?.job
     const progress = job ? importProgress(job) : undefined
@@ -13,6 +16,10 @@ export function LocalImportPanel({ disabled, onComplete }: { disabled: boolean; 
     const stopping = job?.pauseRequested || job?.cancelRequested
     const button = 'rounded-lg border border-[var(--border-line)] px-3 py-2 text-sm disabled:opacity-40'
     const number = (n: number) => n.toLocaleString()
+    useImperativeHandle(controlRef, () => ({ choose: () => { if (!disabled && !vm.busy) void vm.choose() }, reopen: vm.reopen }))
+    useEffect(() => { onBusyChange?.(vm.busy) }, [vm.busy, onBusyChange])
+    useEffect(() => { onHasResultChange?.(!!job) }, [!!job, onHasResultChange])
+    if (compact && !vm.error && (vm.dismissed || (!job && !vm.busy))) return null
     if (vm.dismissed) return <section aria-label="로컬 폴더 가져오기" className="flex flex-wrap items-center gap-2">
         <button type="button" className={button} disabled={disabled || vm.busy} onClick={() => void vm.choose()}>폴더 가져오기</button>
         <button type="button" className={button} onClick={vm.reopen}>최근 결과</button>

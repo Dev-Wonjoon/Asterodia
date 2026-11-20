@@ -49,10 +49,10 @@ func binaryDefinitions() []binaryDefinition {
 		{
 			name:            "gallery-dl",
 			filename:        "gallery-dl.exe",
-			expectedVersion: "1.32.1",
+			expectedVersion: "1.32.20",
 			versionArgs:     []string{"--config-ignore", "--version"},
 			downloadURL: "https://codeberg.org/mikf/gallery-dl/" +
-				"releases/download/v1.32.1/gallery-dl.exe",
+				"releases/download/v1.32.20/gallery-dl.exe",
 		},
 		{
 			name:        "ffmpeg",

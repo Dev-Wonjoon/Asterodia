@@ -36,7 +36,7 @@ export const ChipButton = ({
 }: ChipButtonProps): ReactElement => (
     <button
         type="button"
-        className={`inline-flex h-8 items-center gap-1 rounded-lg border px-3 text-sm transition-colors ${active ? chipClasses.active : chipClasses.neutral} ${className}`}
+        className={`motion-control inline-flex h-8 items-center gap-1 rounded-lg border px-3 text-sm ${active ? chipClasses.active : chipClasses.neutral} ${className}`}
         {...props}
     >
         {children}

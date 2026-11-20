@@ -130,6 +130,9 @@ func applicationServices(
 
 		paths.Bin,
 		func(progress engine.InstallProgress) {
+			if progress.Phase == "completed" && (progress.Engine == "ffmpeg" || progress.Engine == "ffprobe" || progress.Engine == "imagemagick") {
+				thumb.ScheduleMissing()
+			}
 			if app := application.Get(); app != nil {
 				app.Event.Emit("engine:install-progress", progress)
 			}
@@ -154,6 +157,11 @@ func applicationServices(
 		application.NewService(&desktop.SystemService{}),
 		application.NewService(desktop.NewService(databaseImporter, func() (string, error) {
 			return application.Get().Dialog.OpenFile().CanChooseFiles(true).CanChooseDirectories(false).AddFilter("StorageBucket 데이터베이스", "*.db;*.sqlite;*.sqlite3").SetTitle("병합할 데이터베이스 선택").PromptForSingleSelection()
+		}, func() {
+			thumb.ScheduleMissing()
+			if app := application.Get(); app != nil {
+				app.Event.Emit("media:thumbnail-updated", int64(0))
+			}
 		})),
 	}, desktop.MediaMiddleware(db, filepath.Join(paths.Cache, "previews")), closeAll, nil
 }

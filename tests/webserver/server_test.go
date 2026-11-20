@@ -192,6 +192,24 @@ func TestServerPortConflict(t *testing.T) {
 	}
 }
 
+func TestFavicon(t *testing.T) {
+	f := newFixture(t)
+	status(t, f.server.Start())
+	code, _, page := f.request(t, "GET", "/", nil)
+	if code != http.StatusOK || !bytes.Contains(page, []byte(`rel="icon" type="image/x-icon" href="/favicon.ico"`)) {
+		t.Fatal("페이지의 favicon 연결이 없습니다")
+	}
+	code, headers, data := f.request(t, "GET", "/favicon.ico", nil)
+	contentType := headers.Get("Content-Type")
+	if code != http.StatusOK || (contentType != "image/x-icon" && contentType != "image/vnd.microsoft.icon") || len(data) < 6 || !bytes.Equal(data[:4], []byte{0, 0, 1, 0}) || (data[4] == 0 && data[5] == 0) {
+		t.Fatalf("유효한 ICO 응답이 아닙니다: 상태 %d, 형식 %s, 크기 %d", code, headers.Get("Content-Type"), len(data))
+	}
+	code, headHeaders, body := f.request(t, "HEAD", "/favicon.ico", nil)
+	if code != http.StatusOK || len(body) != 0 || headHeaders.Get("Content-Type") != headers.Get("Content-Type") || headHeaders.Get("Content-Length") != headers.Get("Content-Length") {
+		t.Fatal("favicon HEAD 응답이 GET 메타데이터와 다릅니다")
+	}
+}
+
 func TestReadOnlyLibraryAndPrivacy(t *testing.T) {
 	f := newFixture(t)
 	id, fileID, path := f.seed(t, "<script>private title</script>", "image", ".png")

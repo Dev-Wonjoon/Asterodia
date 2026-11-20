@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
-import { act, createElement as h } from 'react'
+import { act, createElement as h, createRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LocalImportJob, LocalImportPage } from '@contracts/local-import-api'
-import { LocalImportPanel } from '@renderer/features/localimport/LocalImportPanel'
+import { LocalImportPanel, type LocalImportControls } from '@renderer/features/localimport/LocalImportPanel'
 import { useLocalImportViewModel } from '@renderer/features/localimport/useLocalImportViewModel'
 import { canDismissImport, readDismissedImport, writeDismissedImport } from '@renderer/features/localimport/panelVisibility'
 import { cleanupReact, clickButton, deferred, mount } from './reactHarness'
@@ -18,6 +18,24 @@ const success = (data: LocalImportPage) => ({ ok: true as const, data })
 beforeEach(() => { vi.resetAllMocks(); localStorage.clear(); api.get.mockResolvedValue(success(page())); api.files.mockResolvedValue({ ok: true, data: { files: [], total: 0, hasNextPage: false } }) })
 afterEach(async () => { await cleanupReact(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 const render = () => mount(h(LocalImportPanel, { disabled: false, onComplete: vi.fn() }))
+
+it('keeps an idle compact panel hidden and starts import from the gallery menu handle', async()=>{
+    api.get.mockResolvedValue(success({job:null,folders:[],total:0,hasNextPage:false}))
+    const pending=deferred<ReturnType<typeof success>>();api.choose.mockReturnValue(pending.promise)
+    const controls=createRef<LocalImportControls>(), changed=vi.fn()
+    await mount(h(LocalImportPanel,{compact:true,controlRef:controls,onBusyChange:changed,disabled:false,onComplete:vi.fn()}))
+    expect(document.body.textContent).toBe('');await act(async()=>controls.current!.choose())
+    expect(api.choose).toHaveBeenCalledOnce();expect(changed).toHaveBeenCalledWith(true)
+    await act(async()=>pending.resolve(success(page('ready','menu-job'))));expect(document.body.textContent).toContain('등록 시작')
+})
+
+it('reopens a hidden compact result and blocks disabled menu imports', async()=>{
+    const controls=createRef<LocalImportControls>()
+    await mount(h(LocalImportPanel,{compact:true,controlRef:controls,disabled:true,onComplete:vi.fn()}))
+    await clickButton('가져오기 결과 닫기');expect(document.body.textContent).toBe('')
+    await act(async()=>controls.current!.choose());expect(api.choose).not.toHaveBeenCalled()
+    await act(async()=>controls.current!.reopen());expect(document.body.textContent).toContain('전체 2개')
+})
 
 describe('completed import panel visibility', () => {
     it.each(['completed', 'completed_with_errors'] as const)('closes %s without changing a job and reopens the result', async state => {

@@ -58,6 +58,7 @@ try {
     Invoke-TestGroup 'ytdlp-download' './tests/engine' '^TestYtdlpDownload'
     Invoke-TestGroup 'engine-parsers' './tests/engine' '^Test(ParseGalleryDLDiscovery|GalleryDLInstagramTargetKey|YtdlpTargetKeyCompatibility)$'
     Invoke-TestGroup 'integration' './tests/integration'
+    Invoke-TestGroup 'thumbnail' './tests/thumbnail'
     Invoke-TestGroup 'webserver' './tests/webserver'
     Invoke-TestGroup 'filemove' './tests/filemove' -CoverPackage './internal/filemove'
     & go vet . ./internal/... ./tests/...

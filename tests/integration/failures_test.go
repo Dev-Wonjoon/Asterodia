@@ -126,10 +126,10 @@ func TestThumbnailSourceChangeAndMissingSource(t *testing.T) {
 		t.Fatal(err)
 	}
 	status := success(t, thumbs.Get(t.Context(), thumbnail.Request{MediaID: id, FileID: fileID})).(thumbnail.Status)
-	if status.State != "missing" || status.CanRetry {
+	if status.State != "missing" || !status.CanRetry {
 		t.Fatalf("원본 없음 상태 %+v", status)
 	}
-	errorCode(t, thumbs.Retry(t.Context(), thumbnail.Request{MediaID: id, FileID: fileID}), "NOT_RETRYABLE")
+	success(t, thumbs.Retry(t.Context(), thumbnail.Request{MediaID: id, FileID: fileID}))
 	errorCode(t, thumbs.Get(t.Context(), thumbnail.Request{MediaID: id, FileID: fileID + 100}), "NOT_FOUND")
 }
 

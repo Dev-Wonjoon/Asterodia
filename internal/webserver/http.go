@@ -88,7 +88,7 @@ func (s *Service) routes() http.Handler {
 		}
 	})
 	web, _ := fs.Sub(assets, "web")
-	for _, path := range []string{"/app.js", "/style.css"} {
+	for _, path := range []string{"/app.js", "/style.css", "/favicon.ico"} {
 		mux.Handle("GET "+path, http.FileServerFS(web))
 	}
 	return mux

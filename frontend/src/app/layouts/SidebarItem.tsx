@@ -27,7 +27,7 @@ export const SidebarItem = ({
             title={collapsed ? label : undefined}
             className={`
                 w-full flex items-center py-3 rounded-xl
-                transition-colors duration-200 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed
+                motion-control text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed
                 ${collapsed ? 'justify-center px-0' : 'gap-3 px-4'}
                 ${
                     isActive

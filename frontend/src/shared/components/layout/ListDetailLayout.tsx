@@ -109,14 +109,14 @@ export function ListDetailLayout({
             {open && (
                 <>
                     {overlay && (
-                        <div className="absolute inset-0 z-20 bg-black/30" aria-hidden="true" />
+                        <div className="motion-backdrop absolute inset-0 z-20 bg-black/30" aria-hidden="true" />
                     )}
                     <aside
                         ref={panel}
                         role={overlay ? 'dialog' : undefined}
                         aria-labelledby={headingId}
                         className={
-                            'flex min-h-0 flex-col border-l border-[var(--border-line)] bg-[var(--bg-app)] ' +
+                            'motion-panel flex min-h-0 flex-col border-l border-[var(--border-line)] bg-[var(--bg-app)] ' +
                             (overlay
                                 ? 'absolute inset-y-0 right-0 z-30 w-full max-w-[400px] shadow-2xl'
                                 : 'w-[400px] shrink-0')
@@ -137,7 +137,7 @@ export function ListDetailLayout({
                                 닫기
                             </button>
                         </header>
-                        <div key={detailKey} className="min-h-0 flex-1 overflow-y-auto p-5">
+                        <div key={detailKey} className="motion-page min-h-0 flex-1 overflow-y-auto p-5">
                             {detail}
                         </div>
                     </aside>

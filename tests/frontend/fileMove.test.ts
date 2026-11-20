@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
-import { act, createElement as h } from 'react'
+import { act, createElement as h, createRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MoveStatus } from '@contracts/file-move-api'
-import { FileMovePanel, moveLabel, moveRunning } from '@renderer/features/gallery/FileMovePanel'
+import { FileMovePanel, moveLabel, moveRunning, type FileMoveControls } from '@renderer/features/gallery/FileMovePanel'
 import { cleanupReact, clickButton, deferred, mount } from './reactHarness'
 const mocks = vi.hoisted(() => ({ confirm: vi.fn(), get: vi.fn(), create: vi.fn(), run: vi.fn(), pause: vi.fn(), retry: vi.fn(), directories: vi.fn() }))
 const api = { fileMove: mocks, media: { directories: mocks.directories } }
@@ -21,6 +21,14 @@ async function choose() {
 beforeEach(() => { vi.resetAllMocks(); mocks.get.mockResolvedValue(ok(null)); mocks.directories.mockResolvedValue(ok({ data: [folder], hasNextPage: false })); mocks.create.mockResolvedValue(ok({ jobId: 'created' })); for (const name of ['run', 'pause', 'retry'] as const) mocks[name].mockResolvedValue(ok({ jobId: 'move-1' })); mocks.confirm.mockResolvedValue(true) })
 afterEach(async () => { await cleanupReact(); vi.useRealTimers(); vi.restoreAllMocks() })
 const props = () => ({ selection, disabled: false, onCreated: vi.fn(), onChanged: vi.fn() })
+
+it('hides idle move controls and opens its destination chooser from the toolbar',async()=>{
+ const controls=createRef<FileMoveControls>(), changed=vi.fn()
+ await mount(h(FileMovePanel,{...props(),compact:true,controlRef:controls,onBusyChange:changed}))
+ expect(document.body.textContent).toBe('');await act(async()=>controls.current!.choose())
+ expect(document.body.textContent).toContain('가져오기로 등록한 폴더');expect(changed).toHaveBeenCalledWith(true)
+ await clickButton('닫기');expect(document.body.textContent).toBe('')
+})
 describe('explicit file moves', () => {
  it('creates one job for several media and uses the selected directory', async () => {
   const p = props(); await mount(h(FileMovePanel, p));await choose();await clickButton('이동 시작')

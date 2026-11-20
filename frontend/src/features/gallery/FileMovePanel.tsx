@@ -1,5 +1,5 @@
 import { useConfirm } from '@renderer/shared/hooks/useConfirm'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
 import type { MoveSelection, MoveStatus } from '@contracts/file-move-api'
 import type { MediaDirectoryDto } from '@contracts/media-v2'
 import { getApi } from '@renderer/shared/api'
@@ -9,8 +9,10 @@ import { formatBytes } from '@renderer/shared/utils/formatBytes'
 export const moveRunning = (state: string) => state === 'running' || state === 'pausing'
 export const moveLabel = (state: string) => ({ pending: '시작 대기', running: '이동 중', pausing: '중단 중', paused: '중단됨', interrupted: '중단됨 · 이어하기 가능', completed: '이동 완료', completed_with_errors: '일부 처리 필요', failed: '실패', copying: '복사 중', verified: '검증 완료', committed: '원본 정리 대기', cleanup_pending: '원본 정리 필요', excluded: '대상 폴더에 있음' }[state] ?? state)
 
-export function FileMovePanel({ selection, disabled, onCreated, onChanged }: {
- selection: MoveSelection[]; disabled: boolean; onCreated: () => void; onChanged: () => void
+export interface FileMoveControls { choose: () => void }
+
+export function FileMovePanel({ selection, disabled, onCreated, onChanged, compact = false, controlRef, onBusyChange }: {
+ selection: MoveSelection[]; disabled: boolean; onCreated: () => void; onChanged: () => void; compact?: boolean; controlRef?: Ref<FileMoveControls>; onBusyChange?: (busy: boolean) => void
 }) {
  const { confirm } = useConfirm()
  const starting = useRef(false)
@@ -93,13 +95,16 @@ export function FileMovePanel({ selection, disabled, onCreated, onChanged }: {
   finally { if (mounted.current) { setBusy(false);setRefresh(v => v + 1) } }
  }
  const running = status && moveRunning(status.state)
+ useImperativeHandle(controlRef, () => ({ choose: () => { if (!busy && !disabled && !running && selection.length) void folders() } }))
+ useEffect(() => { onBusyChange?.(busy || choosing) }, [busy, choosing, onBusyChange])
  const button = 'rounded-lg border border-[var(--border-line)] px-3 py-2 text-sm disabled:opacity-40'
+ if (compact && !error && !choosing && !status) return null
  return <section aria-label="파일 이동" className="space-y-3">
-  <div className="flex flex-wrap items-center gap-2">
+  {!compact && <div className="flex flex-wrap items-center gap-2">
    <span className="text-sm">게시글 {selection.length}개 선택</span>
    <button className={button} disabled={busy || disabled || !!running || !selection.length} onClick={() => void folders()}>파일 이동</button>
    {selection.length > 0 && <button className={button} disabled={busy} onClick={onCreated}>선택 해제</button>}
-  </div>
+  </div>}
   {error && <p role="alert" className="text-sm text-red-500">{error}</p>}
   {choosing && <div className="space-y-3 rounded-xl border border-[var(--border-line)] p-4">
    <p className="text-sm">가져오기로 등록한 폴더를 선택하세요. 게시글 구분은 DB에서 유지합니다.</p>
