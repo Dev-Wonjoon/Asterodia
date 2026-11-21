@@ -1,0 +1,113 @@
+Source: cpu/asm_aix_ppc64.s, cpu/cpu.go, cpu/cpu_arm.go, cpu/cpu_gccgo_x86.c, cpu/cpu_gccgo_x86.go, cpu/cpu_gc_x86.go, cpu/cpu_gc_x86.s, cpu/cpu_linux.go, cpu/cpu_linux_arm64.go, cpu/cpu_linux_ppc64x.go, cpu/cpu_mips64x.go, cpu/cpu_mipsx.go, cpu/cpu_test.go, cpu/cpu_x86.go, plan9/mksyscall.go, unix/affinity_linux.go, unix/aliases.go, unix/asm_aix_ppc64.s, unix/darwin_test.go, unix/dev_aix_ppc.go, unix/dev_aix_ppc64.go, unix/example_exec_test.go, unix/example_flock_test.go, unix/ioctl_signed.go, unix/ioctl_unsigned.go, unix/linux/mksysnum.go, unix/mkasm.go, unix/mksyscall.go, unix/mksysnum.go, unix/sendfile_test.go, unix/syscall_aix.go, unix/syscall_aix_ppc.go, unix/syscall_aix_ppc64.go, unix/syscall_aix_test.go, unix/syscall_darwin_libSystem.go, unix/syscall_darwin_test.go, unix/syscall_freebsd_arm64.go, unix/syscall_linux_gc.go, unix/syscall_linux_gccgo_386.go, unix/syscall_linux_gccgo_arm.go, unix/syscall_linux_gc_386.go, unix/syscall_linux_riscv64.go, unix/syscall_netbsd_test.go, unix/syscall_openbsd_test.go, unix/syscall_unix_gc_ppc64x.go, unix/types_aix.go, unix/unveil_openbsd.go, unix/xattr_bsd.go, unix/xattr_test.go, windows/aliases.go, windows/svc/mgr/recovery.go, windows/types_windows_arm.go
+// Copyright 2018 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: cpu/asm_darwin_arm64_gc.s, cpu/asm_darwin_x86_gc.s, cpu/cpu_darwin_x86.go, cpu/cpu_linux_riscv64.go, cpu/cpu_other_x86.go, cpu/syscall_darwin_arm64_gc.go, cpu/syscall_darwin_x86_gc.go, unix/bpxsvc_zos.go, unix/bpxsvc_zos.s, unix/mksyscall_zos_s390x.go, unix/sockcmsg_zos.go, unix/symaddr_zos_s390x.s, unix/vgetrandom_linux.go, unix/vgetrandom_unsupported.go, unix/xattr_zos_test.go, windows/env_windows_test.go
+// Copyright 2024 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: cpu/byteorder.go, cpu/cpu_aix.go, cpu/cpu_arm64.go, cpu/cpu_arm64.s, cpu/cpu_gccgo_arm64.go, cpu/cpu_gccgo_s390x.go, cpu/cpu_gc_arm64.go, cpu/cpu_gc_s390x.go, cpu/cpu_linux_arm.go, cpu/cpu_linux_noinit.go, cpu/cpu_linux_s390x.go, cpu/cpu_other_arm64.go, cpu/cpu_riscv64.go, cpu/cpu_s390x.s, cpu/cpu_wasm.go, cpu/hwcap_linux.go, cpu/syscall_aix_ppc64_gc.go, unix/asm_linux_riscv64.s, unix/asm_openbsd_mips64.s, unix/dirent_test.go, unix/fcntl_darwin.go, unix/fdset.go, unix/fdset_test.go, unix/getdirentries_test.go, unix/mksyscall_aix_ppc.go, unix/mksyscall_aix_ppc64.go, unix/mksyscall_solaris.go, unix/mksysctl_openbsd.go, unix/readdirent_getdents.go, unix/readdirent_getdirentries.go, unix/sockcmsg_dragonfly.go, unix/sockcmsg_unix_other.go, unix/syscall_internal_linux_test.go, unix/syscall_netbsd_arm64.go, unix/syscall_openbsd_arm64.go, unix/syscall_openbsd_mips64.go, unix/syscall_openbsd_ppc64.go, unix/syscall_openbsd_riscv64.go
+// Copyright 2019 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: cpu/cpu_darwin_arm64.go, cpu/cpu_darwin_arm64_other.go, cpu/cpu_gc_riscv64.go, cpu/cpu_netbsd_amd64.go, cpu/cpu_riscv64.s, cpu/cpu_sparc64.go, cpu/cpu_windows.go, cpu/cpu_windows_arm64.go, cpu/riscv64_hwprobe_test.go, unix/readv_unix.go, unix/readv_unix_test.go, windows/xattr_test.go
+// Copyright 2026 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: cpu/cpu_linux_loong64.go, cpu/cpu_loong64.s, unix/auxv.go, unix/auxv_linux_test.go, unix/auxv_unsupported.go
+// Copyright 2025 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: cpu/cpu_linux_mips64x.go, cpu/cpu_netbsd_arm64.go, cpu/cpu_other_arm.go, cpu/cpu_other_mips64x.go, cpu/cpu_ppc64x.go, cpu/cpu_s390x.go, cpu/cpu_s390x_test.go, cpu/cpu_zos.go, cpu/cpu_zos_s390x.go, cpu/syscall_aix_gccgo.go, execabs/execabs.go, execabs/execabs_test.go, unix/asm_zos_s390x.s, unix/dev_zos.go, unix/dev_zos_test.go, unix/internal/mkmerge/mkmerge.go, unix/internal/mkmerge/mkmerge_test.go, unix/ioctl_zos.go, unix/mmap_zos_test.go, unix/ptrace_darwin.go, unix/ptrace_ios.go, unix/syscall_internal_bsd_test.go, unix/syscall_internal_darwin_test.go, unix/syscall_zos_s390x.go, unix/syscall_zos_test.go, unix/zerrors_zos_s390x.go, unix/ztypes_zos_s390x.go
+// Copyright 2020 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: cpu/cpu_loong64.go, cpu/cpu_openbsd_arm64.go, cpu/cpu_openbsd_arm64.s, cpu/cpu_other_ppc64x.go, cpu/cpu_other_riscv64.go, cpu/parse.go, cpu/parse_test.go, cpu/proc_cpuinfo_linux.go, execabs/execabs_go118.go, execabs/execabs_go119.go, unix/asm_bsd_ppc64.s, unix/asm_linux_loong64.s, unix/getfsstat_test.go, unix/syscall_freebsd_riscv64.go, unix/syscall_hurd.go, unix/syscall_hurd_386.go, unix/syscall_internal_solaris_test.go, unix/syscall_linux_alarm.go, unix/syscall_linux_loong64.go, unix/syscall_openbsd_libc.go
+// Copyright 2022 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: cpu/endian_big.go, cpu/endian_little.go, cpu/endian_test.go, cpu/runtime_auxv.go, cpu/runtime_auxv_go121.go, cpu/runtime_auxv_go121_test.go, unix/dup3_test.go, unix/export_mremap_test.go, unix/getvfsstat_test.go, unix/mmap_nomremap.go, unix/mremap.go, unix/mremap_test.go, unix/sysctl_netbsd_test.go, windows/mkwinsyscall/mkwinsyscall_test.go
+// Copyright 2023 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: plan9/asm.s, unix/asm_linux_ppc64x.s, unix/asm_solaris_amd64.s, unix/fcntl.go, unix/fcntl_linux_32bit.go, unix/mmap_unix_test.go, unix/syscall_bsd_test.go, unix/syscall_freebsd_test.go
+// Copyright 2014 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: plan9/asm_plan9_386.s, plan9/asm_plan9_amd64.s, plan9/asm_plan9_arm.s, plan9/str.go, plan9/syscall.go, unix/asm_linux_386.s, unix/asm_linux_amd64.s, unix/asm_linux_arm.s, unix/dirent.go, unix/linux/types.go, unix/syscall.go, unix/syscall_bsd.go, unix/syscall_darwin_amd64.go, unix/syscall_dragonfly.go, unix/syscall_dragonfly_amd64.go, unix/syscall_freebsd_386.go, unix/syscall_freebsd_amd64.go, unix/syscall_linux.go, unix/syscall_linux_386.go, unix/syscall_linux_amd64.go, unix/syscall_linux_arm.go, unix/syscall_linux_gc_arm.go, unix/syscall_linux_ppc64x.go, unix/syscall_linux_sparc64.go, unix/syscall_netbsd_386.go, unix/syscall_netbsd_amd64.go, unix/syscall_openbsd_386.go, unix/syscall_openbsd_amd64.go, unix/syscall_solaris.go, unix/syscall_solaris_amd64.go, unix/syscall_unix.go, unix/types_darwin.go, unix/types_dragonfly.go, unix/types_freebsd.go, unix/types_netbsd.go, unix/types_openbsd.go, unix/types_solaris.go, windows/exec_windows.go, windows/mksyscall.go, windows/str.go, windows/syscall.go, windows/syscall_windows.go
+// Copyright 2009 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: plan9/dir_plan9.go, plan9/race.go, plan9/race0.go, unix/creds_test.go, unix/race.go, unix/race0.go, unix/syscall_freebsd_arm.go, windows/eventlog.go, windows/race.go, windows/race0.go, windows/security_windows.go, windows/service.go, windows/svc/debug/log.go, windows/svc/debug/service.go, windows/svc/eventlog/install.go, windows/svc/eventlog/log.go, windows/svc/eventlog/log_test.go, windows/svc/example/beep.go, windows/svc/example/install.go, windows/svc/example/main.go, windows/svc/example/manage.go, windows/svc/example/service.go, windows/svc/mgr/config.go, windows/svc/mgr/mgr.go, windows/svc/mgr/mgr_test.go, windows/svc/mgr/service.go, windows/svc/security.go, windows/svc/service.go, windows/svc/svc_test.go, windows/syscall_windows_test.go
+// Copyright 2012 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: plan9/env_plan9.go, plan9/errors_plan9.go, plan9/syscall_plan9.go, unix/sockcmsg_linux.go, unix/sockcmsg_unix.go, windows/dll_windows.go, windows/types_windows.go, windows/types_windows_386.go, windows/types_windows_amd64.go, windows/types_windows_arm64.go
+// Copyright 2011 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: plan9/pwd_plan9.go, unix/asm_linux_arm64.s, unix/asm_linux_mips64x.s, unix/constants.go, unix/gccgo.go, unix/gccgo_c.c, unix/gccgo_linux_amd64.go, unix/syscall_darwin_arm64.go, unix/syscall_linux_arm64.go, unix/syscall_linux_mips64x.go, windows/registry/export_test.go, windows/registry/key.go, windows/registry/mksyscall.go, windows/registry/registry_test.go, windows/registry/syscall.go, windows/registry/value.go
+// Copyright 2015 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: plan9/syscall_test.go, unix/syscall_netbsd_arm.go, unix/syscall_test.go, unix/syscall_unix_test.go, windows/mkwinsyscall/mkwinsyscall.go, windows/syscall_test.go
+// Copyright 2013 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: unix/asm_bsd_386.s, unix/asm_bsd_amd64.s, unix/asm_bsd_arm.s, unix/asm_bsd_arm64.s, unix/asm_bsd_riscv64.s, unix/example_sysvshm_test.go, unix/ifreq_linux.go, unix/ifreq_linux_test.go, unix/ioctl_linux.go, unix/pipe2_test.go, unix/syscall_illumos.go, unix/syscall_linux_ppc.go, unix/sysvshm_linux.go, unix/sysvshm_unix.go, unix/sysvshm_unix_other.go, unix/sysvshm_unix_test.go, windows/setupapi_windows.go
+// Copyright 2021 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: unix/asm_linux_mipsx.s, unix/asm_linux_s390x.s, unix/bluetooth_linux.go, unix/mkpost.go, unix/openbsd_test.go, unix/pledge_openbsd.go, unix/syscall_linux_amd64_gc.go, unix/syscall_linux_mipsx.go, unix/syscall_linux_s390x.go, unix/syscall_linux_test.go, unix/syscall_unix_gc.go
+// Copyright 2016 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: unix/cap_freebsd.go, unix/dev_darwin.go, unix/dev_dragonfly.go, unix/dev_freebsd.go, unix/dev_linux.go, unix/dev_linux_test.go, unix/dev_netbsd.go, unix/dev_openbsd.go, unix/linux/mkall.go, unix/pagesize_unix.go, unix/syscall_openbsd_arm.go, unix/syscall_solaris_test.go, unix/timestruct.go, windows/memory_windows.go
+// Copyright 2017 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: unix/endian_big.go
+// Copyright 2016 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+//
+//go:build armbe || arm64be || m68k || mips || mips64 || mips64p32 || ppc || ppc64 || s390 || s390x || shbe || sparc || sparc64
+
+Source: unix/endian_little.go
+// Copyright 2016 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+//
+//go:build 386 || amd64 || amd64p32 || alpha || arm || arm64 || loong64 || mipsle || mips64le || mips64p32le || nios2 || ppc64le || riscv || riscv64 || sh
+
+Source: unix/env_unix.go, windows/env_windows.go
+// Copyright 2010 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: unix/syscall_darwin.go, unix/syscall_freebsd.go, unix/syscall_netbsd.go, unix/syscall_openbsd.go
+// Copyright 2009,2010 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: unix/timestruct_test.go
+// Copyright 2017 The Go Authors. All right reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.

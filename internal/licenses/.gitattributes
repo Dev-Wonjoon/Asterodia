@@ -1,0 +1,3 @@
+# Retain the original bytes used by provenance and embedded notice SHA-256 checks.
+texts/* -text
+upstream/* -text

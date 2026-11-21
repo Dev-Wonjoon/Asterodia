@@ -53,7 +53,7 @@ const SETTINGS_TABS = [
     },
     {
         id: 'license',
-        label: '라이센스',
+        label: '라이선스',
         icon: (
             <svg
                 xmlns="http://www.w3.org/2000/svg"

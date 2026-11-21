@@ -1,92 +1,129 @@
 # Third-Party Software Notices
 
-This application uses the following open-source software.
+StorageBucket uses the components listed below. Scope identifies bundled components, separately installed external tools, and build-only packages. Original license, copyright, NOTICE and third-party texts supplied by these components are retained in `internal/licenses/texts/`, embedded in the application, and available offline in Settings → Open-source licenses and the mobile `/licenses` page.
 
-## Bundled Libraries
+The StorageBucket project license is in [LICENSE](LICENSE). External tools are downloaded from upstream on the user’s machine and executed separately. Their binary distributions and included dependencies have their own terms. Redistributing those binaries requires satisfying the terms for the exact binaries and their corresponding source, not just retaining this summary.
 
-### Lucide (`lucide-react`)
+| Component | Version | Scope | License | Original notices |
+| --- | --- | --- | --- | --- |
+| [Go standard library and runtime](https://go.dev/) | go1.27.3 | bundled | BSD-3-Clause; additional source notices | [1](internal/licenses/texts/go-runtime-LICENSE.txt), [2](internal/licenses/texts/go-stdlib-crypto_internal_boring_LICENSE.txt), [3](internal/licenses/texts/go-stdlib-vendor_golang.org_x_crypto_LICENSE.txt), [4](internal/licenses/texts/go-stdlib-vendor_golang.org_x_crypto_PATENTS.txt), [5](internal/licenses/texts/go-stdlib-vendor_golang.org_x_net_LICENSE.txt), [6](internal/licenses/texts/go-stdlib-vendor_golang.org_x_net_PATENTS.txt), [7](internal/licenses/texts/go-stdlib-vendor_golang.org_x_sys_LICENSE.txt), [8](internal/licenses/texts/go-stdlib-vendor_golang.org_x_sys_PATENTS.txt), [9](internal/licenses/texts/go-stdlib-vendor_golang.org_x_text_LICENSE.txt), [10](internal/licenses/texts/go-stdlib-vendor_golang.org_x_text_PATENTS.txt), [11](internal/licenses/texts/go-stdlib-source-notices.txt) |
+| [github.com/adrg/xdg](https://pkg.go.dev/github.com/adrg/xdg@v0.5.3) | v0.5.3 | bundled | MIT | [1](internal/licenses/texts/github.com_adrg_xdg-LICENSE.txt) |
+| [github.com/bits-and-blooms/bitset](https://pkg.go.dev/github.com/bits-and-blooms/bitset@v1.20.0) | v1.20.0 | bundled | BSD-3-Clause | [1](internal/licenses/texts/github.com_bits-and-blooms_bitset-LICENSE.txt), [2](internal/licenses/texts/github.com_bits-and-blooms_bitset-source-copyrights.txt) |
+| [github.com/dustin/go-humanize](https://pkg.go.dev/github.com/dustin/go-humanize@v1.0.1) | v1.0.1 | bundled | MIT | [1](internal/licenses/texts/github.com_dustin_go-humanize-LICENSE.txt) |
+| [github.com/go-ole/go-ole](https://pkg.go.dev/github.com/go-ole/go-ole@v1.3.0) | v1.3.0 | bundled | MIT | [1](internal/licenses/texts/github.com_go-ole_go-ole-LICENSE.txt), [2](internal/licenses/texts/github.com_go-ole_go-ole-source-copyrights.txt) |
+| [github.com/google/uuid](https://pkg.go.dev/github.com/google/uuid@v1.6.0) | v1.6.0 | bundled | BSD-3-Clause | [1](internal/licenses/texts/github.com_google_uuid-LICENSE.txt), [2](internal/licenses/texts/github.com_google_uuid-source-copyrights.txt) |
+| [github.com/mattn/go-isatty](https://pkg.go.dev/github.com/mattn/go-isatty@v0.0.24) | v0.0.24 | bundled | MIT | [1](internal/licenses/texts/github.com_mattn_go-isatty-LICENSE.txt) |
+| [github.com/ncruces/go-strftime](https://pkg.go.dev/github.com/ncruces/go-strftime@v1.0.0) | v1.0.0 | bundled | MIT | [1](internal/licenses/texts/github.com_ncruces_go-strftime-LICENSE.txt) |
+| [github.com/nlnwa/whatwg-url](https://pkg.go.dev/github.com/nlnwa/whatwg-url@v0.6.2) | v0.6.2 | bundled | Apache-2.0 | [1](internal/licenses/texts/github.com_nlnwa_whatwg-url-LICENSE.txt), [2](internal/licenses/texts/github.com_nlnwa_whatwg-url-source-copyrights.txt) |
+| [github.com/remyoudompheng/bigfft](https://pkg.go.dev/github.com/remyoudompheng/bigfft@v0.0.0-20230129092748-24d4a6f8daec) | v0.0.0-20230129092748-24d4a6f8daec | bundled | BSD-3-Clause | [1](internal/licenses/texts/github.com_remyoudompheng_bigfft-LICENSE.txt), [2](internal/licenses/texts/github.com_remyoudompheng_bigfft-source-copyrights.txt) |
+| [github.com/wailsapp/wails/v3](https://pkg.go.dev/github.com/wailsapp/wails/v3@v3.0.0) | v3.0.0 | bundled | MIT; additional MIT/ISC notices | [1](internal/licenses/texts/github.com_wailsapp_wails_v3-LICENSE.txt), [2](internal/licenses/texts/github.com_wailsapp_wails_v3-internal_go-common-file-dialog_LICENSE.txt), [3](internal/licenses/texts/github.com_wailsapp_wails_v3-internal_templates_ios_frontend_public_puppertino_LICENSE.txt), [4](internal/licenses/texts/github.com_wailsapp_wails_v3-internal_webview2_webviewloader_LICENSE.txt), [5](internal/licenses/texts/github.com_wailsapp_wails_v3-source-copyrights.txt) |
+| [golang.org/x/net](https://pkg.go.dev/golang.org/x/net@v0.60.0) | v0.60.0 | bundled | BSD-3-Clause | [1](internal/licenses/texts/golang.org_x_net-LICENSE.txt), [2](internal/licenses/texts/golang.org_x_net-PATENTS.txt), [3](internal/licenses/texts/golang.org_x_net-source-copyrights.txt) |
+| [golang.org/x/sys](https://pkg.go.dev/golang.org/x/sys@v0.48.0) | v0.48.0 | bundled | BSD-3-Clause | [1](internal/licenses/texts/golang.org_x_sys-LICENSE.txt), [2](internal/licenses/texts/golang.org_x_sys-PATENTS.txt), [3](internal/licenses/texts/golang.org_x_sys-source-copyrights.txt) |
+| [golang.org/x/text](https://pkg.go.dev/golang.org/x/text@v0.42.0) | v0.42.0 | bundled | BSD-3-Clause; additional source notices | [1](internal/licenses/texts/golang.org_x_text-LICENSE.txt), [2](internal/licenses/texts/golang.org_x_text-PATENTS.txt), [3](internal/licenses/texts/golang.org_x_text-source-copyrights.txt) |
+| [modernc.org/libc](https://pkg.go.dev/modernc.org/libc@v1.77.1) | v1.77.1 | bundled | BSD-3-Clause; see third-party notices | [1](internal/licenses/texts/modernc.org_libc-AUTHORS.txt), [2](internal/licenses/texts/modernc.org_libc-LICENSE.txt), [3](internal/licenses/texts/modernc.org_libc-LICENSE-3RD-PARTY.md.txt), [4](internal/licenses/texts/modernc.org_libc-source-copyrights.txt) |
+| [modernc.org/mathutil](https://pkg.go.dev/modernc.org/mathutil@v1.7.1) | v1.7.1 | bundled | BSD-3-Clause; see additional notices | [1](internal/licenses/texts/modernc.org_mathutil-AUTHORS.txt), [2](internal/licenses/texts/modernc.org_mathutil-LICENSE.txt), [3](internal/licenses/texts/modernc.org_mathutil-mersenne_AUTHORS.txt), [4](internal/licenses/texts/modernc.org_mathutil-mersenne_LICENSE.txt), [5](internal/licenses/texts/modernc.org_mathutil-source-copyrights.txt) |
+| [modernc.org/memory](https://pkg.go.dev/modernc.org/memory@v1.12.1) | v1.12.1 | bundled | BSD-3-Clause; see additional notices | [1](internal/licenses/texts/modernc.org_memory-AUTHORS.txt), [2](internal/licenses/texts/modernc.org_memory-LICENSE.txt), [3](internal/licenses/texts/modernc.org_memory-LICENSE-GO.txt), [4](internal/licenses/texts/modernc.org_memory-LICENSE-LOGO.txt), [5](internal/licenses/texts/modernc.org_memory-LICENSE-MMAP-GO.txt), [6](internal/licenses/texts/modernc.org_memory-source-copyrights.txt) |
+| [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite@v1.60.1) | v1.60.1 | bundled | BSD-3-Clause; see third-party notices | [1](internal/licenses/texts/modernc.org_sqlite-AUTHORS.txt), [2](internal/licenses/texts/modernc.org_sqlite-LICENSE.txt), [3](internal/licenses/texts/modernc.org_sqlite-LICENSE-3RD-PARTY.md.txt), [4](internal/licenses/texts/modernc.org_sqlite-LICENSE-SQLITE.txt), [5](internal/licenses/texts/modernc.org_sqlite-LICENSE-SQLITE_VEC.txt), [6](internal/licenses/texts/modernc.org_sqlite-source-copyrights.txt) |
+| [npm: @babel/helper-string-parser](https://www.npmjs.com/package/@babel/helper-string-parser/v/7.29.14) | 7.29.14 | build | MIT | [1](internal/licenses/texts/npm-node_modules__babel_helper-string-parser-LICENSE.txt) |
+| [npm: @babel/helper-validator-identifier](https://www.npmjs.com/package/@babel/helper-validator-identifier/v/7.29.7) | 7.29.7 | build | MIT | [1](internal/licenses/texts/npm-node_modules__babel_helper-validator-identifier-LICENSE.txt) |
+| [npm: @babel/parser](https://www.npmjs.com/package/@babel/parser/v/7.29.14) | 7.29.14 | build | MIT | [1](internal/licenses/texts/npm-node_modules__babel_parser-LICENSE.txt) |
+| [npm: @babel/types](https://www.npmjs.com/package/@babel/types/v/7.29.14) | 7.29.14 | build | MIT | [1](internal/licenses/texts/npm-node_modules__babel_types-LICENSE.txt) |
+| [npm: @bcoe/v8-coverage](https://www.npmjs.com/package/@bcoe/v8-coverage/v/1.0.2) | 1.0.2 | build | MIT | [1](internal/licenses/texts/npm-node_modules__bcoe_v8-coverage-LICENSE.md.txt), [2](internal/licenses/texts/npm-node_modules__bcoe_v8-coverage-LICENSE.txt.txt) |
+| [npm: @jridgewell/gen-mapping](https://www.npmjs.com/package/@jridgewell/gen-mapping/v/0.3.13) | 0.3.13 | build | MIT | [1](internal/licenses/texts/npm-node_modules__jridgewell_gen-mapping-LICENSE.txt) |
+| [npm: @jridgewell/remapping](https://www.npmjs.com/package/@jridgewell/remapping/v/2.3.5) | 2.3.5 | build | MIT | [1](internal/licenses/texts/npm-node_modules__jridgewell_remapping-LICENSE.txt) |
+| [npm: @jridgewell/resolve-uri](https://www.npmjs.com/package/@jridgewell/resolve-uri/v/3.1.2) | 3.1.2 | build | MIT | [1](internal/licenses/texts/npm-node_modules__jridgewell_resolve-uri-LICENSE.txt) |
+| [npm: @jridgewell/sourcemap-codec](https://www.npmjs.com/package/@jridgewell/sourcemap-codec/v/1.6.0) | 1.6.0 | build | MIT | [1](internal/licenses/texts/npm-node_modules__jridgewell_sourcemap-codec-LICENSE.txt) |
+| [npm: @jridgewell/trace-mapping](https://www.npmjs.com/package/@jridgewell/trace-mapping/v/0.3.31) | 0.3.31 | build | MIT | [1](internal/licenses/texts/npm-node_modules__jridgewell_trace-mapping-LICENSE.txt) |
+| [npm: @oxc-project/types](https://www.npmjs.com/package/@oxc-project/types/v/0.156.0) | 0.156.0 | build | MIT | [1](internal/licenses/texts/npm-node_modules__oxc-project_types-LICENSE.txt) |
+| [npm: @rolldown/binding-win32-x64-msvc](https://www.npmjs.com/package/@rolldown/binding-win32-x64-msvc/v/1.2.16) | 1.2.16 | build | MIT | [1](internal/licenses/texts/npm-node_modules__rolldown_binding-win32-x64-msvc-LICENSE.txt), [2](internal/licenses/texts/npm-node_modules__rolldown_binding-win32-x64-msvc-THIRD-PARTY-LICENSE.txt) |
+| [npm: @rolldown/pluginutils](https://www.npmjs.com/package/@rolldown/pluginutils/v/1.0.1) | 1.0.1 | build | MIT | [1](internal/licenses/texts/npm-node_modules__rolldown_pluginutils-LICENSE.txt) |
+| [npm: @standard-schema/spec](https://www.npmjs.com/package/@standard-schema/spec/v/1.1.0) | 1.1.0 | build | MIT | [1](internal/licenses/texts/npm-node_modules__standard-schema_spec-LICENSE.txt) |
+| [npm: @tailwindcss/node](https://www.npmjs.com/package/@tailwindcss/node/v/4.3.3) | 4.3.3 | build | MIT | [1](internal/licenses/texts/npm-node_modules__tailwindcss_node-LICENSE.txt) |
+| [npm: lightningcss](https://www.npmjs.com/package/lightningcss/v/1.32.0) | 1.32.0 | build | MPL-2.0 | [1](internal/licenses/texts/npm-node_modules__tailwindcss_node_node_modules_lightningcss-LICENSE.txt) |
+| [npm: lightningcss-win32-x64-msvc](https://www.npmjs.com/package/lightningcss-win32-x64-msvc/v/1.32.0) | 1.32.0 | build | MPL-2.0 | [1](internal/licenses/texts/npm-node_modules__tailwindcss_node_node_modules_lightningcss-win32-x64-msvc-LICENSE.txt) |
+| [npm: @tailwindcss/oxide](https://www.npmjs.com/package/@tailwindcss/oxide/v/4.3.3) | 4.3.3 | build | MIT | [1](internal/licenses/texts/npm-node_modules__tailwindcss_oxide-LICENSE.txt) |
+| [npm: @tailwindcss/oxide-win32-x64-msvc](https://www.npmjs.com/package/@tailwindcss/oxide-win32-x64-msvc/v/4.3.3) | 4.3.3 | build | MIT | [1](internal/licenses/texts/npm-node_modules__tailwindcss_oxide-win32-x64-msvc-LICENSE.txt) |
+| [npm: @tailwindcss/vite](https://www.npmjs.com/package/@tailwindcss/vite/v/4.3.3) | 4.3.3 | build | MIT | [1](internal/licenses/texts/npm-node_modules__tailwindcss_vite-LICENSE.txt) |
+| [npm: @types/chai](https://www.npmjs.com/package/@types/chai/v/5.2.3) | 5.2.3 | build | MIT | [1](internal/licenses/texts/npm-node_modules__types_chai-LICENSE.txt) |
+| [npm: @types/deep-eql](https://www.npmjs.com/package/@types/deep-eql/v/4.0.2) | 4.0.2 | build | MIT | [1](internal/licenses/texts/npm-node_modules__types_deep-eql-LICENSE.txt) |
+| [npm: @types/estree](https://www.npmjs.com/package/@types/estree/v/1.0.10) | 1.0.10 | build | MIT | [1](internal/licenses/texts/npm-node_modules__types_estree-LICENSE.txt) |
+| [npm: @types/node](https://www.npmjs.com/package/@types/node/v/26.6.6) | 26.6.6 | build | MIT | [1](internal/licenses/texts/npm-node_modules__types_node-LICENSE.txt) |
+| [npm: @types/react](https://www.npmjs.com/package/@types/react/v/19.3.0) | 19.3.0 | build | MIT | [1](internal/licenses/texts/npm-node_modules__types_react-LICENSE.txt) |
+| [npm: @types/react-dom](https://www.npmjs.com/package/@types/react-dom/v/19.3.0) | 19.3.0 | build | MIT | [1](internal/licenses/texts/npm-node_modules__types_react-dom-LICENSE.txt) |
+| [npm: @types/whatwg-mimetype](https://www.npmjs.com/package/@types/whatwg-mimetype/v/3.0.2) | 3.0.2 | build | MIT | [1](internal/licenses/texts/npm-node_modules__types_whatwg-mimetype-LICENSE.txt) |
+| [npm: @types/ws](https://www.npmjs.com/package/@types/ws/v/8.18.2) | 8.18.2 | build | MIT | [1](internal/licenses/texts/npm-node_modules__types_ws-LICENSE.txt) |
+| [npm: @vitejs/plugin-react](https://www.npmjs.com/package/@vitejs/plugin-react/v/6.1.2) | 6.1.2 | build | MIT | [1](internal/licenses/texts/npm-node_modules__vitejs_plugin-react-LICENSE.txt) |
+| [npm: @vitest/coverage-v8](https://www.npmjs.com/package/@vitest/coverage-v8/v/4.1.12) | 4.1.12 | build | MIT | [1](internal/licenses/texts/npm-node_modules__vitest_coverage-v8-LICENSE.txt) |
+| [npm: @vitest/expect](https://www.npmjs.com/package/@vitest/expect/v/4.1.12) | 4.1.12 | build | MIT | [1](internal/licenses/texts/npm-node_modules__vitest_expect-LICENSE.txt) |
+| [npm: @vitest/mocker](https://www.npmjs.com/package/@vitest/mocker/v/4.1.12) | 4.1.12 | build | MIT | [1](internal/licenses/texts/npm-node_modules__vitest_mocker-LICENSE.txt) |
+| [npm: @vitest/pretty-format](https://www.npmjs.com/package/@vitest/pretty-format/v/4.1.12) | 4.1.12 | build | MIT | [1](internal/licenses/texts/npm-node_modules__vitest_pretty-format-LICENSE.txt) |
+| [npm: @vitest/runner](https://www.npmjs.com/package/@vitest/runner/v/4.1.12) | 4.1.12 | build | MIT | [1](internal/licenses/texts/npm-node_modules__vitest_runner-LICENSE.txt) |
+| [npm: @vitest/snapshot](https://www.npmjs.com/package/@vitest/snapshot/v/4.1.12) | 4.1.12 | build | MIT | [1](internal/licenses/texts/npm-node_modules__vitest_snapshot-LICENSE.txt) |
+| [npm: @vitest/spy](https://www.npmjs.com/package/@vitest/spy/v/4.1.12) | 4.1.12 | build | MIT | [1](internal/licenses/texts/npm-node_modules__vitest_spy-LICENSE.txt) |
+| [npm: @vitest/utils](https://www.npmjs.com/package/@vitest/utils/v/4.1.12) | 4.1.12 | build | MIT | [1](internal/licenses/texts/npm-node_modules__vitest_utils-LICENSE.txt) |
+| [npm: @wailsio/runtime](https://www.npmjs.com/package/@wailsio/runtime/v/3.0.0) | 3.0.0 | bundled | MIT | [1](internal/licenses/texts/npm-wails-runtime-LICENSE.txt) |
+| [npm: assertion-error](https://www.npmjs.com/package/assertion-error/v/2.0.1) | 2.0.1 | build | MIT | [1](internal/licenses/texts/npm-node_modules_assertion-error-LICENSE.txt) |
+| [npm: ast-v8-to-istanbul](https://www.npmjs.com/package/ast-v8-to-istanbul/v/1.0.8) | 1.0.8 | build | MIT | [1](internal/licenses/texts/npm-node_modules_ast-v8-to-istanbul-LICENSE.txt) |
+| [npm: buffer-image-size](https://www.npmjs.com/package/buffer-image-size/v/0.6.4) | 0.6.4 | build | MIT | [1](internal/licenses/texts/npm-node_modules_buffer-image-size-LICENSE.txt) |
+| [npm: chai](https://www.npmjs.com/package/chai/v/6.3.0) | 6.3.0 | build | MIT | [1](internal/licenses/texts/npm-node_modules_chai-LICENSE.txt) |
+| [npm: convert-source-map](https://www.npmjs.com/package/convert-source-map/v/2.0.0) | 2.0.0 | build | MIT | [1](internal/licenses/texts/npm-node_modules_convert-source-map-LICENSE.txt) |
+| [npm: csstype](https://www.npmjs.com/package/csstype/v/3.2.3) | 3.2.3 | build | MIT | [1](internal/licenses/texts/npm-node_modules_csstype-LICENSE.txt) |
+| [npm: detect-libc](https://www.npmjs.com/package/detect-libc/v/2.1.2) | 2.1.2 | build | Apache-2.0 | [1](internal/licenses/texts/npm-node_modules_detect-libc-LICENSE.txt) |
+| [npm: enhanced-resolve](https://www.npmjs.com/package/enhanced-resolve/v/5.26.0) | 5.26.0 | build | MIT | [1](internal/licenses/texts/npm-node_modules_enhanced-resolve-LICENSE.txt) |
+| [npm: entities](https://www.npmjs.com/package/entities/v/7.0.1) | 7.0.1 | build | BSD-2-Clause | [1](internal/licenses/texts/npm-node_modules_entities-LICENSE.txt) |
+| [npm: es-module-lexer](https://www.npmjs.com/package/es-module-lexer/v/2.3.2) | 2.3.2 | build | MIT | [1](internal/licenses/texts/npm-node_modules_es-module-lexer-LICENSE.txt) |
+| [npm: estree-walker](https://www.npmjs.com/package/estree-walker/v/3.0.3) | 3.0.3 | build | MIT | [1](internal/licenses/texts/npm-node_modules_estree-walker-LICENSE.txt) |
+| [npm: expect-type](https://www.npmjs.com/package/expect-type/v/1.4.0) | 1.4.0 | build | Apache-2.0 | [1](internal/licenses/texts/npm-node_modules_expect-type-LICENSE.txt) |
+| [npm: fdir](https://www.npmjs.com/package/fdir/v/6.5.0) | 6.5.0 | build | MIT | [1](internal/licenses/texts/npm-node_modules_fdir-LICENSE.txt) |
+| [npm: graceful-fs](https://www.npmjs.com/package/graceful-fs/v/4.2.11) | 4.2.11 | build | ISC | [1](internal/licenses/texts/npm-node_modules_graceful-fs-LICENSE.txt) |
+| [npm: happy-dom](https://www.npmjs.com/package/happy-dom/v/21.0.4) | 21.0.4 | build | MIT | [1](internal/licenses/texts/npm-node_modules_happy-dom-LICENSE.txt) |
+| [npm: has-flag](https://www.npmjs.com/package/has-flag/v/4.0.0) | 4.0.0 | build | MIT | [1](internal/licenses/texts/npm-node_modules_has-flag-license.txt) |
+| [npm: html-escaper](https://www.npmjs.com/package/html-escaper/v/2.0.2) | 2.0.2 | build | MIT | [1](internal/licenses/texts/npm-node_modules_html-escaper-LICENSE.txt.txt) |
+| [npm: istanbul-lib-coverage](https://www.npmjs.com/package/istanbul-lib-coverage/v/3.2.2) | 3.2.2 | build | BSD-3-Clause | [1](internal/licenses/texts/npm-node_modules_istanbul-lib-coverage-LICENSE.txt) |
+| [npm: istanbul-lib-report](https://www.npmjs.com/package/istanbul-lib-report/v/3.0.1) | 3.0.1 | build | BSD-3-Clause | [1](internal/licenses/texts/npm-node_modules_istanbul-lib-report-LICENSE.txt) |
+| [npm: istanbul-reports](https://www.npmjs.com/package/istanbul-reports/v/3.2.0) | 3.2.0 | build | BSD-3-Clause | [1](internal/licenses/texts/npm-node_modules_istanbul-reports-LICENSE.txt) |
+| [npm: jiti](https://www.npmjs.com/package/jiti/v/2.7.0) | 2.7.0 | build | MIT | [1](internal/licenses/texts/npm-node_modules_jiti-LICENSE.txt) |
+| [npm: js-tokens](https://www.npmjs.com/package/js-tokens/v/10.0.0) | 10.0.0 | build | MIT | [1](internal/licenses/texts/npm-node_modules_js-tokens-LICENSE.txt) |
+| [npm: lightningcss](https://www.npmjs.com/package/lightningcss/v/1.33.0) | 1.33.0 | build | MPL-2.0 | [1](internal/licenses/texts/npm-node_modules_lightningcss-LICENSE.txt) |
+| [npm: lightningcss-win32-x64-msvc](https://www.npmjs.com/package/lightningcss-win32-x64-msvc/v/1.33.0) | 1.33.0 | build | MPL-2.0 | [1](internal/licenses/texts/npm-node_modules_lightningcss-win32-x64-msvc-LICENSE.txt) |
+| [npm: lucide-react](https://www.npmjs.com/package/lucide-react/v/1.61.0) | 1.61.0 | bundled | ISC AND MIT (Feather portions) | [1](internal/licenses/texts/npm-node_modules_lucide-react-LICENSE.txt) |
+| [npm: magic-string](https://www.npmjs.com/package/magic-string/v/0.30.21) | 0.30.21 | build | MIT | [1](internal/licenses/texts/npm-node_modules_magic-string-LICENSE.txt) |
+| [npm: magicast](https://www.npmjs.com/package/magicast/v/0.5.5) | 0.5.5 | build | MIT | [1](internal/licenses/texts/npm-node_modules_magicast-LICENSE.txt) |
+| [npm: make-dir](https://www.npmjs.com/package/make-dir/v/4.0.0) | 4.0.0 | build | MIT | [1](internal/licenses/texts/npm-node_modules_make-dir-license.txt) |
+| [npm: nanoid](https://www.npmjs.com/package/nanoid/v/3.3.20) | 3.3.20 | build | MIT | [1](internal/licenses/texts/npm-node_modules_nanoid-LICENSE.txt) |
+| [npm: obug](https://www.npmjs.com/package/obug/v/2.2.1) | 2.2.1 | build | MIT | [1](internal/licenses/texts/npm-node_modules_obug-LICENSE.txt) |
+| [npm: pathe](https://www.npmjs.com/package/pathe/v/2.0.3) | 2.0.3 | build | MIT | [1](internal/licenses/texts/npm-node_modules_pathe-LICENSE.txt) |
+| [npm: picocolors](https://www.npmjs.com/package/picocolors/v/1.1.1) | 1.1.1 | build | ISC | [1](internal/licenses/texts/npm-node_modules_picocolors-LICENSE.txt) |
+| [npm: picomatch](https://www.npmjs.com/package/picomatch/v/4.0.7) | 4.0.7 | build | MIT | [1](internal/licenses/texts/npm-node_modules_picomatch-LICENSE.txt) |
+| [npm: postcss](https://www.npmjs.com/package/postcss/v/8.5.32) | 8.5.32 | build | MIT | [1](internal/licenses/texts/npm-node_modules_postcss-LICENSE.txt) |
+| [npm: react](https://www.npmjs.com/package/react/v/19.3.1) | 19.3.1 | bundled | MIT | [1](internal/licenses/texts/npm-node_modules_react-LICENSE.txt) |
+| [npm: react-dom](https://www.npmjs.com/package/react-dom/v/19.3.1) | 19.3.1 | bundled | MIT | [1](internal/licenses/texts/npm-node_modules_react-dom-LICENSE.txt) |
+| [npm: rolldown](https://www.npmjs.com/package/rolldown/v/1.2.16) | 1.2.16 | build | MIT | [1](internal/licenses/texts/npm-node_modules_rolldown-LICENSE.txt), [2](internal/licenses/texts/npm-node_modules_rolldown-THIRD-PARTY-LICENSE.txt) |
+| [npm: scheduler](https://www.npmjs.com/package/scheduler/v/0.28.0) | 0.28.0 | bundled | MIT | [1](internal/licenses/texts/npm-node_modules_scheduler-LICENSE.txt) |
+| [npm: semver](https://www.npmjs.com/package/semver/v/7.8.6) | 7.8.6 | build | ISC | [1](internal/licenses/texts/npm-node_modules_semver-LICENSE.txt) |
+| [npm: siginfo](https://www.npmjs.com/package/siginfo/v/2.0.0) | 2.0.0 | build | ISC | [1](internal/licenses/texts/npm-node_modules_siginfo-LICENSE.txt) |
+| [npm: source-map-js](https://www.npmjs.com/package/source-map-js/v/1.2.2) | 1.2.2 | build | BSD-3-Clause | [1](internal/licenses/texts/npm-node_modules_source-map-js-LICENSE.txt) |
+| [npm: stackback](https://www.npmjs.com/package/stackback/v/0.0.2) | 0.0.2 | build | MIT | [1](internal/licenses/texts/stackback-package-metadata.txt) |
+| [npm: std-env](https://www.npmjs.com/package/std-env/v/4.3.0) | 4.3.0 | build | MIT | [1](internal/licenses/texts/npm-node_modules_std-env-LICENCE.txt) |
+| [npm: supports-color](https://www.npmjs.com/package/supports-color/v/7.2.0) | 7.2.0 | build | MIT | [1](internal/licenses/texts/npm-node_modules_supports-color-license.txt) |
+| [npm: tailwindcss](https://www.npmjs.com/package/tailwindcss/v/4.3.3) | 4.3.3 | bundled | MIT | [1](internal/licenses/texts/npm-node_modules_tailwindcss-LICENSE.txt) |
+| [npm: tapable](https://www.npmjs.com/package/tapable/v/2.3.3) | 2.3.3 | build | MIT | [1](internal/licenses/texts/npm-node_modules_tapable-LICENSE.txt) |
+| [npm: tinybench](https://www.npmjs.com/package/tinybench/v/2.9.0) | 2.9.0 | build | MIT | [1](internal/licenses/texts/npm-node_modules_tinybench-LICENSE.txt) |
+| [npm: tinyexec](https://www.npmjs.com/package/tinyexec/v/1.3.1) | 1.3.1 | build | MIT | [1](internal/licenses/texts/npm-node_modules_tinyexec-LICENSE.txt) |
+| [npm: tinyglobby](https://www.npmjs.com/package/tinyglobby/v/0.2.17) | 0.2.17 | build | MIT | [1](internal/licenses/texts/npm-node_modules_tinyglobby-LICENSE.txt) |
+| [npm: tinyrainbow](https://www.npmjs.com/package/tinyrainbow/v/3.2.0) | 3.2.0 | build | MIT | [1](internal/licenses/texts/npm-node_modules_tinyrainbow-LICENCE.txt) |
+| [npm: typescript](https://www.npmjs.com/package/typescript/v/5.9.3) | 5.9.3 | build | Apache-2.0 | [1](internal/licenses/texts/npm-node_modules_typescript-LICENSE.txt.txt), [2](internal/licenses/texts/npm-node_modules_typescript-ThirdPartyNoticeText.txt.txt) |
+| [npm: undici-types](https://www.npmjs.com/package/undici-types/v/8.9.0) | 8.9.0 | build | MIT | [1](internal/licenses/texts/npm-node_modules_undici-types-LICENSE.txt) |
+| [npm: vite](https://www.npmjs.com/package/vite/v/8.3.5) | 8.3.5 | build | MIT | [1](internal/licenses/texts/npm-node_modules_vite-LICENSE.md.txt) |
+| [npm: vitest](https://www.npmjs.com/package/vitest/v/4.1.12) | 4.1.12 | build | MIT | [1](internal/licenses/texts/npm-node_modules_vitest-LICENSE.md.txt) |
+| [npm: whatwg-mimetype](https://www.npmjs.com/package/whatwg-mimetype/v/3.0.0) | 3.0.0 | build | MIT | [1](internal/licenses/texts/npm-node_modules_whatwg-mimetype-LICENSE.txt.txt) |
+| [npm: why-is-node-running](https://www.npmjs.com/package/why-is-node-running/v/2.3.0) | 2.3.0 | build | MIT | [1](internal/licenses/texts/npm-node_modules_why-is-node-running-LICENSE.txt) |
+| [npm: ws](https://www.npmjs.com/package/ws/v/8.23.0) | 8.23.0 | build | MIT | [1](internal/licenses/texts/npm-node_modules_ws-LICENSE.txt) |
+| [Inter font](https://rsms.me/inter/) | Bundled Inter-Medium.ttf | bundled | OFL-1.1 | [1](internal/licenses/texts/inter-OFL.txt) |
+| [yt-dlp](https://github.com/yt-dlp/yt-dlp) | 2026.10.26 Windows executable | external | Unlicense (source); GPL-3.0-or-later (PyInstaller binary) | [1](internal/licenses/texts/external-yt-dlp-LICENSE.txt), [2](internal/licenses/texts/external-yt-dlp-THIRD_PARTY_LICENSES.txt.txt), [3](internal/licenses/texts/external-ffmpeg-COPYING.GPLv3.txt) |
+| [gallery-dl](https://github.com/mikf/gallery-dl) | 1.32.20 Windows executable | external | GPL-2.0-only; dependencies have separate terms | [1](internal/licenses/texts/external-gallery-dl-LICENSE.txt), [2](internal/licenses/texts/external-Python-LICENSE.txt), [3](internal/licenses/texts/external-gallery-binary-markupsafe-3.0.4.dist-info-licenses-LICENSE.txt.txt), [4](internal/licenses/texts/external-gallery-binary-websockets-16.1.1.dist-info-licenses-LICENSE.txt), [5](internal/licenses/texts/external-Jinja-LICENSE.txt), [6](internal/licenses/texts/external-PyYAML-LICENSE.txt), [7](internal/licenses/texts/external-PySocks-LICENSE.txt), [8](internal/licenses/texts/external-truststore-LICENSE.txt), [9](internal/licenses/texts/external-PyInstaller-COPYING.txt), [10](internal/licenses/texts/external-yt-dlp-THIRD_PARTY_LICENSES.txt.txt) |
+| [FFmpeg / ffprobe (BtbN GPL build)](https://ffmpeg.org/legal.html) | Rolling latest; inspect installed -version / -L | external | GPL; exact build configuration governs | [1](internal/licenses/texts/external-ffmpeg-LICENSE.md.txt), [2](internal/licenses/texts/external-ffmpeg-COPYING.GPLv3.txt), [3](internal/licenses/texts/external-ffmpeg-COPYING.GPLv2.txt), [4](internal/licenses/texts/external-ffmpeg-COPYING.LGPLv2.1.txt), [5](internal/licenses/texts/external-BtbN-README.md.txt), [6](internal/licenses/texts/external-BtbN-LICENSE.txt) |
+| [ImageMagick](https://imagemagick.org/license/) | 7.1.2-34 portable Q16 x64 | external | ImageMagick License; delegate licenses in NOTICE | [1](internal/licenses/texts/external-ImageMagick-LICENSE.txt.txt), [2](internal/licenses/texts/external-ImageMagick-NOTICE.txt.txt) |
+| [Node.js (optional external runtime)](https://nodejs.org/) | System-installed version; v24.11.1 reference notices | external | MIT; bundled components have separate terms | [1](internal/licenses/texts/external-Node-LICENSE.txt) |
 
-- Version: 1.61.0
-- License: ISC; MIT for portions derived from Feather
-- Source: https://github.com/lucide-icons/lucide
-- Website: https://lucide.dev
-
-The following license text is reproduced from the installed
-`lucide-react@1.61.0` package's `LICENSE` file.
-
-```text
-ISC License
-
-Copyright (c) 2026 Lucide Icons and Contributors
-
-Permission to use, copy, modify, and/or distribute this software for any
-purpose with or without fee is hereby granted, provided that the above
-copyright notice and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
----
-
-The following Lucide icons are derived from the Feather project:
-
-airplay, alert-circle, alert-octagon, alert-triangle, aperture, arrow-down-circle, arrow-down-left, arrow-down-right, arrow-down, arrow-left-circle, arrow-left, arrow-right-circle, arrow-right, arrow-up-circle, arrow-up-left, arrow-up-right, arrow-up, at-sign, calendar, cast, check, chevron-down, chevron-left, chevron-right, chevron-up, chevrons-down, chevrons-left, chevrons-right, chevrons-up, circle, clipboard, clock, code, columns, command, compass, corner-down-left, corner-down-right, corner-left-down, corner-left-up, corner-right-down, corner-right-up, corner-up-left, corner-up-right, crosshair, database, divide-circle, divide-square, dollar-sign, download, external-link, feather, frown, hash, headphones, help-circle, info, italic, key, layout, life-buoy, link-2, link, loader, lock, log-in, log-out, maximize, meh, minimize, minimize-2, minus-circle, minus-square, minus, monitor, moon, more-horizontal, more-vertical, move, music, navigation-2, navigation, octagon, pause-circle, percent, plus-circle, plus-square, plus, power, radio, rss, search, server, share, shopping-bag, sidebar, smartphone, smile, square, table-2, tablet, target, terminal, trash-2, trash, triangle, tv, type, upload, x-circle, x-octagon, x-square, x, zoom-in, zoom-out
-
-The MIT License (MIT) (for the icons listed above)
-
-Copyright (c) 2013-present Cole Bemis
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
-## Runtime-Downloaded Tools
-
-The following binaries are NOT bundled with this application.
-They are downloaded at runtime directly from their official sources
-by the user's machine.
-
----
-
-### yt-dlp
-
-- License: The Unlicense
-- Source: https://github.com/yt-dlp/yt-dlp
-- Release: https://github.com/yt-dlp/yt-dlp/releases
-
-
----
-
-### FFmpeg
-
-- License: LGPL-2.1 / GPL-2.0 (depending on build configuration)
-- Source: https://github.com/FFmpeg/FFmpeg
-- Website: https://ffmpeg.org
-
----
-
-### gallery-dl
-
-- License: GPL-2.0
-- Source: https://github.com/mikf/gallery-dl
-- Release: https://github.com/mikf/gallery-dl/releases
+Generated by `node tools/generate-licenses.mjs`. Verify before shipping with `node tools/generate-licenses.mjs --check`. Build-only packages are included for attribution and audit; they are not all linked into the release executable.

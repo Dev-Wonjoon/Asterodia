@@ -1,0 +1,37 @@
+[
+  {
+    "name": "yt-dlp", "version": "2026.10.26 Windows executable",
+    "license": "Unlicense (source); GPL-3.0-or-later (PyInstaller binary)",
+    "url": "https://github.com/yt-dlp/yt-dlp", "sourceURL": "https://github.com/yt-dlp/yt-dlp/tree/2026.10.26",
+    "notice": "소스는 Unlicense이며 공식 Windows 단독 실행 파일은 포함된 구성 요소로 인해 GPLv3+ 조건을 따릅니다. 공식 배포본의 서드파티 고지를 함께 제공합니다.",
+    "files": ["yt-dlp-LICENSE", "yt-dlp-THIRD_PARTY_LICENSES.txt", "ffmpeg-COPYING.GPLv3"]
+  },
+  {
+    "name": "gallery-dl", "version": "1.32.20 Windows executable",
+    "license": "GPL-2.0-only; dependencies have separate terms",
+    "url": "https://github.com/mikf/gallery-dl", "sourceURL": "https://github.com/mikf/gallery-dl/tree/v1.32.20",
+    "notice": "Copyright 2014-2026 Mike Fährmann. Python과 타사 구성 요소를 포함하는 독립 실행 파일입니다. 배포본에 포함된 MarkupSafe·websockets 원문과 Python·추가 구성 요소의 참고 고지를 보존합니다. yt-dlp 종합 고지는 공통 의존성의 참고 자료이며 gallery-dl 전체 구성의 버전 명세는 아닙니다.",
+    "files": ["gallery-dl-LICENSE", "Python-LICENSE", "gallery-binary-markupsafe-3.0.4.dist-info-licenses-LICENSE.txt", "gallery-binary-websockets-16.1.1.dist-info-licenses-LICENSE", "Jinja-LICENSE", "PyYAML-LICENSE", "PySocks-LICENSE", "truststore-LICENSE", "PyInstaller-COPYING", "yt-dlp-THIRD_PARTY_LICENSES.txt"]
+  },
+  {
+    "name": "FFmpeg / ffprobe (BtbN GPL build)", "version": "Rolling latest; inspect installed -version / -L",
+    "license": "GPL; exact build configuration governs",
+    "url": "https://ffmpeg.org/legal.html", "sourceURL": "https://github.com/BtbN/FFmpeg-Builds",
+    "notice": "BtbN의 win64-gpl 빌드를 내려받습니다. GPL 버전과 추가 구성 요소는 설치한 실행 파일의 -L·-version 결과와 bin/licenses에 보존한 배포본 고지를 확인하세요. 아래 GPL/LGPL 원문은 빌드별 조건 확인용 참고 자료입니다. BtbN 빌드 스크립트의 MIT와 FFmpeg 바이너리의 GPL은 별도입니다.",
+    "files": ["ffmpeg-LICENSE.md", "ffmpeg-COPYING.GPLv3", "ffmpeg-COPYING.GPLv2", "ffmpeg-COPYING.LGPLv2.1", "BtbN-README.md", "BtbN-LICENSE"]
+  },
+  {
+    "name": "ImageMagick", "version": "7.1.2-34 portable Q16 x64",
+    "license": "ImageMagick License; delegate licenses in NOTICE",
+    "url": "https://imagemagick.org/license/", "sourceURL": "https://github.com/ImageMagick/ImageMagick/tree/7.1.2-34",
+    "notice": "원본 파일 검사와 표시용 캐시 생성에 사용합니다. 고정된 공식 portable 배포본의 LICENSE.txt와 NOTICE.txt를 원문 그대로 보존합니다. 설치 디렉터리에도 배포본 고지가 함께 남습니다.",
+    "files": ["ImageMagick-LICENSE.txt", "ImageMagick-NOTICE.txt"]
+  },
+  {
+    "name": "Node.js (optional external runtime)", "version": "System-installed version; v24.11.1 reference notices",
+    "license": "MIT; bundled components have separate terms",
+    "url": "https://nodejs.org/", "sourceURL": "https://github.com/nodejs/node/tree/v24.11.1",
+    "notice": "yt-dlp의 JavaScript 처리에 PATH의 Node.js를 사용할 수 있습니다. 앱이 설치하거나 함께 배포하지 않습니다. 아래 원문은 v24.11.1 참고 고지이며 실제 설치된 Node.js 버전의 LICENSE가 적용됩니다.",
+    "files": ["Node-LICENSE"]
+  }
+]

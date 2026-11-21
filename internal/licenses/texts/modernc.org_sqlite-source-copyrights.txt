@@ -1,0 +1,903 @@
+Source: addport.go
+// Copyright 2022 The Sqlite Authors. All rights reserved
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: all_test.go
+// Copyright 2016 The Sqlite Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: backup.go, backup_test.go, conn.go, driver.go, error.go, module_volatile_test.go, result.go, rows.go, stmt.go, tx.go, vtab.go
+// Copyright 2025 The Sqlite Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: bind_test.go, connector.go, connector_test.go, conn_test.go, dbstatus.go, dbstatus_test.go, defensive_test.go, dqs_test.go, driver_register_test.go, error_rc_test.go, func_ctx_pool_test.go, func_ctx_test.go, internal/vendorstamp/vendorstamp.go, internal/vendorstamp/vendorstamp_test.go, lib/seh.go, ofd.go, ofd_linux_test.go, ofd_other_test.go, ofd_stub.go, ofd_unix.go, pagecache.go, pagecache_pin_test.go, pagecache_test.go, pagecache_trampolines.go, pcache/bench_test.go, pcache/e2e_test.go, pcache/pool.go, pcache/pool_test.go, pcache/sharing.go, pcachepool_test.go, seh_test.go, strictpragma.go, strictpragma_test.go, vec/patch_freebsd.go, vendorstamp_test.go, vfs/close_test.go
+// Copyright 2026 The Sqlite Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: convert.go
+// Copyright 2011 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: dmesg.go, nodmesg.go
+// Copyright 2023 The Sqlite Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: doc.go, sqlite.go
+// Copyright 2017 The Sqlite Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: dsn_test.go, fcntl.go, fcntl_test.go
+// Copyright 2024 The Sqlite Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: func_test.go, lib/defs.go, vfs/all_test.go, vfs/patches.go, vfs/patches32.go, vfs/patches64.go
+// Copyright 2022 The Sqlite Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: lib/hooks.go, lib/hooks_linux_arm64.go, mutex.go
+// Copyright 2019 The Sqlite Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: lib/libsqlite3_freebsd.go, lib/libsqlite3_windows.go
+// Copyright 2026 The libsqlite3-go Authors. All rights reserved.
+// Use of the source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: lib/mutex.go, norlimit.go, rlimit.go, rulimit.go
+// Copyright 2021 The Sqlite Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: lib/sqlite.go
+/*
+** 2001 September 15
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+** Header file for the Virtual DataBase Engine (VDBE)
+**
+** This header defines the interface to the virtual database engine
+** or VDBE.  The VDBE implements an abstract machine that runs a
+** simple program to access and modify the underlying database.
+ */
+
+Source: lib/sqlite.go
+/*
+** 2000-05-29
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+** Driver template for the LEMON parser generator.
+**
+** The "lemon" program processes an LALR(1) input grammar file, then uses
+** this template to construct a parser.  The "lemon" program inserts text
+** at each "%%" line.  Also, any "P-a-r-s-e" identifier prefix (without the
+** interstitial "-" characters) contained in this template is changed into
+** the value of the %name directive from the grammar.  Otherwise, the content
+** of this template is copied straight through into the generate parser
+** source file.
+**
+** The following is the concatenation of all %include directives from the
+** input grammar file:
+ */
+
+Source: lib/sqlite.go
+/*
+** 2001 September 15
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+** This header file defines the interface that the sqlite B-Tree file
+** subsystem.  See comments in the source code for a detailed description
+** of what each interface routine does.
+ */
+
+Source: lib/sqlite_g_0000000000000014.go, lib/sqlite_g_0000000000000028.go, lib/sqlite_g_0000000000000140.go, lib/sqlite_g_0000000000003e80.go
+/*
+** 2014 May 31
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+******************************************************************************
+**
+** Interfaces to extend FTS5. Using the interfaces defined in this file,
+** FTS5 may be extended with:
+**
+**     * custom tokenizers, and
+**     * custom auxiliary functions.
+ */
+
+Source: lib/sqlite_g_0000000000000014.go, lib/sqlite_g_0000000000000028.go, lib/sqlite_g_0000000000000140.go, lib/sqlite_g_0000000000003e80.go
+/*
+** 2014 May 31
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+******************************************************************************
+**
+ */
+
+Source: lib/sqlite_g_0000000000000038.go
+/*
+** 2014 May 31
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+******************************************************************************
+ */
+
+Source: lib/sqlite_g_0000000000000038.go
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+Source: lib/sqlite_g_000000000000003c.go, lib/sqlite_g_0000000000003fc0.go, lib/sqlite_g_0000000000018000.go, lib/sqlite_netbsd_amd64.go
+/*
+** 2011-07-09
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+** This file contains code for the VdbeSorter object, used in concert with
+** a VdbeCursor to sort large numbers of keys for CREATE INDEX statements
+** or by SELECT statements with ORDER BY clauses that cannot be satisfied
+** using indexes and without LIMIT clauses.
+**
+** The VdbeSorter object implements a multi-threaded external merge sort
+** algorithm that is efficient even if the number of elements being sorted
+** exceeds the available memory.
+**
+** Here is the (internal, non-API) interface between this module and the
+** rest of the SQLite system:
+**
+**    sqlite3VdbeSorterInit()       Create a new VdbeSorter object.
+**
+**    sqlite3VdbeSorterWrite()      Add a single new row to the VdbeSorter
+**                                  object.  The row is a binary blob in the
+**                                  OP_MakeRecord format that contains both
+**                                  the ORDER BY key columns and result columns
+**                                  in the case of a SELECT w/ ORDER BY, or
+**                                  the complete record for an index entry
+**                                  in the case of a CREATE INDEX.
+**
+**    sqlite3VdbeSorterRewind()     Sort all content previously added.
+**                                  Position the read cursor on the
+**                                  first sorted element.
+**
+**    sqlite3VdbeSorterNext()       Advance the read cursor to the next sorted
+**                                  element.
+**
+**    sqlite3VdbeSorterRowkey()     Return the complete binary blob for the
+**                                  row currently under the read cursor.
+**
+**    sqlite3VdbeSorterCompare()    Compare the binary blob for the row
+**                                  currently under the read cursor against
+**                                  another binary blob X and report if
+**                                  X is strictly less than the read cursor.
+**                                  Used to enforce uniqueness in a
+**                                  CREATE UNIQUE INDEX statement.
+**
+**    sqlite3VdbeSorterClose()      Close the VdbeSorter object and reclaim
+**                                  all resources.
+**
+**    sqlite3VdbeSorterReset()      Refurbish the VdbeSorter for reuse.  This
+**                                  is like Close() followed by Init() only
+**                                  much faster.
+**
+** The interfaces above must be called in a particular order.  Write() can
+** only occur in between Init()/Reset() and Rewind().  Next(), Rowkey(), and
+** Compare() can only occur in between Rewind() and Close()/Reset(). i.e.
+**
+**   Init()
+**   for each record: Write()
+**   Rewind()
+**     Rowkey()/Compare()
+**   Next()
+**   Close()
+**
+** Algorithm:
+**
+** Records passed to the sorter via calls to Write() are initially held
+** unsorted in main memory. Assuming the amount of memory used never exceeds
+** a threshold, when Rewind() is called the set of records is sorted using
+** an in-memory merge sort. In this case, no temporary files are required
+** and subsequent calls to Rowkey(), Next() and Compare() read records
+** directly from main memory.
+**
+** If the amount of space used to store records in main memory exceeds the
+** threshold, then the set of records currently in memory are sorted and
+** written to a temporary file in "Packed Memory Array" (PMA) format.
+** A PMA created at this point is known as a "level-0 PMA". Higher levels
+** of PMAs may be created by merging existing PMAs together - for example
+** merging two or more level-0 PMAs together creates a level-1 PMA.
+**
+** The threshold for the amount of main memory to use before flushing
+** records to a PMA is roughly the same as the limit configured for the
+** page-cache of the main database. Specifically, the threshold is set to
+** the value returned by "PRAGMA main.page_size" multiplied by
+** that returned by "PRAGMA main.cache_size", in bytes.
+**
+** If the sorter is running in single-threaded mode, then all PMAs generated
+** are appended to a single temporary file. Or, if the sorter is running in
+** multi-threaded mode then up to (N+1) temporary files may be opened, where
+** N is the configured number of worker threads. In this case, instead of
+** sorting the records and writing the PMA to a temporary file itself, the
+** calling thread usually launches a worker thread to do so. Except, if
+** there are already N worker threads running, the main thread does the work
+** itself.
+**
+** The sorter is running in multi-threaded mode if (a) the library was built
+** with pre-processor symbol SQLITE_MAX_WORKER_THREADS set to a value greater
+** than zero, and (b) worker threads have been enabled at runtime by calling
+** "PRAGMA threads=N" with some value of N greater than 0.
+**
+** When Rewind() is called, any data remaining in memory is flushed to a
+** final PMA. So at this point the data is stored in some number of sorted
+** PMAs within temporary files on disk.
+**
+** If there are fewer than SORTER_MAX_MERGE_COUNT PMAs in total and the
+** sorter is running in single-threaded mode, then these PMAs are merged
+** incrementally as keys are retrieved from the sorter by the VDBE.  The
+** MergeEngine object, described in further detail below, performs this
+** merge.
+**
+** Or, if running in multi-threaded mode, then a background thread is
+** launched to merge the existing PMAs. Once the background thread has
+** merged T bytes of data into a single sorted PMA, the main thread
+** begins reading keys from that PMA while the background thread proceeds
+** with merging the next T bytes of data. And so on.
+**
+** Parameter T is set to half the value of the memory threshold used
+** by Write() above to determine when to create a new PMA.
+**
+** If there are more than SORTER_MAX_MERGE_COUNT PMAs in total when
+** Rewind() is called, then a hierarchy of incremental-merges is used.
+** First, T bytes of data from the first SORTER_MAX_MERGE_COUNT PMAs on
+** disk are merged together. Then T bytes of data from the second set, and
+** so on, such that no operation ever merges more than SORTER_MAX_MERGE_COUNT
+** PMAs at a time. This done is to improve locality.
+**
+** If running in multi-threaded mode and there are more than
+** SORTER_MAX_MERGE_COUNT PMAs on disk when Rewind() is called, then more
+** than one background thread may be created. Specifically, there may be
+** one background thread for each temporary file on disk, and one background
+** thread to merge the output of each of the others to a single PMA for
+** the main thread to read from.
+ */
+
+Source: lib/sqlite_g_0000000000000154.go, lib/sqlite_g_000000000001feab.go
+/*
+** 2009 November 25
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+**
+** This file contains code used to insert the values of host parameters
+** (aka "wildcards") into the SQL text output by sqlite3_trace().
+**
+** The Vdbe parse-tree explainer is also found here.
+ */
+
+Source: lib/sqlite_g_0000000000003fc0.go, lib/sqlite_g_000000000001c03f.go
+/*
+** 2004 May 22
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+******************************************************************************
+**
+** This file contains code that is specific to Windows.
+ */
+
+Source: lib/sqlite_g_0000000000003fc0.go, lib/sqlite_g_000000000001c03f.go
+/*
+** 2016-09-07
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+******************************************************************************
+**
+** This file implements an in-memory VFS. A database is held as a contiguous
+** block of memory.
+**
+** This file also implements interface sqlite3_serialize() and
+** sqlite3_deserialize().
+ */
+
+Source: lib/sqlite_g_000000000001c03f.go
+/*
+** 2007 August 28
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+** This file contains the C functions that implement mutexes for pthreads
+ */
+
+Source: lib/sqlite_g_000000000001c03f.go
+/*
+** 2007 August 14
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+** This file contains the C functions that implement mutexes for Win32.
+ */
+
+Source: lib/sqlite_g_000000000001c03f.go
+/*
+** 2001 September 15
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+**
+** Memory allocation functions used throughout sqlite.
+ */
+
+Source: lib/sqlite_g_000000000001c03f.go
+/*
+** 2004 April 13
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+** This file contains routines used to translate between UTF-8,
+** UTF-16, UTF-16BE, and UTF-16LE.
+**
+** Notes on UTF-8:
+**
+**   Byte-0    Byte-1    Byte-2    Byte-3    Value
+**  0xxxxxxx                                 00000000 00000000 0xxxxxxx
+**  110yyyyy  10xxxxxx                       00000000 00000yyy yyxxxxxx
+**  1110zzzz  10yyyyyy  10xxxxxx             00000000 zzzzyyyy yyxxxxxx
+**  11110uuu  10uuzzzz  10yyyyyy  10xxxxxx   000uuuuu zzzzyyyy yyxxxxxx
+**
+**
+** Notes on UTF-16:  (with wwww+1==uuuuu)
+**
+**      Word-0               Word-1          Value
+**  110110ww wwzzzzyy   110111yy yyxxxxxx    000uuuuu zzzzyyyy yyxxxxxx
+**  zzzzyyyy yyxxxxxx                        00000000 zzzzyyyy yyxxxxxx
+**
+**
+** BOM or Byte Order Mark:
+**     0xff 0xfe   little-endian utf-16 follows
+**     0xfe 0xff   big-endian utf-16 follows
+**
+ */
+
+Source: lib/sqlite_g_000000000001ffff.go
+/*
+** 2015-06-06
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+** This module contains C code that generates VDBE code used to process
+** the WHERE clause of SQL statements.
+**
+** This file was split off from where.c on 2015-06-06 in order to reduce the
+** size of where.c and make it easier to edit.  This file contains the routines
+** that actually generate the bulk of the WHERE loop code.  The original where.c
+** file retains the code that does query planning and analysis.
+ */
+
+Source: lib/sqlite_g_000000000001ffff.go
+/*
+** 2013-11-12
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+**
+** This file contains structure and macro definitions for the query
+** planner logic in "where.c".  These definitions are broken out into
+** a separate source file for easier editing.
+ */
+
+Source: lib/sqlite_g_000000000003feab.go, lib/sqlite_g_0000000000040154.go
+/*
+** 2009 March 3
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+**
+** This file contains the implementation of the sqlite3_unlock_notify()
+** API method and its associated functionality.
+ */
+
+Source: lib/sqlite_g_000000000003feab.go, lib/sqlite_g_0000000000040154.go
+/*
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+** This file contains the implementation for TRIGGERs
+ */
+
+Source: lib/sqlite_g_000000000003feab.go, lib/sqlite_g_0000000000040154.go
+/*
+** 2007 May 6
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+** $Id: icu.c,v 1.7 2007/12/13 21:54:11 drh Exp $
+**
+** This file implements an integration between the ICU library
+** ("International Components for Unicode", an open-source library
+** for handling unicode data) and SQLite. The integration uses
+** ICU to provide the following to SQLite:
+**
+**   * An implementation of the SQL regexp() function (and hence REGEXP
+**     operator) using the ICU uregex_XX() APIs.
+**
+**   * Implementations of the SQL scalar upper() and lower() functions
+**     for case mapping.
+**
+**   * Integration of ICU and SQLite collation sequences.
+**
+**   * An implementation of the LIKE operator that uses ICU to
+**     provide case-independent matching.
+ */
+
+Source: lib/sqlite_g_000000000003feab.go, lib/sqlite_g_0000000000040154.go
+/*
+** 2007 June 22
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+** This file implements a tokenizer for fts3 based on the ICU library.
+ */
+
+Source: lib/sqlite_g_000000000003feab.go, lib/sqlite_g_0000000000040154.go
+/*
+** 2014 August 30
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+**
+**
+** OVERVIEW
+**
+**  The RBU extension requires that the RBU update be packaged as an
+**  SQLite database. The tables it expects to find are described in
+**  sqlite3rbu.h.  Essentially, for each table xyz in the target database
+**  that the user wishes to write to, a corresponding data_xyz table is
+**  created in the RBU database and populated with one row for each row to
+**  update, insert or delete from the target table.
+**
+**  The update proceeds in three stages:
+**
+**  1) The database is updated. The modified database pages are written
+**     to a *-oal file. A *-oal file is just like a *-wal file, except
+**     that it is named "<database>-oal" instead of "<database>-wal".
+**     Because regular SQLite clients do not look for file named
+**     "<database>-oal", they go on using the original database in
+**     rollback mode while the *-oal file is being generated.
+**
+**     During this stage RBU does not update the database by writing
+**     directly to the target tables. Instead it creates "imposter"
+**     tables using the SQLITE_TESTCTRL_IMPOSTER interface that it uses
+**     to update each b-tree individually. All updates required by each
+**     b-tree are completed before moving on to the next, and all
+**     updates are done in sorted key order.
+**
+**  2) The "<database>-oal" file is moved to the equivalent "<database>-wal"
+**     location using a call to rename(2). Before doing this the RBU
+**     module takes an EXCLUSIVE lock on the database file, ensuring
+**     that there are no other active readers.
+**
+**     Once the EXCLUSIVE lock is released, any other database readers
+**     detect the new *-wal file and read the database in wal mode. At
+**     this point they see the new version of the database - including
+**     the updates made as part of the RBU update.
+**
+**  3) The new *-wal file is checkpointed. This proceeds in the same way
+**     as a regular database checkpoint, except that a single frame is
+**     checkpointed each time sqlite3rbu_step() is called. If the RBU
+**     handle is closed before the entire *-wal file is checkpointed,
+**     the checkpoint progress is saved in the RBU database and the
+**     checkpoint can be resumed by another RBU client at some point in
+**     the future.
+**
+** POTENTIAL PROBLEMS
+**
+**  The rename() call might not be portable. And RBU is not currently
+**  syncing the directory after renaming the file.
+**
+**  When state is saved, any commit to the *-oal file and the commit to
+**  the RBU update database are not atomic. So if the power fails at the
+**  wrong moment they might get out of sync. As the main database will be
+**  committed before the RBU update database this will likely either just
+**  pass unnoticed, or result in SQLITE_CONSTRAINT errors (due to UNIQUE
+**  constraint violations).
+**
+**  If some client does modify the target database mid RBU update, or some
+**  other error occurs, the RBU extension will keep throwing errors. It's
+**  not really clear how to get out of this state. The system could just
+**  by delete the RBU update database and *-oal file and have the device
+**  download the update again and start over.
+**
+**  At present, for an UPDATE, both the new.* and old.* records are
+**  collected in the rbu_xyz table. And for both UPDATEs and DELETEs all
+**  fields are collected.  This means we're probably writing a lot more
+**  data to disk when saving the state of an ongoing update to the RBU
+**  update database than is strictly necessary.
+**
+ */
+
+Source: lib/sqlite_g_000000000003feab.go, lib/sqlite_g_0000000000040154.go
+/*
+** 2014 August 30
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+**
+** This file contains the public interface for the RBU extension.
+ */
+
+Source: lib/sqlite_g_000000000006003f.go
+/*
+** 2008 June 18
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+**
+** This module implements the sqlite3_status() interface and related
+** functionality.
+ */
+
+Source: lib/sqlite_g_000000000006003f.go
+/*
+** 2003 September 6
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+** This is the header file for information that is private to the
+** VDBE.  This information used to all be at the top of the single
+** source code file "vdbe.c".  When that file became too big (over
+** 6000 lines long) it was split up into several smaller files and
+** this header information was factored out.
+ */
+
+Source: vec/patches.go
+// Package vec bundles sqlite-vec, the vector search extension for SQLite, in
+// the same CGo-free form as the rest of this module. The bundled version is
+// v0.1.9; see https://github.com/asg017/sqlite-vec for the extension's own
+// documentation.
+//
+// The package exports no API. Import it for its side effect, which installs
+// the extension with sqlite3_auto_extension so that every connection opened
+// afterwards has it loaded:
+//
+//	import (
+//		"database/sql"
+//
+//		_ "modernc.org/sqlite"
+//		_ "modernc.org/sqlite/vec"
+//	)
+//
+// The vec0 virtual table module and the vec_* SQL functions are then
+// available:
+//
+//	CREATE VIRTUAL TABLE vec_examples USING vec0(embedding float[8])
+//
+// Importing this package rules out [modernc.org/sqlite.RegisterPageCache].
+// sqlite3_auto_extension initializes SQLite, which then refuses the page
+// cache configuration, and this package's init runs before any code in a
+// package importing it.
+//
+// # License
+//
+// sqlite-vec is Copyright (c) 2024 Alex Garcia and is dual-licensed Apache-2.0
+// OR MIT; it is used here under the MIT license. That is a different license
+// from the rest of this module -- SQLite itself is public domain and this
+// module's own code is BSD-3-Clause -- and the MIT notice must accompany
+// redistribution of the sources in this package. It travels with them as
+// LICENSE-SQLITE_VEC in the module root.
+
+Source: vec/vec_g_000000000000003c.go, vec/vec_g_0000000000003fc0.go, vec/vec_g_0000000000018000.go, vec/vec_g_0000000000060000.go, vec/vec_netbsd_amd64.go
+/*
+** 2001-09-15
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+** This header file defines the interface that the SQLite library
+** presents to client programs.  If a C-function, structure, datatype,
+** or constant definition does not appear in this file, then it is
+** not a published API of SQLite, is subject to change without
+** notice, and should not be referenced by programs that use SQLite.
+**
+** Some of the definitions that are in this file are marked as
+** "experimental".  Experimental interfaces are normally new
+** features recently added to SQLite.  We do not anticipate changes
+** to experimental interfaces but reserve the right to make minor changes
+** if experience from use "in the wild" suggest such changes are prudent.
+**
+** The official C-language API documentation for SQLite is derived
+** from comments in this file.  This file is the authoritative source
+** on how SQLite interfaces are supposed to operate.
+**
+** The name of this file under configuration management is "sqlite.h.in".
+** The makefile makes some minor changes to this file (such as inserting
+** the version number) and changes its name to "sqlite3.h" as
+** part of the build process.
+ */
+
+Source: vfs/c/vfs.c
+/*
+** 2010 April 7
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+**
+** This file implements an example of a simple VFS implementation that 
+** omits complex features often not required or not possible on embedded
+** platforms.  Code is included to buffer writes to the journal file, 
+** which can be a significant performance improvement on some embedded
+** platforms.
+**
+** OVERVIEW
+**
+**   The code in this file implements a minimal SQLite VFS that can be 
+**   used on Linux and other posix-like operating systems. The following 
+**   system calls are used:
+**
+**    File-system: access(), unlink(), getcwd()
+**    File IO:     open(), read(), write(), fsync(), close(), fstat()
+**    Other:       sleep(), usleep(), time()
+**
+**   The following VFS features are omitted:
+**
+**     1. File locking. The user must ensure that there is at most one
+**        connection to each database when using this VFS. Multiple
+**        connections to a single shared-cache count as a single connection
+**        for the purposes of the previous statement.
+**
+**     2. The loading of dynamic extensions (shared libraries).
+**
+**     3. Temporary files. The user must configure SQLite to use in-memory
+**        temp files when using this VFS. The easiest way to do this is to
+**        compile with:
+**
+**          -DSQLITE_TEMP_STORE=3
+**
+**     4. File truncation. As of version 3.6.24, SQLite may run without
+**        a working xTruncate() call, providing the user does not configure
+**        SQLite to use "journal_mode=truncate", or use both
+**        "journal_mode=persist" and ATTACHed databases.
+**
+**   It is assumed that the system uses UNIX-like path-names. Specifically,
+**   that '/' characters are used to separate path components and that
+**   a path-name is a relative path unless it begins with a '/'. And that
+**   no UTF-8 encoded paths are greater than 512 bytes in length.
+**
+** JOURNAL WRITE-BUFFERING
+**
+**   To commit a transaction to the database, SQLite first writes rollback
+**   information into the journal file. This usually consists of 4 steps:
+**
+**     1. The rollback information is sequentially written into the journal
+**        file, starting at the start of the file.
+**     2. The journal file is synced to disk.
+**     3. A modification is made to the first few bytes of the journal file.
+**     4. The journal file is synced to disk again.
+**
+**   Most of the data is written in step 1 using a series of calls to the
+**   VFS xWrite() method. The buffers passed to the xWrite() calls are of
+**   various sizes. For example, as of version 3.6.24, when committing a 
+**   transaction that modifies 3 pages of a database file that uses 4096 
+**   byte pages residing on a media with 512 byte sectors, SQLite makes 
+**   eleven calls to the xWrite() method to create the rollback journal, 
+**   as follows:
+**
+**             Write offset | Bytes written
+**             ----------------------------
+**                        0            512
+**                      512              4
+**                      516           4096
+**                     4612              4
+**                     4616              4
+**                     4620           4096
+**                     8716              4
+**                     8720              4
+**                     8724           4096
+**                    12820              4
+**             ++++++++++++SYNC+++++++++++
+**                        0             12
+**             ++++++++++++SYNC+++++++++++
+**
+**   On many operating systems, this is an efficient way to write to a file.
+**   However, on some embedded systems that do not cache writes in OS 
+**   buffers it is much more efficient to write data in blocks that are
+**   an integer multiple of the sector-size in size and aligned at the
+**   start of a sector.
+**
+**   To work around this, the code in this file allocates a fixed size
+**   buffer of SQLITE_VFS_BUFFERSZ using sqlite3_malloc() whenever a 
+**   journal file is opened. It uses the buffer to coalesce sequential
+**   writes into aligned SQLITE_VFS_BUFFERSZ blocks. When SQLite
+**   invokes the xSync() method to sync the contents of the file to disk,
+**   all accumulated data is written out, even if it does not constitute
+**   a complete block. This means the actual IO to create the rollback 
+**   journal for the example transaction above is this:
+**
+**             Write offset | Bytes written
+**             ----------------------------
+**                        0           8192
+**                     8192           4632
+**             ++++++++++++SYNC+++++++++++
+**                        0             12
+**             ++++++++++++SYNC+++++++++++
+**
+**   Much more efficient if the underlying OS is not caching write 
+**   operations.
+*/
+
+Source: vfs/vfs_windows_386.go, vfs/vfs_windows_386.go, vfs/vfs_windows_386.go
+/**
+ * This file has no copyright assigned and is placed in the Public Domain.
+ * This file is part of the mingw-w64 runtime package.
+ * No warranty is given; refer to the file DISCLAIMER.PD within this package.
+ */

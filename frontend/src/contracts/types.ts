@@ -111,9 +111,15 @@ export interface EngineStatus {
 }
 
 export interface LicenseInfo {
+    id: string
     name: string
+    version: string
+    license: string
+    scope: string
     url: string
+    sourceURL: string
     notice: string
+    text: string
 }
 
 export interface EngineInstallProgress {

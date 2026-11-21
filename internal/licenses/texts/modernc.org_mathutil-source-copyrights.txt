@@ -1,0 +1,34 @@
+Source: all_test.go, bits.go, envelope.go, mathutil.go, permute.go, primes.go, rat.go, rnd.go, tables.go, test_deps.go
+// Copyright (c) 2014 The mathutil Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: binarylog.go, binarylog_test.go, poly.go
+// Copyright (c) 2016 The mathutil Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: example/example.go, example2/example2.go, example3/example3.go
+// Copyright (c) 2011 CZ.NIC z.s.p.o. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: example4/main.go
+// Copyright (c) 2011 jnml. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: ff/main.go
+// Copyright (c) jnml. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: int.go, int_test.go
+// Copyright (c) 2018 The mathutil Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: mersenne/all_test.go, mersenne/mersenne.go
+// Copyright (c) 2014 The mersenne Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.

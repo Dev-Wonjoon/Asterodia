@@ -1,0 +1,24 @@
+Source: dce.go, doc.go, hash.go, json_test.go, marshal.go, node.go, seq_test.go, sql.go, sql_test.go, time.go, util.go, uuid_test.go, version1.go, version4.go
+// Copyright 2016 Google Inc.  All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: node_js.go, node_net.go
+// Copyright 2017 Google Inc.  All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: null.go, null_test.go
+// Copyright 2021 Google Inc.  All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: uuid.go
+// Copyright 2018 Google Inc.  All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: version6.go, version7.go
+// Copyright 2023 Google Inc.  All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.

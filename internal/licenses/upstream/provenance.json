@@ -1,0 +1,102 @@
+[
+  {
+    "file": "yt-dlp-LICENSE",
+    "url": "https://raw.githubusercontent.com/yt-dlp/yt-dlp/2026.10.26/LICENSE",
+    "sha256": "7e12e5df4bae12cb21581ba157ced20e1986a0508dd10d0e8a4ab9a4cf94e85c"
+  },
+  {
+    "file": "yt-dlp-THIRD_PARTY_LICENSES.txt",
+    "url": "https://raw.githubusercontent.com/yt-dlp/yt-dlp/2026.10.26/THIRD_PARTY_LICENSES.txt",
+    "sha256": "472aefe951c7db35e1657c1d13fd337140511ed6f2b329205105ad441c5a02b7"
+  },
+  {
+    "file": "gallery-dl-LICENSE",
+    "url": "https://raw.githubusercontent.com/mikf/gallery-dl/v1.32.20/LICENSE",
+    "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643"
+  },
+  {
+    "file": "ffmpeg-LICENSE.md",
+    "url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/master/LICENSE.md",
+    "sha256": "e6dc72d5665a1ebd6dcc841de59278dad4ca77ecc47b03f1064a55c3e9ea8bb8"
+  },
+  {
+    "file": "ffmpeg-COPYING.GPLv3",
+    "url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/master/COPYING.GPLv3",
+    "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+  },
+  {
+    "file": "ffmpeg-COPYING.GPLv2",
+    "url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/master/COPYING.GPLv2",
+    "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643"
+  },
+  {
+    "file": "ffmpeg-COPYING.LGPLv2.1",
+    "url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/master/COPYING.LGPLv2.1",
+    "sha256": "246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30"
+  },
+  {
+    "file": "BtbN-README.md",
+    "url": "https://raw.githubusercontent.com/BtbN/FFmpeg-Builds/master/README.md",
+    "sha256": "4f6f817fd57c5524e0d0832618e8f75d589093e2f05ef1ec2839af98e70e5053"
+  },
+  {
+    "file": "BtbN-LICENSE",
+    "url": "https://raw.githubusercontent.com/BtbN/FFmpeg-Builds/master/LICENSE",
+    "sha256": "3a8df6889e4d5487b75f58326ef816df31ea49649d8f7146efda860b8167a964"
+  },
+  {
+    "file": "ImageMagick-LICENSE.txt",
+    "url": "https://github.com/ImageMagick/ImageMagick/releases/download/7.1.2-34/ImageMagick-7.1.2-34-portable-Q16-x64.7z#LICENSE.txt",
+    "sha256": "5ffcbc771d4cc2827ca8c4505f6b5b61e0bc1d933e0f41a47eea16ed06db4f90"
+  },
+  {
+    "file": "ImageMagick-NOTICE.txt",
+    "url": "https://github.com/ImageMagick/ImageMagick/releases/download/7.1.2-34/ImageMagick-7.1.2-34-portable-Q16-x64.7z#NOTICE.txt",
+    "sha256": "e3b886c90cd022d1767f89d61522be57bb77b7e9c44d5bf92f57fa231ac7b6bf"
+  },
+  {
+    "file": "Python-LICENSE",
+    "url": "https://raw.githubusercontent.com/python/cpython/v3.14.0/LICENSE",
+    "sha256": "b0e25a78cffb43f4d92de8b61ccfa1f1f98ecbc22330b54b5251e7b6ba010231"
+  },
+  {
+    "file": "Node-LICENSE",
+    "url": "https://raw.githubusercontent.com/nodejs/node/v24.11.1/LICENSE",
+    "sha256": "537308465103a306d0e3eecf42632b4ff1b48aaaec044e9fc10a78c81fd00b34"
+  },
+  {
+    "file": "gallery-binary-markupsafe-3.0.4.dist-info-licenses-LICENSE.txt",
+    "url": "https://codeberg.org/mikf/gallery-dl/releases/download/v1.32.20/gallery-dl.exe#markupsafe-3.0.4.dist-info/licenses/LICENSE.txt",
+    "sha256": "4631ec0db5fd90a547e336817264c6798214338146f8ac94b4a57f96ee8c9ec4"
+  },
+  {
+    "file": "gallery-binary-websockets-16.1.1.dist-info-licenses-LICENSE",
+    "url": "https://codeberg.org/mikf/gallery-dl/releases/download/v1.32.20/gallery-dl.exe#websockets-16.1.1.dist-info/licenses/LICENSE",
+    "sha256": "0f44514998aca209d3482d10204a8adf2aa4296ff157a36a5c0922f2280632d3"
+  },
+  {
+    "file": "Jinja-LICENSE",
+    "url": "https://raw.githubusercontent.com/pallets/jinja/3.1.6/LICENSE.txt",
+    "sha256": "3b49dcee4105eb37bac10faf1be260408fe85d252b8e9df2e0979fc1e094437b"
+  },
+  {
+    "file": "PyYAML-LICENSE",
+    "url": "https://raw.githubusercontent.com/yaml/pyyaml/6.0.3/LICENSE",
+    "sha256": "8d3928f9dc4490fd635707cb88eb26bd764102a7282954307d3e5167a577e8a4"
+  },
+  {
+    "file": "truststore-LICENSE",
+    "url": "https://raw.githubusercontent.com/sethmlarson/truststore/v0.10.4/LICENSE",
+    "sha256": "33be7b7e8fa4fd19b1760e1a8ed8a668bdab852c91b692dd41424bcb725a9fca"
+  },
+  {
+    "file": "PyInstaller-COPYING",
+    "url": "https://raw.githubusercontent.com/pyinstaller/pyinstaller/v6.16.0/COPYING.txt",
+    "sha256": "dcf75fdb959db1e3b41c0f8505069d2ece781b5ec6b3d0a4d30975cfc6580245"
+  },
+  {
+    "file": "PySocks-LICENSE",
+    "url": "https://raw.githubusercontent.com/Anorov/PySocks/master/LICENSE",
+    "sha256": "7027e214e014eb78b7adcc1ceda5aca713a79fc4f6a0c52c9da5b3e707e6ffe9"
+  }
+]

@@ -1,0 +1,4 @@
+Source: bitset_benchmark_test.go, bitset_test.go
+// Copyright 2014 Will Fitzgerald. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.

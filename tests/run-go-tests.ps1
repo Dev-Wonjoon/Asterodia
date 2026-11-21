@@ -49,6 +49,8 @@ if (-not $oldGallery -and (Test-Path -LiteralPath (Join-Path $repositoryPath 'bi
 }
 if ($Live) { $env:STORAGEBUCKET_LIVE_TESTS = '1' } else { $env:STORAGEBUCKET_LIVE_TESTS = '0' }
 try {
+    Invoke-TestGroup 'licenses' './tests/licenses'
+    Invoke-TestGroup 'engine-notices' './tests/engine' '^TestEngineNotices'
     Invoke-TestGroup 'database-open' './tests/database'
     Invoke-TestGroup 'mediaedit' './tests/mediaedit'
     Invoke-TestGroup 'local-import' './tests/localimport'

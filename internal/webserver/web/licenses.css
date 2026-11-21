@@ -1,0 +1,12 @@
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+body { margin: 0; background: light-dark(#f7f7f9, #171719); color: light-dark(#202024, #eeeef2); }
+main { max-width: 960px; margin: auto; padding: 24px 16px 48px; }
+a { color: light-dark(#2455b9, #9dbbff); }
+nav { margin-bottom: 24px; }
+h1 { font-size: 1.6rem; }
+p { line-height: 1.65; }
+details { margin: 12px 0; padding: 16px; border: 1px solid light-dark(#d4d4df, #50505c); border-radius: 10px; }
+summary { cursor: pointer; overflow-wrap: anywhere; }
+summary span { display: block; margin: 6px 0 0 20px; font-size: .85rem; line-height: 1.5; }
+pre { max-height: 65vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.5; padding: 12px; background: light-dark(#fff, #232328); }
+@media (max-width: 480px) { main { padding: 16px 12px 32px; } details { padding: 12px; } }

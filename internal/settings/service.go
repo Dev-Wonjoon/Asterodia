@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/Dev-Wonjoon/StorageBucket/internal/licenses"
 )
 
 type Dialogs struct {
@@ -162,17 +164,5 @@ func (s *Service) ShowItemInFolder(path string) error {
 	return s.dialogs.Reveal(path)
 }
 
-type License struct {
-	Name   string `json:"name"`
-	URL    string `json:"url"`
-	Notice string `json:"notice"`
-}
-
-func (s *Service) GetEngineLicenses() []License {
-	return []License{
-		{"ImageMagick", "https://imagemagick.org/script/license.php", "ImageMagick License. 원본 파일의 검사·표시용 캐시 생성에 사용합니다."},
-		{"yt-dlp", "https://github.com/yt-dlp/yt-dlp/blob/master/LICENSE", "Unlicense. 배포 바이너리에 포함된 의존성은 별도 라이선스를 따릅니다."},
-		{"gallery-dl", "https://github.com/mikf/gallery-dl/blob/master/LICENSE", "GNU General Public License v2."},
-		{"FFmpeg", "https://ffmpeg.org/legal.html", "FFmpeg 빌드 구성에 따라 LGPL 또는 GPL이 적용됩니다. 설치하는 BtbN GPL 빌드는 GPL을 따릅니다."},
-	}
-}
+// GetEngineLicenses retains the existing binding name and now includes all notices.
+func (s *Service) GetEngineLicenses() []licenses.Entry { return licenses.List() }

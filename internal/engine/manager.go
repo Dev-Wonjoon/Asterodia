@@ -326,9 +326,10 @@ func (m *Manager) Install(
 		return false, fmt.Errorf("%s 파일 검증: %w", name, err)
 	}
 
-	if _, err := m.runner.ReadVersion(
+	version, err := m.runner.ReadVersion(
 		ctx, name, stagedBinary,
-	); err != nil {
+	)
+	if err != nil {
 		return false, err
 	}
 
@@ -355,6 +356,9 @@ func (m *Manager) Install(
 			return false, e
 		}
 		return true, nil
+	}
+	if err := m.retainEngineNotices(staging, stagedBinary, definition, version); err != nil {
+		return false, fmt.Errorf("%s 라이선스 고지 보존: %w", name, err)
 	}
 	if err := replaceEngineBinary(
 		stagedBinary, destination,
@@ -542,7 +546,10 @@ func extractEngineBinary(
 	defer reader.Close()
 
 	// 압축 내부 경로 대신 지정한 목적지에 파일 하나만 기록한다.
-	return writeEngineFile(destination, reader)
+	if err := writeEngineFile(destination, reader); err != nil {
+		return err
+	}
+	return extractArchiveNotices(archive, filepath.Join(filepath.Dir(destination), "notices"))
 }
 
 func validateEngineBinary(filename string) error {

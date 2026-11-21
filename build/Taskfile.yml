@@ -1,6 +1,15 @@
 version: '3'
 
 tasks:
+  licenses:check:
+    summary: Verify offline third-party notices match the release dependencies
+    run: once
+    deps:
+      - task: go:mod:tidy
+      - task: install:frontend:deps
+    cmds:
+      - node tools/generate-licenses.mjs --check
+
   go:mod:tidy:
     summary: Runs `go mod tidy`
     internal: true
@@ -86,6 +95,7 @@ tasks:
       - dist/**/*
     deps:
       - task: install:frontend:deps
+      - task: licenses:check
       - task: generate:bindings
         vars:
           BUILD_FLAGS:

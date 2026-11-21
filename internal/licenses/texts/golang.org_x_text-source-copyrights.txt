@@ -1,0 +1,63 @@
+Source: cases/cases.go, cases/context.go, cases/context_test.go, cases/example_test.go, cases/gen.go, cases/gen_trieval.go, cases/map.go, cases/map_test.go, collate/option.go, collate/option_test.go, internal/colltab/collate_test.go, internal/colltab/numeric.go, internal/colltab/numeric_test.go, internal/colltab/weighter_test.go, internal/language/coverage.go, internal/language/gen_common.go, internal/triegen/compact.go, internal/triegen/example_compact_test.go, internal/triegen/example_test.go, internal/triegen/gen_test.go, internal/triegen/print.go, internal/triegen/triegen.go, internal/ucd/example_test.go, internal/ucd/ucd.go, language/coverage.go, language/coverage_test.go, language/display/dict.go, language/display/display.go, language/display/display_test.go, language/display/examples_test.go, language/display/lookup.go, language/display/maketables.go, runes/example_test.go, runes/runes.go, unicode/cldr/cldr_test.go, unicode/cldr/collate_test.go
+// Copyright 2014 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: cases/fold.go, cases/fold_test.go, cases/icu.go, cases/icu_test.go, currency/example_test.go, currency/query.go, currency/query_test.go, encoding/unicode/utf32/utf32.go, encoding/unicode/utf32/utf32_test.go, feature/plural/gen.go, feature/plural/gen_common.go, feature/plural/plural.go, feature/plural/plural_test.go, internal/export/idna/gen.go, internal/export/idna/gen_common.go, internal/export/idna/gen_test.go, internal/export/idna/gen_trieval.go, internal/export/idna/idna.go, internal/export/idna/idna_test.go, internal/export/idna/punycode.go, internal/export/idna/punycode_test.go, internal/export/idna/trie.go, internal/number/gen.go, internal/number/gen_common.go, internal/number/number.go, internal/number/number_test.go, internal/number/tables_test.go, internal/stringset/set.go, internal/stringset/set_test.go, internal/testtext/gc.go, internal/testtext/gccgo.go, language/httpexample_test.go, message/pipeline/extract.go, secure/bidirule/bench_test.go, secure/bidirule/bidirule.go, secure/bidirule/bidirule_test.go, secure/doc.go, secure/precis/context.go, secure/precis/profile_test.go, unicode/bidi/prop.go, unicode/norm/example_test.go, unicode/runenames/example_test.go, unicode/runenames/gen.go, unicode/runenames/runenames.go, unicode/runenames/runenames_test.go
+// Copyright 2016 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: cases/info.go, currency/currency.go, currency/currency_test.go, currency/format.go, currency/format_test.go, currency/gen.go, currency/gen_common.go, doc.go, encoding/charmap/charmap_test.go, encoding/htmlindex/gen.go, encoding/htmlindex/htmlindex.go, encoding/htmlindex/htmlindex_test.go, encoding/htmlindex/map.go, encoding/ianaindex/example_test.go, encoding/ianaindex/ianaindex.go, encoding/internal/identifier/gen.go, encoding/internal/identifier/identifier.go, encoding/internal/internal.go, encoding/japanese/all.go, encoding/japanese/all_test.go, encoding/korean/all_test.go, encoding/simplifiedchinese/all.go, encoding/simplifiedchinese/all_test.go, encoding/traditionalchinese/all_test.go, encoding/unicode/override.go, encoding/unicode/unicode_test.go, gen.go, internal/colltab/colltab.go, internal/colltab/iter.go, internal/colltab/iter_test.go, internal/format/format.go, internal/gen/code.go, internal/gen/gen.go, internal/internal.go, internal/internal_test.go, internal/language/compact/gen_index.go, internal/language/compact/gen_test.go, internal/match.go, internal/match_test.go, internal/number/pattern.go, internal/number/pattern_test.go, internal/tag/tag.go, internal/tag/tag_test.go, internal/testtext/codesize.go, internal/testtext/flag.go, internal/testtext/text.go, internal/utf8internal/utf8internal.go, language/display/dict_test.go, message/catalog.go, message/message.go, message/message_test.go, runes/cond.go, runes/cond_test.go, runes/runes_test.go, search/index.go, search/pattern.go, search/pattern_test.go, search/search.go, secure/precis/benchmark_test.go, secure/precis/class.go, secure/precis/class_test.go, secure/precis/doc.go, secure/precis/enforce_test.go, secure/precis/gen.go, secure/precis/gen_trieval.go, secure/precis/nickname.go, secure/precis/options.go, secure/precis/profile.go, secure/precis/profiles.go, secure/precis/tables_test.go, secure/precis/transformer.go, unicode/bidi/bidi.go, unicode/bidi/bracket.go, unicode/bidi/core.go, unicode/bidi/core_test.go, unicode/bidi/gen.go, unicode/bidi/gen_ranges.go, unicode/bidi/gen_trieval.go, unicode/bidi/tables_test.go, unicode/doc.go, unicode/rangetable/gen.go, unicode/rangetable/merge.go, unicode/rangetable/merge_test.go, unicode/rangetable/rangetable.go, width/example_test.go, width/gen.go, width/gen_common.go, width/gen_trieval.go, width/tables_test.go, width/transform.go, width/transform_test.go, width/width.go
+// Copyright 2015 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: collate/build/builder.go, collate/build/builder_test.go, collate/build/colelem.go, collate/build/colelem_test.go, collate/build/contract.go, collate/build/contract_test.go, collate/build/order.go, collate/build/order_test.go, collate/build/table.go, collate/build/trie.go, collate/build/trie_test.go, collate/collate.go, collate/collate_test.go, collate/export_test.go, collate/maketables.go, collate/reg_test.go, collate/table_test.go, collate/tools/colcmp/col.go, collate/tools/colcmp/colcmp.go, collate/tools/colcmp/darwin.go, collate/tools/colcmp/gen.go, collate/tools/colcmp/icu.go, internal/colltab/collelem.go, internal/colltab/collelem_test.go, internal/colltab/contract.go, internal/colltab/contract_test.go, internal/colltab/table.go, internal/colltab/trie.go, internal/colltab/trie_test.go, unicode/norm/example_iter_test.go
+// Copyright 2012 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: collate/examples_test.go, collate/example_sort_test.go
+// Copyright 2021 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: collate/index.go, collate/sort.go, collate/sort_test.go, encoding/charmap/charmap.go, encoding/charmap/maketables.go, encoding/encoding.go, encoding/encoding_test.go, encoding/example_test.go, encoding/japanese/eucjp.go, encoding/japanese/iso2022jp.go, encoding/japanese/maketables.go, encoding/japanese/shiftjis.go, encoding/korean/euckr.go, encoding/korean/maketables.go, encoding/simplifiedchinese/gbk.go, encoding/simplifiedchinese/hzgb2312.go, encoding/simplifiedchinese/maketables.go, encoding/traditionalchinese/big5.go, encoding/traditionalchinese/maketables.go, encoding/unicode/unicode.go, internal/colltab/weighter.go, internal/language/compact/gen.go, internal/language/compact/language.go, internal/language/compact/language_test.go, internal/language/compact/parse_test.go, internal/language/compact/tags.go, internal/language/gen.go, internal/language/language.go, internal/language/language_test.go, internal/language/lookup.go, internal/language/lookup_test.go, internal/language/match.go, internal/language/match_test.go, internal/language/parse.go, internal/language/parse_test.go, internal/language/tags.go, language/examples_test.go, language/gen.go, language/language.go, language/language_test.go, language/lookup_test.go, language/match.go, language/match_test.go, language/parse.go, language/parse_test.go, language/tags.go, transform/examples_test.go, transform/transform.go, transform/transform_test.go, unicode/cldr/base.go, unicode/cldr/cldr.go, unicode/cldr/collate.go, unicode/cldr/data_test.go, unicode/cldr/decode.go, unicode/cldr/makexml.go, unicode/cldr/resolve.go, unicode/cldr/slice.go, unicode/cldr/slice_test.go, unicode/norm/forminfo_test.go, unicode/norm/transform.go
+// Copyright 2013 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: date/gen.go, date/gen_test.go, encoding/ianaindex/gen.go, encoding/ianaindex/ianaindex_test.go, encoding/internal/enctest/enctest.go, feature/plural/example_test.go, feature/plural/message.go, feature/plural/message_test.go, internal/catmsg/catmsg.go, internal/catmsg/catmsg_test.go, internal/catmsg/codec.go, internal/catmsg/varint.go, internal/catmsg/varint_test.go, internal/cldrtree/cldrtree.go, internal/cldrtree/cldrtree_test.go, internal/cldrtree/generate.go, internal/cldrtree/option.go, internal/cldrtree/tree.go, internal/cldrtree/type.go, internal/export/idna/example_test.go, internal/format/parser.go, internal/format/parser_test.go, internal/number/decimal.go, internal/number/decimal_test.go, internal/number/format.go, internal/number/format_test.go, language/doc.go, message/catalog/catalog.go, message/catalog/catalog_test.go, message/catalog/dict.go, message/catalog_test.go, message/doc.go, message/examples_test.go, message/fmt_test.go, message/format.go, message/pipeline/generate.go, message/pipeline/message.go, message/pipeline/pipeline.go, message/pipeline/pipeline_test.go, message/pipeline/rewrite.go, message/print.go, number/doc.go, number/examples_test.go, number/format.go, number/format_test.go, number/number.go, number/number_test.go, number/option.go
+// Copyright 2017 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: encoding/ianaindex/ascii.go, encoding/ianaindex/ascii_test.go, internal/export/unicode/unicode_test.go
+// Copyright 2019 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: encoding/internal/identifier/mib.go
+	// VenturaUS is the MIB identifier with IANA name Ventura-US.
+	//
+	// Ventura US.  ASCII plus characters typically used in
+	// publishing, like pilcrow, copyright, registered, trade mark,
+	// section, dagger, and double dagger in the range A0 (hex)
+	// to FF (hex).
+	// PCL Symbol Set id: 14J
+
+Source: internal/export/idna/conformancev2_test.go, internal/export/unicode/doc.go, internal/gen/bitfield/bitfield.go, internal/gen/bitfield/bitfield_test.go, internal/language/compact/compact.go, internal/language/compact/gen_parents.go, internal/language/compact.go, internal/language/compose.go, internal/language/compose_test.go
+// Copyright 2018 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: internal/export/unicode/gen.go
+// Copyright 2009 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: unicode/norm/composition.go, unicode/norm/composition_test.go, unicode/norm/forminfo.go, unicode/norm/input.go, unicode/norm/iter.go, unicode/norm/iter_test.go, unicode/norm/maketables.go, unicode/norm/normalize.go, unicode/norm/normalize_test.go, unicode/norm/readwriter.go, unicode/norm/readwriter_test.go, unicode/norm/transform_test.go, unicode/norm/trie.go, unicode/norm/triegen.go, unicode/norm/ucd_test.go
+// Copyright 2011 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.

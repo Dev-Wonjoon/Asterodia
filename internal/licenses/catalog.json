@@ -1,0 +1,2558 @@
+{
+  "schema": 1,
+  "target": "windows/amd64 production",
+  "inputs": {
+    "go.mod": "95d2812df3aeebc2a310d13933a81f1df381727a93ec3be47e1c60fed213fe21",
+    "go.sum": "4ee12621a0df49ed2a84afac9efbbc0678e8dd36d319fdb7324ca2d78ddfbabd",
+    "frontend/package.json": "78f8d8524aa3be1861a0752ee9658ada318f8a4583b8fcd5b8e866b2f4ec51e9",
+    "frontend/package-lock.json": "0000c8b9df59c0ce4af563937d3e25784fc0b4475b147919ee4560b95f7f57cc",
+    "frontend/public/Inter-Medium.ttf": "a645f55492d1c8cdace43c72be8cbec08e680b5a86d8b4c2d1c50d6e41e9cc96",
+    "frontend/public/bg-desktop.jpg": "4c94788acb1ad9c75feebc0b832cfba2720c6edc12ed32620238ab1c52299e5e",
+    "frontend/public/bg-mobile.jpg": "ca4d8da7f4e44cf8d23662fe6e9f3bfe12eb24651b7069cce1df04bb7dc33847",
+    "internal/engine/manager.go": "b8e37a72817ce8b97db9b8b2b09b25f44ffe63288f3f3d61a54f3c65c4fba9f9",
+    "tools/generate-licenses.mjs": "783277a515ba71c1f7ddb69750e3f045e78b160d1be65e75d68b7b447a558812",
+    "internal/licenses/upstream/provenance.json": "8e77a14e3f880d1be55efd41eded22e5b43a495a4e81636336d58c79def9c5ed",
+    "internal/licenses/upstream/engines.json": "e71f9e0d5174f5c393ea1541ac1245d7be36f639893fe6b0caecf88a5834c221"
+  },
+  "goModules": [
+    "github.com/adrg/xdg@v0.5.3",
+    "github.com/bits-and-blooms/bitset@v1.20.0",
+    "github.com/dustin/go-humanize@v1.0.1",
+    "github.com/go-ole/go-ole@v1.3.0",
+    "github.com/google/uuid@v1.6.0",
+    "github.com/mattn/go-isatty@v0.0.24",
+    "github.com/ncruces/go-strftime@v1.0.0",
+    "github.com/nlnwa/whatwg-url@v0.6.2",
+    "github.com/remyoudompheng/bigfft@v0.0.0-20230129092748-24d4a6f8daec",
+    "github.com/wailsapp/wails/v3@v3.0.0",
+    "golang.org/x/net@v0.60.0",
+    "golang.org/x/sys@v0.48.0",
+    "golang.org/x/text@v0.42.0",
+    "modernc.org/libc@v1.77.1",
+    "modernc.org/mathutil@v1.7.1",
+    "modernc.org/memory@v1.12.1",
+    "modernc.org/sqlite@v1.60.1"
+  ],
+  "entries": [
+    {
+      "id": "Go_standard_library_and_runtime_go1.27.3",
+      "name": "Go standard library and runtime",
+      "version": "go1.27.3",
+      "license": "BSD-3-Clause; additional source notices",
+      "scope": "bundled",
+      "url": "https://go.dev/",
+      "sourceURL": "https://go.dev/dl/",
+      "notice": "Go 런타임·표준 라이브러리와 소스 트리에 동봉된 추가 고지.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/go-runtime-LICENSE.txt",
+          "url": "https://go.dev/LICENSE",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+        },
+        {
+          "title": "src/crypto/internal/boring/LICENSE",
+          "file": "texts/go-stdlib-crypto_internal_boring_LICENSE.txt",
+          "url": "https://go.dev/src/crypto/internal/boring/LICENSE",
+          "sha256": "56210f826b8f0fbac3160dfe55c97f4019eb6cdda3963b5a0eab8a8bdb62360e"
+        },
+        {
+          "title": "src/vendor/golang.org/x/crypto/LICENSE",
+          "file": "texts/go-stdlib-vendor_golang.org_x_crypto_LICENSE.txt",
+          "url": "https://go.dev/src/vendor/golang.org/x/crypto/LICENSE",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+        },
+        {
+          "title": "src/vendor/golang.org/x/crypto/PATENTS",
+          "file": "texts/go-stdlib-vendor_golang.org_x_crypto_PATENTS.txt",
+          "url": "https://go.dev/src/vendor/golang.org/x/crypto/PATENTS",
+          "sha256": "96f408bfae65bf137fc2525d3ecb030271c50c1e90799f87abf8846d8dd505cc"
+        },
+        {
+          "title": "src/vendor/golang.org/x/net/LICENSE",
+          "file": "texts/go-stdlib-vendor_golang.org_x_net_LICENSE.txt",
+          "url": "https://go.dev/src/vendor/golang.org/x/net/LICENSE",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+        },
+        {
+          "title": "src/vendor/golang.org/x/net/PATENTS",
+          "file": "texts/go-stdlib-vendor_golang.org_x_net_PATENTS.txt",
+          "url": "https://go.dev/src/vendor/golang.org/x/net/PATENTS",
+          "sha256": "96f408bfae65bf137fc2525d3ecb030271c50c1e90799f87abf8846d8dd505cc"
+        },
+        {
+          "title": "src/vendor/golang.org/x/sys/LICENSE",
+          "file": "texts/go-stdlib-vendor_golang.org_x_sys_LICENSE.txt",
+          "url": "https://go.dev/src/vendor/golang.org/x/sys/LICENSE",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+        },
+        {
+          "title": "src/vendor/golang.org/x/sys/PATENTS",
+          "file": "texts/go-stdlib-vendor_golang.org_x_sys_PATENTS.txt",
+          "url": "https://go.dev/src/vendor/golang.org/x/sys/PATENTS",
+          "sha256": "96f408bfae65bf137fc2525d3ecb030271c50c1e90799f87abf8846d8dd505cc"
+        },
+        {
+          "title": "src/vendor/golang.org/x/text/LICENSE",
+          "file": "texts/go-stdlib-vendor_golang.org_x_text_LICENSE.txt",
+          "url": "https://go.dev/src/vendor/golang.org/x/text/LICENSE",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+        },
+        {
+          "title": "src/vendor/golang.org/x/text/PATENTS",
+          "file": "texts/go-stdlib-vendor_golang.org_x_text_PATENTS.txt",
+          "url": "https://go.dev/src/vendor/golang.org/x/text/PATENTS",
+          "sha256": "96f408bfae65bf137fc2525d3ecb030271c50c1e90799f87abf8846d8dd505cc"
+        },
+        {
+          "title": "Original license and copyright comment blocks retained from Go source",
+          "file": "texts/go-stdlib-source-notices.txt",
+          "url": "https://go.dev/src/",
+          "sha256": "b023352b6ba6406f97a2da9474b82cf64eb855cc5cdb616187496ad7f7e6df0d"
+        }
+      ]
+    },
+    {
+      "id": "github.com_adrg_xdg_v0.5.3",
+      "name": "github.com/adrg/xdg",
+      "version": "v0.5.3",
+      "license": "MIT",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/github.com/adrg/xdg@v0.5.3",
+      "sourceURL": "https://pkg.go.dev/github.com/adrg/xdg@v0.5.3",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/github.com_adrg_xdg-LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/adrg/xdg@v0.5.3",
+          "sha256": "fb119fabde05e05b70b07f445b3f41863b22326c0ebb5b7bee9f0309112d3640"
+        }
+      ]
+    },
+    {
+      "id": "github.com_bits-and-blooms_bitset_v1.20.0",
+      "name": "github.com/bits-and-blooms/bitset",
+      "version": "v1.20.0",
+      "license": "BSD-3-Clause",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/github.com/bits-and-blooms/bitset@v1.20.0",
+      "sourceURL": "https://pkg.go.dev/github.com/bits-and-blooms/bitset@v1.20.0",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/github.com_bits-and-blooms_bitset-LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/bits-and-blooms/bitset@v1.20.0",
+          "sha256": "3ef376b769105f14098dd45e9d08ed3568c77d38ad33c470634606048e62119f"
+        },
+        {
+          "title": "Original license and copyright comment blocks retained from source",
+          "file": "texts/github.com_bits-and-blooms_bitset-source-copyrights.txt",
+          "url": "https://pkg.go.dev/github.com/bits-and-blooms/bitset@v1.20.0",
+          "sha256": "bdf828616babffac87d79463cd47c134e1baa814407dd61010743407533ae871"
+        }
+      ]
+    },
+    {
+      "id": "github.com_dustin_go-humanize_v1.0.1",
+      "name": "github.com/dustin/go-humanize",
+      "version": "v1.0.1",
+      "license": "MIT",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/github.com/dustin/go-humanize@v1.0.1",
+      "sourceURL": "https://pkg.go.dev/github.com/dustin/go-humanize@v1.0.1",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/github.com_dustin_go-humanize-LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/dustin/go-humanize@v1.0.1",
+          "sha256": "a973b4498c13eb74baa2a8e5c351426a6826f2fcdd909916dbe53ee2e755fd71"
+        }
+      ]
+    },
+    {
+      "id": "github.com_go-ole_go-ole_v1.3.0",
+      "name": "github.com/go-ole/go-ole",
+      "version": "v1.3.0",
+      "license": "MIT",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/github.com/go-ole/go-ole@v1.3.0",
+      "sourceURL": "https://pkg.go.dev/github.com/go-ole/go-ole@v1.3.0",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/github.com_go-ole_go-ole-LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/go-ole/go-ole@v1.3.0",
+          "sha256": "d883dbca28769ff23dd4368a8edb7ad9f9f23a8f86adde2875c6e41a828aac62"
+        },
+        {
+          "title": "Original license and copyright comment blocks retained from source",
+          "file": "texts/github.com_go-ole_go-ole-source-copyrights.txt",
+          "url": "https://pkg.go.dev/github.com/go-ole/go-ole@v1.3.0",
+          "sha256": "c7969453a22bbc52eecdda29a822a645f50c4cc18ee34b6a0837c173fd3b5197"
+        }
+      ]
+    },
+    {
+      "id": "github.com_google_uuid_v1.6.0",
+      "name": "github.com/google/uuid",
+      "version": "v1.6.0",
+      "license": "BSD-3-Clause",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/github.com/google/uuid@v1.6.0",
+      "sourceURL": "https://pkg.go.dev/github.com/google/uuid@v1.6.0",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/github.com_google_uuid-LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/google/uuid@v1.6.0",
+          "sha256": "0a8d61ed3cbfd5312326e8126c31ce9c627a283adc99131b56896d29ada04b2d"
+        },
+        {
+          "title": "Original license and copyright comment blocks retained from source",
+          "file": "texts/github.com_google_uuid-source-copyrights.txt",
+          "url": "https://pkg.go.dev/github.com/google/uuid@v1.6.0",
+          "sha256": "d68e59eb39e4d475254b57593ee86df87c0dc8aad9e2bef6cf754cab952fed16"
+        }
+      ]
+    },
+    {
+      "id": "github.com_mattn_go-isatty_v0.0.24",
+      "name": "github.com/mattn/go-isatty",
+      "version": "v0.0.24",
+      "license": "MIT",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/github.com/mattn/go-isatty@v0.0.24",
+      "sourceURL": "https://pkg.go.dev/github.com/mattn/go-isatty@v0.0.24",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/github.com_mattn_go-isatty-LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/mattn/go-isatty@v0.0.24",
+          "sha256": "08eab1118c80885fa1fa6a6dd7303f65a379fcb3733e063d20d1bbc2c76e6fa1"
+        }
+      ]
+    },
+    {
+      "id": "github.com_ncruces_go-strftime_v1.0.0",
+      "name": "github.com/ncruces/go-strftime",
+      "version": "v1.0.0",
+      "license": "MIT",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/github.com/ncruces/go-strftime@v1.0.0",
+      "sourceURL": "https://pkg.go.dev/github.com/ncruces/go-strftime@v1.0.0",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/github.com_ncruces_go-strftime-LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/ncruces/go-strftime@v1.0.0",
+          "sha256": "38ae43959daf953a393a585b2988672cb65a5a541aca0d0be5e72595a0a16883"
+        }
+      ]
+    },
+    {
+      "id": "github.com_nlnwa_whatwg-url_v0.6.2",
+      "name": "github.com/nlnwa/whatwg-url",
+      "version": "v0.6.2",
+      "license": "Apache-2.0",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/github.com/nlnwa/whatwg-url@v0.6.2",
+      "sourceURL": "https://pkg.go.dev/github.com/nlnwa/whatwg-url@v0.6.2",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/github.com_nlnwa_whatwg-url-LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/nlnwa/whatwg-url@v0.6.2",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        },
+        {
+          "title": "Original license and copyright comment blocks retained from source",
+          "file": "texts/github.com_nlnwa_whatwg-url-source-copyrights.txt",
+          "url": "https://pkg.go.dev/github.com/nlnwa/whatwg-url@v0.6.2",
+          "sha256": "f134720a0e3918441a5b2c4216d075081a8578972fb3c5aa3895d35f38719c46"
+        }
+      ]
+    },
+    {
+      "id": "github.com_remyoudompheng_bigfft_v0.0.0-20230129092748-24d4a6f8daec",
+      "name": "github.com/remyoudompheng/bigfft",
+      "version": "v0.0.0-20230129092748-24d4a6f8daec",
+      "license": "BSD-3-Clause",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/github.com/remyoudompheng/bigfft@v0.0.0-20230129092748-24d4a6f8daec",
+      "sourceURL": "https://pkg.go.dev/github.com/remyoudompheng/bigfft@v0.0.0-20230129092748-24d4a6f8daec",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/github.com_remyoudompheng_bigfft-LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/remyoudompheng/bigfft@v0.0.0-20230129092748-24d4a6f8daec",
+          "sha256": "dd26a7abddd02e2d0aba97805b31f248ef7835d9e10da289b22e3b8ab78b324d"
+        },
+        {
+          "title": "Original license and copyright comment blocks retained from source",
+          "file": "texts/github.com_remyoudompheng_bigfft-source-copyrights.txt",
+          "url": "https://pkg.go.dev/github.com/remyoudompheng/bigfft@v0.0.0-20230129092748-24d4a6f8daec",
+          "sha256": "5feec05cb7978ee66dfbed646636bb75e0789c02b996db57c2169e9d2745666d"
+        }
+      ]
+    },
+    {
+      "id": "github.com_wailsapp_wails_v3_v3.0.0",
+      "name": "github.com/wailsapp/wails/v3",
+      "version": "v3.0.0",
+      "license": "MIT; additional MIT/ISC notices",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/github.com/wailsapp/wails/v3@v3.0.0",
+      "sourceURL": "https://pkg.go.dev/github.com/wailsapp/wails/v3@v3.0.0",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/github.com_wailsapp_wails_v3-LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/wailsapp/wails/v3@v3.0.0",
+          "sha256": "cede95c28e6e9d67d1c1e49e8ba3c20250c7d4080c3faca1579b6732327ae40d"
+        },
+        {
+          "title": "internal/go-common-file-dialog/LICENSE",
+          "file": "texts/github.com_wailsapp_wails_v3-internal_go-common-file-dialog_LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/wailsapp/wails/v3@v3.0.0",
+          "sha256": "2c09e92358414ef4da9739026acadfbd0663118e590238b306d70ccf60db3159"
+        },
+        {
+          "title": "internal/templates/ios/frontend/public/puppertino/LICENSE",
+          "file": "texts/github.com_wailsapp_wails_v3-internal_templates_ios_frontend_public_puppertino_LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/wailsapp/wails/v3@v3.0.0",
+          "sha256": "a82239687742375c71ef1cc05b9351f86db937b0dba8120c1f0a02e2b444508b"
+        },
+        {
+          "title": "internal/webview2/webviewloader/LICENSE",
+          "file": "texts/github.com_wailsapp_wails_v3-internal_webview2_webviewloader_LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/wailsapp/wails/v3@v3.0.0",
+          "sha256": "e2c9290019954c3c3664428b73b34186b2bb8faad9b2c50605d7cdd9df5c7177"
+        },
+        {
+          "title": "Original license and copyright comment blocks retained from source",
+          "file": "texts/github.com_wailsapp_wails_v3-source-copyrights.txt",
+          "url": "https://pkg.go.dev/github.com/wailsapp/wails/v3@v3.0.0",
+          "sha256": "ccf6b29a702324600df86d6736581fa55ca23907c1932a259db75a9719000606"
+        }
+      ]
+    },
+    {
+      "id": "golang.org_x_net_v0.60.0",
+      "name": "golang.org/x/net",
+      "version": "v0.60.0",
+      "license": "BSD-3-Clause",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/golang.org/x/net@v0.60.0",
+      "sourceURL": "https://pkg.go.dev/golang.org/x/net@v0.60.0",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/golang.org_x_net-LICENSE.txt",
+          "url": "https://pkg.go.dev/golang.org/x/net@v0.60.0",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+        },
+        {
+          "title": "PATENTS",
+          "file": "texts/golang.org_x_net-PATENTS.txt",
+          "url": "https://pkg.go.dev/golang.org/x/net@v0.60.0",
+          "sha256": "96f408bfae65bf137fc2525d3ecb030271c50c1e90799f87abf8846d8dd505cc"
+        },
+        {
+          "title": "Original license and copyright comment blocks retained from source",
+          "file": "texts/golang.org_x_net-source-copyrights.txt",
+          "url": "https://pkg.go.dev/golang.org/x/net@v0.60.0",
+          "sha256": "8dff34b2355d55fda916df2ade32e8da460372c6ffa1362c9e56307755e5df32"
+        }
+      ]
+    },
+    {
+      "id": "golang.org_x_sys_v0.48.0",
+      "name": "golang.org/x/sys",
+      "version": "v0.48.0",
+      "license": "BSD-3-Clause",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/golang.org/x/sys@v0.48.0",
+      "sourceURL": "https://pkg.go.dev/golang.org/x/sys@v0.48.0",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/golang.org_x_sys-LICENSE.txt",
+          "url": "https://pkg.go.dev/golang.org/x/sys@v0.48.0",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+        },
+        {
+          "title": "PATENTS",
+          "file": "texts/golang.org_x_sys-PATENTS.txt",
+          "url": "https://pkg.go.dev/golang.org/x/sys@v0.48.0",
+          "sha256": "96f408bfae65bf137fc2525d3ecb030271c50c1e90799f87abf8846d8dd505cc"
+        },
+        {
+          "title": "Original license and copyright comment blocks retained from source",
+          "file": "texts/golang.org_x_sys-source-copyrights.txt",
+          "url": "https://pkg.go.dev/golang.org/x/sys@v0.48.0",
+          "sha256": "84a0af1940cdfe653262339b2c2df6fd1e121efd604314ba2cd1b13a72cee1c7"
+        }
+      ]
+    },
+    {
+      "id": "golang.org_x_text_v0.42.0",
+      "name": "golang.org/x/text",
+      "version": "v0.42.0",
+      "license": "BSD-3-Clause; additional source notices",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/golang.org/x/text@v0.42.0",
+      "sourceURL": "https://pkg.go.dev/golang.org/x/text@v0.42.0",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/golang.org_x_text-LICENSE.txt",
+          "url": "https://pkg.go.dev/golang.org/x/text@v0.42.0",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+        },
+        {
+          "title": "PATENTS",
+          "file": "texts/golang.org_x_text-PATENTS.txt",
+          "url": "https://pkg.go.dev/golang.org/x/text@v0.42.0",
+          "sha256": "96f408bfae65bf137fc2525d3ecb030271c50c1e90799f87abf8846d8dd505cc"
+        },
+        {
+          "title": "Original license and copyright comment blocks retained from source",
+          "file": "texts/golang.org_x_text-source-copyrights.txt",
+          "url": "https://pkg.go.dev/golang.org/x/text@v0.42.0",
+          "sha256": "a282e1f75cd3849fa2bb092d2d7ef71bba602cb94e3635bc629728a4c4978bb9"
+        }
+      ]
+    },
+    {
+      "id": "modernc.org_libc_v1.77.1",
+      "name": "modernc.org/libc",
+      "version": "v1.77.1",
+      "license": "BSD-3-Clause; see third-party notices",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/modernc.org/libc@v1.77.1",
+      "sourceURL": "https://pkg.go.dev/modernc.org/libc@v1.77.1",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "AUTHORS",
+          "file": "texts/modernc.org_libc-AUTHORS.txt",
+          "url": "https://pkg.go.dev/modernc.org/libc@v1.77.1",
+          "sha256": "40224528f3c7363534f59521d803a4eb627966b334d732bfc68a788655cb2545"
+        },
+        {
+          "title": "LICENSE",
+          "file": "texts/modernc.org_libc-LICENSE.txt",
+          "url": "https://pkg.go.dev/modernc.org/libc@v1.77.1",
+          "sha256": "95ff867eb55a56935fa7492406cfa953fb7c13ca73f4c0a86ae05756b4605600"
+        },
+        {
+          "title": "LICENSE-3RD-PARTY.md",
+          "file": "texts/modernc.org_libc-LICENSE-3RD-PARTY.md.txt",
+          "url": "https://pkg.go.dev/modernc.org/libc@v1.77.1",
+          "sha256": "f597097efe3d97021f89170746bd3a0fb9a8b6fb26b82043ed68a4e0283bee6c"
+        },
+        {
+          "title": "Original license and copyright comment blocks retained from source",
+          "file": "texts/modernc.org_libc-source-copyrights.txt",
+          "url": "https://pkg.go.dev/modernc.org/libc@v1.77.1",
+          "sha256": "aa05dbfa25af2f0981e77c129f702009e2ff5e41a9bbe9a36dcc724970107985"
+        }
+      ]
+    },
+    {
+      "id": "modernc.org_mathutil_v1.7.1",
+      "name": "modernc.org/mathutil",
+      "version": "v1.7.1",
+      "license": "BSD-3-Clause; see additional notices",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/modernc.org/mathutil@v1.7.1",
+      "sourceURL": "https://pkg.go.dev/modernc.org/mathutil@v1.7.1",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "AUTHORS",
+          "file": "texts/modernc.org_mathutil-AUTHORS.txt",
+          "url": "https://pkg.go.dev/modernc.org/mathutil@v1.7.1",
+          "sha256": "51fcdd68bb605f080283bb6eabb72452591289650599d3d67603381834e536af"
+        },
+        {
+          "title": "LICENSE",
+          "file": "texts/modernc.org_mathutil-LICENSE.txt",
+          "url": "https://pkg.go.dev/modernc.org/mathutil@v1.7.1",
+          "sha256": "bfa9bf72a72ca009fd62a8f84fca3dca67e51d93af96352723646599898b6cf5"
+        },
+        {
+          "title": "mersenne/AUTHORS",
+          "file": "texts/modernc.org_mathutil-mersenne_AUTHORS.txt",
+          "url": "https://pkg.go.dev/modernc.org/mathutil@v1.7.1",
+          "sha256": "f79ff8b413938c3ce7c60db12242a663d8e840249bd838fcf58f4aaccfec5454"
+        },
+        {
+          "title": "mersenne/LICENSE",
+          "file": "texts/modernc.org_mathutil-mersenne_LICENSE.txt",
+          "url": "https://pkg.go.dev/modernc.org/mathutil@v1.7.1",
+          "sha256": "c05630f9ca899ea094620d37daea6ba66f99adbf9268ea5fea9db607e1102bd9"
+        },
+        {
+          "title": "Original license and copyright comment blocks retained from source",
+          "file": "texts/modernc.org_mathutil-source-copyrights.txt",
+          "url": "https://pkg.go.dev/modernc.org/mathutil@v1.7.1",
+          "sha256": "f8cc44b5ad473a278f784feec017747ac02e8276f31c04a7cebe18f0ffeefdd5"
+        }
+      ]
+    },
+    {
+      "id": "modernc.org_memory_v1.12.1",
+      "name": "modernc.org/memory",
+      "version": "v1.12.1",
+      "license": "BSD-3-Clause; see additional notices",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/modernc.org/memory@v1.12.1",
+      "sourceURL": "https://pkg.go.dev/modernc.org/memory@v1.12.1",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "AUTHORS",
+          "file": "texts/modernc.org_memory-AUTHORS.txt",
+          "url": "https://pkg.go.dev/modernc.org/memory@v1.12.1",
+          "sha256": "df1f424436f279309de85b82e494d548297a2570e9b5794630d7e72c9eb50b6a"
+        },
+        {
+          "title": "LICENSE",
+          "file": "texts/modernc.org_memory-LICENSE.txt",
+          "url": "https://pkg.go.dev/modernc.org/memory@v1.12.1",
+          "sha256": "59895e669f48f168b6b858358f6005779cdf40a265f7828813061b56af67b496"
+        },
+        {
+          "title": "LICENSE-GO",
+          "file": "texts/modernc.org_memory-LICENSE-GO.txt",
+          "url": "https://pkg.go.dev/modernc.org/memory@v1.12.1",
+          "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067"
+        },
+        {
+          "title": "LICENSE-LOGO",
+          "file": "texts/modernc.org_memory-LICENSE-LOGO.txt",
+          "url": "https://pkg.go.dev/modernc.org/memory@v1.12.1",
+          "sha256": "5ae5bee3072a841376451b48d8cfcec7188e10543926d5870828d36c8a750dc5"
+        },
+        {
+          "title": "LICENSE-MMAP-GO",
+          "file": "texts/modernc.org_memory-LICENSE-MMAP-GO.txt",
+          "url": "https://pkg.go.dev/modernc.org/memory@v1.12.1",
+          "sha256": "c2eba69f20d05414538c3a5df7694dde392e065ff70882e1625e90f5d6659fff"
+        },
+        {
+          "title": "Original license and copyright comment blocks retained from source",
+          "file": "texts/modernc.org_memory-source-copyrights.txt",
+          "url": "https://pkg.go.dev/modernc.org/memory@v1.12.1",
+          "sha256": "77b5b1c3099cb1b082bde6a59bcfe1e0ca7c5337c6e26e0938df2c7bc6e4bdb4"
+        }
+      ]
+    },
+    {
+      "id": "modernc.org_sqlite_v1.60.1",
+      "name": "modernc.org/sqlite",
+      "version": "v1.60.1",
+      "license": "BSD-3-Clause; see third-party notices",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/modernc.org/sqlite@v1.60.1",
+      "sourceURL": "https://pkg.go.dev/modernc.org/sqlite@v1.60.1",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "AUTHORS",
+          "file": "texts/modernc.org_sqlite-AUTHORS.txt",
+          "url": "https://pkg.go.dev/modernc.org/sqlite@v1.60.1",
+          "sha256": "6bff0356ad7a2aee1961df765de4c5beef4b1d0a00fa2d8704ecb6b6043b4922"
+        },
+        {
+          "title": "LICENSE",
+          "file": "texts/modernc.org_sqlite-LICENSE.txt",
+          "url": "https://pkg.go.dev/modernc.org/sqlite@v1.60.1",
+          "sha256": "c6fe05491a60ae13bcd223088d2705e36dede24e5587226231d2459ada5c4822"
+        },
+        {
+          "title": "LICENSE-3RD-PARTY.md",
+          "file": "texts/modernc.org_sqlite-LICENSE-3RD-PARTY.md.txt",
+          "url": "https://pkg.go.dev/modernc.org/sqlite@v1.60.1",
+          "sha256": "b4366b9c27a9364633e015011a231913ed19bf1228f335bf617e50a6f7b168a6"
+        },
+        {
+          "title": "LICENSE-SQLITE",
+          "file": "texts/modernc.org_sqlite-LICENSE-SQLITE.txt",
+          "url": "https://pkg.go.dev/modernc.org/sqlite@v1.60.1",
+          "sha256": "8438c9c89b849131ead81d5435cb97fcf052df5b0b286dda8a2d4c29e6cb3fd0"
+        },
+        {
+          "title": "LICENSE-SQLITE_VEC",
+          "file": "texts/modernc.org_sqlite-LICENSE-SQLITE_VEC.txt",
+          "url": "https://pkg.go.dev/modernc.org/sqlite@v1.60.1",
+          "sha256": "6ce72bbe12d975bd5286e5ab0a064c069693300c47bccbc57bec18485f1621ea"
+        },
+        {
+          "title": "Original license and copyright comment blocks retained from source",
+          "file": "texts/modernc.org_sqlite-source-copyrights.txt",
+          "url": "https://pkg.go.dev/modernc.org/sqlite@v1.60.1",
+          "sha256": "31bbca93c82ab09ed81c2a1d1fbac5e65c42d401ed2631ceee8d8fca78acdfa5"
+        }
+      ]
+    },
+    {
+      "id": "npm___babel_helper-string-parser_7.29.14",
+      "name": "npm: @babel/helper-string-parser",
+      "version": "7.29.14",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@babel/helper-string-parser/v/7.29.14",
+      "sourceURL": "https://github.com/babel/babel.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__babel_helper-string-parser-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@babel/helper-string-parser/v/7.29.14",
+          "sha256": "117da2af0d4ce0fe1c8e19b5cff9dcd806adf973d328d27b11d4448c4ff24f76"
+        }
+      ]
+    },
+    {
+      "id": "npm___babel_helper-validator-identifier_7.29.7",
+      "name": "npm: @babel/helper-validator-identifier",
+      "version": "7.29.7",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@babel/helper-validator-identifier/v/7.29.7",
+      "sourceURL": "https://github.com/babel/babel.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__babel_helper-validator-identifier-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@babel/helper-validator-identifier/v/7.29.7",
+          "sha256": "117da2af0d4ce0fe1c8e19b5cff9dcd806adf973d328d27b11d4448c4ff24f76"
+        }
+      ]
+    },
+    {
+      "id": "npm___babel_parser_7.29.14",
+      "name": "npm: @babel/parser",
+      "version": "7.29.14",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@babel/parser/v/7.29.14",
+      "sourceURL": "https://github.com/babel/babel.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__babel_parser-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@babel/parser/v/7.29.14",
+          "sha256": "2e97627cb278aa7556fb9e8817368302301a595b6c7582512b8d74c57b773652"
+        }
+      ]
+    },
+    {
+      "id": "npm___babel_types_7.29.14",
+      "name": "npm: @babel/types",
+      "version": "7.29.14",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@babel/types/v/7.29.14",
+      "sourceURL": "https://github.com/babel/babel.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__babel_types-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@babel/types/v/7.29.14",
+          "sha256": "117da2af0d4ce0fe1c8e19b5cff9dcd806adf973d328d27b11d4448c4ff24f76"
+        }
+      ]
+    },
+    {
+      "id": "npm___bcoe_v8-coverage_1.0.2",
+      "name": "npm: @bcoe/v8-coverage",
+      "version": "1.0.2",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@bcoe/v8-coverage/v/1.0.2",
+      "sourceURL": "https://github.com/bcoe/v8-coverage.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE.md",
+          "file": "texts/npm-node_modules__bcoe_v8-coverage-LICENSE.md.txt",
+          "url": "https://www.npmjs.com/package/@bcoe/v8-coverage/v/1.0.2",
+          "sha256": "98d226d560dfbb0a07a77c3654acc18ba6c87589c48cf00cb2a9855ad50fcd07"
+        },
+        {
+          "title": "LICENSE.txt",
+          "file": "texts/npm-node_modules__bcoe_v8-coverage-LICENSE.txt.txt",
+          "url": "https://www.npmjs.com/package/@bcoe/v8-coverage/v/1.0.2",
+          "sha256": "1a9c55b2961f5e3062e181fa55666c44d011fc3cc03ed6d4fa4321c51f2a5ec5"
+        }
+      ]
+    },
+    {
+      "id": "npm___jridgewell_gen-mapping_0.3.13",
+      "name": "npm: @jridgewell/gen-mapping",
+      "version": "0.3.13",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@jridgewell/gen-mapping/v/0.3.13",
+      "sourceURL": "https://github.com/jridgewell/sourcemaps.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__jridgewell_gen-mapping-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@jridgewell/gen-mapping/v/0.3.13",
+          "sha256": "769d154fbde32a915af110b1123650bc79f4cbe675acc66e005265bf069c6c6c"
+        }
+      ]
+    },
+    {
+      "id": "npm___jridgewell_remapping_2.3.5",
+      "name": "npm: @jridgewell/remapping",
+      "version": "2.3.5",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@jridgewell/remapping/v/2.3.5",
+      "sourceURL": "https://github.com/jridgewell/sourcemaps.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__jridgewell_remapping-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@jridgewell/remapping/v/2.3.5",
+          "sha256": "769d154fbde32a915af110b1123650bc79f4cbe675acc66e005265bf069c6c6c"
+        }
+      ]
+    },
+    {
+      "id": "npm___jridgewell_resolve-uri_3.1.2",
+      "name": "npm: @jridgewell/resolve-uri",
+      "version": "3.1.2",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@jridgewell/resolve-uri/v/3.1.2",
+      "sourceURL": "https://github.com/jridgewell/resolve-uri",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__jridgewell_resolve-uri-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@jridgewell/resolve-uri/v/3.1.2",
+          "sha256": "b8778b155bfde5a28b023a558753c0fa058a52bb9de35c343c250be1bbcdedab"
+        }
+      ]
+    },
+    {
+      "id": "npm___jridgewell_sourcemap-codec_1.6.0",
+      "name": "npm: @jridgewell/sourcemap-codec",
+      "version": "1.6.0",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@jridgewell/sourcemap-codec/v/1.6.0",
+      "sourceURL": "https://github.com/jridgewell/sourcemaps.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__jridgewell_sourcemap-codec-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@jridgewell/sourcemap-codec/v/1.6.0",
+          "sha256": "769d154fbde32a915af110b1123650bc79f4cbe675acc66e005265bf069c6c6c"
+        }
+      ]
+    },
+    {
+      "id": "npm___jridgewell_trace-mapping_0.3.31",
+      "name": "npm: @jridgewell/trace-mapping",
+      "version": "0.3.31",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@jridgewell/trace-mapping/v/0.3.31",
+      "sourceURL": "https://github.com/jridgewell/sourcemaps.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__jridgewell_trace-mapping-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@jridgewell/trace-mapping/v/0.3.31",
+          "sha256": "769d154fbde32a915af110b1123650bc79f4cbe675acc66e005265bf069c6c6c"
+        }
+      ]
+    },
+    {
+      "id": "npm___oxc-project_types_0.156.0",
+      "name": "npm: @oxc-project/types",
+      "version": "0.156.0",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@oxc-project/types/v/0.156.0",
+      "sourceURL": "https://github.com/oxc-project/oxc.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__oxc-project_types-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@oxc-project/types/v/0.156.0",
+          "sha256": "95ced5ecf1133fbf41d409b5555c86c344f83f3b019926057ddbc07cfdcc27b3"
+        }
+      ]
+    },
+    {
+      "id": "npm___rolldown_binding-win32-x64-msvc_1.2.16",
+      "name": "npm: @rolldown/binding-win32-x64-msvc",
+      "version": "1.2.16",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@rolldown/binding-win32-x64-msvc/v/1.2.16",
+      "sourceURL": "https://github.com/rolldown/rolldown.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "rolldown/LICENSE",
+          "file": "texts/npm-node_modules__rolldown_binding-win32-x64-msvc-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/rolldown/v/1.2.16",
+          "sha256": "23ecfff35a5a2e80d92142f75228912c3b1abc4b5a8337a821ff4397e2f9f734"
+        },
+        {
+          "title": "rolldown/THIRD-PARTY-LICENSE",
+          "file": "texts/npm-node_modules__rolldown_binding-win32-x64-msvc-THIRD-PARTY-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/rolldown/v/1.2.16",
+          "sha256": "a877291d800ed43692f3f9ae09d8e01cc6f7293ad39d43896059c188ffbb8b7c"
+        }
+      ]
+    },
+    {
+      "id": "npm___rolldown_pluginutils_1.0.1",
+      "name": "npm: @rolldown/pluginutils",
+      "version": "1.0.1",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@rolldown/pluginutils/v/1.0.1",
+      "sourceURL": "https://github.com/rolldown/plugins.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__rolldown_pluginutils-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@rolldown/pluginutils/v/1.0.1",
+          "sha256": "e1919b3b98b8bf6c1b99fcc60a0ed46027c97ac947432e1278446c9606f50161"
+        }
+      ]
+    },
+    {
+      "id": "npm___standard-schema_spec_1.1.0",
+      "name": "npm: @standard-schema/spec",
+      "version": "1.1.0",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@standard-schema/spec/v/1.1.0",
+      "sourceURL": "https://github.com/standard-schema/standard-schema",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__standard-schema_spec-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@standard-schema/spec/v/1.1.0",
+          "sha256": "653b779005a3a4d64a7288c940f7b9a0e8f0b1e0375f6aa6af9473caf131e564"
+        }
+      ]
+    },
+    {
+      "id": "npm___tailwindcss_node_4.3.3",
+      "name": "npm: @tailwindcss/node",
+      "version": "4.3.3",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@tailwindcss/node/v/4.3.3",
+      "sourceURL": "https://github.com/tailwindlabs/tailwindcss.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__tailwindcss_node-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@tailwindcss/node/v/4.3.3",
+          "sha256": "60e0b68c0f35c078eef3a5d29419d0b03ff84ec1df9c3f9d6e39a519a5ae7985"
+        }
+      ]
+    },
+    {
+      "id": "npm__lightningcss_1.32.0",
+      "name": "npm: lightningcss",
+      "version": "1.32.0",
+      "license": "MPL-2.0",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/lightningcss/v/1.32.0",
+      "sourceURL": "https://github.com/parcel-bundler/lightningcss.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__tailwindcss_node_node_modules_lightningcss-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/lightningcss/v/1.32.0",
+          "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
+        }
+      ]
+    },
+    {
+      "id": "npm__lightningcss-win32-x64-msvc_1.32.0",
+      "name": "npm: lightningcss-win32-x64-msvc",
+      "version": "1.32.0",
+      "license": "MPL-2.0",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/lightningcss-win32-x64-msvc/v/1.32.0",
+      "sourceURL": "https://github.com/parcel-bundler/lightningcss.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__tailwindcss_node_node_modules_lightningcss-win32-x64-msvc-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/lightningcss-win32-x64-msvc/v/1.32.0",
+          "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
+        }
+      ]
+    },
+    {
+      "id": "npm___tailwindcss_oxide_4.3.3",
+      "name": "npm: @tailwindcss/oxide",
+      "version": "4.3.3",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@tailwindcss/oxide/v/4.3.3",
+      "sourceURL": "https://github.com/tailwindlabs/tailwindcss.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__tailwindcss_oxide-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@tailwindcss/oxide/v/4.3.3",
+          "sha256": "60e0b68c0f35c078eef3a5d29419d0b03ff84ec1df9c3f9d6e39a519a5ae7985"
+        }
+      ]
+    },
+    {
+      "id": "npm___tailwindcss_oxide-win32-x64-msvc_4.3.3",
+      "name": "npm: @tailwindcss/oxide-win32-x64-msvc",
+      "version": "4.3.3",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@tailwindcss/oxide-win32-x64-msvc/v/4.3.3",
+      "sourceURL": "https://github.com/tailwindlabs/tailwindcss.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__tailwindcss_oxide-win32-x64-msvc-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@tailwindcss/oxide-win32-x64-msvc/v/4.3.3",
+          "sha256": "60e0b68c0f35c078eef3a5d29419d0b03ff84ec1df9c3f9d6e39a519a5ae7985"
+        }
+      ]
+    },
+    {
+      "id": "npm___tailwindcss_vite_4.3.3",
+      "name": "npm: @tailwindcss/vite",
+      "version": "4.3.3",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@tailwindcss/vite/v/4.3.3",
+      "sourceURL": "https://github.com/tailwindlabs/tailwindcss.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__tailwindcss_vite-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@tailwindcss/vite/v/4.3.3",
+          "sha256": "60e0b68c0f35c078eef3a5d29419d0b03ff84ec1df9c3f9d6e39a519a5ae7985"
+        }
+      ]
+    },
+    {
+      "id": "npm___types_chai_5.2.3",
+      "name": "npm: @types/chai",
+      "version": "5.2.3",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@types/chai/v/5.2.3",
+      "sourceURL": "https://github.com/DefinitelyTyped/DefinitelyTyped.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__types_chai-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@types/chai/v/5.2.3",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ]
+    },
+    {
+      "id": "npm___types_deep-eql_4.0.2",
+      "name": "npm: @types/deep-eql",
+      "version": "4.0.2",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@types/deep-eql/v/4.0.2",
+      "sourceURL": "https://github.com/DefinitelyTyped/DefinitelyTyped.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__types_deep-eql-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@types/deep-eql/v/4.0.2",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ]
+    },
+    {
+      "id": "npm___types_estree_1.0.10",
+      "name": "npm: @types/estree",
+      "version": "1.0.10",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@types/estree/v/1.0.10",
+      "sourceURL": "https://github.com/DefinitelyTyped/DefinitelyTyped.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__types_estree-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@types/estree/v/1.0.10",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ]
+    },
+    {
+      "id": "npm___types_node_26.6.6",
+      "name": "npm: @types/node",
+      "version": "26.6.6",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@types/node/v/26.6.6",
+      "sourceURL": "https://github.com/DefinitelyTyped/DefinitelyTyped.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__types_node-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@types/node/v/26.6.6",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ]
+    },
+    {
+      "id": "npm___types_react_19.3.0",
+      "name": "npm: @types/react",
+      "version": "19.3.0",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@types/react/v/19.3.0",
+      "sourceURL": "https://github.com/DefinitelyTyped/DefinitelyTyped.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__types_react-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@types/react/v/19.3.0",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ]
+    },
+    {
+      "id": "npm___types_react-dom_19.3.0",
+      "name": "npm: @types/react-dom",
+      "version": "19.3.0",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@types/react-dom/v/19.3.0",
+      "sourceURL": "https://github.com/DefinitelyTyped/DefinitelyTyped.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__types_react-dom-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@types/react-dom/v/19.3.0",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ]
+    },
+    {
+      "id": "npm___types_whatwg-mimetype_3.0.2",
+      "name": "npm: @types/whatwg-mimetype",
+      "version": "3.0.2",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@types/whatwg-mimetype/v/3.0.2",
+      "sourceURL": "https://github.com/DefinitelyTyped/DefinitelyTyped.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__types_whatwg-mimetype-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@types/whatwg-mimetype/v/3.0.2",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ]
+    },
+    {
+      "id": "npm___types_ws_8.18.2",
+      "name": "npm: @types/ws",
+      "version": "8.18.2",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@types/ws/v/8.18.2",
+      "sourceURL": "https://github.com/DefinitelyTyped/DefinitelyTyped.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__types_ws-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@types/ws/v/8.18.2",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ]
+    },
+    {
+      "id": "npm___vitejs_plugin-react_6.1.2",
+      "name": "npm: @vitejs/plugin-react",
+      "version": "6.1.2",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@vitejs/plugin-react/v/6.1.2",
+      "sourceURL": "https://github.com/vitejs/vite-plugin-react.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__vitejs_plugin-react-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@vitejs/plugin-react/v/6.1.2",
+          "sha256": "29b68325fe026047d13e187b44c33b2acacf7dc647dec4583702e59f235e13b5"
+        }
+      ]
+    },
+    {
+      "id": "npm___vitest_coverage-v8_4.1.12",
+      "name": "npm: @vitest/coverage-v8",
+      "version": "4.1.12",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@vitest/coverage-v8/v/4.1.12",
+      "sourceURL": "https://github.com/vitest-dev/vitest.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__vitest_coverage-v8-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@vitest/coverage-v8/v/4.1.12",
+          "sha256": "04575fc5bfae19a9b63100f8691f901a2e15a399011ac02db435a9ef27295551"
+        }
+      ]
+    },
+    {
+      "id": "npm___vitest_expect_4.1.12",
+      "name": "npm: @vitest/expect",
+      "version": "4.1.12",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@vitest/expect/v/4.1.12",
+      "sourceURL": "https://github.com/vitest-dev/vitest.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__vitest_expect-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@vitest/expect/v/4.1.12",
+          "sha256": "04575fc5bfae19a9b63100f8691f901a2e15a399011ac02db435a9ef27295551"
+        }
+      ]
+    },
+    {
+      "id": "npm___vitest_mocker_4.1.12",
+      "name": "npm: @vitest/mocker",
+      "version": "4.1.12",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@vitest/mocker/v/4.1.12",
+      "sourceURL": "https://github.com/vitest-dev/vitest.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__vitest_mocker-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@vitest/mocker/v/4.1.12",
+          "sha256": "04575fc5bfae19a9b63100f8691f901a2e15a399011ac02db435a9ef27295551"
+        }
+      ]
+    },
+    {
+      "id": "npm___vitest_pretty-format_4.1.12",
+      "name": "npm: @vitest/pretty-format",
+      "version": "4.1.12",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@vitest/pretty-format/v/4.1.12",
+      "sourceURL": "https://github.com/vitest-dev/vitest.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__vitest_pretty-format-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@vitest/pretty-format/v/4.1.12",
+          "sha256": "04575fc5bfae19a9b63100f8691f901a2e15a399011ac02db435a9ef27295551"
+        }
+      ]
+    },
+    {
+      "id": "npm___vitest_runner_4.1.12",
+      "name": "npm: @vitest/runner",
+      "version": "4.1.12",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@vitest/runner/v/4.1.12",
+      "sourceURL": "https://github.com/vitest-dev/vitest.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__vitest_runner-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@vitest/runner/v/4.1.12",
+          "sha256": "04575fc5bfae19a9b63100f8691f901a2e15a399011ac02db435a9ef27295551"
+        }
+      ]
+    },
+    {
+      "id": "npm___vitest_snapshot_4.1.12",
+      "name": "npm: @vitest/snapshot",
+      "version": "4.1.12",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@vitest/snapshot/v/4.1.12",
+      "sourceURL": "https://github.com/vitest-dev/vitest.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__vitest_snapshot-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@vitest/snapshot/v/4.1.12",
+          "sha256": "04575fc5bfae19a9b63100f8691f901a2e15a399011ac02db435a9ef27295551"
+        }
+      ]
+    },
+    {
+      "id": "npm___vitest_spy_4.1.12",
+      "name": "npm: @vitest/spy",
+      "version": "4.1.12",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@vitest/spy/v/4.1.12",
+      "sourceURL": "https://github.com/vitest-dev/vitest.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__vitest_spy-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@vitest/spy/v/4.1.12",
+          "sha256": "04575fc5bfae19a9b63100f8691f901a2e15a399011ac02db435a9ef27295551"
+        }
+      ]
+    },
+    {
+      "id": "npm___vitest_utils_4.1.12",
+      "name": "npm: @vitest/utils",
+      "version": "4.1.12",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/@vitest/utils/v/4.1.12",
+      "sourceURL": "https://github.com/vitest-dev/vitest.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules__vitest_utils-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/@vitest/utils/v/4.1.12",
+          "sha256": "04575fc5bfae19a9b63100f8691f901a2e15a399011ac02db435a9ef27295551"
+        }
+      ]
+    },
+    {
+      "id": "npm___wailsio_runtime_3.0.0",
+      "name": "npm: @wailsio/runtime",
+      "version": "3.0.0",
+      "license": "MIT",
+      "scope": "bundled",
+      "url": "https://www.npmjs.com/package/@wailsio/runtime/v/3.0.0",
+      "sourceURL": "https://github.com/wailsapp/wails.git",
+      "notice": "프런트엔드 번들 또는 생성된 스타일에 사용합니다.",
+      "documents": [
+        {
+          "title": "Wails LICENSE (runtime source repository)",
+          "file": "texts/npm-wails-runtime-LICENSE.txt",
+          "url": "https://github.com/wailsapp/wails/blob/v3.0.0/v3/LICENSE",
+          "sha256": "cede95c28e6e9d67d1c1e49e8ba3c20250c7d4080c3faca1579b6732327ae40d"
+        }
+      ]
+    },
+    {
+      "id": "npm__assertion-error_2.0.1",
+      "name": "npm: assertion-error",
+      "version": "2.0.1",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/assertion-error/v/2.0.1",
+      "sourceURL": "https://www.npmjs.com/package/assertion-error/v/2.0.1",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_assertion-error-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/assertion-error/v/2.0.1",
+          "sha256": "2130216d5ab4c02134f8247f32999feda0abe1eaf028218baeac445c19ce4cea"
+        }
+      ]
+    },
+    {
+      "id": "npm__ast-v8-to-istanbul_1.0.8",
+      "name": "npm: ast-v8-to-istanbul",
+      "version": "1.0.8",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/ast-v8-to-istanbul/v/1.0.8",
+      "sourceURL": "https://github.com/AriPerkkio/ast-v8-to-istanbul.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_ast-v8-to-istanbul-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/ast-v8-to-istanbul/v/1.0.8",
+          "sha256": "7771f0b6f55e76efe99cb8e6fdbff583193c9bdfd74d41620d330cc3db6b913a"
+        }
+      ]
+    },
+    {
+      "id": "npm__buffer-image-size_0.6.4",
+      "name": "npm: buffer-image-size",
+      "version": "0.6.4",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/buffer-image-size/v/0.6.4",
+      "sourceURL": "https://www.npmjs.com/package/buffer-image-size/v/0.6.4",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_buffer-image-size-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/buffer-image-size/v/0.6.4",
+          "sha256": "54d0b82d1e7d0bc60a4b48b6172f1a9fa7385cfa8a448d14ad3a638930ef417c"
+        }
+      ]
+    },
+    {
+      "id": "npm__chai_6.3.0",
+      "name": "npm: chai",
+      "version": "6.3.0",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/chai/v/6.3.0",
+      "sourceURL": "https://github.com/chaijs/chai",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_chai-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/chai/v/6.3.0",
+          "sha256": "b181da80336ff9dd1043fc8be1a764d7382363433319aa872e4d2cb5ce2a3066"
+        }
+      ]
+    },
+    {
+      "id": "npm__convert-source-map_2.0.0",
+      "name": "npm: convert-source-map",
+      "version": "2.0.0",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/convert-source-map/v/2.0.0",
+      "sourceURL": "https://github.com/thlorenz/convert-source-map.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_convert-source-map-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/convert-source-map/v/2.0.0",
+          "sha256": "1fa6ee8bb95a81ae3d73a5bd074a3ac380ffec13697051063ca1a601921b91db"
+        }
+      ]
+    },
+    {
+      "id": "npm__csstype_3.2.3",
+      "name": "npm: csstype",
+      "version": "3.2.3",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/csstype/v/3.2.3",
+      "sourceURL": "https://github.com/frenic/csstype",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_csstype-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/csstype/v/3.2.3",
+          "sha256": "11d55bd4541c75ee7879547ac49089c489163dae49551389713c3d026cab383e"
+        }
+      ]
+    },
+    {
+      "id": "npm__detect-libc_2.1.2",
+      "name": "npm: detect-libc",
+      "version": "2.1.2",
+      "license": "Apache-2.0",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/detect-libc/v/2.1.2",
+      "sourceURL": "https://github.com/lovell/detect-libc.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_detect-libc-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/detect-libc/v/2.1.2",
+          "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+        }
+      ]
+    },
+    {
+      "id": "npm__enhanced-resolve_5.26.0",
+      "name": "npm: enhanced-resolve",
+      "version": "5.26.0",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/enhanced-resolve/v/5.26.0",
+      "sourceURL": "https://github.com/webpack/enhanced-resolve.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_enhanced-resolve-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/enhanced-resolve/v/5.26.0",
+          "sha256": "9068a8782d2fb4c6e432cfa25334efa56f722822180570802bf86e71b6003b1e"
+        }
+      ]
+    },
+    {
+      "id": "npm__entities_7.0.1",
+      "name": "npm: entities",
+      "version": "7.0.1",
+      "license": "BSD-2-Clause",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/entities/v/7.0.1",
+      "sourceURL": "https://github.com/fb55/entities.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_entities-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/entities/v/7.0.1",
+          "sha256": "cb992345949ccd6e8394b2cd6c465f7b897c864f845937dbf64e8997f389e164"
+        }
+      ]
+    },
+    {
+      "id": "npm__es-module-lexer_2.3.2",
+      "name": "npm: es-module-lexer",
+      "version": "2.3.2",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/es-module-lexer/v/2.3.2",
+      "sourceURL": "https://github.com/guybedford/es-module-lexer.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_es-module-lexer-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/es-module-lexer/v/2.3.2",
+          "sha256": "8a4b6c44eebfb026d23719a348145a661a555568dbfdc11618ff2d0dd9306b00"
+        }
+      ]
+    },
+    {
+      "id": "npm__estree-walker_3.0.3",
+      "name": "npm: estree-walker",
+      "version": "3.0.3",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/estree-walker/v/3.0.3",
+      "sourceURL": "https://github.com/Rich-Harris/estree-walker",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_estree-walker-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/estree-walker/v/3.0.3",
+          "sha256": "8a6dcbabe7179f9c8489c08a7d874d0f1e093ae7449e03756ccf87cb9d0e296e"
+        }
+      ]
+    },
+    {
+      "id": "npm__expect-type_1.4.0",
+      "name": "npm: expect-type",
+      "version": "1.4.0",
+      "license": "Apache-2.0",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/expect-type/v/1.4.0",
+      "sourceURL": "https://github.com/mmkal/expect-type.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_expect-type-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/expect-type/v/1.4.0",
+          "sha256": "7c6cc83c84eaa249a85bf12fe3eedd831bb50c696e8890b5248223ae68c7b408"
+        }
+      ]
+    },
+    {
+      "id": "npm__fdir_6.5.0",
+      "name": "npm: fdir",
+      "version": "6.5.0",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/fdir/v/6.5.0",
+      "sourceURL": "https://github.com/thecodrr/fdir.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_fdir-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/fdir/v/6.5.0",
+          "sha256": "9a39f2aadab11a3697edd668ff2d8ad885b649737b7ab4d3bf12b34e5ada0c86"
+        }
+      ]
+    },
+    {
+      "id": "npm__graceful-fs_4.2.11",
+      "name": "npm: graceful-fs",
+      "version": "4.2.11",
+      "license": "ISC",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/graceful-fs/v/4.2.11",
+      "sourceURL": "https://github.com/isaacs/node-graceful-fs",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_graceful-fs-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/graceful-fs/v/4.2.11",
+          "sha256": "f65c5d9f22a317b2a10803bd1868461ce6499c2ed7217bc80c0cc772a748789c"
+        }
+      ]
+    },
+    {
+      "id": "npm__happy-dom_21.0.4",
+      "name": "npm: happy-dom",
+      "version": "21.0.4",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/happy-dom/v/21.0.4",
+      "sourceURL": "https://github.com/capricorn86/happy-dom",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_happy-dom-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/happy-dom/v/21.0.4",
+          "sha256": "46a5fbffa79b8dc33e512852b5ac5da71317eee5ce122ddb601cf1add07848cf"
+        }
+      ]
+    },
+    {
+      "id": "npm__has-flag_4.0.0",
+      "name": "npm: has-flag",
+      "version": "4.0.0",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/has-flag/v/4.0.0",
+      "sourceURL": "https://www.npmjs.com/package/has-flag/v/4.0.0",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "license",
+          "file": "texts/npm-node_modules_has-flag-license.txt",
+          "url": "https://www.npmjs.com/package/has-flag/v/4.0.0",
+          "sha256": "48da2f39e100d4085767e94966b43f4fa95ff6a0698fba57ed460914e35f94a0"
+        }
+      ]
+    },
+    {
+      "id": "npm__html-escaper_2.0.2",
+      "name": "npm: html-escaper",
+      "version": "2.0.2",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/html-escaper/v/2.0.2",
+      "sourceURL": "https://github.com/WebReflection/html-escaper.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE.txt",
+          "file": "texts/npm-node_modules_html-escaper-LICENSE.txt.txt",
+          "url": "https://www.npmjs.com/package/html-escaper/v/2.0.2",
+          "sha256": "27d06bbb2eb031be8aa376868a2e1f11b6acba938d4cc8e1234b66b9739c54a3"
+        }
+      ]
+    },
+    {
+      "id": "npm__istanbul-lib-coverage_3.2.2",
+      "name": "npm: istanbul-lib-coverage",
+      "version": "3.2.2",
+      "license": "BSD-3-Clause",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/istanbul-lib-coverage/v/3.2.2",
+      "sourceURL": "https://www.npmjs.com/package/istanbul-lib-coverage/v/3.2.2",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_istanbul-lib-coverage-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/istanbul-lib-coverage/v/3.2.2",
+          "sha256": "e09f9b52c6ce5c17ba8103cd0cbf446c33b5448b0c1d01d711b36a1f15a501ba"
+        }
+      ]
+    },
+    {
+      "id": "npm__istanbul-lib-report_3.0.1",
+      "name": "npm: istanbul-lib-report",
+      "version": "3.0.1",
+      "license": "BSD-3-Clause",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/istanbul-lib-report/v/3.0.1",
+      "sourceURL": "https://www.npmjs.com/package/istanbul-lib-report/v/3.0.1",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_istanbul-lib-report-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/istanbul-lib-report/v/3.0.1",
+          "sha256": "e09f9b52c6ce5c17ba8103cd0cbf446c33b5448b0c1d01d711b36a1f15a501ba"
+        }
+      ]
+    },
+    {
+      "id": "npm__istanbul-reports_3.2.0",
+      "name": "npm: istanbul-reports",
+      "version": "3.2.0",
+      "license": "BSD-3-Clause",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/istanbul-reports/v/3.2.0",
+      "sourceURL": "https://www.npmjs.com/package/istanbul-reports/v/3.2.0",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_istanbul-reports-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/istanbul-reports/v/3.2.0",
+          "sha256": "e09f9b52c6ce5c17ba8103cd0cbf446c33b5448b0c1d01d711b36a1f15a501ba"
+        }
+      ]
+    },
+    {
+      "id": "npm__jiti_2.7.0",
+      "name": "npm: jiti",
+      "version": "2.7.0",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/jiti/v/2.7.0",
+      "sourceURL": "https://www.npmjs.com/package/jiti/v/2.7.0",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_jiti-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/jiti/v/2.7.0",
+          "sha256": "46231df5a7733c3f52f11b71f3df61813007745b62b09031acfb45fb42d75082"
+        }
+      ]
+    },
+    {
+      "id": "npm__js-tokens_10.0.0",
+      "name": "npm: js-tokens",
+      "version": "10.0.0",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/js-tokens/v/10.0.0",
+      "sourceURL": "https://www.npmjs.com/package/js-tokens/v/10.0.0",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_js-tokens-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/js-tokens/v/10.0.0",
+          "sha256": "3b07ef3fdd96c7f4025deb20139ec92b3fb88d3988b98047d9beee10b659f47b"
+        }
+      ]
+    },
+    {
+      "id": "npm__lightningcss_1.33.0",
+      "name": "npm: lightningcss",
+      "version": "1.33.0",
+      "license": "MPL-2.0",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/lightningcss/v/1.33.0",
+      "sourceURL": "https://github.com/parcel-bundler/lightningcss.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_lightningcss-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/lightningcss/v/1.33.0",
+          "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
+        }
+      ]
+    },
+    {
+      "id": "npm__lightningcss-win32-x64-msvc_1.33.0",
+      "name": "npm: lightningcss-win32-x64-msvc",
+      "version": "1.33.0",
+      "license": "MPL-2.0",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/lightningcss-win32-x64-msvc/v/1.33.0",
+      "sourceURL": "https://github.com/parcel-bundler/lightningcss.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_lightningcss-win32-x64-msvc-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/lightningcss-win32-x64-msvc/v/1.33.0",
+          "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
+        }
+      ]
+    },
+    {
+      "id": "npm__lucide-react_1.61.0",
+      "name": "npm: lucide-react",
+      "version": "1.61.0",
+      "license": "ISC AND MIT (Feather portions)",
+      "scope": "bundled",
+      "url": "https://www.npmjs.com/package/lucide-react/v/1.61.0",
+      "sourceURL": "https://github.com/lucide-icons/lucide.git",
+      "notice": "프런트엔드 번들 또는 생성된 스타일에 사용합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_lucide-react-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/lucide-react/v/1.61.0",
+          "sha256": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57"
+        }
+      ]
+    },
+    {
+      "id": "npm__magic-string_0.30.21",
+      "name": "npm: magic-string",
+      "version": "0.30.21",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/magic-string/v/0.30.21",
+      "sourceURL": "https://github.com/Rich-Harris/magic-string.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_magic-string-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/magic-string/v/0.30.21",
+          "sha256": "1cbe51b907662f6cb1492b16c359384a595180bf0e4d101603ed525e75c4e484"
+        }
+      ]
+    },
+    {
+      "id": "npm__magicast_0.5.5",
+      "name": "npm: magicast",
+      "version": "0.5.5",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/magicast/v/0.5.5",
+      "sourceURL": "https://www.npmjs.com/package/magicast/v/0.5.5",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_magicast-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/magicast/v/0.5.5",
+          "sha256": "7917b04272f3f7c11f9fb89716742747a77f5906ebe5a81e70cbd090b8c7f961"
+        }
+      ]
+    },
+    {
+      "id": "npm__make-dir_4.0.0",
+      "name": "npm: make-dir",
+      "version": "4.0.0",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/make-dir/v/4.0.0",
+      "sourceURL": "https://www.npmjs.com/package/make-dir/v/4.0.0",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "license",
+          "file": "texts/npm-node_modules_make-dir-license.txt",
+          "url": "https://www.npmjs.com/package/make-dir/v/4.0.0",
+          "sha256": "5c932d88256b4ab958f64a856fa48e8bd1f55bc1d96b8149c65689e0c61789d3"
+        }
+      ]
+    },
+    {
+      "id": "npm__nanoid_3.3.20",
+      "name": "npm: nanoid",
+      "version": "3.3.20",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/nanoid/v/3.3.20",
+      "sourceURL": "https://www.npmjs.com/package/nanoid/v/3.3.20",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_nanoid-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/nanoid/v/3.3.20",
+          "sha256": "da4db1480d9beea3483a2eda5c53b22238d0827d57da162b48f122e04d2d9987"
+        }
+      ]
+    },
+    {
+      "id": "npm__obug_2.2.1",
+      "name": "npm: obug",
+      "version": "2.2.1",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/obug/v/2.2.1",
+      "sourceURL": "https://github.com/sxzz/obug.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_obug-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/obug/v/2.2.1",
+          "sha256": "ee48679d379ca6b4493d5e231094d85f818dd9be40b1a4f234fb7ff657ee35d9"
+        }
+      ]
+    },
+    {
+      "id": "npm__pathe_2.0.3",
+      "name": "npm: pathe",
+      "version": "2.0.3",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/pathe/v/2.0.3",
+      "sourceURL": "https://www.npmjs.com/package/pathe/v/2.0.3",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_pathe-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/pathe/v/2.0.3",
+          "sha256": "52e92576851154bad7737e90cc72818936f43665cb0e3f7428ed8edc8cc5709b"
+        }
+      ]
+    },
+    {
+      "id": "npm__picocolors_1.1.1",
+      "name": "npm: picocolors",
+      "version": "1.1.1",
+      "license": "ISC",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/picocolors/v/1.1.1",
+      "sourceURL": "https://www.npmjs.com/package/picocolors/v/1.1.1",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_picocolors-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/picocolors/v/1.1.1",
+          "sha256": "6582629e2979466878f6014313dcc2f3756c9616148682227ce3063dde310750"
+        }
+      ]
+    },
+    {
+      "id": "npm__picomatch_4.0.7",
+      "name": "npm: picomatch",
+      "version": "4.0.7",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/picomatch/v/4.0.7",
+      "sourceURL": "https://www.npmjs.com/package/picomatch/v/4.0.7",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_picomatch-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/picomatch/v/4.0.7",
+          "sha256": "d0cd141b0c322fded5dfad1d4645bb2fedfc05b7321fe1009469638190d59ef9"
+        }
+      ]
+    },
+    {
+      "id": "npm__postcss_8.5.32",
+      "name": "npm: postcss",
+      "version": "8.5.32",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/postcss/v/8.5.32",
+      "sourceURL": "https://www.npmjs.com/package/postcss/v/8.5.32",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_postcss-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/postcss/v/8.5.32",
+          "sha256": "5be1f3465bba68a626777f984878814aaf35e7ef8e9fd314d469bcf887050fb8"
+        }
+      ]
+    },
+    {
+      "id": "npm__react_19.3.1",
+      "name": "npm: react",
+      "version": "19.3.1",
+      "license": "MIT",
+      "scope": "bundled",
+      "url": "https://www.npmjs.com/package/react/v/19.3.1",
+      "sourceURL": "https://github.com/react/react.git",
+      "notice": "프런트엔드 번들 또는 생성된 스타일에 사용합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_react-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/react/v/19.3.1",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ]
+    },
+    {
+      "id": "npm__react-dom_19.3.1",
+      "name": "npm: react-dom",
+      "version": "19.3.1",
+      "license": "MIT",
+      "scope": "bundled",
+      "url": "https://www.npmjs.com/package/react-dom/v/19.3.1",
+      "sourceURL": "https://github.com/react/react.git",
+      "notice": "프런트엔드 번들 또는 생성된 스타일에 사용합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_react-dom-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/react-dom/v/19.3.1",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ]
+    },
+    {
+      "id": "npm__rolldown_1.2.16",
+      "name": "npm: rolldown",
+      "version": "1.2.16",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/rolldown/v/1.2.16",
+      "sourceURL": "https://github.com/rolldown/rolldown.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_rolldown-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/rolldown/v/1.2.16",
+          "sha256": "23ecfff35a5a2e80d92142f75228912c3b1abc4b5a8337a821ff4397e2f9f734"
+        },
+        {
+          "title": "THIRD-PARTY-LICENSE",
+          "file": "texts/npm-node_modules_rolldown-THIRD-PARTY-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/rolldown/v/1.2.16",
+          "sha256": "a877291d800ed43692f3f9ae09d8e01cc6f7293ad39d43896059c188ffbb8b7c"
+        }
+      ]
+    },
+    {
+      "id": "npm__scheduler_0.28.0",
+      "name": "npm: scheduler",
+      "version": "0.28.0",
+      "license": "MIT",
+      "scope": "bundled",
+      "url": "https://www.npmjs.com/package/scheduler/v/0.28.0",
+      "sourceURL": "https://github.com/react/react.git",
+      "notice": "프런트엔드 번들 또는 생성된 스타일에 사용합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_scheduler-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/scheduler/v/0.28.0",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ]
+    },
+    {
+      "id": "npm__semver_7.8.6",
+      "name": "npm: semver",
+      "version": "7.8.6",
+      "license": "ISC",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/semver/v/7.8.6",
+      "sourceURL": "https://github.com/npm/node-semver.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_semver-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/semver/v/7.8.6",
+          "sha256": "4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b"
+        }
+      ]
+    },
+    {
+      "id": "npm__siginfo_2.0.0",
+      "name": "npm: siginfo",
+      "version": "2.0.0",
+      "license": "ISC",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/siginfo/v/2.0.0",
+      "sourceURL": "https://github.com/emilbayes/siginfo.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_siginfo-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/siginfo/v/2.0.0",
+          "sha256": "3bdddf0b9b08aaa2fe4365b803fc958ed32c0597ca0bd727be8d9fcb8b248d18"
+        }
+      ]
+    },
+    {
+      "id": "npm__source-map-js_1.2.2",
+      "name": "npm: source-map-js",
+      "version": "1.2.2",
+      "license": "BSD-3-Clause",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/source-map-js/v/1.2.2",
+      "sourceURL": "https://www.npmjs.com/package/source-map-js/v/1.2.2",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_source-map-js-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/source-map-js/v/1.2.2",
+          "sha256": "6cb0631f71c7749763fd3dd1d5bee52dd1070ec17f2edc1710079ad070bd2fbd"
+        }
+      ]
+    },
+    {
+      "id": "npm__stackback_0.0.2",
+      "name": "npm: stackback",
+      "version": "0.0.2",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/stackback/v/0.0.2",
+      "sourceURL": "https://github.com/shtylman/node-stackback.git",
+      "notice": "빌드·테스트 전용입니다. 원본 패키지는 별도 LICENSE 파일 없이 package.json에 MIT와 작성자를 명시하므로 해당 원본 선언을 보존합니다.",
+      "documents": [
+        {
+          "title": "Original package metadata (MIT declaration and author; upstream package supplies no separate license file)",
+          "file": "texts/stackback-package-metadata.txt",
+          "url": "https://www.npmjs.com/package/stackback/v/0.0.2",
+          "sha256": "4d984909b27d37d2f1a379b9cda7292a6e3a133c076df166d740a17514ac6e60"
+        }
+      ]
+    },
+    {
+      "id": "npm__std-env_4.3.0",
+      "name": "npm: std-env",
+      "version": "4.3.0",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/std-env/v/4.3.0",
+      "sourceURL": "https://www.npmjs.com/package/std-env/v/4.3.0",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENCE",
+          "file": "texts/npm-node_modules_std-env-LICENCE.txt",
+          "url": "https://www.npmjs.com/package/std-env/v/4.3.0",
+          "sha256": "a6f36438e46fb911859f3b9c4cad045ba64e1af3d8f4512c60258fa2d7552d28"
+        }
+      ]
+    },
+    {
+      "id": "npm__supports-color_7.2.0",
+      "name": "npm: supports-color",
+      "version": "7.2.0",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/supports-color/v/7.2.0",
+      "sourceURL": "https://www.npmjs.com/package/supports-color/v/7.2.0",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "license",
+          "file": "texts/npm-node_modules_supports-color-license.txt",
+          "url": "https://www.npmjs.com/package/supports-color/v/7.2.0",
+          "sha256": "48da2f39e100d4085767e94966b43f4fa95ff6a0698fba57ed460914e35f94a0"
+        }
+      ]
+    },
+    {
+      "id": "npm__tailwindcss_4.3.3",
+      "name": "npm: tailwindcss",
+      "version": "4.3.3",
+      "license": "MIT",
+      "scope": "bundled",
+      "url": "https://www.npmjs.com/package/tailwindcss/v/4.3.3",
+      "sourceURL": "https://github.com/tailwindlabs/tailwindcss.git",
+      "notice": "프런트엔드 번들 또는 생성된 스타일에 사용합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_tailwindcss-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/tailwindcss/v/4.3.3",
+          "sha256": "60e0b68c0f35c078eef3a5d29419d0b03ff84ec1df9c3f9d6e39a519a5ae7985"
+        }
+      ]
+    },
+    {
+      "id": "npm__tapable_2.3.3",
+      "name": "npm: tapable",
+      "version": "2.3.3",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/tapable/v/2.3.3",
+      "sourceURL": "https://www.npmjs.com/package/tapable/v/2.3.3",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_tapable-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/tapable/v/2.3.3",
+          "sha256": "824ef6c33ae5ecbbab65d37f2b37da2bfc81d76cf7676ec0f59d00a0a38bdb75"
+        }
+      ]
+    },
+    {
+      "id": "npm__tinybench_2.9.0",
+      "name": "npm: tinybench",
+      "version": "2.9.0",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/tinybench/v/2.9.0",
+      "sourceURL": "https://www.npmjs.com/package/tinybench/v/2.9.0",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_tinybench-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/tinybench/v/2.9.0",
+          "sha256": "cebc084d54e6dd99e53292ddb4bc1cdb63d9bfcd9ce438fe3aa6eb106d79e2ea"
+        }
+      ]
+    },
+    {
+      "id": "npm__tinyexec_1.3.1",
+      "name": "npm: tinyexec",
+      "version": "1.3.1",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/tinyexec/v/1.3.1",
+      "sourceURL": "https://github.com/tinylibs/tinyexec.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_tinyexec-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/tinyexec/v/1.3.1",
+          "sha256": "f95f668fe64081ddb4153b322e34fdd719b991285ed08177d5ad7133b7988d92"
+        }
+      ]
+    },
+    {
+      "id": "npm__tinyglobby_0.2.17",
+      "name": "npm: tinyglobby",
+      "version": "0.2.17",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/tinyglobby/v/0.2.17",
+      "sourceURL": "https://github.com/SuperchupuDev/tinyglobby.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_tinyglobby-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/tinyglobby/v/0.2.17",
+          "sha256": "22c68811e174cbbfb3813d4135918df4f540959c14d872e601d9abe83d3cde8f"
+        }
+      ]
+    },
+    {
+      "id": "npm__tinyrainbow_3.2.0",
+      "name": "npm: tinyrainbow",
+      "version": "3.2.0",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/tinyrainbow/v/3.2.0",
+      "sourceURL": "https://github.com/tinylibs/tinyrainbow.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENCE",
+          "file": "texts/npm-node_modules_tinyrainbow-LICENCE.txt",
+          "url": "https://www.npmjs.com/package/tinyrainbow/v/3.2.0",
+          "sha256": "cebc084d54e6dd99e53292ddb4bc1cdb63d9bfcd9ce438fe3aa6eb106d79e2ea"
+        }
+      ]
+    },
+    {
+      "id": "npm__typescript_5.9.3",
+      "name": "npm: typescript",
+      "version": "5.9.3",
+      "license": "Apache-2.0",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/typescript/v/5.9.3",
+      "sourceURL": "https://github.com/microsoft/TypeScript.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE.txt",
+          "file": "texts/npm-node_modules_typescript-LICENSE.txt.txt",
+          "url": "https://www.npmjs.com/package/typescript/v/5.9.3",
+          "sha256": "a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47"
+        },
+        {
+          "title": "ThirdPartyNoticeText.txt",
+          "file": "texts/npm-node_modules_typescript-ThirdPartyNoticeText.txt.txt",
+          "url": "https://www.npmjs.com/package/typescript/v/5.9.3",
+          "sha256": "1af3c68039c57e539422da82a4faada506ce6d0ea6f90e0b699d02dbcdb7a90c"
+        }
+      ]
+    },
+    {
+      "id": "npm__undici-types_8.9.0",
+      "name": "npm: undici-types",
+      "version": "8.9.0",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/undici-types/v/8.9.0",
+      "sourceURL": "https://github.com/nodejs/undici.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_undici-types-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/undici-types/v/8.9.0",
+          "sha256": "a6db8096b2707bc0102d256917d4d33f298ba36d8c3f25de067a2b5bb379db27"
+        }
+      ]
+    },
+    {
+      "id": "npm__vite_8.3.5",
+      "name": "npm: vite",
+      "version": "8.3.5",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/vite/v/8.3.5",
+      "sourceURL": "https://github.com/vitejs/vite.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE.md",
+          "file": "texts/npm-node_modules_vite-LICENSE.md.txt",
+          "url": "https://www.npmjs.com/package/vite/v/8.3.5",
+          "sha256": "a22152baa1aef74402443008e767e7c689a524c0909d19b0431d97f5ab066a13"
+        }
+      ]
+    },
+    {
+      "id": "npm__vitest_4.1.12",
+      "name": "npm: vitest",
+      "version": "4.1.12",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/vitest/v/4.1.12",
+      "sourceURL": "https://github.com/vitest-dev/vitest.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE.md",
+          "file": "texts/npm-node_modules_vitest-LICENSE.md.txt",
+          "url": "https://www.npmjs.com/package/vitest/v/4.1.12",
+          "sha256": "881d660c26831481b697e39724d4a35c9f86e07b67156d4aeb693a0b39910435"
+        }
+      ]
+    },
+    {
+      "id": "npm__whatwg-mimetype_3.0.0",
+      "name": "npm: whatwg-mimetype",
+      "version": "3.0.0",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/whatwg-mimetype/v/3.0.0",
+      "sourceURL": "https://www.npmjs.com/package/whatwg-mimetype/v/3.0.0",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE.txt",
+          "file": "texts/npm-node_modules_whatwg-mimetype-LICENSE.txt.txt",
+          "url": "https://www.npmjs.com/package/whatwg-mimetype/v/3.0.0",
+          "sha256": "528eec83cb836a0adda9f8fc3d6a2a70a710d6cc0be9a155f92212c8df28acfa"
+        }
+      ]
+    },
+    {
+      "id": "npm__why-is-node-running_2.3.0",
+      "name": "npm: why-is-node-running",
+      "version": "2.3.0",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/why-is-node-running/v/2.3.0",
+      "sourceURL": "https://github.com/mafintosh/why-is-node-running.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_why-is-node-running-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/why-is-node-running/v/2.3.0",
+          "sha256": "6a134e51aa31496c15a741592fc5d782b2dbf8d8b6b8524e15c8520ae0cd6374"
+        }
+      ]
+    },
+    {
+      "id": "npm__ws_8.23.0",
+      "name": "npm: ws",
+      "version": "8.23.0",
+      "license": "MIT",
+      "scope": "build",
+      "url": "https://www.npmjs.com/package/ws/v/8.23.0",
+      "sourceURL": "https://github.com/websockets/ws.git",
+      "notice": "빌드·타입 검사·테스트용 의존성. 이 분류가 모두 배포 EXE에 포함된다는 의미는 아닙니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/npm-node_modules_ws-LICENSE.txt",
+          "url": "https://www.npmjs.com/package/ws/v/8.23.0",
+          "sha256": "2b29dcfe0d6471f7e8c92c5fb38c9f93edee10330937055440192f1832b1ecef"
+        }
+      ]
+    },
+    {
+      "id": "Inter_font_Bundled_Inter-Medium.ttf",
+      "name": "Inter font",
+      "version": "Bundled Inter-Medium.ttf",
+      "license": "OFL-1.1",
+      "scope": "bundled",
+      "url": "https://rsms.me/inter/",
+      "sourceURL": "https://github.com/rsms/inter",
+      "notice": "Wails 템플릿에서 가져온 글꼴 파일의 고지입니다.",
+      "documents": [
+        {
+          "title": "Inter Font License.txt",
+          "file": "texts/inter-OFL.txt",
+          "url": "https://github.com/rsms/inter/blob/master/LICENSE.txt",
+          "sha256": "6e6410f2892d61813f54654098dc9654d0a3af2e92172999bee07eec13b0a75a"
+        }
+      ]
+    },
+    {
+      "id": "yt-dlp_2026.10.26_Windows_executable",
+      "name": "yt-dlp",
+      "version": "2026.10.26 Windows executable",
+      "license": "Unlicense (source); GPL-3.0-or-later (PyInstaller binary)",
+      "scope": "external",
+      "url": "https://github.com/yt-dlp/yt-dlp",
+      "sourceURL": "https://github.com/yt-dlp/yt-dlp/tree/2026.10.26",
+      "notice": "소스는 Unlicense이며 공식 Windows 단독 실행 파일은 포함된 구성 요소로 인해 GPLv3+ 조건을 따릅니다. 공식 배포본의 서드파티 고지를 함께 제공합니다.",
+      "documents": [
+        {
+          "title": "yt-dlp-LICENSE",
+          "file": "texts/external-yt-dlp-LICENSE.txt",
+          "url": "https://raw.githubusercontent.com/yt-dlp/yt-dlp/2026.10.26/LICENSE",
+          "sha256": "7e12e5df4bae12cb21581ba157ced20e1986a0508dd10d0e8a4ab9a4cf94e85c"
+        },
+        {
+          "title": "yt-dlp-THIRD_PARTY_LICENSES.txt",
+          "file": "texts/external-yt-dlp-THIRD_PARTY_LICENSES.txt.txt",
+          "url": "https://raw.githubusercontent.com/yt-dlp/yt-dlp/2026.10.26/THIRD_PARTY_LICENSES.txt",
+          "sha256": "472aefe951c7db35e1657c1d13fd337140511ed6f2b329205105ad441c5a02b7"
+        },
+        {
+          "title": "ffmpeg-COPYING.GPLv3",
+          "file": "texts/external-ffmpeg-COPYING.GPLv3.txt",
+          "url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/master/COPYING.GPLv3",
+          "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+        }
+      ]
+    },
+    {
+      "id": "gallery-dl_1.32.20_Windows_executable",
+      "name": "gallery-dl",
+      "version": "1.32.20 Windows executable",
+      "license": "GPL-2.0-only; dependencies have separate terms",
+      "scope": "external",
+      "url": "https://github.com/mikf/gallery-dl",
+      "sourceURL": "https://github.com/mikf/gallery-dl/tree/v1.32.20",
+      "notice": "Copyright 2014-2026 Mike Fährmann. Python과 타사 구성 요소를 포함하는 독립 실행 파일입니다. 배포본에 포함된 MarkupSafe·websockets 원문과 Python·추가 구성 요소의 참고 고지를 보존합니다. yt-dlp 종합 고지는 공통 의존성의 참고 자료이며 gallery-dl 전체 구성의 버전 명세는 아닙니다.",
+      "documents": [
+        {
+          "title": "gallery-dl-LICENSE",
+          "file": "texts/external-gallery-dl-LICENSE.txt",
+          "url": "https://raw.githubusercontent.com/mikf/gallery-dl/v1.32.20/LICENSE",
+          "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643"
+        },
+        {
+          "title": "Python-LICENSE",
+          "file": "texts/external-Python-LICENSE.txt",
+          "url": "https://raw.githubusercontent.com/python/cpython/v3.14.0/LICENSE",
+          "sha256": "b0e25a78cffb43f4d92de8b61ccfa1f1f98ecbc22330b54b5251e7b6ba010231"
+        },
+        {
+          "title": "gallery-binary-markupsafe-3.0.4.dist-info-licenses-LICENSE.txt",
+          "file": "texts/external-gallery-binary-markupsafe-3.0.4.dist-info-licenses-LICENSE.txt.txt",
+          "url": "https://codeberg.org/mikf/gallery-dl/releases/download/v1.32.20/gallery-dl.exe#markupsafe-3.0.4.dist-info/licenses/LICENSE.txt",
+          "sha256": "4631ec0db5fd90a547e336817264c6798214338146f8ac94b4a57f96ee8c9ec4"
+        },
+        {
+          "title": "gallery-binary-websockets-16.1.1.dist-info-licenses-LICENSE",
+          "file": "texts/external-gallery-binary-websockets-16.1.1.dist-info-licenses-LICENSE.txt",
+          "url": "https://codeberg.org/mikf/gallery-dl/releases/download/v1.32.20/gallery-dl.exe#websockets-16.1.1.dist-info/licenses/LICENSE",
+          "sha256": "0f44514998aca209d3482d10204a8adf2aa4296ff157a36a5c0922f2280632d3"
+        },
+        {
+          "title": "Jinja-LICENSE",
+          "file": "texts/external-Jinja-LICENSE.txt",
+          "url": "https://raw.githubusercontent.com/pallets/jinja/3.1.6/LICENSE.txt",
+          "sha256": "3b49dcee4105eb37bac10faf1be260408fe85d252b8e9df2e0979fc1e094437b"
+        },
+        {
+          "title": "PyYAML-LICENSE",
+          "file": "texts/external-PyYAML-LICENSE.txt",
+          "url": "https://raw.githubusercontent.com/yaml/pyyaml/6.0.3/LICENSE",
+          "sha256": "8d3928f9dc4490fd635707cb88eb26bd764102a7282954307d3e5167a577e8a4"
+        },
+        {
+          "title": "PySocks-LICENSE",
+          "file": "texts/external-PySocks-LICENSE.txt",
+          "url": "https://raw.githubusercontent.com/Anorov/PySocks/master/LICENSE",
+          "sha256": "7027e214e014eb78b7adcc1ceda5aca713a79fc4f6a0c52c9da5b3e707e6ffe9"
+        },
+        {
+          "title": "truststore-LICENSE",
+          "file": "texts/external-truststore-LICENSE.txt",
+          "url": "https://raw.githubusercontent.com/sethmlarson/truststore/v0.10.4/LICENSE",
+          "sha256": "33be7b7e8fa4fd19b1760e1a8ed8a668bdab852c91b692dd41424bcb725a9fca"
+        },
+        {
+          "title": "PyInstaller-COPYING",
+          "file": "texts/external-PyInstaller-COPYING.txt",
+          "url": "https://raw.githubusercontent.com/pyinstaller/pyinstaller/v6.16.0/COPYING.txt",
+          "sha256": "dcf75fdb959db1e3b41c0f8505069d2ece781b5ec6b3d0a4d30975cfc6580245"
+        },
+        {
+          "title": "yt-dlp-THIRD_PARTY_LICENSES.txt",
+          "file": "texts/external-yt-dlp-THIRD_PARTY_LICENSES.txt.txt",
+          "url": "https://raw.githubusercontent.com/yt-dlp/yt-dlp/2026.10.26/THIRD_PARTY_LICENSES.txt",
+          "sha256": "472aefe951c7db35e1657c1d13fd337140511ed6f2b329205105ad441c5a02b7"
+        }
+      ]
+    },
+    {
+      "id": "FFmpeg___ffprobe__BtbN_GPL_build__Rolling_latest__inspect_installed_-version___-L",
+      "name": "FFmpeg / ffprobe (BtbN GPL build)",
+      "version": "Rolling latest; inspect installed -version / -L",
+      "license": "GPL; exact build configuration governs",
+      "scope": "external",
+      "url": "https://ffmpeg.org/legal.html",
+      "sourceURL": "https://github.com/BtbN/FFmpeg-Builds",
+      "notice": "BtbN의 win64-gpl 빌드를 내려받습니다. GPL 버전과 추가 구성 요소는 설치한 실행 파일의 -L·-version 결과와 bin/licenses에 보존한 배포본 고지를 확인하세요. 아래 GPL/LGPL 원문은 빌드별 조건 확인용 참고 자료입니다. BtbN 빌드 스크립트의 MIT와 FFmpeg 바이너리의 GPL은 별도입니다.",
+      "documents": [
+        {
+          "title": "ffmpeg-LICENSE.md",
+          "file": "texts/external-ffmpeg-LICENSE.md.txt",
+          "url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/master/LICENSE.md",
+          "sha256": "e6dc72d5665a1ebd6dcc841de59278dad4ca77ecc47b03f1064a55c3e9ea8bb8"
+        },
+        {
+          "title": "ffmpeg-COPYING.GPLv3",
+          "file": "texts/external-ffmpeg-COPYING.GPLv3.txt",
+          "url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/master/COPYING.GPLv3",
+          "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+        },
+        {
+          "title": "ffmpeg-COPYING.GPLv2",
+          "file": "texts/external-ffmpeg-COPYING.GPLv2.txt",
+          "url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/master/COPYING.GPLv2",
+          "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643"
+        },
+        {
+          "title": "ffmpeg-COPYING.LGPLv2.1",
+          "file": "texts/external-ffmpeg-COPYING.LGPLv2.1.txt",
+          "url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/master/COPYING.LGPLv2.1",
+          "sha256": "246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30"
+        },
+        {
+          "title": "BtbN-README.md",
+          "file": "texts/external-BtbN-README.md.txt",
+          "url": "https://raw.githubusercontent.com/BtbN/FFmpeg-Builds/master/README.md",
+          "sha256": "4f6f817fd57c5524e0d0832618e8f75d589093e2f05ef1ec2839af98e70e5053"
+        },
+        {
+          "title": "BtbN-LICENSE",
+          "file": "texts/external-BtbN-LICENSE.txt",
+          "url": "https://raw.githubusercontent.com/BtbN/FFmpeg-Builds/master/LICENSE",
+          "sha256": "3a8df6889e4d5487b75f58326ef816df31ea49649d8f7146efda860b8167a964"
+        }
+      ]
+    },
+    {
+      "id": "ImageMagick_7.1.2-34_portable_Q16_x64",
+      "name": "ImageMagick",
+      "version": "7.1.2-34 portable Q16 x64",
+      "license": "ImageMagick License; delegate licenses in NOTICE",
+      "scope": "external",
+      "url": "https://imagemagick.org/license/",
+      "sourceURL": "https://github.com/ImageMagick/ImageMagick/tree/7.1.2-34",
+      "notice": "원본 파일 검사와 표시용 캐시 생성에 사용합니다. 고정된 공식 portable 배포본의 LICENSE.txt와 NOTICE.txt를 원문 그대로 보존합니다. 설치 디렉터리에도 배포본 고지가 함께 남습니다.",
+      "documents": [
+        {
+          "title": "ImageMagick-LICENSE.txt",
+          "file": "texts/external-ImageMagick-LICENSE.txt.txt",
+          "url": "https://github.com/ImageMagick/ImageMagick/releases/download/7.1.2-34/ImageMagick-7.1.2-34-portable-Q16-x64.7z#LICENSE.txt",
+          "sha256": "5ffcbc771d4cc2827ca8c4505f6b5b61e0bc1d933e0f41a47eea16ed06db4f90"
+        },
+        {
+          "title": "ImageMagick-NOTICE.txt",
+          "file": "texts/external-ImageMagick-NOTICE.txt.txt",
+          "url": "https://github.com/ImageMagick/ImageMagick/releases/download/7.1.2-34/ImageMagick-7.1.2-34-portable-Q16-x64.7z#NOTICE.txt",
+          "sha256": "e3b886c90cd022d1767f89d61522be57bb77b7e9c44d5bf92f57fa231ac7b6bf"
+        }
+      ]
+    },
+    {
+      "id": "Node.js__optional_external_runtime__System-installed_version__v24.11.1_reference_notices",
+      "name": "Node.js (optional external runtime)",
+      "version": "System-installed version; v24.11.1 reference notices",
+      "license": "MIT; bundled components have separate terms",
+      "scope": "external",
+      "url": "https://nodejs.org/",
+      "sourceURL": "https://github.com/nodejs/node/tree/v24.11.1",
+      "notice": "yt-dlp의 JavaScript 처리에 PATH의 Node.js를 사용할 수 있습니다. 앱이 설치하거나 함께 배포하지 않습니다. 아래 원문은 v24.11.1 참고 고지이며 실제 설치된 Node.js 버전의 LICENSE가 적용됩니다.",
+      "documents": [
+        {
+          "title": "Node-LICENSE",
+          "file": "texts/external-Node-LICENSE.txt",
+          "url": "https://raw.githubusercontent.com/nodejs/node/v24.11.1/LICENSE",
+          "sha256": "537308465103a306d0e3eecf42632b4ff1b48aaaec044e9fc10a78c81fd00b34"
+        }
+      ]
+    }
+  ]
+}

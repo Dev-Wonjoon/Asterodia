@@ -1,0 +1,19 @@
+Source: all_test.go, counters.go, memory.go, mmap_windows.go, nocounters.go, trace_disabled.go, trace_enabled.go
+// Copyright 2017 The Memory Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: decommit_unix.go, decommit_windows.go
+// Copyright 2026 The Memory Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: memory32.go, memory64.go
+// Copyright 2018 The Memory Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: mmap_unix.go
+// Copyright 2011 Evan Shaw. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE-MMAP-GO file.

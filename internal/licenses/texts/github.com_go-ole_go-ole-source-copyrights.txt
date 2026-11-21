@@ -1,0 +1,32 @@
+Source: _example/libreoffice/libreoffice.go
+/*
+	Demonstrates basic LibreOffce (OpenOffice) automation with OLE using GO-OLE.
+	Usage: 	cd [...]\go-ole\example\libreoffice
+			go run libreoffice.go
+	References:
+			http://www.openoffice.org/api/basic/man/tutorial/tutorial.pdf
+			http://api.libreoffice.org/examples/examples.html#OLE_examples
+			https://wiki.openoffice.org/wiki/Documentation/BASIC_Guide
+
+	Tested environment:
+			go 1.6.2 (windows/amd64)
+			LibreOffice 5.1.0.3 (32 bit)
+			Windows 10 (64 bit)
+
+	The MIT License (MIT)
+	Copyright (c) 2016 Sebastian Schleemilch <https://github.com/itschleemilch>.
+
+	Permission is hereby granted, free of charge, to any person obtaining a copy of
+	this software and associated documentation files (the "Software"), to deal in
+	the Software without restriction, including without limitation the rights to use,
+	copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+	and to permit persons to whom the Software is furnished to do so, subject to the
+	following conditions:
+
+	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+	INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+	PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+	LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+	TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+	OR OTHER DEALINGS IN THE SOFTWARE.
+*/
