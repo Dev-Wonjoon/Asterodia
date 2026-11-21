@@ -7,12 +7,14 @@ export function DownloadThumbnail({
     url,
     localPath,
     completed = false,
-    title = '다운로드 썸네일'
+    title = '다운로드 썸네일',
+    fullWidth = false
 }: {
     url: string
     localPath?: string | null
     completed?: boolean
     title?: string
+    fullWidth?: boolean
 }): React.JSX.Element {
     const [result, setResult] = useState<{
         url: string
@@ -74,7 +76,7 @@ export function DownloadThumbnail({
     const loading = current ? current.loading : !localPath
 
     return (
-        <div className="flex aspect-video w-28 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--bg-hover)] text-[var(--text-muted)] sm:w-36">
+        <div className={'flex aspect-video shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--bg-hover)] text-[var(--text-muted)] ' + (fullWidth ? 'w-full' : 'w-28 sm:w-36')}>
             {src && src !== failedSrc ? (
                 <img
                     key={src}

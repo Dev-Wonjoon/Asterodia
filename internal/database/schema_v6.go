@@ -76,7 +76,7 @@ func upgradeImportCheckpoints(ctx context.Context, q connection, checkpoint func
 			return e
 		}
 		staging := name + "_v6"
-		ddl := strings.Replace(tableDDL(schemaSQL, name), `CREATE TABLE "`+name+`"`, `CREATE TABLE "`+staging+`"`, 1)
+		ddl := strings.Replace(tableDDL(schemaV6SQL, name), `CREATE TABLE "`+name+`"`, `CREATE TABLE "`+staging+`"`, 1)
 		if _, err = q.ExecContext(ctx, ddl); err != nil {
 			return err
 		}
@@ -92,7 +92,7 @@ func upgradeImportCheckpoints(ctx context.Context, q connection, checkpoint func
 	if _, err = q.ExecContext(ctx, "UPDATE local_import_job SET work_version=1,scan_complete=CASE WHEN state='scanning' THEN 0 ELSE 1 END"); err != nil {
 		return err
 	}
-	if _, err = q.ExecContext(ctx, tableDDL(schemaSQL, "local_import_scan_directory")); err != nil {
+	if _, err = q.ExecContext(ctx, tableDDL(schemaV6SQL, "local_import_scan_directory")); err != nil {
 		return err
 	}
 	expected, e := memoryDatabase()
@@ -100,7 +100,7 @@ func upgradeImportCheckpoints(ctx context.Context, q connection, checkpoint func
 		return e
 	}
 	defer expected.Close()
-	if _, err = expected.ExecContext(ctx, schemaSQL); err != nil {
+	if _, err = expected.ExecContext(ctx, schemaV6SQL); err != nil {
 		return err
 	}
 	want, e := records(ctx, expected, "SELECT type,name,tbl_name,sql FROM sqlite_master WHERE sql IS NOT NULL AND (type='trigger' OR type='index') ORDER BY type,name")

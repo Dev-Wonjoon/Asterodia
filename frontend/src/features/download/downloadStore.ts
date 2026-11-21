@@ -7,7 +7,7 @@ import type {
     ManualDownloadTrigger
 } from '@contracts/download-api'
 import type { DownloadJobOptions } from '@contracts/download-api'
-import { canRetryDownload, downloadTrigger } from './downloadPresentation'
+import { canRetryDownload, downloadTrigger, isGalleryDownload } from './downloadPresentation'
 
 export const DOWNLOAD_PAGE_SIZE = 50
 
@@ -20,6 +20,7 @@ export interface DownloadNotice {
 
 export interface DownloadSnapshot {
     queue: DownloadJobDto[]
+    activeJobs: DownloadJobDto[]
     mediaRevision: number
     ready: boolean
     loading: boolean
@@ -63,6 +64,7 @@ function failure(code: string, message: string): DownloadResponse<never> {
 export function createDownloadStore(api: DownloadApi, pollMs = 2000, confirm: Confirm = async () => false): DownloadStore {
     let snapshot: DownloadSnapshot = {
         queue: [],
+        activeJobs: [],
         mediaRevision: 0,
         ready: false,
         loading: false,
@@ -260,12 +262,24 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000, confirm: Co
                 return
             }
 
-            for (const job of page.data) {
+            const activeJobs = (page.activeJobs ?? page.data).filter(isGalleryDownload)
+            const activeIds = new Set(activeJobs.map(job => job.id))
+            const pageIds = new Set(page.data.map(job => job.id))
+            const outsidePage = [...observed].filter(([id, job]) =>
+                (job.state === 'pending' || job.state === 'running') && !activeIds.has(id) && !pageIds.has(id))
+            const ended = await Promise.all(outsidePage.map(async ([jobId]) => {
+                try { return await api.get({ jobId }) } catch { return null }
+            }))
+            if (!connected || generation !== ownGeneration || serial !== readSerial) return
+            for (const result of ended) if (result?.ok) observe(result.data)
+            for (const job of [...page.data, ...activeJobs]) {
                 observe(job)
             }
 
             const keep = new Set([
                 ...page.data.map((job) => job.id),
+                ...activeIds,
+                ...outsidePage.filter((_, index) => !ended[index]?.ok).map(([id]) => id),
                 ...requested,
                 ...batchPending,
                 ...(snapshot.detail.jobId ? [snapshot.detail.jobId] : [])
@@ -277,6 +291,7 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000, confirm: Co
 
             publish({
                 queue: page.data,
+                activeJobs,
                 offset: page.offset,
                 hasNextPage: page.hasNextPage,
                 loading: false,
@@ -464,6 +479,9 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000, confirm: Co
                 observe(job)
 
                 publish({
+                    activeJobs: isGalleryDownload(job)
+                        ? [job, ...snapshot.activeJobs.filter(item => item.id !== job.id)]
+                        : snapshot.activeJobs,
                     queue: [job, ...snapshot.queue.filter((item) => item.id !== job.id)].slice(
                         0,
                         DOWNLOAD_PAGE_SIZE

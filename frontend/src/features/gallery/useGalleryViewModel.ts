@@ -15,7 +15,8 @@ export function useGalleryViewModel(favoritesOnly = false, filter?: MediaFilter)
 
     const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
 
-    const { mediaRevision } = useDownloadViewModel()
+    const downloads = useDownloadViewModel()
+    const { mediaRevision } = downloads
     const filterKey = JSON.stringify(filter ?? {})
 
     useEffect(() => () => store.cancelReads(), [store])
@@ -57,6 +58,7 @@ export function useGalleryViewModel(favoritesOnly = false, filter?: MediaFilter)
     return {
         store,
         snapshot,
+        downloads,
         openInFolder
     }
 }

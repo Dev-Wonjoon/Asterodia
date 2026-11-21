@@ -51,7 +51,9 @@ func Select(rawURL string, options Options) (Kind, error) {
 			return "", ErrInvalidURL
 		}
 	}
-	if options.Type == "audio" ||
+	manifestPath := strings.ToLower(parsed.Path)
+	if strings.HasSuffix(manifestPath, ".m3u8") || strings.HasSuffix(manifestPath, ".mpd") ||
+		options.Type == "audio" ||
 		options.Quality == "audio" ||
 		(options.Quality != "" && options.Quality != "best") ||
 		options.Extension != "" {

@@ -6,6 +6,7 @@ import { MediaPreview } from '@renderer/shared/components/media/MediaPreview'
 import { MediaPlayer } from '@renderer/shared/components/media/MediaPlayer'
 import { MEDIA_PAGE_SIZE, type GallerySnapshot, type GalleryStore } from './galleryStore'
 import { MediaThumbnailStatus } from './MediaThumbnailStatus'
+import { MediaEditLauncher } from '../mediaedit/MediaEditLauncher'
 
 export interface MediaDetailFocusRequest {
     mediaId: number
@@ -442,6 +443,7 @@ export function MediaDetailPane({
                                 </div>
 
                                 <div className="flex flex-wrap items-start gap-2">
+                                    {(file.kind === 'video'||file.kind==='image'&&(file.detectedFormat==='gif'||/\.gif$/i.test(file.filepath))) && <MediaEditLauncher file={file} disabled={disabled} />}
                                     <button
                                         type="button"
                                         className={button}

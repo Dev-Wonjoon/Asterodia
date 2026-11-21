@@ -5,7 +5,7 @@ import type { WebServerStatus, WebServerResult } from '@contracts/webserver-api'
 import { WebServerSettings } from '@renderer/features/settings/WebServerSettings'
 import { cleanupReact, clickButton, deferred, mount } from './reactHarness'
 
-const api = vi.hoisted(() => ({ status: vi.fn(), start: vi.fn(), stop: vi.fn() }))
+const api = vi.hoisted(() => ({ status: vi.fn(), start: vi.fn(), stop: vi.fn(), setEditing: vi.fn() }))
 vi.mock('@renderer/shared/api', () => ({ getApi: () => ({ webServer: api }) }))
 const state = (running = false, error: string | null = null): WebServerStatus => ({ running, url: 'http://127.0.0.1:9246', error })
 const ok = (data: WebServerStatus): WebServerResult<WebServerStatus> => ({ ok: true, data })
@@ -21,7 +21,7 @@ describe('localhost web server controls', () => {
         await mount(h(WebServerSettings)); expect(button('서버 시작').disabled).toBe(true)
         await act(async () => { first.resolve(ok(state())) }); expect(document.body.textContent).toContain('꺼짐')
         expect(document.body.textContent).toContain('http://127.0.0.1:9246')
-        expect(document.body.textContent).not.toMatch(/tailscale/i)
+        expect(document.body.textContent).toContain('모바일 편집 허용')
         expect(document.querySelector('code')).toBeNull()
         await act(async () => { await vi.advanceTimersByTimeAsync(4000) }); expect(api.status).toHaveBeenCalledTimes(1)
         await clickButton('서버 시작'); expect(document.body.textContent).toContain('실행 중')

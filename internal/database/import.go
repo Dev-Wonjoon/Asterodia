@@ -147,6 +147,12 @@ func checkImportIdle(ctx context.Context, q connection) error {
 	if active > 0 {
 		return fmt.Errorf("다운로드·가져오기·파일 이동·정리 작업을 마친 뒤 DB를 가져오세요")
 	}
+	if err := q.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM media_edit_session WHERE state IN ('pending','preparing','stop_unconfirmed'))+(SELECT count(*) FROM media_edit_job WHERE state IN ('pending','running','verifying','publishing','stop_unconfirmed'))`).Scan(&active); err != nil {
+		return err
+	}
+	if active > 0 {
+		return fmt.Errorf("미디어 편집 작업을 마친 뒤 DB를 가져오세요")
+	}
 	return nil
 }
 func sourceIdentity(data map[string][]record, path string) string {
@@ -497,7 +503,7 @@ func (m *merge) parent(r record) error {
 			}
 			target = candidate
 		}
-	case "legacy":
+	case "legacy", "edited":
 		paths := []string{}
 		for _, f := range m.sourceFiles[old] {
 			paths = append(paths, pathIdentity(textValue(f["filepath"]), m.sourceDir))

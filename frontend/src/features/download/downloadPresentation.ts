@@ -41,6 +41,10 @@ export function visibleProgress(job: DownloadJobDto): number | null {
         ? job.progress
         : null
 }
+export function isGalleryDownload(job: DownloadJobDto): boolean {
+    return (job.state === 'pending' || job.state === 'running') &&
+        !job.historyOnly && !job.cleanupRequired && job.phase !== 'rolling_back'
+}
 export function downloadTrigger(job: DownloadJobDto): ManualDownloadTrigger | null {
     if (job.state === 'pending') return 'manual_initial'
     if (job.state === 'failed') return 'manual_retry'

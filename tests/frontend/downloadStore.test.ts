@@ -96,6 +96,7 @@ function fixture() {
       } = {}) =>
         ok({
           data: rows.slice(offset, offset + limit),
+          activeJobs: rows.filter(row => row.state === 'pending' || row.state === 'running'),
           limit,
           offset,
           hasNextPage: rows.length > offset + limit
@@ -175,6 +176,33 @@ afterEach(() => {
 })
 
 describe('download store', () => {
+  it('keeps active gallery jobs across history pages and removes failures without deleting history', async () => {
+    const f = fixture()
+    f.rows.push(...Array.from({length: 55}, (_, i) => job('history-' + i, 'failed')), job('old', 'running'))
+    const { store } = open(f); await flush()
+    expect(store.getSnapshot().queue.some(row => row.id === 'old')).toBe(false)
+    expect(store.getSnapshot().activeJobs.map(row => row.id)).toEqual(['old'])
+    f.rows[55].state = 'failed'; await store.refresh()
+    expect(store.getSnapshot().activeJobs).toEqual([])
+    expect(store.getSnapshot().mediaRevision).toBe(0)
+    expect(f.rows).toHaveLength(56)
+    f.rows[55].state = 'pending'; await store.refresh()
+    expect(store.getSnapshot().activeJobs.map(row => row.id)).toEqual(['old'])
+    f.rows[55].state = 'completed'; f.rows[55].currentAttemptId = 'finished-old'; await store.refresh()
+    expect(store.getSnapshot().activeJobs).toEqual([])
+    expect(store.getSnapshot().mediaRevision).toBe(1)
+    await store.refresh(); expect(store.getSnapshot().mediaRevision).toBe(1)
+  })
+
+  it('retries an off-page completion lookup after a transient read failure', async () => {
+    const f = fixture()
+    f.rows.push(...Array.from({length: 50}, (_, i) => job('history-' + i, 'failed')), job('old', 'running'))
+    const { store } = open(f); await flush()
+    f.rows[50].state = 'completed'; f.rows[50].currentAttemptId = 'new-attempt'
+    f.api.get.mockRejectedValueOnce(new Error('temporary'))
+    await store.refresh(); expect(store.getSnapshot().mediaRevision).toBe(0)
+    await store.refresh(); expect(store.getSnapshot().mediaRevision).toBe(1)
+  })
   it('한 provider의 조회 결과를 여러 소비자가 공유한다', async () => {
     const f = fixture()
     const { store } = open(f)

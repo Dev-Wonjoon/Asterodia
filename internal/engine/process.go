@@ -121,13 +121,25 @@ func (r *ProcessRunner) Run(
 		return ProcessResult{ExitCode: -1}, err
 	}
 
-	if request.Timeout <= 0 {
+	if request.Timeout <= 0 && !request.Unbounded {
 		return ProcessResult{ExitCode: -1},
 			fmt.Errorf("프로세스 실행 제한 시간은 양수여야 합니다")
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, request.Timeout)
-	defer cancel()
+	if !request.Unbounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, request.Timeout)
+		defer cancel()
+	}
+	if observer, ok := ctx.Value(memoryKey{}).(func(ProcessMemory)); ok {
+		next := request.OnMemory
+		request.OnMemory = func(sample ProcessMemory) {
+			observer(sample)
+			if next != nil {
+				next(sample)
+			}
+		}
+	}
 	observer, _ := ctx.Value(outputKey{}).(func(Output))
 	if observer != nil {
 		name := strings.TrimSuffix(strings.ToLower(filepath.Base(request.Executable)), ".exe")

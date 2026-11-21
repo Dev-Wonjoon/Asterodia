@@ -7,7 +7,8 @@ import {
     downloadPlatform,
     downloadStatus,
     downloadTrigger,
-    visibleProgress
+    visibleProgress,
+    isGalleryDownload
 } from '@renderer/features/download/downloadPresentation'
 const job: DownloadJobDto = {
     id: 'job',
@@ -23,6 +24,13 @@ const job: DownloadJobDto = {
 }
 
 describe('download presentation', () => {
+    it('shows only active, non-history jobs in the gallery', () => {
+        for (const state of ['pending', 'running'] as const) expect(isGalleryDownload({ ...job, state })).toBe(true)
+        for (const state of ['failed', 'cancelled', 'interrupted', 'completed'] as const) expect(isGalleryDownload({ ...job, state })).toBe(false)
+        expect(isGalleryDownload({ ...job, phase: 'rolling_back' })).toBe(false)
+        expect(isGalleryDownload({ ...job, cleanupRequired: true })).toBe(false)
+        expect(isGalleryDownload({ ...job, historyOnly: true })).toBe(false)
+    })
     it('only finished failed/cancelled requests can be deleted or included in bulk retry', () => {
         for (const state of ['failed', 'cancelled'] as const) {
             const target = { ...job, state }
@@ -43,7 +51,7 @@ describe('download presentation', () => {
         expect(result.ok).toBe(false)
         if (!result.ok) {
             expect(result.error.message).toContain('MP4·M4A')
-            expect(result.error.message).toContain('HLS·DASH')
+            expect(result.error.message).not.toContain('아직 지원하지 않습니다')
         }
     })
     it('Instagram 인증·접근 제한·요청 제한의 안내를 구분한다', () => {

@@ -43,7 +43,9 @@ func (s *Service) list(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
-	result := s.library.List(ctx, media.ListRequest{Limit: limit, Offset: offset, Filter: media.Filter{Keyword: q}})
+	filter := mobileSearchFilter(r)
+	filter.Keyword = q
+	result := s.library.List(ctx, media.ListRequest{Limit: limit, Offset: offset, Filter: filter})
 	if apiError(w, r, result) {
 		return
 	}
@@ -53,6 +55,27 @@ func (s *Service) list(w http.ResponseWriter, r *http.Request) {
 		items = append(items, publicSummary(row))
 	}
 	respond(w, r, map[string]any{"data": items, "total": page["total"], "hasNextPage": page["hasNextPage"]})
+}
+
+func mobileSearchFilter(r *http.Request) media.Filter {
+	query := r.URL.Query()
+	return media.Filter{Tags: query["tag"], Authors: query["author"], Platforms: query["platform"], TagMode: "and"}
+}
+
+func (s *Service) searchSuggestions(w http.ResponseWriter, r *http.Request) {
+	limit, e1 := integer(r, "limit", 10)
+	offset, e2 := integer(r, "offset", 0)
+	if e1 != nil || e2 != nil || limit < 1 || limit > 50 || offset < 0 {
+		http.Error(w, "조회 범위를 확인하세요", 400)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	result := s.library.SearchSuggest(ctx, media.SearchSuggestRequest{Text: r.URL.Query().Get("q"), Limit: limit, Offset: offset, Filter: mobileSearchFilter(r)})
+	if apiError(w, r, result) {
+		return
+	}
+	respond(w, r, result.Data)
 }
 
 func (s *Service) detail(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +96,7 @@ func (s *Service) detail(w http.ResponseWriter, r *http.Request) {
 	page := row["files"].(media.Object)
 	files := []map[string]any{}
 	for _, file := range page["data"].([]media.Object) {
-		files = append(files, map[string]any{"id": file["id"], "title": file["title"], "kind": file["kind"], "width": file["width"], "height": file["height"], "duration": file["duration"]})
+		files = append(files, map[string]any{"id": file["id"], "title": file["title"], "kind": file["kind"], "width": file["width"], "height": file["height"], "duration": file["duration"], "detectedFormat": file["detectedFormat"]})
 	}
 	detail["files"] = map[string]any{"data": files, "total": page["total"], "hasNextPage": page["hasNextPage"]}
 	respond(w, r, detail)

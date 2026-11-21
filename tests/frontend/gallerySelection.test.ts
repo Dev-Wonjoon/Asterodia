@@ -7,18 +7,35 @@ const mocks = vi.hoisted(() => ({ bulk: vi.fn(), unregister: vi.fn(), confirm: v
 const api = {fileMove:{get:mocks.get,create:mocks.create,run:mocks.run},media:{directories:mocks.directories},onMediaThumbnailUpdated:mocks.on}
 vi.mock('@renderer/shared/hooks/useConfirm',()=>({useConfirm:()=>({confirm:mocks.confirm,isOpen:false})}))
 vi.mock('@renderer/shared/api',()=>({getApi:()=>api}))
-const store = {refresh:mocks.refresh,getSnapshot:mocks.getSnapshot,unregisterMedia:mocks.unregister,bulk:mocks.bulk}
-vi.mock('@renderer/features/gallery/useGalleryViewModel',()=>({useGalleryViewModel:()=>({store,snapshot:mocks.state,openInFolder:vi.fn()})}))
+const store = {refresh:mocks.refresh,getSnapshot:mocks.getSnapshot,unregisterMedia:mocks.unregister,bulk:mocks.bulk,closeDetail:vi.fn()}
+const downloads = { activeJobs: [] as any[], cancellingIds: [], openDetail: vi.fn(), closeDetail: vi.fn(), cancelDownload: vi.fn() }
+vi.mock('@renderer/features/gallery/useGalleryViewModel',()=>({useGalleryViewModel:()=>({store,snapshot:mocks.state,openInFolder:vi.fn(),downloads})}))
 vi.mock('@renderer/shared/hooks/useLeaveGuard',()=>({useLeaveGuard:vi.fn()}))
 vi.mock('@renderer/shared/hooks/useInfiniteScroll',()=>({useInfiniteScroll:vi.fn()}))
+vi.mock('@renderer/features/download/components/DownloadThumbnail',()=>({DownloadThumbnail:()=>h('div',null,'작업 썸네일')}))
+vi.mock('@renderer/features/download/components/DownloadDetailPane',()=>({DownloadDetailPane:()=>h('div',null,'선택한 다운로드 작업')}))
 vi.mock('@renderer/features/localimport/LocalImportPanel',()=>({LocalImportPanel:()=>null}))
 afterEach(cleanupReact)
 function setup(){
+ downloads.activeJobs=[]; downloads.openDetail.mockClear(); downloads.closeDetail.mockClear(); downloads.cancelDownload.mockClear()
  mocks.confirm.mockReset().mockResolvedValue(true);mocks.unregister.mockReset().mockResolvedValue(true)
  mocks.bulk.mockReset().mockResolvedValue({succeeded:[1],failed:[{mediaId:2,message:'시험 오류'}]})
  mocks.state={busy:false,needsRefresh:false,detail:{mediaId:null},list:{status:'ready',page:{data:[1,2].map(id=>({id,title:'게시글 '+id,sourceKind:'download',revision:4,createdAt:1,isFavorite:false,fileCount:2})),total:2,hasNextPage:false}}}
  mocks.getSnapshot.mockImplementation(()=>mocks.state);mocks.on.mockReturnValue(()=>{});mocks.get.mockResolvedValue({ok:true,data:null});mocks.directories.mockResolvedValue({ok:true,data:{data:[{id:7,directoryPath:'C:/B'}],hasNextPage:false}});mocks.create.mockResolvedValue({ok:true,data:{jobId:'job'}});mocks.run.mockResolvedValue({ok:true,data:{jobId:'job'}})
 }
+it('shows active downloads before registered media and connects cancellation and detail', async () => {
+ setup(); downloads.activeJobs=[{id:'queued',title:'새 영상',url:'https://example.invalid/a',state:'pending',phase:null,progress:0,cleanupRequired:false}]
+ await mount(h(GalleryPage))
+ expect([...document.querySelectorAll('article')].map(item=>item.textContent)).toEqual([expect.stringContaining('새 영상'),expect.stringContaining('게시글 1'),expect.stringContaining('게시글 2')])
+ await clickButton('다운로드 취소');expect(downloads.cancelDownload).toHaveBeenCalledExactlyOnceWith('queued')
+ await clickButton('새 영상 다운로드 상세보기');expect(downloads.openDetail).toHaveBeenCalledExactlyOnceWith('queued')
+ expect(document.body.textContent).toContain('선택한 다운로드 작업')
+})
+it('does not mix queued jobs into favorites or search results', async () => {
+ setup(); downloads.activeJobs=[{id:'queued',title:'새 영상'}]
+ const stop=await mount(h(GalleryPage,{favoritesOnly:true}));expect(document.body.textContent).not.toContain('새 영상');await stop()
+ await mount(h(GalleryPage,{filter:{keyword:'검색'}}));expect(document.body.textContent).not.toContain('새 영상')
+})
 it('connects gallery checkboxes to one multi-post move request',async()=>{
  setup()
  await mount(h(GalleryPage))
@@ -66,13 +83,13 @@ it('shows selection actions and counts on the left only while items are selected
  setup();await mount(h(GalleryPage))
  const header=document.querySelector('header')!
  const initialControls=[...header.querySelectorAll('button')].map(item=>item.textContent)
- expect(initialControls).toEqual(['새로고침','메뉴'])
+ expect(initialControls).toEqual(['미디어 편집 작업','새로고침','메뉴'])
  expect(header.querySelector('[role=status]')).toBeNull();expect(header.querySelector('.invisible')).toBeNull()
  expect(header.textContent).not.toContain('묶음');expect(header.textContent).not.toContain('게시글')
  await act(async()=>document.querySelector<HTMLInputElement>('input[type=checkbox]')!.click())
  expect(header.querySelector('[role=status]')?.textContent).toBe('2 / 1')
  expect([...document.querySelectorAll('button')].some(item=>item.getAttribute('aria-label')==='게시글 1 더보기')).toBe(true)
- expect([...header.querySelectorAll('button')].map(item=>item.textContent)).toEqual(['선택 작업','새로고침','메뉴'])
+ expect([...header.querySelectorAll('button')].map(item=>item.textContent)).toEqual(['미디어 편집 작업','선택 작업','새로고침','메뉴'])
  expect(header.textContent!.indexOf('선택 작업')).toBeLessThan(header.textContent!.indexOf('2 / 1'))
  expect(header.textContent!.indexOf('2 / 1')).toBeLessThan(header.textContent!.indexOf('새로고침'))
  await clickButton('메뉴');await clickButton('선택 해제')

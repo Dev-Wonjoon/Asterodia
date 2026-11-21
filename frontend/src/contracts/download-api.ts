@@ -64,6 +64,7 @@ export interface DownloadJobDto {
 
 export interface DownloadPageDto {
     data: DownloadJobDto[]
+    activeJobs?: DownloadJobDto[]
     limit: number
     offset: number
     hasNextPage: boolean
@@ -157,7 +158,7 @@ export function downloadFailure(code: string): DownloadResponse<never> {
         CANNOT_CANCEL_COMMITTING: '저장 중인 작업은 취소할 수 없습니다.',
         DATABASE_ERROR: '다운로드 DB 작업을 처리하지 못했습니다.',
         UNSUPPORTED_TARGET_DISCOVERY: '지원하지 않는 주소·옵션이거나 엔진 버전이 맞지 않습니다.',
-        UNSUPPORTED_MEDIA_FORMAT: '요청한 종류·화질에 맞는 HTTP(S) MP4·M4A 파일이 없습니다. HLS·DASH는 아직 지원하지 않습니다.',
+        UNSUPPORTED_MEDIA_FORMAT: '요청한 종류·화질에 맞는 MP4·M4A 포맷이 없습니다. 다른 화질이나 옵션을 선택하세요.',
         DOWNLOAD_ENGINE_FAILED: '다운로드 엔진이 작업을 완료하지 못했습니다. 실제 오류와 실행 로그를 확인하세요.',
         ENGINE_STOP_UNCONFIRMED: '엔진 종료 상태를 확인할 수 없어 실행을 보류했습니다.'
     }

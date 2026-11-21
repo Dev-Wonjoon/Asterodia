@@ -27,7 +27,7 @@ type Ytdlp struct {
 	runner         ProcessRunner
 }
 
-var ErrUnsupportedMediaFormat = errors.New("지원하는 HTTP(S) MP4·M4A 포맷이 없습니다. HLS·DASH 등 분할 스트리밍은 아직 지원하지 않습니다")
+var ErrUnsupportedMediaFormat = errors.New("요청한 종류·화질에 맞는 MP4·M4A 포맷이 없습니다")
 
 func ytdlpMaxHeight(quality string) (int, error) {
 	height, ok := map[string]int{"": 0, "best": 0, "audio": 0, "480": 480, "720": 720, "1080": 1080, "2k": 1440, "4k": 2160, "8k": 4320}[quality]
@@ -163,7 +163,7 @@ func selectYtdlpFormats(
 	case !audio && videoOnly != nil:
 		return []ytdlpDirectFormat{*videoOnly}, "bestvideo", nil
 	default:
-		return nil, "", fmt.Errorf("%w. 요청한 종류·화질에 맞는 직접 파일이 필요합니다", ErrUnsupportedMediaFormat)
+		return nil, "", ErrUnsupportedMediaFormat
 	}
 }
 
@@ -222,6 +222,13 @@ func (y *Ytdlp) DownloadSingle(
 	}
 	expectedFormatID := selected[0].ID
 	merge := len(selected) == 2
+	streaming := false
+	for _, format := range selected {
+		streaming = streaming || format.Protocol == "m3u8" || format.Protocol == "m3u8_native" || format.Protocol == "http_dash_segments"
+	}
+	if streaming && !filepath.IsAbs(y.FFmpegLocation) {
+		return "", fmt.Errorf("HLS·DASH 처리에는 FFmpeg 절대 경로가 필요합니다")
+	}
 	if merge {
 		expectedFormatID += "+" + selected[1].ID
 	}
@@ -248,7 +255,9 @@ func (y *Ytdlp) DownloadSingle(
 			"--no-cookies", "--no-cookies-from-browser",
 			"--no-js-runtimes", "--no-remote-components",
 			"--encoding", "utf-8", "--abort-on-error",
-			"--no-simulate", "--no-quiet", "--progress", "--newline", "--progress-delta", "0.5", "--fixup", "never",
+			"--no-simulate", "--no-quiet", "--progress", "--newline", "--progress-delta", "0.5",
+			"--abort-on-unavailable-fragments", "--fixup", "detect_or_warn",
+			"--downloader", "m3u8:native",
 			"--paths", "home:" + stageDir,
 			"--paths", "temp:" + stageDir,
 			"--output", "media.%(ext)s",
@@ -257,7 +266,7 @@ func (y *Ytdlp) DownloadSingle(
 		},
 	}
 
-	if audio || merge {
+	if audio || merge || streaming {
 		request.Arguments = append(request.Arguments,
 			"--ffmpeg-location", y.FFmpegLocation,
 		)
@@ -433,7 +442,6 @@ func buildYtdlpDownloadInfo(raw json.RawMessage, target YtdlpTarget) (string, er
 			format.AudioCodec != "none"
 
 		if format.ID == "" || (!hasVideo && !audioOnly) ||
-			len(candidate.Fragments) > 0 ||
 			(drm != "" && drm != "null" && drm != "false") {
 			continue
 		}
@@ -446,10 +454,15 @@ func buildYtdlpDownloadInfo(raw json.RawMessage, target YtdlpTarget) (string, er
 		if format.Protocol == "" {
 			format.Protocol = mediaURL.Scheme
 		}
-		if format.Protocol != "http" && format.Protocol != "https" {
+		switch format.Protocol {
+		case "http", "https", "m3u8", "m3u8_native", "http_dash_segments":
+		default:
 			continue
 		}
 		// Preserve the extractor's bounded Range requests when freezing formats.
+		if len(candidate.Fragments) > 0 && (format.Protocol == "http" || format.Protocol == "https") {
+			continue
+		}
 		if format.DownloaderOptions != nil && format.DownloaderOptions.HTTPChunkSize < 0 {
 			format.DownloaderOptions.HTTPChunkSize = 0
 		}

@@ -1,4 +1,5 @@
 import { useConfirm } from '@renderer/shared/hooks/useConfirm'
+import { MediaEditLauncher } from '../mediaedit/MediaEditLauncher'
 import { FileMovePanel, type FileMoveControls } from "./FileMovePanel"
 import type { MoveSelection } from "@contracts/file-move-api"
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -10,6 +11,8 @@ import { MediaPreview } from '@renderer/shared/components/media/MediaPreview'
 import { MediaDetailPane, type MediaDetailFocusRequest } from './MediaDetailPane'
 import { GalleryCardActions } from './GalleryCardActions'
 import { useGalleryViewModel } from './useGalleryViewModel'
+import { GalleryDownloadCard } from './GalleryDownloadCard'
+import { DownloadDetailPane } from '../download/components/DownloadDetailPane'
 import type { MediaFilter } from '@contracts/media-v2'
 import { getApi } from '@renderer/shared/api'
 import { LocalImportPanel, type LocalImportControls } from '@renderer/features/localimport/LocalImportPanel'
@@ -30,7 +33,16 @@ export const GalleryPage = ({
 } = {}): React.JSX.Element => {
     const { confirm } = useConfirm()
     const generation = useRef(0)
-    const { store, snapshot: state, openInFolder } = useGalleryViewModel(favoritesOnly, filter)
+    const { store, snapshot: state, openInFolder, downloads } = useGalleryViewModel(favoritesOnly, filter)
+    const activeJobs = !favoritesOnly && !filter ? downloads.activeJobs : []
+    const [downloadDetailId, setDownloadDetailId] = useState<string | null>(null)
+    useEffect(() => () => downloads.closeDetail(), [downloads.closeDetail])
+    useEffect(() => {
+        if (downloadDetailId && !activeJobs.some(job => job.id === downloadDetailId)) {
+            setDownloadDetailId(null)
+            downloads.closeDetail()
+        }
+    }, [activeJobs, downloadDetailId, downloads.closeDetail])
 
     useEffect(() => { ++generation.current; return () => { ++generation.current } }, [store])
     const [selection, setSelection] = useState<MoveSelection[]>([])
@@ -127,6 +139,7 @@ export const GalleryPage = ({
             const latest = store.getSnapshot()
             if (!accepted || generation.current !== own || latest.busy || latest.detail.mediaId !== current.detail.mediaId) return false
             setEditFocus(null)
+            setDownloadDetailId(null); downloads.closeDetail()
             void store.openDetail(mediaId)
             return true
         }
@@ -159,6 +172,9 @@ export const GalleryPage = ({
         void store.unregisterMedia({ mediaId, expectedRevision: media.revision })
     }
     function closeDetail(): boolean | Promise<boolean> {
+        if (downloadDetailId !== null) {
+            setDownloadDetailId(null); downloads.closeDetail(); return true
+        }
         const current = store.getSnapshot(), own = generation.current
         if (current.busy) return false
         const apply = (accepted: boolean) => {
@@ -181,15 +197,24 @@ export const GalleryPage = ({
     const button =
         'rounded-lg border border-[var(--border-line)] px-3 py-2 text-sm disabled:opacity-40'
 
+    async function openDownload(jobId: string) {
+        const own = generation.current
+        if (disabled || moveBusy || tagCommand !== null || !await closeDetail()) return
+        // A discard dialog may outlive the selected download or gallery view.
+        if (generation.current !== own || !downloads.activeJobs.some(job => job.id === jobId)) return
+        setDownloadDetailId(jobId)
+        void downloads.openDetail(jobId)
+    }
+
     return (
         <ListDetailLayout
-            detailLabel="미디어 상세"
-            detailKey={state.detail.mediaId}
+            detailLabel={downloadDetailId ? '다운로드 상세' : '미디어 상세'}
+            detailKey={downloadDetailId ? 'download:' + downloadDetailId : state.detail.mediaId}
             onClose={closeDetail}
             listRef={listScrollRef}
             closeDisabled={state.busy || bulk.busy || moveBusy || tagCommand !== null}
             detail={
-                state.detail.mediaId !== null ? (
+                downloadDetailId !== null ? <DownloadDetailPane /> : state.detail.mediaId !== null ? (
                     <MediaDetailPane
                         key={state.detail.mediaId}
                         state={state}
@@ -205,6 +230,7 @@ export const GalleryPage = ({
             <div className="space-y-5 pb-6">
                 <header className="flex flex-wrap items-center justify-between gap-3">
                     <h1 className="text-lg font-semibold">{title}</h1>
+                    <MediaEditLauncher />
 
                     <GalleryToolbar total={list.status === 'ready' ? list.page.total : null} count={selection.length} disabled={state.busy || bulk.busy || moveBusy || draftDirty} actionDisabled={state.needsRefresh || list.status !== 'ready'} importDisabled={importBusy || state.needsRefresh} canImport={!favoritesOnly} hasImportResult={hasImportResult}
                         onImport={() => importControls.current?.choose()} onRecentImport={() => importControls.current?.reopen()}
@@ -251,11 +277,13 @@ export const GalleryPage = ({
                     </div>
                 )}
 
-                {list.status === 'ready' && list.page.total === 0 && (
+                {activeJobs.length > 0 && <p role="status" className="text-sm text-[var(--text-muted)]">다운로드 대기·진행 중 {activeJobs.length}건</p>}
+                {list.status === 'ready' && list.page.total === 0 && activeJobs.length === 0 && (
                     <p className="py-16 text-center text-[var(--text-muted)]">{emptyMessage}</p>
                 )}
 
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,200px),1fr))] gap-4">
+                    {activeJobs.map(job => <GalleryDownloadCard key={'download:' + job.id} job={job} selected={downloadDetailId === job.id} disabled={disabled || moveBusy || tagCommand !== null} cancelling={downloads.cancellingIds.includes(job.id)} onOpen={() => { void openDownload(job.id) }} onCancel={() => downloads.cancelDownload(job.id)} />)}
                     {list.page.data.map((media) => (
                         <article
                             key={media.id}
@@ -295,6 +323,8 @@ export const GalleryPage = ({
                                             ? '로컬 폴더'
                                             : media.sourceKind === 'download'
                                               ? '다운로드'
+                                              : media.sourceKind === 'edited'
+                                                ? '편집 결과'
                                               : '기존 자료'}
 
                                         {' · 파일 ' + media.fileCount + '개'}

@@ -13,6 +13,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -295,6 +296,12 @@ func (s *Service) generate(ctx context.Context, req Request) error {
 		_, imageEngineError := os.Stat(s.imageInspectorPath())
 		if s.imageInspector != nil && imageEngineError == nil {
 			if e := s.imageInspector.ImagePreview(ctx, path, tmp); e != nil {
+				return e
+			}
+			break
+		}
+		if strings.EqualFold(filepath.Ext(path), ".webp") {
+			if e := (engine.VideoEditor{FFmpeg: s.ffmpeg}).WebPThumbnail(ctx, path, tmp); e != nil {
 				return e
 			}
 			break

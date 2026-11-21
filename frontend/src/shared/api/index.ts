@@ -1,4 +1,5 @@
 import { Service as FileMoveService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/filemove";
+import { Service as MediaEditService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/mediaedit";
 import type { AppApi } from "@contracts/api";
 import { Service as WebServerService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/webserver";
 import { Service as LocalImportService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/localimport";
@@ -24,6 +25,20 @@ async function response<T>(pending: Promise<Result>): Promise<T> {
 }
 
 const api: AppApi = {
+    mediaEdit: {
+        frames: request => response(MediaEditService.Frames(wire(request))),
+        frameStatus: request => response(MediaEditService.FrameStatus(wire(request))),
+        selection: request => response(MediaEditService.Selection(wire(request))),
+        resources: request => response(MediaEditService.Resources(wire(request))),
+        resultPath: request => response(MediaEditService.ResultPath(request)),
+        prepare: request => response(MediaEditService.Prepare(wire(request))),
+        getSession: request => response(MediaEditService.GetSession(request)),
+        create: request => response(MediaEditService.Create(wire(request))),
+        getJob: request => response(MediaEditService.GetJob(request)),
+        list: () => response(MediaEditService.List()),
+        cancel: request => response(MediaEditService.Cancel(request)),
+        release: request => response(MediaEditService.Release(request)),
+    },
  fileMove: {
   create: request => response(FileMoveService.Create(wire(request))),
   get: (request = {}) => response(FileMoveService.Get(wire(request))),
@@ -32,6 +47,7 @@ const api: AppApi = {
   retry: request => response(FileMoveService.Retry(wire(request))),
  },
     webServer: {
+        setEditing: enabled => response(WebServerService.SetEditing(enabled)),
         status: () => response(WebServerService.Status()),
         start: () => response(WebServerService.Start()),
         stop: () => response(WebServerService.Stop()),
@@ -57,6 +73,7 @@ const api: AppApi = {
         unregisterFiles: (request) => response(MediaService.UnregisterFiles(wire(request))),
         unregisterMedia: (request) => response(MediaService.UnregisterMedia(wire(request))),
         suggest: (request) => response(MediaService.Suggest(wire(request))),
+        searchSuggest: (request) => response(MediaService.SearchSuggest(wire(request))),
     },
     downloads: {
         remove: (request) => response(DownloadService.Delete(request)),

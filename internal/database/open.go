@@ -19,7 +19,13 @@ var schemaV3SQL string
 var schemaV4SQL = strings.Replace(strings.Replace(schemaV3SQL, "kind = 'image' AND canonical_path_key", "kind IN ('image','video','audio') AND canonical_path_key", 1), "AND width IS NOT NULL AND height IS NOT NULL)),", "AND (kind = 'audio' OR (width IS NOT NULL AND height IS NOT NULL)) AND (kind = 'image' OR duration IS NOT NULL))),", 1)
 
 var schemaV5SQL = schemaV5()
-var schemaSQL = schemaV6()
+var schemaV6SQL = schemaV6()
+var schemaV7SQL = schemaV7()
+var schemaV8SQL = schemaV8()
+
+// Freeze shipped DDL: subsequent changes must use a new version and migration.
+var schemaV9SQL = schemaV8SQL + searchV9DDL()
+var schemaSQL = schemaV9SQL
 
 func Open(ctx context.Context, filename string) (*sql.DB, error) {
 	return OpenWithOptions(ctx, filename, MigrationOptions{BackupDirectory: filepath.Join(filepath.Dir(filename), "backups"), LegacyStorageRoot: filepath.Join(filepath.Dir(filename), "downloads")})

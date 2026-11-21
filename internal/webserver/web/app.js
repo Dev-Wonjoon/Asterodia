@@ -1,12 +1,18 @@
 'use strict';
+import { mountMediaEditor } from './editor.js';
+import { mountSearchSuggestions } from './search.js';
 const el = id => document.getElementById(id);
 const state = { offset: 0, q: '', total: 0, next: false, busy: false, serial: 0, controller: null, media: null, fileOffset: 0, fileNext: false, detailSerial: 0 };
+state.tags = []; state.authors = [];
+function searchParameters() { const query = new URLSearchParams(); for (const tag of state.tags) query.append('tag', tag); for (const author of state.authors) query.append('author', author); return query; }
 async function request(path, signal) {
     let response;
     try {
         response = await fetch(path, { signal, credentials: 'same-origin', headers: { Accept: 'application/json' } });
-    } catch (error) {
-        if (error.name === 'AbortError') throw error;
+    }
+    catch (error) {
+        if (error.name === 'AbortError')
+            throw error;
         throw new Error('서버에 연결하지 못했습니다. PC 앱의 서버 상태를 확인해 주세요.');
     }
     if (!response.ok)
@@ -38,7 +44,8 @@ async function load() {
     el('message').textContent = '라이브러리를 읽고 있습니다…';
     updatePaging();
     try {
-        const page = await request('/api/library?limit=24&offset=' + state.offset + '&q=' + encodeURIComponent(state.q), state.controller.signal);
+        const query = searchParameters(); query.set('limit','24'); query.set('offset',String(state.offset)); query.set('q',state.q);
+        const page = await request('/api/library?' + query, state.controller.signal);
         if (serial !== state.serial)
             return;
         state.next = page.hasNextPage;
@@ -120,7 +127,7 @@ async function loadFiles() {
                 }
                 else {
                     player.controls = true;
-                player.setAttribute('controlsList', 'nodownload');
+                    player.setAttribute('controlsList', 'nodownload');
                     player.preload = 'none';
                     if (kind === 'video')
                         player.playsInline = true;
@@ -140,6 +147,14 @@ async function loadFiles() {
             else
                 figure.append(text('p', '표시를 지원하지 않는 미디어입니다.'));
             figure.append(text('figcaption', file.title || '파일 ' + file.id));
+            if (file.kind === 'video'||file.kind==='image'&&file.detectedFormat==='gif') {
+                const edit = text('button',file.kind==='image'?'GIF 편집':'GIF 만들기·영상 자르기');
+                edit.type = 'button';
+                edit.dataset.edit = 'true';
+                edit.hidden = !editAccess.enabled;
+                edit.addEventListener('click', () => openEditor({ id: file.id, title: file.title || detail.title, duration: file.duration,kind:file.kind,detectedFormat:file.detectedFormat,nativeGIF:file.kind==='image', src: fileURL(file.id, 'content') }));
+                figure.append(edit);
+            }
             el('files').append(figure);
         }
         el('detail-message').textContent = '파일 ' + detail.files.total + '개';
@@ -152,11 +167,18 @@ async function loadFiles() {
             el('detail-message').textContent = error.message;
     }
 }
-el('search').addEventListener('submit', event => {
-    event.preventDefault();
-    state.q = el('keyword').value.trim();
-    state.offset = 0;
-    void load();
+let searchTimer;
+function applySearch() { clearTimeout(searchTimer); state.q = el('keyword').value; state.offset = 0; void load(); }
+function renderSearchFilters() {
+    el('search-filters').replaceChildren();
+    for (const [field,label] of [['tags','태그'],['authors','작성자']]) for (const value of state[field]) {
+        const button = text('button',label + ': ' + value + ' ×'); button.type = 'button'; button.setAttribute('aria-label',label + ' ' + value + ' 제거');
+        button.addEventListener('click',()=>{state[field]=state[field].filter(item=>item!==value); renderSearchFilters(); applySearch();}); el('search-filters').append(button);
+    }
+}
+mountSearchSuggestions({ input: el('keyword'), form: el('search'), request, parameters: searchParameters,
+    onInput(value,composing) { clearTimeout(searchTimer); if (!composing) searchTimer = setTimeout(applySearch,300); },
+    onApply(item) { if (item.kind === 'tag' || item.kind === 'author') { const field=item.kind==='tag'?'tags':'authors'; if(!state[field].includes(item.value))state[field].push(item.value); el('keyword').value=''; renderSearchFilters(); } else el('keyword').value=item.value; applySearch(); }
 });
 el('refresh').addEventListener('click', () => void load());
 el('previous').addEventListener('click', () => {
@@ -185,4 +207,30 @@ document.addEventListener('play', event => {
         if (player !== event.target)
             player.pause();
 }, true);
-void load();
+let editAccess = { enabled: false, csrf: '' };
+let openedEditor = null;
+async function editRequest(name, value, read = false, attempt = 0) {
+    const path = '/api/edit/' + name + (read && value?.id ? '?'+new URLSearchParams(Object.entries(value).map(([k,v])=>[k,String(v)])).toString() : '');
+    const response = await fetch(path, read ? { credentials: 'same-origin' } : { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-StorageBucket-CSRF': editAccess.csrf }, body: JSON.stringify(value) });
+    if(response.status===429&&attempt<5){await new Promise(resolve=>setTimeout(resolve,1200));return editRequest(name,value,read,attempt+1);}
+    if (!response.ok && !response.headers.get('Content-Type')?.includes('application/json'))
+        throw new Error(await response.text());
+    return response.json();
+}
+const editAPI = { frames: value => editRequest('frames',value), frameStatus: value => editRequest('frames',value,true), selection: value => editRequest('selection',value), resources: value => editRequest('resources',value), prepare: value => editRequest('prepare', value), getSession: value => editRequest('session', value, true), create: value => editRequest('create', value), getJob: value => editRequest('job', value, true), list: () => editRequest('list', null, true), cancel: value => editRequest('cancel', value), release: value => editRequest('release', value) };
+function openEditor(file) { if (openedEditor)
+    return; openedEditor = mountMediaEditor(el('editor-host'), { api: editAPI, file, onClose: () => { openedEditor = null; } }); }
+el('edit-history').addEventListener('click', () => openEditor());
+async function loadEditAccess() { try {
+    editAccess = await request('/api/edit/status');
+    el('access-mode').textContent = editAccess.enabled ? '편집 허용' : '읽기 전용';
+    el('edit-history').hidden = !editAccess.enabled;
+    for (const button of document.querySelectorAll('button[data-edit]'))
+        button.hidden = !editAccess.enabled;
+}
+catch {
+    editAccess = { enabled: false, csrf: '' };
+    el('edit-history').hidden = true;
+} }
+void loadEditAccess().then(load);
+setInterval(() => void loadEditAccess(), 5000);

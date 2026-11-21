@@ -51,6 +51,8 @@ func TestGenericWebpagePublication(t *testing.T) {
 	for _, args := range [][]string{
 		{"-nostdin", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=blue:s=64x48:d=0.3", "-f", "lavfi", "-i", "sine=frequency=800:duration=0.3", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", "-movflags", "+faststart", videoPath},
 		{"-nostdin", "-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=800:duration=0.3", "-c:a", "aac", audioPath},
+		{"-nostdin", "-loglevel", "error", "-stream_loop", "4", "-i", videoPath, "-t", "1.5", "-c", "copy", "-f", "hls", "-hls_playlist_type", "vod", "-hls_list_size", "0", filepath.Join(assets.root, "stream.m3u8")},
+		{"-nostdin", "-loglevel", "error", "-i", videoPath, "-c", "copy", "-f", "dash", "-seg_duration", "0.1", filepath.Join(assets.root, "stream.mpd")},
 	} {
 		if _, e := new(engine.ProcessRunner).Run(t.Context(), engine.ProcessRequest{Executable: ffmpeg, Directory: assets.root, Timeout: 30 * time.Second, Arguments: args}); e != nil {
 			t.Fatal(e)
@@ -64,7 +66,7 @@ func TestGenericWebpagePublication(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	for _, mode := range []string{"single", "multiple", "direct", "mp3", "m4a-to-mp3", "mkv", "unsupported-hls", "second-fails", "retry", "cancel", "replacement-fails"} {
+	for _, mode := range []string{"single", "multiple", "direct", "mp3", "m4a-to-mp3", "mkv", "hls", "dash", "missing-hls", "second-fails", "retry", "cancel", "replacement-fails"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newFixture(t)
 			cookie := filepath.Join(f.root, "original-cookies.txt")
@@ -93,9 +95,13 @@ func TestGenericWebpagePublication(t *testing.T) {
 					fmt.Fprint(w, "</body></html>")
 					return
 				}
+				if strings.HasPrefix(r.URL.Path, "/streams/") {
+					http.StripPrefix("/streams/", http.FileServer(http.Dir(assets.root))).ServeHTTP(w, r)
+					return
+				}
 				if r.URL.Path == "/fixture.m3u8" {
 					w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
-					fmt.Fprint(w, "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:1\n#EXT-X-MEDIA-SEQUENCE:0\n#EXTINF:0.3,\n/unsupported.ts\n#EXT-X-ENDLIST\n")
+					fmt.Fprint(w, "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXT-X-TARGETDURATION:2\n#EXT-X-MEDIA-SEQUENCE:0\n#EXTINF:1.3,\n/unsupported.ts\n#EXT-X-ENDLIST\n")
 					return
 				}
 				if r.URL.Path == "/one.mp4" || r.URL.Path == "/two.mp4" {
@@ -148,8 +154,12 @@ func TestGenericWebpagePublication(t *testing.T) {
 				options.Extension = "mp3"
 			case "mkv":
 				options.Extension = "mkv"
-			case "unsupported-hls":
+			case "missing-hls":
 				url = server.URL + "/fixture.m3u8"
+			case "hls":
+				url = server.URL + "/streams/stream.m3u8"
+			case "dash":
+				url = server.URL + "/streams/stream.mpd"
 			}
 			svc := download.NewService(f.db, func() string { return filepath.Join(f.root, "downloads") }, func(root string, options engine.Options) download.Runner {
 				discovered.Store(false)
@@ -171,6 +181,10 @@ func TestGenericWebpagePublication(t *testing.T) {
 				return success(t, svc.Enqueue(t.Context(), req)).(download.Job)
 			}
 			job := enqueue(false)
+			activity := success(t, svc.List(t.Context(), download.ListRequest{Limit: 1, Offset: 100})).(map[string]any)["activeJobs"].([]download.Job)
+			if len(activity) != 1 || activity[0].ID != job.ID {
+				t.Fatal("페이지 밖의 대기 작업이 누락됐습니다", activity)
+			}
 			run := func(trigger string) api.Result {
 				return svc.Run(t.Context(), download.RunRequest{JobID: job.ID, Trigger: trigger})
 			}
@@ -192,13 +206,10 @@ func TestGenericWebpagePublication(t *testing.T) {
 			} else {
 				result = run("manual_initial")
 			}
-			if mode == "second-fails" || mode == "retry" || mode == "cancel" || mode == "unsupported-hls" {
+			if mode == "second-fails" || mode == "retry" || mode == "cancel" || mode == "missing-hls" {
 				code := "DOWNLOAD_ENGINE_FAILED"
 				if mode == "cancel" {
 					code = "CANCELLED"
-				}
-				if mode == "unsupported-hls" {
-					code = "UNSUPPORTED_MEDIA_FORMAT"
 				}
 				if result.OK || result.Error == nil || result.Error.Code != code {
 					t.Fatalf("기대 오류 %s, 실제 오류 %+v", code, result.Error)
@@ -206,8 +217,11 @@ func TestGenericWebpagePublication(t *testing.T) {
 				if queryInt(t, f.db, "SELECT count(*) FROM media") != 0 || queryInt(t, f.db, "SELECT count(*) FROM media_file") != 0 || queryInt(t, f.db, "SELECT cleanup_required FROM download_queue WHERE id=?", job.ID) != 0 {
 					t.Fatal("실패한 Generic 다운로드의 부분 자료가 남았습니다")
 				}
-				if mode == "unsupported-hls" && queryInt(t, f.db, "SELECT count(*) FROM download_target") != 0 {
-					t.Fatal("미지원 형식을 저장 대상으로 확정했습니다")
+				if mode == "missing-hls" && queryInt(t, f.db, "SELECT count(*) FROM download_target") != 1 {
+					t.Fatal("HLS 실패 대상 이력이 누락됐습니다")
+				}
+				if len(success(t, svc.List(t.Context(), download.ListRequest{})).(map[string]any)["activeJobs"].([]download.Job)) != 0 {
+					t.Fatal("실패 작업이 활성 갤러리에 남았습니다")
 				}
 				if mode == "retry" {
 					fail.Store(false)
@@ -223,7 +237,7 @@ func TestGenericWebpagePublication(t *testing.T) {
 				want = 2
 			}
 			platform := "HTML5MediaEmbed"
-			if mode == "direct" || mode == "m4a-to-mp3" {
+			if mode == "direct" || mode == "m4a-to-mp3" || mode == "hls" || mode == "dash" {
 				platform = "Generic"
 			}
 			if queryInt(t, f.db, "SELECT count(*) FROM media_file f JOIN platform p ON p.id=f.platform_id WHERE f.media_id=? AND p.name=? AND length(f.content_hash)=64", id, platform) != want {

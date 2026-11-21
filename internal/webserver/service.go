@@ -11,6 +11,8 @@ import (
 
 	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
+	"github.com/Dev-Wonjoon/StorageBucket/internal/mediaedit"
+	"github.com/google/uuid"
 )
 
 const DefaultAddress = "127.0.0.1:9246"
@@ -19,6 +21,7 @@ type Status struct {
 	Running bool    `json:"running"`
 	URL     string  `json:"url"`
 	Error   *string `json:"error"`
+	Editing bool    `json:"editing"`
 }
 
 type Service struct {
@@ -34,6 +37,11 @@ type Service struct {
 	requests   sync.WaitGroup
 	capacity   chan struct{}
 	cancel     context.CancelFunc
+	editor     *mediaedit.Service
+	editing    bool
+	csrf       string
+	editLast   time.Time
+	editTokens float64
 }
 
 func NewService(library *media.Service, address string) *Service {
@@ -46,7 +54,20 @@ func NewService(library *media.Service, address string) *Service {
 }
 
 func (s *Service) snapshot() Status {
-	return Status{Running: s.server != nil, URL: s.url, Error: s.lastError}
+	return Status{Running: s.server != nil, URL: s.url, Error: s.lastError, Editing: s.editing}
+}
+
+//wails:ignore
+func (s *Service) ConfigureEditor(editor *mediaedit.Service) { s.editor = editor }
+
+func (s *Service) SetEditing(enabled bool) api.Result {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed || s.editor == nil {
+		return api.Failure("NOT_READY", "편집 서비스를 사용할 수 없습니다")
+	}
+	s.editing = enabled
+	return api.Success(s.snapshot())
 }
 
 func (s *Service) Status() api.Result {
@@ -85,6 +106,9 @@ func (s *Service) Start() api.Result {
 	generation := s.generation
 	server := &http.Server{Handler: http.HandlerFunc(s.serveHTTP), BaseContext: func(net.Listener) context.Context { return ctx }, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16 << 10}
 	s.server = server
+	s.csrf = uuid.NewString()
+	s.editLast = time.Now()
+	s.editTokens = 8
 	go func() {
 		err := server.Serve(listener)
 		s.mu.Lock()
@@ -105,6 +129,7 @@ func (s *Service) Stop() api.Result {
 	s.mu.Lock()
 	server := s.server
 	s.server = nil
+	s.editing = false
 	s.generation++
 	if s.cancel != nil {
 		s.cancel()

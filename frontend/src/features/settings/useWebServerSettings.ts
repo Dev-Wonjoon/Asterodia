@@ -89,5 +89,21 @@ export function useWebServerSettings() {
             }
         }
     }
-    return { status, loading, busy, error, refresh, toggle }
+    const toggleEditing = async () => {
+        if (!mounted.current || locked.current || !status) return
+        const own = ++revision.current
+        locked.current = true; reading.current?.cancel(); reading.current = null
+        setLoading(false); setBusy(true); setError(null)
+        try {
+            const result = await getApi().webServer.setEditing(!status.editing)
+            if (!mounted.current || own !== revision.current) return
+            if (result.ok) setStatus(result.data)
+            else setError(result.error.message)
+        } catch {
+            if (mounted.current && own === revision.current) setError('모바일 편집 허용 상태를 바꾸지 못했습니다.')
+        } finally {
+            if (own === revision.current) { locked.current = false; if (mounted.current) setBusy(false) }
+        }
+    }
+    return { status, loading, busy, error, refresh, toggle, toggleEditing }
 }

@@ -83,7 +83,7 @@ func TestYtdlpTargetKeyCompatibility(t *testing.T) {
 			}
 		})
 	}
-	t.Run("Generic 직접 파일과 미지원 스트리밍 판정", func(t *testing.T) {
+	t.Run("Generic 직접 파일과 스트리밍 판정", func(t *testing.T) {
 		for _, tc := range []struct {
 			name, ext, protocol                  string
 			audio, silent, fragment, empty, want bool
@@ -91,8 +91,9 @@ func TestYtdlpTargetKeyCompatibility(t *testing.T) {
 			{name: "direct-mp4", ext: "mp4", protocol: "https", want: true},
 			{name: "silent-mp4", ext: "mp4", protocol: "https", silent: true, want: true},
 			{name: "direct-m4a", ext: "m4a", protocol: "https", audio: true, want: true},
-			{name: "hls", ext: "mp4", protocol: "m3u8_native"},
-			{name: "dash", ext: "mp4", protocol: "http_dash_segments", fragment: true},
+			{name: "hls", ext: "mp4", protocol: "m3u8_native", want: true},
+			{name: "hls-ffmpeg", ext: "mp4", protocol: "m3u8", want: true},
+			{name: "dash", ext: "mp4", protocol: "http_dash_segments", fragment: true, want: true},
 			{name: "fragmented-http", ext: "mp4", protocol: "https", fragment: true},
 			{name: "unsupported-webm", ext: "webm", protocol: "https"},
 			{name: "missing-formats", empty: true},

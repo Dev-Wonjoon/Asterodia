@@ -24,6 +24,7 @@ const fetchAuthors = (text: string) => suggest('author', text)
 
 export function useSearchViewModel() {
     const [keyword, setKeyword] = useState('')
+    const [composing, setSearchComposing] = useState(false)
 
     const [debouncedKeyword, setDebouncedKeyword] = useState('')
 
@@ -42,10 +43,11 @@ export function useSearchViewModel() {
     const authors = useSuggestions(fetchAuthors, selectedAuthors)
 
     useEffect(() => {
+        if (composing) return
         const timer = setTimeout(() => setDebouncedKeyword(keyword), 300)
 
         return () => clearTimeout(timer)
-    }, [keyword])
+    }, [keyword, composing])
 
     const filter = useMemo<MediaFilter>(
         () => ({
@@ -73,6 +75,8 @@ export function useSearchViewModel() {
     return {
         keyword,
         setKeyword,
+        setSearchComposing,
+        submitKeyword(value: string) { setKeyword(value); setDebouncedKeyword(value) },
         selectedTags,
         tagMode,
         setTagMode,

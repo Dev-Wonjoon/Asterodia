@@ -1,4 +1,4 @@
-export type MediaSourceKind = 'download' | 'local' | 'legacy'
+export type MediaSourceKind = 'download' | 'local' | 'legacy' | 'edited'
 
 export type MediaStorageKind = 'app_managed' | 'external_reference' | 'unverified_legacy'
 
@@ -44,6 +44,23 @@ export interface MediaSuggestionRequest {
     kind: 'tag' | 'platform' | 'author'
     text: string
     limit?: number
+}
+
+export interface SearchSuggestion { kind: 'title' | 'tag' | 'author' | 'platform'; value: string }
+export interface SearchSuggestionRequest {
+    text: string
+    kind?: SearchSuggestion['kind']
+    limit?: number
+    offset?: number
+    filter?: MediaFilter
+    favoritesOnly?: boolean
+}
+export interface SearchSuggestionPage {
+    data: SearchSuggestion[]
+    offset: number
+    hasNextPage: boolean
+    revision: number
+    indexed: boolean
 }
 
 export interface MediaListRequest {

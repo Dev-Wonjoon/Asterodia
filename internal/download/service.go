@@ -210,34 +210,49 @@ func (s *Service) List(ctx context.Context, req ListRequest) api.Result {
 	if req.Limit < 1 || req.Limit > 200 || req.Offset < 0 {
 		return api.Failure("INVALID_ARGUMENT", "목록 범위가 올바르지 않습니다")
 	}
-	rows, err := s.db.QueryContext(ctx, jobSelect+" ORDER BY q.created_at DESC,q.id DESC LIMIT ? OFFSET ?", req.Limit+1, req.Offset)
+	jobs, err := s.listJobs(ctx, jobSelect+" ORDER BY q.created_at DESC,q.id DESC LIMIT ? OFFSET ?", req.Limit+1, req.Offset)
 	if err != nil {
-		return fail(err)
-	}
-	defer rows.Close()
-	jobs := []Job{}
-	for rows.Next() {
-		j, e := scanJob(rows)
-		if e != nil {
-			return fail(e)
-		}
-		jobs = append(jobs, j)
-	}
-	if err = rows.Err(); err != nil {
-		return fail(err)
-	}
-	// Release the cursor before the local lookup uses the same database pool.
-	if err = rows.Close(); err != nil {
 		return fail(err)
 	}
 	hasNext := len(jobs) > req.Limit
 	if hasNext {
 		jobs = jobs[:req.Limit]
 	}
+	// Gallery activity is independent of the history page. Never create provisional media rows.
+	active, err := s.listJobs(ctx, jobSelect+` WHERE q.state IN ('pending','running') AND q.cleanup_required=0
+		AND coalesce(a.phase,'')<>'rolling_back' AND coalesce(json_extract(q.options_json,'$._importedHistory'),0)=0
+		ORDER BY q.created_at DESC,q.id DESC`)
+	if err != nil {
+		return fail(err)
+	}
+	return api.Success(map[string]any{"data": jobs, "activeJobs": active, "limit": req.Limit, "offset": req.Offset, "hasNextPage": hasNext})
+}
+
+func (s *Service) listJobs(ctx context.Context, query string, args ...any) ([]Job, error) {
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	jobs := []Job{}
+	for rows.Next() {
+		j, e := scanJob(rows)
+		if e != nil {
+			return nil, e
+		}
+		jobs = append(jobs, j)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	// Release the cursor before the local lookup uses the same database pool.
+	if err = rows.Close(); err != nil {
+		return nil, err
+	}
 	for i := range jobs {
 		s.attachPreview(ctx, &jobs[i])
 	}
-	return api.Success(map[string]any{"data": jobs, "limit": req.Limit, "offset": req.Offset, "hasNextPage": hasNext})
+	return jobs, nil
 }
 func (s *Service) Run(ctx context.Context, req RunRequest) api.Result {
 	if req.JobID == "" || (req.Trigger != "manual_initial" && req.Trigger != "manual_retry" && req.Trigger != "manual_restart") {

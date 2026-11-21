@@ -196,12 +196,37 @@ func Migrate(ctx context.Context, db *sql.DB, options MigrationOptions) (Migrati
 			return result, err
 		}
 	}
-	if result.FromVersion >= 2 {
+	if result.FromVersion >= 2 && result.FromVersion < 6 {
 		if err = upgradeImportCheckpoints(ctx, conn, options.Checkpoint); err != nil {
 			return result, err
 		}
 	}
+	if result.FromVersion >= 2 && result.FromVersion < 7 {
+		if err = upgradeMediaEdits(ctx, conn); err != nil {
+			return result, err
+		}
+	}
+	if result.FromVersion >= 2 && result.FromVersion < 8 {
+		if err = upgradeEditStreaming(ctx, conn); err != nil {
+			return result, err
+		}
+	}
 	now := time.Now().UnixMilli()
+	if result.FromVersion >= 2 && result.FromVersion < 9 {
+		if err = upgradeSearch(ctx, conn); err != nil {
+			return result, err
+		}
+	}
+	if result.FromVersion == 9 {
+		if err = upgradeSearchTriggers(ctx, conn); err != nil {
+			return result, err
+		}
+		if options.Checkpoint != nil {
+			if err = options.Checkpoint("after_search_trigger_repair"); err != nil {
+				return result, err
+			}
+		}
+	}
 	if _, err = insert(ctx, conn, "migration_run", record{"id": uuid.NewString(), "target_version": schemaVersion, "source_fingerprint": fingerprint, "schema_hash": hashBytes([]byte(schemaSQL)), "backup_path": result.BackupPath, "completed_at": now}); err != nil {
 		return result, err
 	}

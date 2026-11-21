@@ -5,6 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 import wails from "@wailsio/runtime/plugins/vite";
 
 export default defineConfig({
+    cacheDir: process.env.STORAGEBUCKET_VITE_CACHE,
     resolve: {
       alias: {
         "@renderer": fileURLToPath(new URL("./src", import.meta.url)),

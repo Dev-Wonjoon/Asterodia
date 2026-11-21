@@ -5,12 +5,14 @@ import type { ThumbnailApi } from "./thumbnail-api";
 import type { DatabaseApi } from "./database-api";
 import type { LocalImportApi } from "./local-import-api";
 import type { WebServerApi } from "./webserver-api";
+import type { MediaEditApi } from "./media-edit-api";
 
 export type Unsubscribe = () => void;
 
 import type { FileMoveApi } from "./file-move-api";
 
 export interface AppApi {
+    mediaEdit: MediaEditApi;
     fileMove: FileMoveApi;
     webServer: WebServerApi;
     localImport: LocalImportApi;

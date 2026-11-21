@@ -1,6 +1,7 @@
 import { GalleryPage } from '@renderer/features/gallery/GalleryPage'
 import { useState } from 'react'
 import { useSearchViewModel } from '@renderer/features/search/useSearchViewModel'
+import { SearchSuggestions } from './SearchSuggestions'
 
 export const SearchPage = (): React.JSX.Element => {
     const vm = useSearchViewModel()
@@ -52,18 +53,10 @@ export const SearchPage = (): React.JSX.Element => {
             {/* 검색 영역 */}
             <div className="p-4 border-b border-[var(--border-line)] space-y-3">
                 {/* 키워드 검색 */}
-                <input
-                    type="text"
-                    maxLength={1000}
-                    value={vm.keyword}
-                    onChange={(e) => vm.setKeyword(e.target.value)}
-                    placeholder="제목, 작성자, URL, 태그로 검색..."
-                    className="w-full px-4 py-2 rounded-lg
-                        bg-[var(--bg-hover)] text-[var(--text-main)]
-                        placeholder-[var(--text-placeholder)]
-                        border border-[var(--border-line)]
-                        focus:outline-none focus:border-[var(--color-primary)]"
-                />
+                <SearchSuggestions value={vm.keyword} filter={vm.filter} onChange={vm.setKeyword} onSubmit={vm.submitKeyword} onCompositionChange={vm.setSearchComposing} onSelect={item => {
+                    if (item.kind === 'title') vm.submitKeyword(item.value)
+                    else { if (item.kind === 'tag') vm.addTag(item.value); else if (item.kind === 'author') vm.addAuthor(item.value); else vm.addPlatform(item.value); vm.submitKeyword('') }
+                }} />
 
                 {/* 필터 입력 영역 */}
                 <div className="flex gap-3">

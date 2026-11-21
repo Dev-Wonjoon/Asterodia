@@ -123,11 +123,19 @@ func schemaObjects(ctx context.Context, q connection) (map[string]string, error)
 		if name == "__drizzle_migrations" {
 			continue
 		}
-		if fts && isFTSTable(name) && row["type"] == "table" {
+		if fts && (name == "media_fts" || strings.HasPrefix(name, "media_fts_")) && row["type"] == "table" {
 			if name == "media_fts" && sqlShape(textValue(row["sql"])) != sqlShape("CREATE VIRTUAL TABLE media_fts USING fts5(title, owner_name, url, tag_names)") {
 				return nil, fmt.Errorf("지원하지 않는 검색 인덱스입니다")
 			}
 			continue
+		}
+		if isSearchFTSTable(name) {
+			if name == "search_fts" && sqlShape(textValue(row["sql"])) != sqlShape("CREATE VIRTUAL TABLE search_fts USING fts5(normalized,content='search_term',content_rowid='id',tokenize='trigram',detail=none)") {
+				return nil, fmt.Errorf("지원하지 않는 검색 인덱스입니다")
+			}
+			if name != "search_fts" {
+				continue
+			}
 		}
 		out[textValue(row["type"])+":"+name] = sqlShape(textValue(row["sql"]))
 	}
@@ -137,6 +145,14 @@ func schemaObjects(ctx context.Context, q connection) (map[string]string, error)
 func isFTSTable(name string) bool {
 	switch name {
 	case "media_fts", "media_fts_data", "media_fts_idx", "media_fts_content", "media_fts_docsize", "media_fts_config":
+		return true
+	}
+	return false
+}
+
+func isSearchFTSTable(name string) bool {
+	switch name {
+	case "search_fts", "search_fts_data", "search_fts_idx", "search_fts_docsize", "search_fts_config":
 		return true
 	}
 	return false
@@ -189,6 +205,18 @@ func validateSchema(ctx context.Context, q connection, version int) (int, error)
 			ddl = schemaV5SQL
 		}
 		if version == 6 {
+			ddl = schemaV6SQL
+		}
+		if version == 7 {
+			ddl = schemaV7SQL
+		}
+		if version == 8 {
+			ddl = schemaV8SQL
+		}
+		if version == 9 {
+			ddl = schemaV9SQL
+		}
+		if version == 10 {
 			ddl = schemaSQL
 		}
 		if version == 2 {
@@ -207,6 +235,15 @@ func validateSchema(ctx context.Context, q connection, version int) (int, error)
 	want, e := schemaObjects(ctx, expected)
 	if e != nil {
 		return 0, e
+	}
+	if version == 9 && !sameSchemaObjects(actual, want) {
+		known, err := knownLegacySearchV9(ctx, actual)
+		if err != nil {
+			return 0, err
+		}
+		if known {
+			return count, nil
+		}
 	}
 	if len(actual) != len(want) {
 		return 0, fmt.Errorf("DB 버전 %d의 테이블·인덱스 구성이 알려진 스키마와 다릅니다", version)
@@ -231,7 +268,7 @@ func allData(ctx context.Context, q connection) (map[string][]record, error) {
 	data := map[string][]record{}
 	for _, table := range tables {
 		name := textValue(table["name"])
-		if isFTSTable(name) {
+		if isFTSTable(name) || strings.HasPrefix(name, "search_") {
 			continue
 		}
 		rows, e := records(ctx, q, "SELECT * FROM "+quote(name))

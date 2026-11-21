@@ -427,7 +427,7 @@ func TestRunnerFreezeAndStageAttempt(t *testing.T) {
 
 func TestRunnerGenericPreflight(t *testing.T) {
 	root := downloadTestRoot(t)
-	for _, mode := range []string{"direct", "second-hls", "second-empty", "embedded-hls", "freeze-fails"} {
+	for _, mode := range []string{"direct", "second-hls", "second-empty", "embedded-hls", "second-unsupported-protocol", "freeze-fails"} {
 		t.Run(mode, func(t *testing.T) {
 			db := openStoreTestDB(t)
 			store := download.NewStore(db)
@@ -454,6 +454,9 @@ func TestRunnerGenericPreflight(t *testing.T) {
 						if i == 1 && mode == "second-empty" {
 							delete(row, "format_id")
 						}
+						if i == 1 && mode == "second-unsupported-protocol" {
+							row["protocol"] = "rtmp"
+						}
 						entries = append(entries, row)
 					}
 					raw, _ := json.Marshal(map[string]any{"_type": "playlist", "entries": entries, "n_entries": 2})
@@ -474,7 +477,7 @@ func TestRunnerGenericPreflight(t *testing.T) {
 				t.Fatal(e)
 			}
 			files, e := runner.FreezeAndStageAttempt(t.Context(), store, attempt)
-			if mode == "direct" {
+			if mode == "direct" || mode == "second-hls" || mode == "embedded-hls" {
 				if e != nil || stageCalls != 2 || len(files) != 2 {
 					t.Fatalf("Generic 저장 실패: %v %d %v", files, stageCalls, e)
 				}

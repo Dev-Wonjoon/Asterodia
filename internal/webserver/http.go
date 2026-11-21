@@ -63,12 +63,13 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+	editPost := r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/api/edit/")
+	if r.Method != http.MethodGet && r.Method != http.MethodHead && !editPost {
 		w.Header().Set("Allow", "GET, HEAD")
 		http.Error(w, "읽기 전용 서버입니다", 405)
 		return
 	}
-	if r.ContentLength > 0 {
+	if r.ContentLength > 0 && !editPost {
 		http.Error(w, "요청 본문은 지원하지 않습니다", 400)
 		return
 	}
@@ -78,8 +79,10 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Service) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/library", s.list)
+	mux.HandleFunc("GET /api/search-suggestions", s.searchSuggestions)
 	mux.HandleFunc("GET /api/library/{id}", s.detail)
 	mux.HandleFunc("GET /api/files/{id}/{variant}", s.content)
+	s.editRoutes(mux)
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		data, _ := assets.ReadFile("web/index.html")
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -88,7 +91,7 @@ func (s *Service) routes() http.Handler {
 		}
 	})
 	web, _ := fs.Sub(assets, "web")
-	for _, path := range []string{"/app.js", "/style.css", "/favicon.ico"} {
+	for _, path := range []string{"/app.js", "/style.css", "/favicon.ico", "/editor.js", "/editor.css", "/search.js", "/search.css"} {
 		mux.Handle("GET "+path, http.FileServerFS(web))
 	}
 	return mux

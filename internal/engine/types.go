@@ -54,6 +54,10 @@ type ProcessRequest struct {
 	Timeout    time.Duration
 	Stdin      string
 	Input      io.Reader
+	// Binary output bypasses line scanning and retention.
+	Output    io.Writer
+	OnMemory  func(ProcessMemory)
+	Unbounded bool
 
 	// 진행률 해석 등에 사용한다. 콜백은 빠르게 반환해야 한다.
 	OnStdoutLine func(string) error
@@ -68,6 +72,20 @@ type Output struct {
 	Text   string
 }
 type outputKey struct{}
+
+type ProcessMemory struct {
+	PID                 uint32 `json:"pid"`
+	WorkingSetBytes     uint64 `json:"workingSetBytes"`
+	PeakWorkingSetBytes uint64 `json:"peakWorkingSetBytes"`
+	PrivateBytes        uint64 `json:"privateBytes"`
+	Known               bool   `json:"known"`
+	Active              bool   `json:"active"`
+}
+type memoryKey struct{}
+
+func WithMemoryObserver(ctx context.Context, observer func(ProcessMemory)) context.Context {
+	return context.WithValue(ctx, memoryKey{}, observer)
+}
 
 // WithOutputObserver attaches a fast diagnostic sink to this operation and
 // child engine calls without coupling process execution to a database.

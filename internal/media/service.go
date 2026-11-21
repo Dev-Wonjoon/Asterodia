@@ -7,15 +7,21 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
 	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
 )
 
-type Service struct{ db *sql.DB }
+type Service struct {
+	db           *sql.DB
+	searchMu     sync.Mutex
+	searchCancel context.CancelFunc
+	searchWG     sync.WaitGroup
+}
 
-func NewService(db *sql.DB) *Service { return &Service{db} }
+func NewService(db *sql.DB) *Service { return &Service{db: db} }
 
 type Filter struct {
 	Keyword     string   `json:"keyword"`
@@ -221,6 +227,25 @@ func (s *Service) List(ctx context.Context, req ListRequest) api.Result {
 	}
 	defer tx.Rollback()
 	var total int64
+	if req.Filter.Keyword != "" {
+		ready, e := searchReady(ctx, tx)
+		if e != nil {
+			return failure(e)
+		}
+		if ready {
+			match, values := searchTermMatch(req.Filter.Keyword)
+			withoutKeyword := req
+			withoutKeyword.Filter.Keyword = ""
+			where, args, err = filterSQL(withoutKeyword)
+			if err != nil {
+				return failure(err)
+			}
+			// 'text' stores the original concatenated search fields verbatim; tag
+			// terms preserve the old literal substring semantics without scanning originals.
+			where = "m.id IN (SELECT media_id FROM search_document WHERE term_id IN (SELECT id FROM search_term WHERE kind IN ('text','tag') AND id IN (" + match + ") AND instr(normalized,?)>0)) AND " + where
+			args = append(append(values, searchFold(req.Filter.Keyword)), args...)
+		}
+	}
 	if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM media m WHERE "+where, args...).Scan(&total); err != nil {
 		return failure(err)
 	}
@@ -308,6 +333,12 @@ func checkWrite(ctx context.Context, tx *sql.Tx, id, expected int64) error {
 	}
 	var active int
 	if err := tx.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM download_queue WHERE target_media_id=? AND (state IN ('pending','running') OR cleanup_required=1))+(SELECT count(*) FROM local_import_folder f JOIN local_folder l ON l.id=f.local_folder_id JOIN local_import_job j ON j.id=f.job_id WHERE l.media_id=? AND ((j.state='running' AND f.state IN ('pending','running','interrupted')) OR f.cleanup_required=1))`, id, id).Scan(&active); err != nil {
+		return err
+	}
+	if active > 0 {
+		return domainError("JOB_ACTIVE")
+	}
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM media_edit_session s JOIN media_file f ON f.id=s.source_file_id WHERE f.media_id=? AND (s.state IN ('pending','preparing','stop_unconfirmed') OR EXISTS(SELECT 1 FROM media_edit_page p WHERE p.session_id=s.id AND p.state IN ('pending','running')) OR EXISTS(SELECT 1 FROM media_edit_job j WHERE j.session_id=s.id AND j.state IN ('pending','running','verifying','publishing','stop_unconfirmed')))`, id).Scan(&active); err != nil {
 		return err
 	}
 	if active > 0 {

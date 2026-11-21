@@ -2,14 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const bindings = vi.hoisted(() => ({
     webStatus: vi.fn(), webStart: vi.fn(), webStop: vi.fn(),
+    searchSuggest: vi.fn(),
     list: vi.fn(), edit: vi.fn(), enqueue: vi.fn(), run: vi.fn(), preview: vi.fn(), logs: vi.fn(), remove: vi.fn(),
     thumbnail: vi.fn(), path: vi.fn(), on: vi.fn(), importDatabase: vi.fn(), chooseFolder: vi.fn(), localGet: vi.fn(), localRun: vi.fn(), localCancel: vi.fn(), localRescan: vi.fn(), directories: vi.fn(), localPause: vi.fn(), localResume: vi.fn(), localFiles: vi.fn(), localRetry: vi.fn(), localExclude: vi.fn()
 }))
 vi.mock('@wailsio/runtime', () => ({ Events: { On: bindings.on } }))
 vi.mock('@bindings/filemove', () => ({ Service: { Create: vi.fn(), Get: vi.fn(), Run: vi.fn(), Pause: vi.fn(), Retry: vi.fn() } }))
+vi.mock('@bindings/mediaedit', () => ({ Service: { Prepare: vi.fn(), Create: vi.fn(), GetSession: vi.fn(), GetJob: vi.fn(), List: vi.fn(), Cancel: vi.fn(), Release: vi.fn(), ResultPath: vi.fn() } }))
 vi.mock('@bindings/webserver', () => ({ Service: { Status: bindings.webStatus, Start: bindings.webStart, Stop: bindings.webStop } }))
 vi.mock('@bindings/download', () => ({ Service: { Enqueue: bindings.enqueue, Run: bindings.run, PreviewEngine: bindings.preview, Logs: bindings.logs, Delete: bindings.remove } }))
-vi.mock('@bindings/media', () => ({ Service: { List: bindings.list, Edit: bindings.edit, Directories: bindings.directories } }))
+vi.mock('@bindings/media', () => ({ Service: { List: bindings.list, Edit: bindings.edit, Directories: bindings.directories, SearchSuggest: bindings.searchSuggest } }))
 vi.mock('@bindings/thumbnail', () => ({ Service: { Get: bindings.thumbnail, GetDownloadPreview: vi.fn() } }))
 vi.mock('@bindings/settings', () => ({ Service: { GetDownloadPath: bindings.path } }))
 vi.mock('@bindings/desktop', () => ({ SystemService: { GetDoubleClickInterval: vi.fn() }, Service: { ImportDatabase: bindings.importDatabase } }))
@@ -18,6 +20,13 @@ vi.mock('@bindings/localimport', () => ({ Service: { Choose: bindings.chooseFold
 import { getApi } from '@renderer/shared/api'
 
 describe('Wails API boundary', () => {
+    it('preserves typed suggestion filters, pagination and index revision', async () => {
+        const request = { text: '행', offset: 10, limit: 10, filter: { tags: ['여행'], authors: ['작가'] } }
+        const result = { ok: true, data: { data: [{ kind: 'title', value: '은행' }], offset: 10, hasNextPage: true, revision: 12, indexed: true } }
+        bindings.searchSuggest.mockResolvedValue(result)
+        expect(await getApi().media.searchSuggest(request)).toEqual(result)
+        expect(bindings.searchSuggest).toHaveBeenCalledExactlyOnceWith(request)
+    })
     beforeEach(() => vi.clearAllMocks())
     it('keeps web server lifecycle calls separate from library mutations', async () => {
         const stopped = { ok: true, data: { running: false, url: 'http://127.0.0.1:9246', error: null } }

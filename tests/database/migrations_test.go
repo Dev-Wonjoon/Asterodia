@@ -145,7 +145,7 @@ func TestAutomaticLegacyMigration(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer migrated.Close()
-	if countDB(t, migrated, "PRAGMA user_version") != 6 {
+	if countDB(t, migrated, "PRAGMA user_version") != 10 {
 		t.Fatal("버전 갱신 실패")
 	}
 	if countDB(t, migrated, "SELECT count(*) FROM media WHERE id=7 AND custom_title='기존 제목' AND created_at=1700000000000") != 1 {
@@ -428,7 +428,7 @@ func TestMigrationProcessCrash(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if countDB(t, db, "PRAGMA user_version") != 6 || countDB(t, db, "SELECT count(*) FROM media_file WHERE media_id=7") != 1 {
+	if countDB(t, db, "PRAGMA user_version") != 10 || countDB(t, db, "SELECT count(*) FROM media_file WHERE media_id=7") != 1 {
 		t.Fatal("재시작 이관 실패")
 	}
 }
@@ -458,7 +458,7 @@ func TestV4MigrationProcessCrash(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if countDB(t, db, "PRAGMA user_version") != 6 || countDB(t, db, "SELECT count(*) FROM media_file WHERE media_id=7 AND directory_id IS NOT NULL AND length(file_uuid)=36 AND length(filename_token)=8") != 1 {
+	if countDB(t, db, "PRAGMA user_version") != 10 || countDB(t, db, "SELECT count(*) FROM media_file WHERE media_id=7 AND directory_id IS NOT NULL AND length(file_uuid)=36 AND length(filename_token)=8") != 1 {
 		t.Fatal("v4 이관 재시작 실패")
 	}
 	assertHealthyDB(t, db)

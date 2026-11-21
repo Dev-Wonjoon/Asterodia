@@ -16,6 +16,16 @@ import (
 // Open relative to the directory handle so junction changes cannot escape Root.
 // Denying write/delete sharing keeps the same name and contents until close.
 func OpenOwnedFile(root *os.Root, path string) (*os.File, error) {
+	return openProtectedFile(root, path, windows.FILE_GENERIC_READ|windows.DELETE)
+}
+
+// OpenReadFile pins a source against writes/deletion while allowing FFmpeg's
+// read handle, which does not share DELETE access, to open it concurrently.
+func OpenReadFile(root *os.Root, path string) (*os.File, error) {
+	return openProtectedFile(root, path, windows.FILE_GENERIC_READ)
+}
+
+func openProtectedFile(root *os.Root, path string, access uint32) (*os.File, error) {
 	parent, e := root.Open(filepath.Dir(path))
 	if e != nil {
 		return nil, e
@@ -29,7 +39,7 @@ func OpenOwnedFile(root *os.Root, path string) (*os.File, error) {
 	attributes.Length = uint32(unsafe.Sizeof(attributes))
 	var handle windows.Handle
 	var status windows.IO_STATUS_BLOCK
-	e = windows.NtCreateFile(&handle, windows.FILE_GENERIC_READ|windows.DELETE, &attributes, &status, nil, 0, windows.FILE_SHARE_READ, windows.FILE_OPEN, windows.FILE_NON_DIRECTORY_FILE|windows.FILE_OPEN_REPARSE_POINT|windows.FILE_SYNCHRONOUS_IO_NONALERT, 0, 0)
+	e = windows.NtCreateFile(&handle, access, &attributes, &status, nil, 0, windows.FILE_SHARE_READ, windows.FILE_OPEN, windows.FILE_NON_DIRECTORY_FILE|windows.FILE_OPEN_REPARSE_POINT|windows.FILE_SYNCHRONOUS_IO_NONALERT, 0, 0)
 	if e != nil {
 		if errors.Is(e, windows.STATUS_OBJECT_NAME_NOT_FOUND) || errors.Is(e, windows.STATUS_OBJECT_PATH_NOT_FOUND) {
 			return nil, &os.PathError{Op: "open", Path: path, Err: os.ErrNotExist}

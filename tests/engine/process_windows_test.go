@@ -1,6 +1,7 @@
 package engine_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -165,6 +166,9 @@ func TestProcessFixture(t *testing.T) {
 	case "failure":
 		fmt.Fprintln(os.Stderr, "합성 실패")
 		os.Exit(7)
+	case "binary":
+		_, _ = os.Stdout.Write(bytes.Repeat([]byte{0, 255, 10, 13, 128, 1}, 100000))
+		fmt.Fprintln(os.Stderr, "binary complete")
 
 	case "wait":
 		fmt.Println("ready")
@@ -261,6 +265,19 @@ func TestProcessStreamsDiagnosticsWithBoundedCapture(t *testing.T) {
 	defer mu.Unlock()
 	if bytes < 16<<20 || !stderr || len(result.Stdout) > 64<<10 || !strings.Contains(result.Stdout, "last-stream-line") || !strings.Contains(result.Stderr, "stream diagnostic tail") {
 		t.Fatalf("스트리밍/보관 한도 오류: bytes=%d captured=%d stderr=%v", bytes, len(result.Stdout), stderr)
+	}
+}
+
+func TestProcessBinaryOutputAndMemory(t *testing.T) {
+	request := processRequestForTest(t, "binary")
+	var output bytes.Buffer
+	request.Output = &output
+	known := false
+	request.OnMemory = func(sample engine.ProcessMemory) { known = known || sample.Known }
+	result, err := new(engine.ProcessRunner).Run(t.Context(), request)
+	expected := bytes.Repeat([]byte{0, 255, 10, 13, 128, 1}, 100000)
+	if err != nil || !bytes.Equal(output.Bytes(), expected) || !known || result.Stdout != "" || !strings.Contains(result.Stderr, "binary complete") {
+		t.Fatalf("binary bytes=%d known=%v error=%v", output.Len(), known, err)
 	}
 }
 

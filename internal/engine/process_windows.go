@@ -518,7 +518,9 @@ func runWindowsProcess(
 	go func() {
 		var text string
 		var err error
-		if request.StreamOutput {
+		if request.Output != nil {
+			_, err = io.Copy(request.Output, stdoutReader)
+		} else if request.StreamOutput {
 			text, err = readStreamingOutput(stdoutReader, request.OnStdoutLine)
 		} else {
 			text, err = readProcessOutput(
@@ -582,6 +584,20 @@ func runWindowsProcess(
 	defer ticker.Stop()
 
 	var exitedAt time.Time
+	var sampledAt time.Time
+	sampleMemory := func(active bool) {
+		if request.OnMemory != nil && process.Process != 0 {
+			v := readProcessMemory(process.Process)
+			v.PID = process.ProcessId
+			v.Active = active
+			request.OnMemory(v)
+		}
+	}
+	defer func() {
+		if request.OnMemory != nil {
+			request.OnMemory(ProcessMemory{PID: process.ProcessId, Active: false})
+		}
+	}()
 
 	for {
 		if err := ctx.Err(); err != nil {
@@ -589,6 +605,10 @@ func runWindowsProcess(
 		}
 
 		if process.Process != 0 {
+			if request.OnMemory != nil && time.Since(sampledAt) >= 500*time.Millisecond {
+				sampleMemory(true)
+				sampledAt = time.Now()
+			}
 			status, err := windows.WaitForSingleObject(
 				process.Process,
 				0,
@@ -599,6 +619,7 @@ func runWindowsProcess(
 
 			switch status {
 			case windows.WAIT_OBJECT_0:
+				sampleMemory(false)
 				var exitCode uint32
 
 				if err := windows.GetExitCodeProcess(
@@ -682,4 +703,16 @@ func runWindowsProcess(
 			}
 		}
 	}
+}
+
+var getProcessMemoryInfo = windows.NewLazySystemDLL("psapi.dll").NewProc("GetProcessMemoryInfo")
+
+func readProcessMemory(handle windows.Handle) ProcessMemory {
+	var counters struct {
+		Size, Faults                                                                                          uint32
+		PeakWorkingSet, WorkingSet, PeakPaged, Paged, PeakNonPaged, NonPaged, Pagefile, PeakPagefile, Private uintptr
+	}
+	counters.Size = uint32(unsafe.Sizeof(counters))
+	ok, _, _ := getProcessMemoryInfo.Call(uintptr(handle), uintptr(unsafe.Pointer(&counters)), uintptr(counters.Size))
+	return ProcessMemory{WorkingSetBytes: uint64(counters.WorkingSet), PeakWorkingSetBytes: uint64(counters.PeakWorkingSet), PrivateBytes: uint64(counters.Private), Known: ok != 0}
 }

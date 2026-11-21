@@ -11,10 +11,13 @@ import type {
     MediaUnregisterResult,
     MediaSuggestionRequest,
     MediaDirectoryDto,
-    MediaDirectoryListRequest
+    MediaDirectoryListRequest,
+    SearchSuggestionRequest,
+    SearchSuggestionPage
 } from './media-v2'
 
 export interface MediaApi {
+    searchSuggest(request: SearchSuggestionRequest): Promise<MediaResult<SearchSuggestionPage>>
     directories(request?: MediaDirectoryListRequest): Promise<MediaResult<MediaPage<MediaDirectoryDto>>>
     list(request?: MediaListRequest): Promise<MediaResult<MediaPage<MediaSummaryDto>>>
 
