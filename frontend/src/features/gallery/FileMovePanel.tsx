@@ -9,7 +9,7 @@ import { formatBytes } from '@renderer/shared/utils/formatBytes'
 export const moveRunning = (state: string) => state === 'running' || state === 'pausing'
 export const moveLabel = (state: string) => ({ pending: '시작 대기', running: '이동 중', pausing: '중단 중', paused: '중단됨', interrupted: '중단됨 · 이어하기 가능', completed: '이동 완료', completed_with_errors: '일부 처리 필요', failed: '실패', copying: '복사 중', verified: '검증 완료', committed: '원본 정리 대기', cleanup_pending: '원본 정리 필요', excluded: '대상 폴더에 있음' }[state] ?? state)
 
-export interface FileMoveControls { choose: () => void }
+export interface FileMoveControls { choose: (selection?: MoveSelection[]) => void }
 
 export function FileMovePanel({ selection, disabled, onCreated, onChanged, compact = false, controlRef, onBusyChange }: {
  selection: MoveSelection[]; disabled: boolean; onCreated: () => void; onChanged: () => void; compact?: boolean; controlRef?: Ref<FileMoveControls>; onBusyChange?: (busy: boolean) => void
@@ -23,6 +23,9 @@ export function FileMovePanel({ selection, disabled, onCreated, onChanged, compa
  const [directories, setDirectories] = useState<MediaDirectoryDto[]>([])
  const [hasMoreDirectories, setHasMoreDirectories] = useState(false)
  const [directory, setDirectory] = useState('')
+ const [operation, setOperation] = useState<'copy' | 'move'>('copy')
+ const [chosen, setChosen] = useState<MoveSelection[] | null>(null)
+ const effectiveSelection = chosen ?? selection
  const [keyword, setKeyword] = useState('')
  const [offset, setOffset] = useState(0)
  const [hidden, setHidden] = useState('')
@@ -66,15 +69,16 @@ export function FileMovePanel({ selection, disabled, onCreated, onChanged, compa
   finally { if (mounted.current) setBusy(false) }
  }
  async function start() {
-  if (!selection.length || !directory || busy || disabled) return
+  if (!effectiveSelection.length || !directory || busy || disabled) return
   const target = directories.find(item => item.id === Number(directory))
   if (!target || starting.current) return
   starting.current = true
   setError('')
   try {
-   if (!await confirm({ title: '파일 이동', confirmLabel: '이동 시작', message: `선택한 게시글 ${selection.length}개의 파일을 아래 폴더로 이동할까요?\n${target.directoryPath}\n복사·검증 후 원본을 정리합니다. 게시글별 폴더는 만들지 않습니다.` }) || !mounted.current) return
+   const verb = operation === 'copy' ? '복사' : '이동'
+   if (!await confirm({ title: '한 폴더에 모으기', confirmLabel: `${verb} 시작`, message: `선택한 앨범·파일을 아래 폴더로 ${verb}할까요?\n${target.directoryPath}\n${operation === 'copy' ? '원본 파일과 앨범의 파일 위치는 유지합니다.' : '복사·검증 후 원본을 정리하고 모든 앨범의 파일 위치를 갱신합니다.'} 같은 이름은 번호를 붙여 보존합니다.` }) || !mounted.current) return
    setBusy(true)
-   const created = await api.fileMove.create({ selection, directoryId: target.id })
+   const created = await api.fileMove.create({ selection: effectiveSelection, directoryId: target.id, operation })
    if (!mounted.current) return
    if (!created.ok) { setError(created.error.message); return }
    setChoosing(false);setHidden('');setOffset(0);onCreated()
@@ -95,32 +99,33 @@ export function FileMovePanel({ selection, disabled, onCreated, onChanged, compa
   finally { if (mounted.current) { setBusy(false);setRefresh(v => v + 1) } }
  }
  const running = status && moveRunning(status.state)
- useImperativeHandle(controlRef, () => ({ choose: () => { if (!busy && !disabled && !running && selection.length) void folders() } }))
+ useImperativeHandle(controlRef, () => ({ choose: (override) => { const value = override ?? selection; if (!busy && !disabled && !running && value.length) { setChosen(value.map(item => ({ ...item, fileIds: item.fileIds ? [...item.fileIds] : undefined }))); setOperation('copy'); void folders() } } }))
  useEffect(() => { onBusyChange?.(busy || choosing) }, [busy, choosing, onBusyChange])
  const button = 'rounded-lg border border-[var(--border-line)] px-3 py-2 text-sm disabled:opacity-40'
  if (compact && !error && !choosing && !status) return null
  return <section aria-label="파일 이동" className="space-y-3">
   {!compact && <div className="flex flex-wrap items-center gap-2">
    <span className="text-sm">게시글 {selection.length}개 선택</span>
-   <button className={button} disabled={busy || disabled || !!running || !selection.length} onClick={() => void folders()}>파일 이동</button>
+   <button className={button} disabled={busy || disabled || !!running || !selection.length} onClick={() => { setChosen(null); setOperation('copy'); void folders() }}>한 폴더에 모으기</button>
    {selection.length > 0 && <button className={button} disabled={busy} onClick={onCreated}>선택 해제</button>}
   </div>}
   {error && <p role="alert" className="text-sm text-red-500">{error}</p>}
   {choosing && <div className="space-y-3 rounded-xl border border-[var(--border-line)] p-4">
-   <p className="text-sm">가져오기로 등록한 폴더를 선택하세요. 게시글 구분은 DB에서 유지합니다.</p>
+   <p className="text-sm">가져오기로 등록한 대상 폴더를 선택하세요. 앨범 구분은 유지합니다.</p>
    <form className="flex flex-wrap gap-2" onSubmit={event => { event.preventDefault(); void folders() }}>
     <input aria-label="대상 폴더 검색" value={keyword} onChange={event => setKeyword(event.target.value)} className="min-w-0 flex-1 rounded border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-2" />
     <button className={button} disabled={busy}>검색</button>
    </form>
+   <select aria-label="모으기 방식" value={operation} disabled={busy} onChange={event => setOperation(event.target.value as 'copy' | 'move')} className="w-full rounded border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-2"><option value="copy">복사해서 모으기 · 원본 유지</option><option value="move">이동해서 모으기 · 원본 위치 변경</option></select>
    <select aria-label="이동할 폴더" value={directory} onChange={event => setDirectory(event.target.value)} className="w-full min-w-0 rounded border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-2">
     <option value="">폴더 선택</option>{directories.map(item => <option key={item.id} value={item.id}>{item.directoryPath}</option>)}
    </select>
    {!directories.length && <p className="text-sm">등록된 폴더가 없습니다. 먼저 로컬 폴더 가져오기를 사용하세요.</p>}
    {hasMoreDirectories && <button className={button} disabled={busy} onClick={() => void folders(true)}>폴더 더 불러오기</button>}
-   <div className="flex gap-2"><button className={button} disabled={busy || disabled || !directory || !selection.length} onClick={() => void start()}>이동 시작</button><button className={button} disabled={busy} onClick={() => setChoosing(false)}>닫기</button></div>
+   <div className="flex gap-2"><button className={button} disabled={busy || disabled || !directory || !effectiveSelection.length} onClick={() => void start()}>{operation === 'copy' ? '복사 시작' : '이동 시작'}</button><button className={button} disabled={busy} onClick={() => { setChoosing(false); setChosen(null) }}>닫기</button></div>
   </div>}
   {status && hidden !== status.jobId && <div className="space-y-3 rounded-xl border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-4">
-   <div className="flex items-center justify-between gap-3"><p className="font-medium">{moveLabel(status.state)}</p>{!running && <button aria-label="이동 결과 닫기" className={button} onClick={() => setHidden(status.jobId)}>×</button>}</div>
+   <div className="flex items-center justify-between gap-3"><p className="font-medium">{status.operation === 'copy' ? '복사 · ' : '이동 · '}{moveLabel(status.state)}</p>{!running && <button aria-label="이동 결과 닫기" className={button} onClick={() => setHidden(status.jobId)}>×</button>}</div>
    <p className="break-all text-xs">{status.directory}</p>
    <p className="text-sm">전체 {status.total}개 · 완료 {status.completed}개 · 실패 {status.failed}개 · 원본 정리 대기 {status.cleanupPending}개</p>
    <ProgressBar label="파일 이동 진행률" value={status.totalBytes > 0 ? status.processedBytes / status.totalBytes * 100 : status.total ? (status.completed + status.cleanupPending) / status.total * 100 : 0} />

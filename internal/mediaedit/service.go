@@ -18,6 +18,7 @@ import (
 )
 
 type Service struct {
+	UpdateGate   *api.UpdateGate
 	store        Store
 	cache        string
 	output       func() string
@@ -58,6 +59,11 @@ func (s *Service) signal() {
 }
 
 func (s *Service) Prepare(ctx context.Context, req PrepareRequest) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	req.NativeGIF = false
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -235,6 +241,11 @@ func (s *Service) List(ctx context.Context) api.Result {
 	return api.Success(map[string]any{"sessions": sessions, "jobs": jobs})
 }
 func (s *Service) Create(ctx context.Context, req CreateRequest) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed || s.halted || s.done == nil {
@@ -364,6 +375,11 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) api.Result {
 }
 
 func (s *Service) Cancel(ctx context.Context, req Request) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if !validID(req.ID) {
@@ -410,6 +426,11 @@ func (s *Service) Cancel(ctx context.Context, req Request) api.Result {
 	return api.Success(nil)
 }
 func (s *Service) Release(ctx context.Context, req Request) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if !validID(req.ID) {

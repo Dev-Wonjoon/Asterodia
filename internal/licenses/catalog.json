@@ -2,15 +2,15 @@
   "schema": 1,
   "target": "windows/amd64 production",
   "inputs": {
-    "go.mod": "95d2812df3aeebc2a310d13933a81f1df381727a93ec3be47e1c60fed213fe21",
+    "go.mod": "d9486ef04af202c920c32efa907e3c64a7d9807d43bbff7fb1d4f8d76999398b",
     "go.sum": "4ee12621a0df49ed2a84afac9efbbc0678e8dd36d319fdb7324ca2d78ddfbabd",
     "frontend/package.json": "78f8d8524aa3be1861a0752ee9658ada318f8a4583b8fcd5b8e866b2f4ec51e9",
     "frontend/package-lock.json": "0000c8b9df59c0ce4af563937d3e25784fc0b4475b147919ee4560b95f7f57cc",
     "frontend/public/Inter-Medium.ttf": "a645f55492d1c8cdace43c72be8cbec08e680b5a86d8b4c2d1c50d6e41e9cc96",
     "frontend/public/bg-desktop.jpg": "4c94788acb1ad9c75feebc0b832cfba2720c6edc12ed32620238ab1c52299e5e",
     "frontend/public/bg-mobile.jpg": "ca4d8da7f4e44cf8d23662fe6e9f3bfe12eb24651b7069cce1df04bb7dc33847",
-    "internal/engine/manager.go": "b8e37a72817ce8b97db9b8b2b09b25f44ffe63288f3f3d61a54f3c65c4fba9f9",
-    "tools/generate-licenses.mjs": "783277a515ba71c1f7ddb69750e3f045e78b160d1be65e75d68b7b447a558812",
+    "internal/engine/manager.go": "c3f863657dfef20cf1ab26bf57ef65e79d703a3a5b989dea7bbd58ad386af048",
+    "tools/generate-licenses.mjs": "28790dea83f11870e5299d3dcf1b002af1dc9d01a91fc157cf2fe3465cfb0cb4",
     "internal/licenses/upstream/provenance.json": "8e77a14e3f880d1be55efd41eded22e5b43a495a4e81636336d58c79def9c5ed",
     "internal/licenses/upstream/engines.json": "e71f9e0d5174f5c393ea1541ac1245d7be36f639893fe6b0caecf88a5834c221"
   },
@@ -25,6 +25,7 @@
     "github.com/nlnwa/whatwg-url@v0.6.2",
     "github.com/remyoudompheng/bigfft@v0.0.0-20230129092748-24d4a6f8daec",
     "github.com/wailsapp/wails/v3@v3.0.0",
+    "golang.org/x/mod@v0.41.0",
     "golang.org/x/net@v0.60.0",
     "golang.org/x/sys@v0.48.0",
     "golang.org/x/text@v0.42.0",
@@ -343,6 +344,36 @@
           "file": "texts/github.com_wailsapp_wails_v3-source-copyrights.txt",
           "url": "https://pkg.go.dev/github.com/wailsapp/wails/v3@v3.0.0",
           "sha256": "ccf6b29a702324600df86d6736581fa55ca23907c1932a259db75a9719000606"
+        }
+      ]
+    },
+    {
+      "id": "golang.org_x_mod_v0.41.0",
+      "name": "golang.org/x/mod",
+      "version": "v0.41.0",
+      "license": "BSD-3-Clause",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/golang.org/x/mod@v0.41.0",
+      "sourceURL": "https://pkg.go.dev/golang.org/x/mod@v0.41.0",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/golang.org_x_mod-LICENSE.txt",
+          "url": "https://pkg.go.dev/golang.org/x/mod@v0.41.0",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+        },
+        {
+          "title": "PATENTS",
+          "file": "texts/golang.org_x_mod-PATENTS.txt",
+          "url": "https://pkg.go.dev/golang.org/x/mod@v0.41.0",
+          "sha256": "96f408bfae65bf137fc2525d3ecb030271c50c1e90799f87abf8846d8dd505cc"
+        },
+        {
+          "title": "Original license and copyright comment blocks retained from source",
+          "file": "texts/golang.org_x_mod-source-copyrights.txt",
+          "url": "https://pkg.go.dev/golang.org/x/mod@v0.41.0",
+          "sha256": "7db28cb9c71400b286e4bdc274f9f1a3bf52f6088f1942f46f7ec8f35dfc995f"
         }
       ]
     },

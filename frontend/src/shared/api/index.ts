@@ -1,4 +1,5 @@
 import { Service as FileMoveService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/filemove";
+import { Service as UpdateService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/update";
 import { Service as MediaEditService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/mediaedit";
 import type { AppApi } from "@contracts/api";
 import { Service as WebServerService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/webserver";
@@ -25,6 +26,12 @@ async function response<T>(pending: Promise<Result>): Promise<T> {
 }
 
 const api: AppApi = {
+    updates: {
+        status: () => response(UpdateService.Status()),
+        check: () => response(UpdateService.Check()),
+        download: () => response(UpdateService.Download()),
+        restart: () => response(UpdateService.Restart()),
+    },
     mediaEdit: {
         frames: request => response(MediaEditService.Frames(wire(request))),
         frameStatus: request => response(MediaEditService.FrameStatus(wire(request))),
@@ -66,6 +73,10 @@ const api: AppApi = {
     },
     database: { import: () => response(DesktopService.ImportDatabase()) },
     media: {
+        albums: (request = {}) => response(MediaService.Albums(wire(request))),
+        saveAlbum: request => response(MediaService.SaveAlbum(wire(request))),
+        sequence: request => response(MediaService.Sequence(wire(request))),
+        readFile: request => response(MediaService.ReadFile(wire(request))),
         directories: (request = {}) => response(MediaService.Directories(wire(request))),
         list: (request = {}) => response(MediaService.List(wire(request))),
         get: (request) => response(MediaService.Get(wire(request))),

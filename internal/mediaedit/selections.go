@@ -12,6 +12,11 @@ import (
 // Selection accepts bounded, idempotent chunks, so the HTTP body cap never
 // limits the number of frames or deletion ranges in an entire edit.
 func (s *Service) Selection(ctx context.Context, req SelectionRequest) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed || !validID(req.ID) || !validID(req.SessionID) || req.Offset < 0 || len(req.Ranges) > 256 {

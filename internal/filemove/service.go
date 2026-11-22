@@ -20,16 +20,17 @@ type Inspector interface {
 	Inspect(context.Context, string, string) (engine.LocalMetadata, error)
 }
 type Service struct {
-	inspector Inspector
-	db        *sql.DB
-	mu        sync.Mutex
-	cancel    context.CancelFunc
-	done      chan struct{}
-	active    string
-	copied    int64
-	current   string
-	closed    bool
-	changed   func(int64)
+	UpdateGate *api.UpdateGate
+	inspector  Inspector
+	db         *sql.DB
+	mu         sync.Mutex
+	cancel     context.CancelFunc
+	done       chan struct{}
+	active     string
+	copied     int64
+	current    string
+	closed     bool
+	changed    func(int64)
 }
 
 func NewService(db *sql.DB, changed func(int64)) *Service { return &Service{db: db, changed: changed} }
@@ -38,11 +39,13 @@ func NewService(db *sql.DB, changed func(int64)) *Service { return &Service{db: 
 func (s *Service) ConfigureInspector(inspector Inspector) { s.inspector = inspector }
 
 type Selection struct {
-	MediaID  int64 `json:"mediaId"`
-	Revision int64 `json:"revision"`
+	MediaID  int64   `json:"mediaId"`
+	Revision int64   `json:"revision"`
+	FileIDs  []int64 `json:"fileIds"`
 }
 type CreateRequest struct {
 	Selection   []Selection `json:"selection"`
+	Operation   string      `json:"operation"`
 	DirectoryID int64       `json:"directoryId"`
 }
 type Request struct {
@@ -60,6 +63,7 @@ type Item struct {
 }
 type Status struct {
 	JobID          string `json:"jobId"`
+	Operation      string `json:"operation"`
 	Directory      string `json:"directory"`
 	State          string `json:"state"`
 	Total          int64  `json:"total"`
@@ -75,6 +79,7 @@ type Status struct {
 }
 type expected struct {
 	Version           int    `json:"version"`
+	KeepName          bool   `json:"keepName,omitempty"`
 	Identity          string `json:"identity"`
 	Size              int64  `json:"size"`
 	Mtime             string `json:"mtime"`
@@ -91,12 +96,17 @@ type proof struct {
 
 func failure(err error) api.Result { return api.Failure("FILE_MOVE_FAILED", err.Error()) }
 func (s *Service) Create(ctx context.Context, req CreateRequest) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed || s.active != "" {
 		return api.Failure("JOB_ACTIVE", "파일 이동이 실행 중입니다")
 	}
-	if len(req.Selection) == 0 || len(req.Selection) > 500 || req.DirectoryID <= 0 {
+	if len(req.Selection) == 0 || len(req.Selection) > 500 || req.DirectoryID <= 0 || (req.Operation != "" && req.Operation != "copy" && req.Operation != "move") {
 		return api.Failure("INVALID_ARGUMENT", "게시글 1~500개와 대상 폴더를 선택하세요")
 	}
 	tx, e := s.db.BeginTx(ctx, nil)
@@ -128,33 +138,71 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) api.Result {
 	if _, e = media.NewStore(tx).EnsureDirectory(ctx, actual, key, 1, true); e != nil {
 		return failure(e)
 	}
-	seen := map[int64]bool{}
-	totalFiles := 0
+	seen := map[int64][]int64{}
+	selected := map[int64]bool{}
 	for _, selection := range req.Selection {
-		if seen[selection.MediaID] {
-			continue
+		if e = media.CheckWrite(ctx, tx, selection.MediaID, selection.Revision); e != nil {
+			return api.Failure("REVISION_CONFLICT", "선택한 앨범이 변경됐거나 다른 작업에서 사용 중입니다. 새로고침 후 확인하세요.")
 		}
-		seen[selection.MediaID] = true
-		var selectedFiles int
-		if e = tx.QueryRowContext(ctx, "SELECT count(*) FROM media_file WHERE media_id=?", selection.MediaID).Scan(&selectedFiles); e != nil {
+		if len(selection.FileIDs) > 20000 {
+			return api.Failure("INVALID_ARGUMENT", "한 번에 최대 20,000개 파일을 모을 수 있습니다")
+		}
+		raw, _ := json.Marshal(selection.FileIDs)
+		rows, err := tx.QueryContext(ctx, `SELECT id,media_id FROM media_file WHERE (media_id=? OR id IN (SELECT file_id FROM user_album_file WHERE album_id=?)) AND (?=0 OR id IN (SELECT value FROM json_each(?))) ORDER BY position,id LIMIT 20001`, selection.MediaID, selection.MediaID, len(selection.FileIDs), string(raw))
+		if err != nil {
+			return failure(err)
+		}
+		found := map[int64]bool{}
+		for rows.Next() {
+			var file, owner int64
+			if e = rows.Scan(&file, &owner); e != nil {
+				break
+			}
+			found[file] = true
+			if !selected[file] {
+				selected[file] = true
+				seen[owner] = append(seen[owner], file)
+			}
+		}
+		if e == nil {
+			e = rows.Err()
+		}
+		rows.Close()
+		if e != nil {
 			return failure(e)
 		}
-		totalFiles += selectedFiles
-		if totalFiles > 20000 {
-			return api.Failure("INVALID_ARGUMENT", "한 번에 최대 20,000개 파일을 이동할 수 있습니다")
+		for _, file := range selection.FileIDs {
+			if !found[file] {
+				return api.Failure("INVALID_ARGUMENT", "선택한 파일이 앨범에 없습니다")
+			}
 		}
-		if e = media.CheckWrite(ctx, tx, selection.MediaID, selection.Revision); e != nil {
-			return api.Failure("JOB_ACTIVE", "선택한 게시글이 변경됐거나 다른 작업에서 사용 중입니다. 새로고침 후 확인하세요.")
+		if len(selected) > 20000 {
+			return api.Failure("INVALID_ARGUMENT", "한 번에 최대 20,000개 파일을 모을 수 있습니다")
 		}
+	}
+	// The actual owning groups must be idle even when selection came from a virtual album.
+	for owner := range seen {
+		var revision int64
+		if e = tx.QueryRowContext(ctx, "SELECT revision FROM media WHERE id=?", owner).Scan(&revision); e != nil {
+			return failure(e)
+		}
+		if e = media.CheckWrite(ctx, tx, owner, revision); e != nil {
+			return api.Failure("JOB_ACTIVE", "원본 파일의 다른 작업이 진행 중입니다")
+		}
+	}
+	operation := req.Operation
+	if operation == "" {
+		operation = "move"
 	}
 	job := uuid.NewString()
 	now := time.Now().UnixMilli()
-	if _, e = tx.ExecContext(ctx, "INSERT INTO file_move_job(id,target_directory_id,target_directory_snapshot,state,created_at,updated_at)VALUES(?,?,?,'pending',?,?)", job, req.DirectoryID, actual, now, now); e != nil {
+	if _, e = tx.ExecContext(ctx, "INSERT INTO file_move_job(id,target_directory_id,target_directory_snapshot,state,created_at,updated_at,operation)VALUES(?,?,?,'pending',?,?,?)", job, req.DirectoryID, actual, now, now, operation); e != nil {
 		return failure(e)
 	}
 	count := 0
-	for id := range seen {
-		rows, err := tx.QueryContext(ctx, "SELECT id,file_uuid,filepath,filename_token,coalesce(content_hash,'') FROM media_file WHERE media_id=? ORDER BY position", id)
+	for id, ids := range seen {
+		rawIDs, _ := json.Marshal(ids)
+		rows, err := tx.QueryContext(ctx, "SELECT id,file_uuid,filepath,filename_token,coalesce(content_hash,'') FROM media_file WHERE media_id=? AND id IN (SELECT value FROM json_each(?)) ORDER BY position,id", id, string(rawIDs))
 		if err != nil {
 			return failure(err)
 		}
@@ -183,7 +231,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) api.Result {
 				return api.Failure("INVALID_ARGUMENT", "한 번에 최대 20,000개 파일을 이동할 수 있습니다")
 			}
 			state, message := "pending", ""
-			stat := expected{Version: 1, Token: f.token, DirectoryIdentity: dirID, Hash: f.hash}
+			stat := expected{Version: 1, KeepName: req.Operation != "", Token: f.token, DirectoryIdentity: dirID, Hash: f.hash}
 			path, sourceKey, err := media.CanonicalPath(f.path)
 			if err == nil {
 				// Do not follow a last-component link, or accept a directory as a file.
@@ -233,13 +281,13 @@ func (s *Service) Get(ctx context.Context, req Request) api.Result {
 	var v Status
 	v.Items = []Item{}
 	v.Offset = req.Offset
-	query := "SELECT id,target_directory_snapshot,state FROM file_move_job WHERE id=?"
+	query := "SELECT id,target_directory_snapshot,state,operation FROM file_move_job WHERE id=?"
 	args := []any{req.JobID}
 	if req.JobID == "" {
-		query = "SELECT id,target_directory_snapshot,state FROM file_move_job WHERE EXISTS(SELECT 1 FROM file_move_item WHERE job_id=file_move_job.id AND json_extract(expected_stat_json,'$.version')=1) ORDER BY created_at DESC,rowid DESC LIMIT 1"
+		query = "SELECT id,target_directory_snapshot,state,operation FROM file_move_job WHERE EXISTS(SELECT 1 FROM file_move_item WHERE job_id=file_move_job.id AND json_extract(expected_stat_json,'$.version')=1) ORDER BY created_at DESC,rowid DESC LIMIT 1"
 		args = nil
 	}
-	if e := s.db.QueryRowContext(ctx, query, args...).Scan(&v.JobID, &v.Directory, &v.State); e != nil {
+	if e := s.db.QueryRowContext(ctx, query, args...).Scan(&v.JobID, &v.Directory, &v.State, &v.Operation); e != nil {
 		if errors.Is(e, sql.ErrNoRows) {
 			return api.Success(nil)
 		}
@@ -276,12 +324,25 @@ func (s *Service) Get(ctx context.Context, req Request) api.Result {
 			v.ProcessedBytes = v.TotalBytes
 		}
 	} else if v.State == "running" || v.State == "pausing" {
-		v.State = "interrupted"
+		// The worker can finish between the first DB read and this lock.
+		// Re-read its final state before reporting an interrupted job.
+		if err := s.db.QueryRowContext(ctx, "SELECT state FROM file_move_job WHERE id=?", v.JobID).Scan(&v.State); err != nil {
+			s.mu.Unlock()
+			return failure(err)
+		}
+		if v.State == "running" || v.State == "pausing" {
+			v.State = "interrupted"
+		}
 	}
 	s.mu.Unlock()
 	return api.Success(v)
 }
 func (s *Service) Run(ctx context.Context, req Request) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed || s.active != "" {
@@ -307,6 +368,11 @@ func (s *Service) Run(ctx context.Context, req Request) api.Result {
 	return api.Success(map[string]string{"jobId": req.JobID})
 }
 func (s *Service) Pause(ctx context.Context, req Request) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.active != req.JobID {
@@ -319,6 +385,11 @@ func (s *Service) Pause(ctx context.Context, req Request) api.Result {
 	return api.Success(map[string]string{"jobId": req.JobID})
 }
 func (s *Service) Retry(ctx context.Context, req Request) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	s.mu.Lock()
 	if s.closed || s.active != "" {
 		s.mu.Unlock()

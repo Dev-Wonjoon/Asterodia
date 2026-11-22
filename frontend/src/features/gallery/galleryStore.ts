@@ -1,5 +1,6 @@
 import type { MediaApi } from '@contracts/media-api'
 import type { MoveSelection } from '@contracts/file-move-api'
+import { readExpandedAlbums, saveExpandedAlbums } from '../../../../internal/webserver/web/album-state.js'
 import type {
     MediaDetailDto,
     MediaEditRequest,
@@ -21,6 +22,7 @@ export interface MediaViewError {
 type Status = 'idle' | 'loading' | 'ready' | 'error' | 'not_ready'
 
 export interface GallerySnapshot {
+    expandedMediaIds?: number[]
     list: {
         status: Status
         page: MediaPage<MediaSummaryDto>
@@ -44,6 +46,7 @@ export interface GallerySnapshot {
 }
 
 export const MEDIA_PAGE_SIZE = 50
+export const GALLERY_PAGE_SIZE = 24
 
 export type GalleryBulkAction =
     | { kind: 'favorite'; value: boolean }
@@ -81,11 +84,14 @@ export function createGalleryStore(
     api: MediaApi,
     options: {
         favoritesOnly?: boolean
+        expandAlbums?: boolean
     } = {}
 ) {
     const favoritesOnly = options.favoritesOnly ?? false
+    const expandAlbums = options.expandAlbums ?? false
     let filter: MediaFilter = {}
     let snapshot: GallerySnapshot = {
+        expandedMediaIds: expandAlbums ? readExpandedAlbums() : [],
         list: emptyList(),
         detail: {
             mediaId: null,
@@ -101,6 +107,7 @@ export function createGalleryStore(
     }
 
     const listeners = new Set<() => void>()
+    let expandedAlbums = snapshot.expandedMediaIds ?? []
     let listToken = 0
     let detailToken = 0
     let refreshQueued = false
@@ -146,7 +153,8 @@ export function createGalleryStore(
 
     async function loadList(
         mode: 'refresh' | 'append' = 'refresh',
-        internal = false
+        internal = false,
+        refreshCountOverride?: number
     ): Promise<boolean> {
         const append = mode === 'append'
         const previous = snapshot.list
@@ -170,9 +178,11 @@ export function createGalleryStore(
 
         const token = ++listToken
         const requestedFilter = structuredClone(filter)
+        const requestedExpanded = [...expandedAlbums]
+        const pageSize = expandAlbums ? GALLERY_PAGE_SIZE : MEDIA_PAGE_SIZE
 
         // 변경 후 재조회할 때 이미 불러온 범위를 유지한다.
-        const refreshCount = Math.max(MEDIA_PAGE_SIZE, previous.nextOffset)
+        const refreshCount = Math.max(pageSize, refreshCountOverride ?? previous.nextOffset)
 
         let offset = append ? previous.nextOffset : 0
         const rows = append ? [...previous.page.data] : []
@@ -193,6 +203,7 @@ export function createGalleryStore(
         })
 
         function failList(error: MediaViewError): false {
+            if (expandAlbums && !append) expandedAlbums = snapshot.expandedMediaIds ?? []
             publish({
                 ...snapshot,
                 list: {
@@ -216,10 +227,11 @@ export function createGalleryStore(
         do {
             const result = await request(() =>
                 api.list({
-                    limit: MEDIA_PAGE_SIZE,
+                    limit: pageSize,
                     offset,
                     favoritesOnly,
-                    filter: requestedFilter
+                    filter: requestedFilter,
+                    ...(expandAlbums ? { gallery: true, expandedMediaIds: requestedExpanded } : {})
                 })
             )
 
@@ -231,6 +243,9 @@ export function createGalleryStore(
             }
 
             const page = result.data
+            if (expandAlbums && append && page.offset !== undefined && page.offset !== offset) {
+                return loadList('refresh', internal)
+            }
 
             if (page.hasNextPage && page.data.length === 0) {
                 return failList({
@@ -246,14 +261,20 @@ export function createGalleryStore(
             hasNextPage = page.hasNextPage
         } while (!append && hasNextPage && offset < refreshCount)
 
-        const byId = new Map<number, MediaSummaryDto>()
+        const byId = new Map<string, MediaSummaryDto>()
 
         for (const media of rows) {
-            byId.set(media.id, media)
+            byId.set(media.galleryFile ? `album:${media.id}:file:${media.galleryFile.id}` : `album:${media.id}`, media)
+        }
+
+        if (expandAlbums) {
+            expandedAlbums = requestedExpanded
+            saveExpandedAlbums(requestedExpanded)
         }
 
         publish({
             ...snapshot,
+            expandedMediaIds: expandAlbums ? requestedExpanded : snapshot.expandedMediaIds,
             list: {
                 status: 'ready',
                 page: {
@@ -445,7 +466,7 @@ export function createGalleryStore(
 
         const data = removeFromList
             ? page.data.filter((previous) => previous.id !== media.id)
-            : page.data.map((previous) => (previous.id === media.id ? media : previous))
+            : page.data.map((previous) => (previous.id === media.id ? { ...previous, ...media } : previous))
 
         const total = removeFromList && listed ? Math.max(0, page.total - 1) : page.total
 
@@ -603,9 +624,19 @@ export function createGalleryStore(
 
         loadMore: () => loadList('append'),
 
+        toggleAlbum(mediaId: number) {
+            if (snapshot.busy || snapshot.needsRefresh || snapshot.list.refreshing) return Promise.resolve(false)
+            const ids = expandedAlbums
+            const next = ids.includes(mediaId) ? ids.filter(id => id !== mediaId) : [...ids, mediaId]
+            const shown = snapshot.list.page.data.filter(item => item.id === mediaId && item.galleryFile).length
+            const count = ids.includes(mediaId) ? snapshot.list.nextOffset - Math.max(0, shown - 1) : snapshot.list.nextOffset
+            expandedAlbums = next
+            return loadList('refresh', false, count)
+        },
+
         loadDetail: (offset: number) => loadDetail(offset),
 
-        async openDetail(mediaId: number) {
+        async openDetail(mediaId: number, fileOffset = 0) {
             if (snapshot.busy) return false
 
             detailToken++
@@ -617,12 +648,12 @@ export function createGalleryStore(
                     mediaId,
                     status: 'idle',
                     data: null,
-                    offset: 0,
+                    offset: fileOffset,
                     error: null
                 }
             })
 
-            return loadDetail(0)
+            return loadDetail(fileOffset)
         },
 
         closeDetail() {

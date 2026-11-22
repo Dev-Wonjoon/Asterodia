@@ -68,6 +68,9 @@ export interface MediaListRequest {
     offset?: number
     favoritesOnly?: boolean
     filter?: MediaFilter
+    gallery?: boolean
+    expandedMediaIds?: number[]
+    anchorMediaId?: number
 }
 
 export interface MediaGetRequest {
@@ -99,6 +102,9 @@ export interface MediaUnregisterFilesRequest extends MediaUnregisterRequest {
 }
 
 export interface MediaSummaryDto {
+    isUserAlbum?: boolean
+    galleryFile?: MediaFileDto
+    galleryFileOffset?: number
     id: number
     sourceKind: MediaSourceKind
     requestUrl: string | null
@@ -117,6 +123,19 @@ export interface MediaSummaryDto {
     createdAt: number
     updatedAt: number | null
 }
+
+export interface AlbumRequest {
+    albumId?: number
+    expectedRevision?: number
+    title?: string
+    addFileIds?: number[]
+    addMediaIds?: number[]
+    removeFileIds?: number[]
+    moveFileId?: number
+    beforeFileId?: number
+    delete?: boolean
+}
+export interface MediaSequence { ids: number[]; title: string; revision: number }
 
 export interface MediaFileDto {
     id: number
@@ -165,6 +184,7 @@ export interface MediaPage<T> {
     data: T[]
     total: number
     hasNextPage: boolean
+    offset?: number
 }
 
 export interface MediaDetailDto extends MediaSummaryDto {

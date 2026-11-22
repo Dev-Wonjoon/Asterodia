@@ -1,0 +1,13 @@
+.sb-viewer{position:fixed;inset:0;box-sizing:border-box;width:100vw;max-width:none;height:100dvh;max-height:none;margin:0;padding:0;border:0;background:#080b12;color:#f3f4f6;overflow:hidden;font:14px/1.5 system-ui,sans-serif}
+.sb-viewer[open]{display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;gap:12px}
+.sb-viewer::backdrop{background:#080b12}
+.sbv-header,.sbv-footer{display:flex;align-items:center;gap:12px;padding:12px 20px;flex-wrap:wrap}
+.sbv-header h2{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:16px;margin:0}
+.sb-viewer button{border:1px solid #475569;background:#172033;color:inherit;border-radius:8px;padding:8px 14px;cursor:pointer;font:inherit}
+.sb-viewer button:disabled{opacity:.35;cursor:default}.sb-viewer button:focus-visible,.sb-viewer input:focus-visible{outline:2px solid #60a5fa;outline-offset:3px}
+.sbv-stage{min-height:0;min-width:0;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:0 20px}
+.sbv-image{width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain}.sbv-video{width:100%;height:100%;min-height:0;display:flex;justify-content:center}
+.sbv-video .sb-player{height:100%;width:100%;display:flex;flex-direction:column}.sbv-video .sbp-screen{flex:1;min-height:0;aspect-ratio:auto}.sbv-video .sbp-screen video{width:100%;height:100%;max-height:100%!important;object-fit:contain}.sbv-video .sbp-jumps{flex-shrink:0}
+.sbv-audio{width:min(100%,560px);text-align:center;padding:16px;box-sizing:border-box}.sbv-audio audio{width:100%}.sbv-artwork{position:relative;width:min(40vh,240px);aspect-ratio:1;margin:0 auto 20px;display:grid;place-items:center;font-size:72px;background:#172033;border-radius:20px;overflow:hidden}.sbv-artwork img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.sbv-options{display:flex;gap:20px;flex-wrap:wrap;margin-left:auto}.sbv-options label{display:flex;gap:7px;align-items:center;cursor:pointer}.sbv-status{margin:0;text-align:center;overflow-wrap:anywhere;padding:0 20px}.sbv-count{font-variant-numeric:tabular-nums;min-width:64px;text-align:center}
+@media(max-width:600px){.sbv-options{width:100%;margin:0;justify-content:center;gap:16px}.sbv-header,.sbv-footer{padding:10px}.sbv-footer{justify-content:center}.sbv-stage{padding:0 8px}.sb-viewer[open]{gap:8px}}

@@ -2,9 +2,11 @@ package engine
 
 import (
 	"archive/zip"
+
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
 	"io"
 	"net/http"
 	"os"
@@ -17,6 +19,7 @@ import (
 )
 
 type Manager struct {
+	UpdateGate        *api.UpdateGate
 	binDir            string
 	runner            ProcessRunner
 	installMu         sync.Mutex
@@ -193,6 +196,11 @@ func (m *Manager) Install(
 	name string,
 	installID string,
 ) (success bool, installErr error) {
+	leaveUpdate, updateAllowed := m.UpdateGate.Enter()
+	if !updateAllowed {
+		return false, fmt.Errorf("%s", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	if installID == "" {
 		return false, fmt.Errorf("설치 요청 식별자가 없습니다")
 	}

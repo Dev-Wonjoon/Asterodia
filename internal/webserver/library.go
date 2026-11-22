@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
@@ -11,11 +12,46 @@ import (
 )
 
 func publicSummary(row map[string]any) map[string]any {
-	result := map[string]any{"id": row["id"], "title": row["title"], "fileCount": row["fileCount"], "createdAt": row["createdAt"], "cover": nil}
+	result := map[string]any{"id": row["id"], "title": row["title"], "isUserAlbum": row["isUserAlbum"], "fileCount": row["fileCount"], "createdAt": row["createdAt"], "cover": nil}
 	if cover, ok := row["cover"].(map[string]any); ok {
 		result["cover"] = map[string]any{"fileId": cover["fileId"], "kind": cover["kind"]}
 	}
+	if file, ok := row["galleryFile"].(map[string]any); ok {
+		result["galleryFile"] = map[string]any{"id": file["id"], "title": file["title"], "kind": file["kind"]}
+		result["galleryFileOffset"] = row["galleryFileOffset"]
+	}
 	return result
+}
+
+func (s *Service) sequence(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		http.Error(w, "앨범을 확인하세요", 400)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	result := s.library.Sequence(ctx, media.SequenceRequest{MediaID: id})
+	if apiError(w, r, result) {
+		return
+	}
+	respond(w, r, result.Data)
+}
+
+func (s *Service) fileInfo(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		http.Error(w, "파일을 확인하세요", 400)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	result := s.library.ReadFile(ctx, media.FileRequest{FileID: id})
+	if apiError(w, r, result) {
+		return
+	}
+	file := result.Data.(media.Object)
+	respond(w, r, map[string]any{"id": file["id"], "title": file["title"], "kind": file["kind"], "duration": file["duration"]})
 }
 
 func apiError(w http.ResponseWriter, r *http.Request, result api.Result) bool {
@@ -45,7 +81,27 @@ func (s *Service) list(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	filter := mobileSearchFilter(r)
 	filter.Keyword = q
-	result := s.library.List(ctx, media.ListRequest{Limit: limit, Offset: offset, Filter: filter})
+	expanded := []int64{}
+	if raw := r.URL.Query().Get("expanded"); raw != "" {
+		if len(raw) > 100000 {
+			http.Error(w, "조회 범위를 확인하세요", 400)
+			return
+		}
+		for _, value := range strings.Split(raw, ",") {
+			id, err := strconv.ParseInt(value, 10, 64)
+			if err != nil || id <= 0 {
+				http.Error(w, "앨범을 확인하세요", 400)
+				return
+			}
+			expanded = append(expanded, id)
+		}
+	}
+	anchor, anchorErr := integer(r, "anchor", 0)
+	if anchorErr != nil || anchor < 0 {
+		http.Error(w, "앨범을 확인하세요", 400)
+		return
+	}
+	result := s.library.List(ctx, media.ListRequest{Limit: limit, Offset: offset, Filter: filter, Gallery: r.URL.Query().Get("gallery") == "1", ExpandedMediaIDs: expanded, AnchorMediaID: int64(anchor)})
 	if apiError(w, r, result) {
 		return
 	}
@@ -54,7 +110,7 @@ func (s *Service) list(w http.ResponseWriter, r *http.Request) {
 	for _, row := range page["data"].([]media.Object) {
 		items = append(items, publicSummary(row))
 	}
-	respond(w, r, map[string]any{"data": items, "total": page["total"], "hasNextPage": page["hasNextPage"]})
+	respond(w, r, map[string]any{"data": items, "total": page["total"], "hasNextPage": page["hasNextPage"], "offset": page["offset"]})
 }
 
 func mobileSearchFilter(r *http.Request) media.Filter {

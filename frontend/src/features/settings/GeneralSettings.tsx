@@ -2,12 +2,13 @@ import { Button } from '@renderer/shared/components/ui/Button'
 import { useGeneralSettingsViewModel } from '@renderer/features/settings/useGeneralSettingsViewModel'
 import { SettingSection } from '@renderer/shared/components/ui/SettingSection'
 import { SettingRow } from '@renderer/shared/components/ui/SettingRow'
+import { UpdateSettings } from './UpdateSettings'
 
 export const GeneralSettings = (): React.JSX.Element => {
     const { downloadPath, changePath, importDatabase, importing, importResult, importError } = useGeneralSettingsViewModel()
 
     return (
-        <SettingSection title="일반 설정" description="앱의 기본 동작을 설정합니다.">
+        <div className="space-y-6"><UpdateSettings /><SettingSection title="일반 설정" description="앱의 기본 동작을 설정합니다.">
             <SettingRow
                 label="다운로드 경로"
                 value={downloadPath || '설정되지 않음'}
@@ -16,8 +17,8 @@ export const GeneralSettings = (): React.JSX.Element => {
                 }
             />
             <SettingRow
-                label="구 버전 데이터베이스 가져오기"
-                value={importing ? 'DB를 확인하고 병합하고 있습니다…' : 'SQLite 데이터베이스 파일 선택'}
+                label="Wails 데이터베이스 가져오기"
+                value={importing ? 'DB를 확인하고 병합하고 있습니다…' : 'StorageBucket Wails DB 파일 선택 · Electron DB는 지원하지 않습니다.'}
                 action={
                     <Button disabled={importing} onClick={() => void importDatabase()}>
                         {importing ? '가져오는 중…' : '가져오기'}
@@ -41,6 +42,6 @@ export const GeneralSettings = (): React.JSX.Element => {
                     <p className="break-all">병합 전 백업: {importResult.backupPath}</p>
                 </div>
             )}
-        </SettingSection>
+        </SettingSection></div>
     )
 }

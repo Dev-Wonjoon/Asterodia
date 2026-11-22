@@ -1,0 +1,73 @@
+// @vitest-environment happy-dom
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { mountVideoPlayer, readSeekSeconds } from '../../internal/webserver/web/player.js'
+let player: ReturnType<typeof mountVideoPlayer> | undefined
+beforeEach(() => {
+    localStorage.clear(); vi.useFakeTimers()
+    vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {})
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
+})
+afterEach(() => { player?.destroy(); player=undefined; document.body.replaceChildren(); vi.useRealTimers(); vi.restoreAllMocks() })
+function setup() {
+    player=mountVideoPlayer(document.body,{src:'/fixture.mp4',title:'영상'})
+    const video=player.video
+    Object.defineProperty(video,'duration',{value:1000,configurable:true})
+    vi.spyOn(video,'getBoundingClientRect').mockReturnValue({left:0,width:800} as DOMRect)
+    video.dispatchEvent(new Event('loadedmetadata'))
+    return video
+}
+const button=(label:string)=>document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!
+it('keeps all eight jumps outside the video screen and clamps both ends',()=>{
+    const video=setup()
+    expect([...document.querySelectorAll('.sbp-jumps button')].map(el=>el.textContent)).toEqual(['-5분','-1분','-30초','-10초','+10초','+30초','+1분','+5분'])
+    expect(document.querySelector('.sbp-screen .sbp-jumps')).toBeNull()
+    video.currentTime=900;button('+5분 이동').click();expect(video.currentTime).toBe(1000)
+    video.currentTime=5;button('-10초 이동').click();expect(video.currentTime).toBe(0)
+    expect(video.controls).toBe(false)
+})
+it('double-clicks seek without also toggling playback, persists a configurable interval',async()=>{
+    const video=setup();video.currentTime=200
+    video.dispatchEvent(new MouseEvent('click',{clientX:20,detail:1}))
+    video.dispatchEvent(new MouseEvent('click',{clientX:20,detail:2}))
+    video.dispatchEvent(new MouseEvent('dblclick',{clientX:20,detail:2,cancelable:true}))
+    await vi.advanceTimersByTimeAsync(600)
+    expect(video.currentTime).toBe(190);expect(video.play).not.toHaveBeenCalled()
+    button('플레이어 설정').click()
+    const input=document.querySelector<HTMLInputElement>('.sbp-settings input')!;input.value='30';input.dispatchEvent(new Event('change'))
+    expect(readSeekSeconds()).toBe(30)
+    video.dispatchEvent(new MouseEvent('dblclick',{clientX:700}));expect(video.currentTime).toBe(220)
+    input.value='0';input.dispatchEvent(new Event('change'));expect(input.value).toBe('30')
+})
+it('recognizes double tap once and ignores synthetic mouse events and swipes',async()=>{
+    const video=setup();video.currentTime=100
+    function tap(x:number) {
+        video.dispatchEvent(new PointerEvent('pointerdown',{pointerType:'touch',pointerId:1,button:0,clientX:x,clientY:20}))
+        video.dispatchEvent(new PointerEvent('pointerup',{pointerType:'touch',pointerId:1,clientX:x,clientY:20}))
+    }
+    tap(700);await vi.advanceTimersByTimeAsync(120);tap(700)
+    video.dispatchEvent(new MouseEvent('click',{clientX:700,detail:1}))
+    video.dispatchEvent(new MouseEvent('dblclick',{clientX:700,detail:2}))
+    await vi.advanceTimersByTimeAsync(600)
+    expect(video.currentTime).toBe(110);expect(video.play).not.toHaveBeenCalled()
+    video.dispatchEvent(new PointerEvent('pointerdown',{pointerType:'touch',pointerId:2,clientX:600,clientY:20}))
+    video.dispatchEvent(new PointerEvent('pointerup',{pointerType:'touch',pointerId:2,clientX:690,clientY:20}))
+    await vi.advanceTimersByTimeAsync(600);expect(video.play).not.toHaveBeenCalled()
+})
+it('plays on a single click, handles keyboard seeks, and releases pending gestures on destroy',async()=>{
+    const video=setup();video.currentTime=50
+    video.dispatchEvent(new MouseEvent('click',{detail:1}));await vi.advanceTimersByTimeAsync(600);expect(video.play).toHaveBeenCalledOnce()
+    player!.root.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true,cancelable:true}));expect(video.currentTime).toBe(40)
+    video.dispatchEvent(new MouseEvent('click',{detail:1}));player!.destroy();player=undefined
+    await vi.advanceTimersByTimeAsync(600);expect(video.play).toHaveBeenCalledOnce()
+})
+it('expands the entire player with its jump buttons when native fullscreen is unavailable',async()=>{
+    setup()
+    player!.root.requestFullscreen=vi.fn().mockRejectedValue(new Error('denied'))
+    button('전체화면').click();await Promise.resolve();await Promise.resolve()
+    expect(document.querySelector('dialog[open] .sbp-jumps')).not.toBeNull()
+    expect(player!.root.classList.contains('is-expanded')).toBe(true)
+    button('전체화면 종료').click();await vi.advanceTimersByTimeAsync(0)
+    expect(document.querySelector('.sbp-fullscreen-dialog')).toBeNull()
+    expect(player!.root.parentElement).toBe(document.body)
+})

@@ -9,7 +9,7 @@ export function useGalleryViewModel(favoritesOnly = false, filter?: MediaFilter)
     const { showToast } = useToast()
 
     const store = useMemo(
-        () => createGalleryStore(getApi().media, { favoritesOnly }),
+        () => createGalleryStore(getApi().media, { favoritesOnly, expandAlbums: true }),
         [favoritesOnly]
     )
 

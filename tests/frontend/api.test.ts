@@ -7,6 +7,7 @@ const bindings = vi.hoisted(() => ({
     thumbnail: vi.fn(), path: vi.fn(), on: vi.fn(), importDatabase: vi.fn(), chooseFolder: vi.fn(), localGet: vi.fn(), localRun: vi.fn(), localCancel: vi.fn(), localRescan: vi.fn(), directories: vi.fn(), localPause: vi.fn(), localResume: vi.fn(), localFiles: vi.fn(), localRetry: vi.fn(), localExclude: vi.fn()
 }))
 vi.mock('@wailsio/runtime', () => ({ Events: { On: bindings.on } }))
+vi.mock('@bindings/update', () => ({ Service: { Status: vi.fn(), Check: vi.fn(), Download: vi.fn(), Restart: vi.fn() } }))
 vi.mock('@bindings/filemove', () => ({ Service: { Create: vi.fn(), Get: vi.fn(), Run: vi.fn(), Pause: vi.fn(), Retry: vi.fn() } }))
 vi.mock('@bindings/mediaedit', () => ({ Service: { Prepare: vi.fn(), Create: vi.fn(), GetSession: vi.fn(), GetJob: vi.fn(), List: vi.fn(), Cancel: vi.fn(), Release: vi.fn(), ResultPath: vi.fn() } }))
 vi.mock('@bindings/webserver', () => ({ Service: { Status: bindings.webStatus, Start: bindings.webStart, Stop: bindings.webStop } }))

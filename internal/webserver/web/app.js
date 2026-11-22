@@ -1,8 +1,14 @@
+import { mountMediaViewer } from './viewer.js';
 'use strict';
 import { mountMediaEditor } from './editor.js';
 import { mountSearchSuggestions } from './search.js';
+import { mountVideoPlayer } from './player.js';
+import { readExpandedAlbums, saveExpandedAlbums } from './album-state.js';
 const el = id => document.getElementById(id);
 const state = { offset: 0, q: '', total: 0, next: false, busy: false, serial: 0, controller: null, media: null, fileOffset: 0, fileNext: false, detailSerial: 0 };
+state.expanded = readExpandedAlbums();
+state.items = []; state.moreError = false; state.retryAppend = false;
+let videoPlayers = [];
 state.tags = []; state.authors = [];
 function searchParameters() { const query = new URLSearchParams(); for (const tag of state.tags) query.append('tag', tag); for (const author of state.authors) query.append('author', author); return query; }
 async function request(path, signal) {
@@ -29,40 +35,73 @@ function fileURL(id, variant) {
         throw new Error('파일 ID를 확인하세요.');
     return '/api/files/' + id + '/' + variant;
 }
-function updatePaging() {
-    el('previous').disabled = state.busy || state.offset === 0;
-    el('next').disabled = state.busy || !state.next;
+function updateFeed() {
     el('refresh').disabled = state.busy;
-    el('page').textContent = (Math.floor(state.offset / 24) + 1) + ' 페이지';
+    el('load-more').disabled = state.busy;
+    el('load-more').hidden = !state.next && !state.moreError;
+    el('load-more').textContent = state.moreError ? '다시 시도' : '더 불러오기';
+    el('feed-status').textContent = state.busy ? '불러오는 중…' : `${state.items.length} / ${state.total}개 항목` + (!state.next && state.items.length ? ' · 모든 항목을 불러왔습니다.' : '');
     el('gallery').setAttribute('aria-busy', String(state.busy));
+    feedObserver?.disconnect();
+    if (!state.busy && state.next && !state.moreError && !el('detail').open) feedObserver?.observe(el('gallery-sentinel'));
 }
-async function load() {
+const itemKey = item => item.galleryFile ? 'album:' + item.id + ':file:' + item.galleryFile.id : 'album:' + item.id;
+async function load({ append = false, count = Math.max(24, state.offset) } = {}) {
+    if (append && (state.busy || !state.next)) return false;
     state.controller?.abort();
     state.controller = new AbortController();
     const serial = ++state.serial;
+    const expanded = [...state.expanded];
+    let offset = append ? state.offset : 0;
+    const rows = append ? [...state.items] : [];
+    let total = state.total, hasNext = false;
     state.busy = true;
-    el('message').textContent = '라이브러리를 읽고 있습니다…';
-    updatePaging();
+    el('message').textContent = '';
+    updateFeed();
     try {
-        const query = searchParameters(); query.set('limit','24'); query.set('offset',String(state.offset)); query.set('q',state.q);
-        const page = await request('/api/library?' + query, state.controller.signal);
-        if (serial !== state.serial)
-            return;
-        state.next = page.hasNextPage;
-        state.total = page.total;
-        el('count').textContent = '총 ' + page.total + '개 묶음';
-        el('gallery').replaceChildren();
-        for (const item of page.data) {
+        do {
+            const query = searchParameters(); query.set('limit', '24'); query.set('offset', String(offset)); query.set('q', state.q);
+            query.set('gallery', '1'); query.set('expanded', expanded.join(','));
+            const page = await request('/api/library?' + query, state.controller.signal);
+            if (serial !== state.serial) return null;
+            if (append && page.offset !== undefined && page.offset !== offset) return load();
+            if (page.hasNextPage && !page.data.length) throw new Error('다음 목록을 확인하지 못했습니다. 다시 시도해 주세요.');
+            rows.push(...page.data); offset += page.data.length;
+            total = page.total; hasNext = page.hasNextPage;
+        } while (!append && hasNext && offset < count);
+        const existing = new Set(append ? state.items.map(itemKey) : []);
+        const unique = [...new Map(rows.map(item => [itemKey(item), item])).values()];
+        state.items = unique; state.offset = offset; state.total = total; state.next = hasNext; state.moreError = false;
+        el('count').textContent = '총 ' + total + '개 항목';
+        renderGallery(append ? unique.filter(item => !existing.has(itemKey(item))) : unique, append);
+        el('message').textContent = unique.length ? '' : state.q ? '검색 결과가 없습니다.' : '아직 등록된 미디어가 없습니다.';
+        saveExpandedAlbums(expanded);
+        return true;
+    } catch (error) {
+        if (serial === state.serial && error.name !== 'AbortError') {
+            el('message').textContent = error.message;
+            state.moreError = true; state.retryAppend = append;
+        }
+        return serial === state.serial ? false : null;
+    } finally {
+        if (serial === state.serial) { state.busy = false; updateFeed(); }
+    }
+}
+function renderGallery(items, append) {
+    if (!append) el('gallery').replaceChildren();
+        for (const item of items) {
+            const card = document.createElement('article'); card.className = 'album-card'; card.dataset.albumId = String(item.id);
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'card';
-            button.addEventListener('click', () => openDetail(item.id));
+            button.addEventListener('click', () => openDetail(item.id, item.galleryFileOffset));
             const cover = document.createElement('div');
             cover.className = 'cover';
             cover.append(text('span', item.cover?.kind === 'audio' ? '오디오' : item.cover?.kind === 'video' ? '영상' : '미디어'));
-            if (item.cover) {
+            const file = item.galleryFile;
+            if (file || item.cover) {
                 const image = document.createElement('img');
-                image.src = fileURL(item.cover.fileId, 'thumbnail');
+                image.src = fileURL(file?.id ?? item.cover.fileId, 'thumbnail');
                 image.alt = '';
                 image.loading = 'lazy';
                 image.addEventListener('error', () => image.remove(), { once: true });
@@ -70,24 +109,35 @@ async function load() {
             }
             const body = document.createElement('div');
             body.className = 'card-body';
-            body.append(text('h2', item.title), text('small', item.fileCount + '개 파일'));
+            body.append(text('h2', file ? file.title || `파일 ${item.galleryFileOffset + 1}` : item.title), text('small', file ? `${item.title} · ${item.galleryFileOffset + 1} / ${item.fileCount}` : item.fileCount + '개 파일'));
             button.append(cover, body);
-            el('gallery').append(button);
+            card.append(button);
+            const watch = text('button', '감상하기'); watch.type = 'button'; watch.className = 'album-toggle'; watch.disabled = item.fileCount === 0;
+            watch.addEventListener('click', () => openViewer(item.id, item.galleryFile?.id)); card.append(watch);
+
+            if (item.fileCount > 1 || file) {
+                const toggle = text('button', file ? '앨범 닫기' : '앨범 펼치기'); toggle.type = 'button'; toggle.className = 'album-toggle'; toggle.setAttribute('aria-expanded', String(Boolean(file))); toggle.setAttribute('aria-label', item.title + ' ' + toggle.textContent);
+                toggle.addEventListener('click', async () => {
+                    if (state.busy) return;
+                    const previous = state.expanded;
+                    state.expanded = previous.includes(item.id) ? previous.filter(id => id !== item.id) : [...previous, item.id];
+                    const top = card.getBoundingClientRect().top;
+                    const shown = state.items.filter(row => row.id === item.id && row.galleryFile).length;
+                    const count = previous.includes(item.id) ? state.offset - Math.max(0, shown - 1) : state.offset;
+                    const loaded = await load({ count });
+                    if (loaded === false) state.expanded = previous;
+                    if (loaded) {
+                        const anchor = el('gallery').querySelector(`[data-album-id="${item.id}"]`);
+                        if (anchor) window.scrollBy(0, anchor.getBoundingClientRect().top - top);
+                    }
+                });
+                card.append(toggle);
+            }
+            el('gallery').append(card);
         }
-        el('message').textContent = page.data.length ? '' : state.q ? '검색 결과가 없습니다.' : '아직 등록된 미디어가 없습니다.';
-    }
-    catch (error) {
-        if (serial === state.serial && error.name !== 'AbortError')
-            el('message').textContent = error.message;
-    }
-    finally {
-        if (serial === state.serial) {
-            state.busy = false;
-            updatePaging();
-        }
-    }
 }
 function clearFiles() {
+    videoPlayers.forEach(player => player.destroy()); videoPlayers = [];
     for (const player of el('files').querySelectorAll('video,audio')) {
         player.pause();
         player.removeAttribute('src');
@@ -95,11 +145,11 @@ function clearFiles() {
     }
     el('files').replaceChildren();
 }
-async function openDetail(id) {
+async function openDetail(id, fileOffset = 0) {
     if (!Number.isSafeInteger(id) || id <= 0)
         return;
     state.media = id;
-    state.fileOffset = 0;
+    state.fileOffset = fileOffset;
     if (!el('detail').open)
         el('detail').showModal();
     await loadFiles();
@@ -120,33 +170,38 @@ async function loadFiles() {
             const figure = document.createElement('figure');
             const kind = ['image', 'video', 'audio'].includes(file.kind) ? file.kind : null;
             if (kind) {
-                const player = document.createElement(kind === 'image' ? 'img' : kind);
-                if (kind === 'image') {
-                    player.alt = file.title || detail.title;
-                    player.loading = 'lazy';
-                }
-                else {
-                    player.controls = true;
-                    player.setAttribute('controlsList', 'nodownload');
-                    player.preload = 'none';
-                    if (kind === 'video')
-                        player.playsInline = true;
-                }
-                player.src = fileURL(file.id, 'content');
-                let fallback = false;
-                player.addEventListener('error', () => {
-                    if (kind === 'image' && !fallback) {
-                        fallback = true;
-                        player.src = fileURL(file.id, 'preview');
-                        return;
+                const player = document.createElement(kind === 'video' ? 'div' : kind === 'image' ? 'img' : kind);
+                if (kind === 'video') {
+                    videoPlayers.push(mountVideoPlayer(player, { src: fileURL(file.id, 'content'), title: file.title || detail.title, poster: fileURL(file.id, 'thumbnail') }));
+                } else {
+                    if (kind === 'image') {
+                        player.alt = file.title || detail.title;
+                        player.loading = 'lazy';
                     }
-                    player.replaceWith(text('p', '이 브라우저에서 표시하거나 재생할 수 없는 형식입니다.'));
-                });
+                    else {
+                        player.controls = true;
+                        player.setAttribute('controlsList', 'nodownload');
+                        player.preload = 'none';
+
+                    }
+                    player.src = fileURL(file.id, 'content');
+                    let fallback = false;
+                    player.addEventListener('error', () => {
+                        if (kind === 'image' && !fallback) {
+                            fallback = true;
+                            player.src = fileURL(file.id, 'preview');
+                            return;
+                        }
+                        player.replaceWith(text('p', '이 브라우저에서 표시하거나 재생할 수 없는 형식입니다.'));
+                    });
+                }
                 figure.append(player);
             }
             else
                 figure.append(text('p', '표시를 지원하지 않는 미디어입니다.'));
             figure.append(text('figcaption', file.title || '파일 ' + file.id));
+            const watch = text('button', '감상하기'); watch.type = 'button'; watch.addEventListener('click', () => openViewer(state.media, file.id)); figure.append(watch);
+
             if (file.kind === 'video'||file.kind==='image'&&file.detectedFormat==='gif') {
                 const edit = text('button',file.kind==='image'?'GIF 편집':'GIF 만들기·영상 자르기');
                 edit.type = 'button';
@@ -168,7 +223,7 @@ async function loadFiles() {
     }
 }
 let searchTimer;
-function applySearch() { clearTimeout(searchTimer); state.q = el('keyword').value; state.offset = 0; void load(); }
+function applySearch() { clearTimeout(searchTimer); state.q = el('keyword').value; state.offset = 0; void load({ count: 24 }); }
 function renderSearchFilters() {
     el('search-filters').replaceChildren();
     for (const [field,label] of [['tags','태그'],['authors','작성자']]) for (const value of state[field]) {
@@ -181,18 +236,14 @@ mountSearchSuggestions({ input: el('keyword'), form: el('search'), request, para
     onApply(item) { if (item.kind === 'tag' || item.kind === 'author') { const field=item.kind==='tag'?'tags':'authors'; if(!state[field].includes(item.value))state[field].push(item.value); el('keyword').value=''; renderSearchFilters(); } else el('keyword').value=item.value; applySearch(); }
 });
 el('refresh').addEventListener('click', () => void load());
-el('previous').addEventListener('click', () => {
-    state.offset = Math.max(0, state.offset - 24);
-    void load();
-});
-el('next').addEventListener('click', () => {
-    state.offset += 24;
-    void load();
-});
+el('load-more').addEventListener('click', () => void load({ append: state.moreError ? state.retryAppend : true }));
+const feedObserver = typeof IntersectionObserver === 'function' ? new IntersectionObserver(entries => {
+    if (entries.some(entry => entry.isIntersecting) && !state.busy && state.next && !state.moreError && !el('detail').open) void load({ append: true });
+}, { rootMargin: '0px 0px 300px 0px' }) : null;
 el('close').addEventListener('click', () => el('detail').close());
 el('detail').addEventListener('close', () => {
     state.detailSerial++;
-    clearFiles();
+    clearFiles(); updateFeed();
 });
 el('file-previous').addEventListener('click', () => {
     state.fileOffset = Math.max(0, state.fileOffset - 24);
@@ -232,5 +283,18 @@ catch {
     editAccess = { enabled: false, csrf: '' };
     el('edit-history').hidden = true;
 } }
-void loadEditAccess().then(load);
+void loadEditAccess().then(() => load());
 setInterval(() => void loadEditAccess(), 5000);
+
+let mediaViewer = null;
+function openViewer(mediaId, fileId) {
+    mediaViewer?.destroy();
+    mediaViewer = mountMediaViewer({ mediaId, fileId,
+        getSequence: id => request('/api/library/' + id + '/sequence'),
+        getFile: id => request('/api/files/' + id + '/info'),
+        contentURL: file => fileURL(file.id, 'content'),
+        previewURL: file => fileURL(file.id, 'preview'),
+        thumbnailURL: file => fileURL(file.id, 'thumbnail'),
+        onClose: () => { mediaViewer = null; },
+    });
+}

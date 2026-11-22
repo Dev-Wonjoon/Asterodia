@@ -24,6 +24,11 @@ func TestV6MediaEditMigrationPreservesHistoryAndRollsBack(t *testing.T) {
 				if e = rows.Scan(&name, &table, &ddl); e != nil {
 					t.Fatal(e)
 				}
+				if old, ok := beforeAlbumSchema(name, table, ddl); !ok {
+					continue
+				} else {
+					ddl = old
+				}
 				if strings.HasPrefix(name, "search_") || strings.HasPrefix(table, "search_") || strings.HasPrefix(table, "media_edit_") || strings.HasPrefix(name, "edit_") {
 					continue
 				}
@@ -70,11 +75,11 @@ func TestV6MediaEditMigrationPreservesHistoryAndRollsBack(t *testing.T) {
 				t.Fatal(e)
 			}
 			defer opened.Close()
-			if countDB(t, opened, "PRAGMA user_version") != 10 || countDB(t, opened, "SELECT seq FROM sqlite_sequence WHERE name='media'") != 321 || textDB(t, opened, "SELECT file_uuid FROM media_file WHERE media_id=7") != identity || countDB(t, opened, "SELECT count(*) FROM migration_run WHERE id='previous-v6'") != 1 {
+			if countDB(t, opened, "PRAGMA user_version") != 11 || countDB(t, opened, "SELECT seq FROM sqlite_sequence WHERE name='media'") != 321 || textDB(t, opened, "SELECT file_uuid FROM media_file WHERE media_id=7") != identity || countDB(t, opened, "SELECT count(*) FROM migration_run WHERE id='previous-v6'") != 1 {
 				t.Fatal("기존 파일·시퀀스·이력 유실")
 			}
 			assertHealthyDB(t, opened)
-			backup := rawDB(t, textDB(t, opened, "SELECT backup_path FROM migration_run WHERE target_version=10"))
+			backup := rawDB(t, textDB(t, opened, "SELECT backup_path FROM migration_run WHERE target_version=11"))
 			if countDB(t, backup, "PRAGMA user_version") != 6 {
 				t.Fatal("v6 백업 유실")
 			}
@@ -96,6 +101,11 @@ func TestV7StreamingMigrationPreservesCachedSessions(t *testing.T) {
 				var name, table, ddl string
 				if e = rows.Scan(&name, &table, &ddl); e != nil {
 					t.Fatal(e)
+				}
+				if old, ok := beforeAlbumSchema(name, table, ddl); !ok {
+					continue
+				} else {
+					ddl = old
 				}
 				if strings.HasPrefix(name, "search_") || strings.HasPrefix(table, "search_") || table == "media_edit_page" || table == "media_edit_selection" || table == "media_edit_range" {
 					continue
@@ -146,7 +156,7 @@ func TestV7StreamingMigrationPreservesCachedSessions(t *testing.T) {
 			}
 			defer migrated.Close()
 			assertHealthyDB(t, migrated)
-			if countDB(t, migrated, "PRAGMA user_version") != 10 || countDB(t, migrated, "SELECT render_version FROM media_edit_session WHERE id='cached'") != 1 || textDB(t, migrated, "SELECT request_json FROM media_edit_job WHERE id='old-job'") != `{"deleted":[1,4]}` {
+			if countDB(t, migrated, "PRAGMA user_version") != 11 || countDB(t, migrated, "SELECT render_version FROM media_edit_session WHERE id='cached'") != 1 || textDB(t, migrated, "SELECT request_json FROM media_edit_job WHERE id='old-job'") != `{"deleted":[1,4]}` {
 				t.Fatal("legacy cached sessions changed")
 			}
 			execDB(t, migrated, "UPDATE media_edit_session SET frame_count=100000 WHERE id='cached'")

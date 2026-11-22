@@ -15,6 +15,7 @@ import (
 )
 
 type Service struct {
+	UpdateGate   *api.UpdateGate
 	db           *sql.DB
 	searchMu     sync.Mutex
 	searchCancel context.CancelFunc
@@ -33,10 +34,13 @@ type Filter struct {
 	CreatedTo   *int64   `json:"createdTo"`
 }
 type ListRequest struct {
-	Limit         int    `json:"limit"`
-	Offset        int    `json:"offset"`
-	FavoritesOnly bool   `json:"favoritesOnly"`
-	Filter        Filter `json:"filter"`
+	Limit            int     `json:"limit"`
+	Offset           int     `json:"offset"`
+	FavoritesOnly    bool    `json:"favoritesOnly"`
+	Filter           Filter  `json:"filter"`
+	Gallery          bool    `json:"gallery"`
+	ExpandedMediaIDs []int64 `json:"expandedMediaIds"`
+	AnchorMediaID    int64   `json:"anchorMediaId"`
 }
 type GetRequest struct {
 	MediaID    int64 `json:"mediaId"`
@@ -132,7 +136,7 @@ func objects(ctx context.Context, q queryer, stmt string, args ...any) ([]Object
 	return result, rows.Err()
 }
 
-const summarySQL = `SELECT m.id,m.source_kind AS sourceKind,u.url AS requestUrl,m.source_title AS sourceTitle,m.custom_title AS customTitle,coalesce(nullif(m.custom_title,''),nullif(m.source_title,''),'제목 없음') AS title,m.revision,m.cover_mode AS coverMode,m.created_at AS createdAt,m.updated_at AS updatedAt,(SELECT count(*) FROM media_file WHERE media_id=m.id) AS fileCount,EXISTS(SELECT 1 FROM favorite WHERE media_id=m.id) AS isFavorite FROM media m LEFT JOIN download_urls u ON u.id=m.request_url_id`
+const summarySQL = `SELECT m.id,m.source_kind AS sourceKind,u.url AS requestUrl,m.source_title AS sourceTitle,m.custom_title AS customTitle,coalesce(nullif(m.custom_title,''),nullif(m.source_title,''),'제목 없음') AS title,m.revision,m.cover_mode AS coverMode,m.created_at AS createdAt,m.updated_at AS updatedAt,((SELECT count(*) FROM media_file WHERE media_id=m.id)+(SELECT count(*) FROM user_album_file WHERE album_id=m.id)) AS fileCount,EXISTS(SELECT 1 FROM user_album a WHERE a.media_id=m.id) AS isUserAlbum,EXISTS(SELECT 1 FROM favorite WHERE media_id=m.id) AS isFavorite FROM media m LEFT JOIN download_urls u ON u.id=m.request_url_id`
 
 func summary(ctx context.Context, q queryer, id int64) (Object, error) {
 	rows, err := objects(ctx, q, summarySQL+" WHERE m.id=?", id)
@@ -144,7 +148,18 @@ func summary(ctx context.Context, q queryer, id int64) (Object, error) {
 	}
 	obj := rows[0]
 	obj["isFavorite"] = obj["isFavorite"] == int64(1)
-	covers, err := objects(ctx, q, `SELECT f.id AS fileId,coalesce(f.thumbnail_path,f.preview_path,CASE WHEN f.kind='image' THEN f.filepath END) AS path,f.kind FROM media_file f JOIN media m ON m.id=f.media_id WHERE m.id=? ORDER BY CASE WHEN m.cover_file_id=f.id THEN 0 ELSE 1 END,CASE WHEN f.thumbnail_path IS NOT NULL OR f.kind='image' THEN 0 ELSE 1 END,f.position,f.id LIMIT 1`, id)
+	obj["isUserAlbum"] = obj["isUserAlbum"] == int64(1)
+	covers, err := objects(ctx, q, `SELECT f.id AS fileId,coalesce(f.thumbnail_path,f.preview_path,CASE WHEN f.kind='image' THEN f.filepath END) AS path,f.kind FROM media_file f WHERE f.media_id=? OR f.id IN (SELECT file_id FROM user_album_file WHERE album_id=?) ORDER BY CASE WHEN f.id=coalesce((SELECT cover_file_id FROM user_album WHERE media_id=?),(SELECT cover_file_id FROM media WHERE id=?)) THEN 0 ELSE 1 END,CASE WHEN f.thumbnail_path IS NOT NULL OR f.kind='image' THEN 0 ELSE 1 END,coalesce((SELECT position FROM user_album_file WHERE album_id=? AND file_id=f.id),f.position),f.id LIMIT 1`, id, id, id, id, id)
+	if obj["isUserAlbum"] == true {
+		var cover sql.NullInt64
+		if e := q.QueryRowContext(ctx, "SELECT cover_file_id FROM user_album WHERE media_id=?", id).Scan(&cover); e != nil {
+			return nil, e
+		}
+		if cover.Valid {
+			obj["coverMode"] = "manual"
+		}
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +190,7 @@ func filterSQL(req ListRequest) (string, []any, error) {
 		where = append(where, "EXISTS(SELECT 1 FROM favorite WHERE media_id=m.id)")
 	}
 	if f.Keyword != "" {
-		where = append(where, `(instr(lower(coalesce(m.custom_title,'')||' '||coalesce(m.source_title,'')),lower(?))>0 OR EXISTS(SELECT 1 FROM media_tag mt JOIN tag t ON t.id=mt.tag_id WHERE mt.media_id=m.id AND instr(lower(t.name),lower(?))>0) OR EXISTS(SELECT 1 FROM media_file f LEFT JOIN profiles p ON p.id=f.profile_id LEFT JOIN platform pl ON pl.id=f.platform_id WHERE f.media_id=m.id AND instr(lower(coalesce(f.title,'')||' '||coalesce(p.owner_name,'')||' '||coalesce(pl.name,'')),lower(?))>0))`)
+		where = append(where, `(instr(lower(coalesce(m.custom_title,'')||' '||coalesce(m.source_title,'')),lower(?))>0 OR EXISTS(SELECT 1 FROM media_tag mt JOIN tag t ON t.id=mt.tag_id WHERE mt.media_id=m.id AND instr(lower(t.name),lower(?))>0) OR EXISTS(SELECT 1 FROM media_file f LEFT JOIN profiles p ON p.id=f.profile_id LEFT JOIN platform pl ON pl.id=f.platform_id WHERE (f.media_id=m.id OR f.id IN (SELECT file_id FROM user_album_file WHERE album_id=m.id)) AND instr(lower(coalesce(f.title,'')||' '||coalesce(p.owner_name,'')||' '||coalesce(pl.name,'')),lower(?))>0))`)
 		args = append(args, f.Keyword, f.Keyword, f.Keyword)
 	}
 	if f.CreatedFrom != nil {
@@ -202,7 +217,7 @@ func filterSQL(req ListRequest) (string, []any, error) {
 	for _, group := range []struct {
 		values []string
 		clause string
-	}{{f.Platforms, "EXISTS(SELECT 1 FROM media_file f JOIN platform p ON p.id=f.platform_id WHERE f.media_id=m.id AND p.name IN (%s))"}, {f.Authors, "EXISTS(SELECT 1 FROM media_file f JOIN profiles p ON p.id=f.profile_id WHERE f.media_id=m.id AND coalesce(p.owner_name,p.owner_id) IN (%s))"}} {
+	}{{f.Platforms, "EXISTS(SELECT 1 FROM media_file f JOIN platform p ON p.id=f.platform_id WHERE (f.media_id=m.id OR f.id IN (SELECT file_id FROM user_album_file WHERE album_id=m.id)) AND p.name IN (%s))"}, {f.Authors, "EXISTS(SELECT 1 FROM media_file f JOIN profiles p ON p.id=f.profile_id WHERE (f.media_id=m.id OR f.id IN (SELECT file_id FROM user_album_file WHERE album_id=m.id)) AND coalesce(p.owner_name,p.owner_id) IN (%s))"}} {
 		if len(group.values) > 0 {
 			where = append(where, fmt.Sprintf(group.clause, placeholders(len(group.values))))
 			for _, v := range group.values {
@@ -246,6 +261,9 @@ func (s *Service) List(ctx context.Context, req ListRequest) api.Result {
 			args = append(append(values, searchFold(req.Filter.Keyword)), args...)
 		}
 	}
+	if req.Gallery {
+		return listGallery(ctx, tx, req, where, args, limit)
+	}
 	if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM media m WHERE "+where, args...).Scan(&total); err != nil {
 		return failure(err)
 	}
@@ -280,7 +298,7 @@ func (s *Service) Get(ctx context.Context, req GetRequest) api.Result {
 	if err != nil {
 		return failure(err)
 	}
-	files, err := objects(ctx, tx, fileSQL+" WHERE media_id=? ORDER BY position,id LIMIT ? OFFSET ?", req.MediaID, limit, req.FileOffset)
+	files, err := albumFiles(ctx, tx, req.MediaID, limit, req.FileOffset)
 	if err != nil {
 		return failure(err)
 	}
@@ -380,6 +398,11 @@ func (s *Service) Directories(ctx context.Context, req DirectoryListRequest) api
 	return api.Success(Object{"data": rows, "total": total, "hasNextPage": int64(req.Offset+len(rows)) < total})
 }
 func (s *Service) Edit(ctx context.Context, req EditRequest) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	if req.TagIDs != nil && req.TagChange != nil {
 		return failure(domainError("INVALID_ARGUMENT"))
 	}
@@ -416,7 +439,7 @@ func (s *Service) Edit(ctx context.Context, req EditRequest) api.Result {
 		var fileID any
 		if req.Cover.Mode == "manual" {
 			var count int
-			if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM media_file WHERE media_id=? AND id=?", req.MediaID, req.Cover.FileID).Scan(&count); err != nil {
+			if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM media_file WHERE "+albumFileWhere+" AND id=?", req.MediaID, req.MediaID, req.Cover.FileID).Scan(&count); err != nil {
 				return failure(err)
 			}
 			if count != 1 {
@@ -426,7 +449,16 @@ func (s *Service) Edit(ctx context.Context, req EditRequest) api.Result {
 		} else if req.Cover.Mode != "auto" {
 			return failure(domainError("INVALID_ARGUMENT"))
 		}
-		if _, err = tx.ExecContext(ctx, "UPDATE media SET cover_mode=?,cover_file_id=? WHERE id=?", req.Cover.Mode, fileID, req.MediaID); err != nil {
+		var isAlbum int
+		if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM user_album WHERE media_id=?", req.MediaID).Scan(&isAlbum); err != nil {
+			return failure(err)
+		}
+		if isAlbum == 1 {
+			_, err = tx.ExecContext(ctx, "UPDATE user_album SET cover_file_id=? WHERE media_id=?", fileID, req.MediaID)
+		} else {
+			_, err = tx.ExecContext(ctx, "UPDATE media SET cover_mode=?,cover_file_id=? WHERE id=?", req.Cover.Mode, fileID, req.MediaID)
+		}
+		if err != nil {
 			return failure(err)
 		}
 	}
@@ -501,6 +533,11 @@ func (s *Service) UnregisterFiles(ctx context.Context, req UnregisterRequest) ap
 	return s.unregister(ctx, req, false)
 }
 func (s *Service) unregister(ctx context.Context, req UnregisterRequest, all bool) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	if !all && (len(req.FileIDs) == 0 || len(req.FileIDs) > 200) {
 		return failure(domainError("INVALID_ARGUMENT"))
 	}
@@ -511,6 +548,38 @@ func (s *Service) unregister(ctx context.Context, req UnregisterRequest, all boo
 	defer tx.Rollback()
 	if err = checkWrite(ctx, tx, req.MediaID, req.ExpectedRevision); err != nil {
 		return failure(err)
+	}
+	var isAlbum int
+	if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM user_album WHERE media_id=?", req.MediaID).Scan(&isAlbum); err != nil {
+		return failure(err)
+	}
+	if isAlbum == 1 {
+		var revision any
+		if all {
+			_, err = tx.ExecContext(ctx, "DELETE FROM media WHERE id=?", req.MediaID)
+		} else {
+			for _, file := range req.FileIDs {
+				if file <= 0 {
+					return failure(domainError("INVALID_ARGUMENT"))
+				}
+				if _, err = tx.ExecContext(ctx, "DELETE FROM user_album_file WHERE album_id=? AND file_id=?", req.MediaID, file); err != nil {
+					return failure(err)
+				}
+			}
+			_, err = tx.ExecContext(ctx, "UPDATE media SET revision=revision+1,updated_at=? WHERE id=?", time.Now().UnixMilli(), req.MediaID)
+			if err == nil {
+				var r int64
+				err = tx.QueryRowContext(ctx, "SELECT revision FROM media WHERE id=?", req.MediaID).Scan(&r)
+				revision = r
+			}
+		}
+		if err != nil {
+			return failure(err)
+		}
+		if err = tx.Commit(); err != nil {
+			return failure(err)
+		}
+		return api.Success(Object{"mediaId": req.MediaID, "parentRemoved": all, "revision": revision, "cleanupTaskId": nil})
 	}
 	clause := "media_id=?"
 	args := []any{req.MediaID}

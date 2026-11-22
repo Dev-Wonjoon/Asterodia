@@ -20,6 +20,7 @@ type ImageInspector interface {
 }
 
 type Service struct {
+	UpdateGate     *api.UpdateGate
 	runSlot        chan struct{}
 	verifyMedia    func(context.Context, string, string) error
 	imageInspector ImageInspector
@@ -152,6 +153,11 @@ func scanJob(row interface{ Scan(...any) error }) (Job, error) {
 	return j, err
 }
 func (s *Service) Enqueue(ctx context.Context, req EnqueueRequest) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	if req.Mode != "create" && req.Mode != "replace" {
 		return api.Failure("INVALID_ARGUMENT", "다운로드 방식이 올바르지 않습니다")
 	}
@@ -255,6 +261,11 @@ func (s *Service) listJobs(ctx context.Context, query string, args ...any) ([]Jo
 	return jobs, nil
 }
 func (s *Service) Run(ctx context.Context, req RunRequest) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	if req.JobID == "" || (req.Trigger != "manual_initial" && req.Trigger != "manual_retry" && req.Trigger != "manual_restart") {
 		return api.Failure("INVALID_ARGUMENT", "실행 요청이 올바르지 않습니다")
 	}
@@ -381,6 +392,11 @@ func (s *Service) Run(ctx context.Context, req RunRequest) api.Result {
 	return api.Success(map[string]any{"status": "committed", "jobId": req.JobID, "attemptId": attempt, "mediaIdSnapshot": mediaID})
 }
 func (s *Service) Cancel(ctx context.Context, req JobRequest) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var phase, state string
@@ -407,6 +423,11 @@ func (s *Service) Cancel(ctx context.Context, req JobRequest) api.Result {
 }
 
 func (s *Service) Cleanup(ctx context.Context, req JobRequest) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, active := s.active[req.JobID]; active {

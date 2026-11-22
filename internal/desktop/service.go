@@ -9,6 +9,7 @@ import (
 )
 
 type Service struct {
+	UpdateGate     *api.UpdateGate
 	mu             sync.Mutex
 	importer       *database.Importer
 	selectDatabase func() (string, error)
@@ -23,6 +24,11 @@ func NewService(importer *database.Importer, selectDatabase func() (string, erro
 	return s
 }
 func (s *Service) ImportDatabase(ctx context.Context) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	if !s.mu.TryLock() {
 		return api.Failure("DATABASE_IMPORT_FAILED", "다른 DB 가져오기가 진행 중입니다")
 	}

@@ -81,6 +81,8 @@ func (s *Service) routes() http.Handler {
 	mux.HandleFunc("GET /api/library", s.list)
 	mux.HandleFunc("GET /api/search-suggestions", s.searchSuggestions)
 	mux.HandleFunc("GET /api/library/{id}", s.detail)
+	mux.HandleFunc("GET /api/library/{id}/sequence", s.sequence)
+	mux.HandleFunc("GET /api/files/{id}/info", s.fileInfo)
 	mux.HandleFunc("GET /api/files/{id}/{variant}", s.content)
 	mux.HandleFunc("GET /licenses", s.licenseNotices)
 	mux.HandleFunc("GET /licenses.txt", s.licenseText)
@@ -93,7 +95,7 @@ func (s *Service) routes() http.Handler {
 		}
 	})
 	web, _ := fs.Sub(assets, "web")
-	for _, path := range []string{"/app.js", "/style.css", "/favicon.ico", "/editor.js", "/editor.css", "/search.js", "/search.css", "/licenses.css"} {
+	for _, path := range []string{"/app.js", "/style.css", "/favicon.ico", "/editor.js", "/editor.css", "/search.js", "/search.css", "/licenses.css", "/player.js", "/player.css", "/album-state.js", "/viewer.js", "/viewer-queue.js", "/viewer.css"} {
 		mux.Handle("GET "+path, http.FileServerFS(web))
 	}
 	return mux

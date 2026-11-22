@@ -82,7 +82,7 @@ func TestV4DirectoryMigrationAndRollback(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer opened.Close()
-			if countDB(t, opened, "PRAGMA user_version") != 10 || countDB(t, opened, "SELECT count(*) FROM migration_run WHERE id='previous' AND target_version=4") != 1 {
+			if countDB(t, opened, "PRAGMA user_version") != 11 || countDB(t, opened, "SELECT count(*) FROM migration_run WHERE id='previous' AND target_version=4") != 1 {
 				t.Fatal("버전 또는 기존 이관 이력 유실")
 			}
 			if countDB(t, opened, "SELECT count(*) FROM media WHERE id=9 AND custom_title='사용자 제목' AND cover_file_id=11 AND revision=7") != 1 || countDB(t, opened, "SELECT count(*) FROM media_tag WHERE media_id=9 AND tag_id=3") != 1 || countDB(t, opened, "SELECT count(*) FROM favorite WHERE media_id=9") != 1 {
@@ -106,7 +106,7 @@ func TestV4DirectoryMigrationAndRollback(t *testing.T) {
 			if len(token) != 8 {
 				t.Fatal(token)
 			}
-			backup := textDB(t, opened, "SELECT backup_path FROM migration_run WHERE target_version=10")
+			backup := textDB(t, opened, "SELECT backup_path FROM migration_run WHERE target_version=11")
 			snapshot := rawDB(t, backup)
 			if countDB(t, snapshot, "PRAGMA user_version") != 4 {
 				t.Fatal("v4 백업 유실")
@@ -118,7 +118,7 @@ func TestV4DirectoryMigrationAndRollback(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer reopened.Close()
-			if textDB(t, reopened, "SELECT file_uuid FROM media_file WHERE id=11") != identity || textDB(t, reopened, "SELECT filename_token FROM media_file WHERE id=11") != token || countDB(t, reopened, "SELECT count(*) FROM migration_run WHERE target_version=10") != 1 {
+			if textDB(t, reopened, "SELECT file_uuid FROM media_file WHERE id=11") != identity || textDB(t, reopened, "SELECT filename_token FROM media_file WHERE id=11") != token || countDB(t, reopened, "SELECT count(*) FROM migration_run WHERE target_version=11") != 1 {
 				t.Fatal("재시작이 식별자·이관 이력을 변경했습니다")
 			}
 		})

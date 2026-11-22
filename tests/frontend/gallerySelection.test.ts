@@ -3,11 +3,12 @@ import { act, createElement as h } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { cleanupReact, clickButton, mount } from './reactHarness'
 import { GalleryPage } from '@renderer/features/gallery/GalleryPage'
+import { useInfiniteScroll } from '@renderer/shared/hooks/useInfiniteScroll'
 const mocks = vi.hoisted(() => ({ bulk: vi.fn(), unregister: vi.fn(), confirm: vi.fn(async () => true), refresh: vi.fn(), getSnapshot: vi.fn(), get: vi.fn(), create: vi.fn(), run: vi.fn(), directories: vi.fn(), on: vi.fn(), state: null as any }))
 const api = {fileMove:{get:mocks.get,create:mocks.create,run:mocks.run},media:{directories:mocks.directories},onMediaThumbnailUpdated:mocks.on}
 vi.mock('@renderer/shared/hooks/useConfirm',()=>({useConfirm:()=>({confirm:mocks.confirm,isOpen:false})}))
 vi.mock('@renderer/shared/api',()=>({getApi:()=>api}))
-const store = {refresh:mocks.refresh,getSnapshot:mocks.getSnapshot,unregisterMedia:mocks.unregister,bulk:mocks.bulk,closeDetail:vi.fn()}
+const store = {refresh:mocks.refresh,getSnapshot:mocks.getSnapshot,unregisterMedia:mocks.unregister,bulk:mocks.bulk,closeDetail:vi.fn(),toggleAlbum:vi.fn(),loadMore:vi.fn(),openDetail:vi.fn()}
 const downloads = { activeJobs: [] as any[], cancellingIds: [], openDetail: vi.fn(), closeDetail: vi.fn(), cancelDownload: vi.fn() }
 vi.mock('@renderer/features/gallery/useGalleryViewModel',()=>({useGalleryViewModel:()=>({store,snapshot:mocks.state,openInFolder:vi.fn(),downloads})}))
 vi.mock('@renderer/shared/hooks/useLeaveGuard',()=>({useLeaveGuard:vi.fn()}))
@@ -42,8 +43,8 @@ it('connects gallery checkboxes to one multi-post move request',async()=>{
  expect(document.querySelectorAll('input[type=checkbox]')).toHaveLength(2)
  const checks=[...document.querySelectorAll<HTMLInputElement>('input[type=checkbox]')];expect(checks).toHaveLength(2)
  await act(async()=>{checks[0].click();checks[1].click()});expect(document.querySelector('[aria-label="전체 2 / 선택 2"]')?.textContent).toBe('2 / 2')
- await clickButton('선택 작업');await clickButton('파일 이동');const select=document.querySelector('select')!;await act(async()=>{select.value='7';select.dispatchEvent(new Event('change',{bubbles:true}))});await clickButton('이동 시작')
- expect(mocks.create).toHaveBeenCalledWith({selection:[{mediaId:1,revision:4},{mediaId:2,revision:4}],directoryId:7});expect(document.querySelector('header [role=status]')).toBeNull()
+ await clickButton('선택 작업');await clickButton('한 폴더에 모으기');const select=document.querySelector('select[aria-label="이동할 폴더"]')!;await act(async()=>{select.value='7';select.dispatchEvent(new Event('change',{bubbles:true}))});await clickButton('복사 시작')
+ expect(mocks.create).toHaveBeenCalledWith({selection:[{mediaId:1,revision:4},{mediaId:2,revision:4}],directoryId:7,operation:'copy'});expect(document.querySelector('header [role=status]')).toBeNull()
 })
 
 it('selects the loaded list, keeps failures selected and clears selection',async()=>{
@@ -115,4 +116,20 @@ it('drops a gallery registration approval when its target changes or the view cl
  setup();let answer!:(accepted:boolean)=>void;mocks.confirm.mockImplementationOnce(()=>new Promise<boolean>(resolve=>answer=resolve))
  const stop=await mount(h(GalleryPage));await clickButton('게시글 1 더보기');await clickButton('등록 해제');mocks.state.list.page.data[0]={...mocks.state.list.page.data[0],revision:5};await act(async()=>answer(true));expect(mocks.unregister).not.toHaveBeenCalled()
  mocks.confirm.mockImplementationOnce(()=>new Promise<boolean>(resolve=>answer=resolve));await clickButton('게시글 2 더보기');await clickButton('등록 해제');await stop();await act(async()=>answer(true));expect(mocks.unregister).not.toHaveBeenCalled()
+})
+
+it('opens an expanded file at its own offset and retains infinite scrolling with a manual retry',async()=>{
+ setup();store.openDetail.mockClear();store.toggleAlbum.mockClear();store.loadMore.mockClear()
+ mocks.state.list.page={data:[{id:1,title:'앨범',sourceKind:'local',revision:4,createdAt:1,fileCount:100,galleryFileOffset:51,galleryFile:{id:52,title:'선택 영상',kind:'video',thumbnailPath:null,previewPath:null}}],total:101,offset:48,hasNextPage:true}
+ await mount(h(GalleryPage))
+ expect(document.querySelectorAll('article')).toHaveLength(1)
+ expect(document.querySelector('input[type=checkbox]')?.getAttribute('aria-label')).toContain('앨범 추가 선택')
+ await clickButton('선택 영상 상세보기');expect(store.openDetail).toHaveBeenCalledExactlyOnceWith(1,51)
+ await clickButton('앨범 앨범 닫기');expect(store.toggleAlbum).toHaveBeenCalledExactlyOnceWith(1)
+ await clickButton('더 불러오기');expect(store.loadMore).toHaveBeenCalledOnce()
+ const options=vi.mocked(useInfiniteScroll).mock.lastCall![0]
+ expect(options.enabled).toBe(true)
+ await options.onLoadMore();expect(store.loadMore).toHaveBeenCalledTimes(2)
+ expect(document.querySelector('[aria-label="갤러리 페이지"]')).toBeNull()
+ expect(document.body.textContent).toContain('1 / 101개 항목')
 })

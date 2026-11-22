@@ -1,4 +1,7 @@
 import type {
+    AlbumRequest,
+    MediaSequence,
+    MediaFileDto,
     MediaDetailDto,
     MediaEditRequest,
     MediaGetRequest,
@@ -17,6 +20,10 @@ import type {
 } from './media-v2'
 
 export interface MediaApi {
+    albums(request?: MediaDirectoryListRequest): Promise<MediaResult<MediaPage<MediaSummaryDto>>>
+    saveAlbum(request: AlbumRequest): Promise<MediaResult<MediaSummaryDto>>
+    sequence(request: { mediaId: number }): Promise<MediaResult<MediaSequence>>
+    readFile(request: { fileId: number }): Promise<MediaResult<MediaFileDto>>
     searchSuggest(request: SearchSuggestionRequest): Promise<MediaResult<SearchSuggestionPage>>
     directories(request?: MediaDirectoryListRequest): Promise<MediaResult<MediaPage<MediaDirectoryDto>>>
     list(request?: MediaListRequest): Promise<MediaResult<MediaPage<MediaSummaryDto>>>

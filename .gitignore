@@ -57,6 +57,7 @@ Thumbs.db
 
 ## local
 *.txt
+!/internal/licenses/texts/*.txt
 bin/
 data/
 downloads/

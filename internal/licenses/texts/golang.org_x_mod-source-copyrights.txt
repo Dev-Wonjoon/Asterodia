@@ -1,0 +1,19 @@
+Source: gosumcheck/main.go, sumdb/client.go, sumdb/client_test.go, sumdb/note/example_test.go, sumdb/note/note.go, sumdb/note/note_test.go, sumdb/server.go, sumdb/storage/mem.go, sumdb/storage/mem_test.go, sumdb/storage/storage.go, sumdb/storage/test.go, sumdb/test.go, sumdb/tlog/ct_test.go, sumdb/tlog/note.go, sumdb/tlog/note_test.go, sumdb/tlog/tile.go, sumdb/tlog/tile_test.go, sumdb/tlog/tlog.go, sumdb/tlog/tlog_test.go, zip/zip.go, zip/zip_test.go
+// Copyright 2019 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: internal/lazyregexp/lazyre.go, modfile/print.go, modfile/read.go, modfile/read_test.go, modfile/rule.go, modfile/rule_test.go, module/module.go, module/module_test.go, module/pseudo.go, module/pseudo_test.go, semver/semver.go, semver/semver_test.go, sumdb/cache.go, sumdb/dirhash/hash.go, sumdb/dirhash/hash_test.go
+// Copyright 2018 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: modfile/work.go, modfile/work_test.go
+// Copyright 2021 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: zip/vendor_test.go
+// Copyright 2020 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.

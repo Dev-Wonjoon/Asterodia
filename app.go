@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/database"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/desktop"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
@@ -21,12 +22,15 @@ import (
 	"github.com/Dev-Wonjoon/StorageBucket/internal/mediaedit"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/settings"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/thumbnail"
+	"github.com/Dev-Wonjoon/StorageBucket/internal/update"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/webserver"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 func applicationServices(
 	paths desktop.Paths,
+	updates *update.Service,
+	updateGate *api.UpdateGate,
 ) ([]application.Service, func(http.Handler) http.Handler, func(), error) {
 	if err := os.MkdirAll(paths.Data, 0700); err != nil {
 		return nil, nil, nil, err
@@ -49,13 +53,15 @@ func applicationServices(
 		return nil, nil, nil, err
 	}
 	databasePath := filepath.Join(paths.Root, "storagebucket.db")
-	db, err := database.OpenWithOptions(context.Background(), databasePath, database.MigrationOptions{BackupDirectory: filepath.Join(paths.Root, "backups"), LegacyStorageRoot: config.GetDownloadPath()})
+	db, err := database.OpenWithOptions(context.Background(), databasePath, database.MigrationOptions{BackupDirectory: filepath.Join(paths.Root, "backups")})
 	if err != nil {
 		unlock()
 		return nil, nil, nil, err
 	}
 	databaseImporter := database.NewImporter(db, databasePath, filepath.Join(paths.Root, "backups"))
 	catalog := media.NewService(db)
+	catalog.UpdateGate = updateGate
+	updates.SetDatabase(db)
 	catalog.StartSearchIndex()
 	web := webserver.NewService(catalog, webserver.DefaultAddress)
 	thumb := thumbnail.NewService(db, filepath.Join(paths.Cache, "thumbnails"), filepath.Join(paths.Bin, "ffmpeg.exe"), func(id int64) {
@@ -81,6 +87,7 @@ func applicationServices(
 		}
 		return (&engine.Ytdlp{Executable: filepath.Join(paths.Bin, "yt-dlp.exe"), CookieBrowser: snapshot.CookieBrowser, CookieFile: snapshot.CookieFilePath, NoPlaylist: true}).Discover(ctx, url, dir)
 	})
+	localImporter.UpdateGate = updateGate
 	downloader := download.NewService(db, config.GetDownloadPath, func(root string, options engine.Options) download.Runner {
 		snapshot := config.Snapshot()
 		jsRuntime := ""
@@ -90,6 +97,7 @@ func applicationServices(
 		return download.Runner{Storage: download.Storage{Root: root}, Ytdlp: &engine.Ytdlp{Executable: filepath.Join(paths.Bin, "yt-dlp.exe"), JSRuntime: jsRuntime, FFmpegLocation: filepath.Join(paths.Bin, "ffmpeg.exe"), CookieBrowser: snapshot.CookieBrowser, CookieFile: snapshot.CookieFilePath, NoPlaylist: options.Playlist == nil || !*options.Playlist}, GalleryDL: &engine.GalleryDL{Executable: filepath.Join(paths.Bin, "gallery-dl.exe"), CookieBrowser: snapshot.CookieBrowser, CookieFile: snapshot.CookieFilePath}}
 	}, thumb.ScheduleMedia)
 	downloader.ConfigureImages(inspector)
+	downloader.UpdateGate = updateGate
 	downloader.ConfigurePreviewLookup(thumb.CachedDownloadPreview)
 	downloader.ConfigurePreviewCleanup(func(ctx context.Context, url string) {
 		_ = thumb.ReleaseDownloadPreview(ctx, url)
@@ -104,6 +112,7 @@ func applicationServices(
 		}
 	})
 	mover.ConfigureInspector(inspector)
+	mover.UpdateGate = updateGate
 	editor := mediaedit.NewService(db, filepath.Join(paths.Cache, "mediaedit"), engine.VideoEditor{FFmpeg: filepath.Join(paths.Bin, "ffmpeg.exe"), FFprobe: filepath.Join(paths.Bin, "ffprobe.exe")}, config.GetDownloadPath, func(id int64) {
 		thumb.ScheduleMedia(id)
 		if app := application.Get(); app != nil {
@@ -111,10 +120,12 @@ func applicationServices(
 		}
 	})
 	web.ConfigureEditor(editor)
+	editor.UpdateGate = updateGate
 	var once sync.Once
 	cleaner := maintenance.NewCleaner(db)
 	closeAll := func() {
 		once.Do(func() {
+			updates.Close()
 			web.Close()
 			editor.Close()
 			mover.Close()
@@ -165,8 +176,19 @@ func applicationServices(
 		closeAll()
 		return nil, nil, nil, err
 	}
+	manager.UpdateGate = updateGate
+	desktopService := desktop.NewService(databaseImporter, func() (string, error) {
+		return application.Get().Dialog.OpenFile().CanChooseFiles(true).CanChooseDirectories(false).AddFilter("StorageBucket 데이터베이스", "*.db;*.sqlite;*.sqlite3").SetTitle("병합할 데이터베이스 선택").PromptForSingleSelection()
+	}, func() {
+		thumb.ScheduleMissing()
+		if app := application.Get(); app != nil {
+			app.Event.Emit("media:thumbnail-updated", int64(0))
+		}
+	})
+	desktopService.UpdateGate = updateGate
 
 	return []application.Service{
+		application.NewService(updates),
 		application.NewService(editor),
 		application.NewService(mover),
 		application.NewService(localImporter),
@@ -177,14 +199,7 @@ func applicationServices(
 		application.NewService(config),
 		application.NewService(thumb),
 		application.NewService(&desktop.SystemService{}),
-		application.NewService(desktop.NewService(databaseImporter, func() (string, error) {
-			return application.Get().Dialog.OpenFile().CanChooseFiles(true).CanChooseDirectories(false).AddFilter("StorageBucket 데이터베이스", "*.db;*.sqlite;*.sqlite3").SetTitle("병합할 데이터베이스 선택").PromptForSingleSelection()
-		}, func() {
-			thumb.ScheduleMissing()
-			if app := application.Get(); app != nil {
-				app.Event.Emit("media:thumbnail-updated", int64(0))
-			}
-		})),
+		application.NewService(desktopService),
 	}, func(next http.Handler) http.Handler {
 		mediaHandler := desktop.MediaMiddleware(db, filepath.Join(paths.Cache, "previews"))(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

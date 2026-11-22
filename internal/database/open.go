@@ -25,10 +25,11 @@ var schemaV8SQL = schemaV8()
 
 // Freeze shipped DDL: subsequent changes must use a new version and migration.
 var schemaV9SQL = schemaV8SQL + searchV9DDL()
-var schemaSQL = schemaV9SQL
+var schemaV10SQL = schemaV9SQL
+var schemaSQL = schemaV10SQL + albumDDL + albumSearchDDL()
 
 func Open(ctx context.Context, filename string) (*sql.DB, error) {
-	return OpenWithOptions(ctx, filename, MigrationOptions{BackupDirectory: filepath.Join(filepath.Dir(filename), "backups"), LegacyStorageRoot: filepath.Join(filepath.Dir(filename), "downloads")})
+	return OpenWithOptions(ctx, filename, MigrationOptions{BackupDirectory: filepath.Join(filepath.Dir(filename), "backups")})
 }
 
 func OpenWithOptions(ctx context.Context, filename string, options MigrationOptions) (*sql.DB, error) {
@@ -60,7 +61,7 @@ func OpenWithOptions(ctx context.Context, filename string, options MigrationOpti
 		}
 	}
 	if err == nil {
-		_, err = validateSchema(ctx, db, schemaVersion)
+		err = validateSchema(ctx, db, schemaVersion)
 	}
 	if err != nil {
 		db.Close()
@@ -81,6 +82,9 @@ func Initialize(ctx context.Context, db *sql.DB) error {
 	}
 	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").Scan(&tables); err != nil {
 		return err
+	}
+	if tables > 0 && version >= 0 && version < minimumSchemaVersion {
+		return fmt.Errorf(electronDBUnsupported)
 	}
 	if version != 0 || tables != 0 {
 		return fmt.Errorf("기존 DB 버전 %d은 빈 DB로 초기화할 수 없습니다", version)

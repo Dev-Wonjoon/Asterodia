@@ -18,11 +18,15 @@ export function MediaDetailPane({
     state,
     store,
     onDirtyChange,
-    focusRequest
+    focusRequest,
+    onViewFile, onAddFiles, onGatherFiles
 }: {
     state: GallerySnapshot
     store: GalleryStore
     onDirtyChange: (dirty: boolean) => void
+    onViewFile?: (fileId: number) => void
+    onAddFiles?: (fileIds: number[]) => void
+    onGatherFiles?: (fileIds: number[]) => void
     focusRequest?: MediaDetailFocusRequest | null
 }) {
     const { showToast } = useToast()
@@ -171,17 +175,11 @@ export function MediaDetailPane({
             {data && (
                 <>
                     <div className="flex flex-col gap-4">
-                        <MediaPreview
-                            path={data.cover?.path ?? null}
-                            title={data.title}
-                            className="aspect-video w-full rounded-lg bg-[var(--bg-active)] object-contain"
-                        />
-
                         <div className="min-w-0 flex-1 space-y-2">
                             <h3 className="break-words font-medium">{data.title}</h3>
 
                             <p className="text-sm text-[var(--text-muted)]">
-                                {data.sourceKind === 'local'
+                                {data.isUserAlbum ? '사용자 앨범' : data.sourceKind === 'local'
                                     ? '로컬 폴더'
                                     : data.sourceKind === 'download'
                                       ? '다운로드'
@@ -400,22 +398,24 @@ export function MediaDetailPane({
                                 key={file.id}
                                 className="flex flex-col gap-3 rounded-lg border border-[var(--border-line)] p-3"
                             >
+                                <div className="flex flex-wrap gap-2">
+                                    {onViewFile && <button type="button" className={button} disabled={disabled} onClick={() => onViewFile(file.id)}>감상하기</button>}
+                                    {onAddFiles && <button type="button" className={button} disabled={disabled} onClick={() => onAddFiles([file.id])}>앨범에 추가</button>}
+                                    {onGatherFiles && <button type="button" className={button} disabled={disabled} onClick={() => onGatherFiles([file.id])}>한 폴더에 모으기</button>}
+                                </div>
                                 {(file.kind === 'video' || file.kind === 'audio') && <MediaPlayer key={`${file.id}:${data.revision}`} path={file.filepath} kind={file.kind} title={file.title ?? file.fileKey} poster={file.thumbnailPath} />}
-                                <MediaPreview
-                                    path={
-                                        file.thumbnailPath ??
-                                        file.previewPath ??
-                                        (file.kind === 'image' ? file.filepath : null)
-                                    }
+                                {file.kind !== 'video' && file.kind !== 'audio' && <MediaPreview
+                                    path={file.kind === 'image' ? file.filepath : file.previewPath ?? file.thumbnailPath}
+                                    fallbackPath={file.kind === 'image' ? file.previewPath ?? file.thumbnailPath : null}
                                     title={file.title ?? file.fileKey}
-                                    className="aspect-video w-full rounded bg-[var(--bg-active)] object-contain"
-                                />
+                                    className="max-h-[60vh] w-full rounded bg-[var(--bg-active)] object-contain"
+                                />}
 
                                 {(file.kind === 'video' || file.kind === 'image') &&
                                     file.thumbnailPath === null && (
                                         <MediaThumbnailStatus
                                             key={`${data.id}:${file.id}:${data.revision}`}
-                                            mediaId={data.id}
+                                            mediaId={file.mediaId ?? data.id}
                                             fileId={file.id}
                                             title={file.title ?? file.fileKey}
                                             disabled={disabled}
@@ -477,7 +477,7 @@ export function MediaDetailPane({
                                         disabled={disabled}
                                         onClick={async () => {
                                             const warning = hasDraft ? '\n\n파일 등록 해제로 묶음이 제거되면 작성 중인 제목·태그도 닫힙니다.' : ''
-                                            if (!await confirm({ title: '파일 등록 해제', message: '이 파일의 등록을 해제할까요? 외부 원본과 보관 방식 미확인 원본은 삭제하지 않습니다. 앱 관리 파일의 정리는 별도로 처리합니다.' + warning, confirmLabel: '등록 해제', danger: true }) || !canContinue()) return
+                                            if (!await confirm({ title: data.isUserAlbum ? '앨범에서 빼기' : '파일 등록 해제', message: (data.isUserAlbum ? '이 앨범에서 파일을 뺄까요? 원본 파일과 다른 앨범은 유지됩니다.' : '이 파일의 등록을 해제할까요? 외부 원본과 보관 방식 미확인 원본은 삭제하지 않습니다. 앱 관리 파일의 정리는 별도로 처리합니다.') + warning, confirmLabel: data.isUserAlbum ? '앨범에서 빼기' : '등록 해제', danger: true }) || !canContinue()) return
                                             void store.unregisterFiles({
                                                 mediaId: data.id,
                                                 expectedRevision: data.revision,
@@ -485,7 +485,7 @@ export function MediaDetailPane({
                                             })
                                         }}
                                     >
-                                        등록 해제
+                                        {data.isUserAlbum ? '앨범에서 빼기' : '등록 해제'}
                                     </button>
                                 </div>
                             </article>
@@ -529,14 +529,14 @@ export function MediaDetailPane({
                         disabled={disabled}
                         onClick={async () => {
                             const warning = hasDraft ? '\n\n작성 중인 제목·태그도 닫힙니다.' : ''
-                            if (!await confirm({ title: '묶음 등록 해제', message: '묶음의 등록을 해제할까요? 외부 원본과 보관 방식 미확인 원본은 삭제하지 않습니다. 앱 관리 파일의 정리는 별도로 처리합니다.' + warning, confirmLabel: '등록 해제', danger: true }) || !canContinue()) return
+                            if (!await confirm({ title: data.isUserAlbum ? '앨범 삭제' : '묶음 등록 해제', message: (data.isUserAlbum ? '앨범을 삭제할까요? 원본 파일과 다른 앨범은 유지됩니다.' : '묶음의 등록을 해제할까요? 외부 원본과 보관 방식 미확인 원본은 삭제하지 않습니다. 앱 관리 파일의 정리는 별도로 처리합니다.') + warning, confirmLabel: data.isUserAlbum ? '앨범 삭제' : '등록 해제', danger: true }) || !canContinue()) return
                             void store.unregisterMedia({
                                 mediaId: data.id,
                                 expectedRevision: data.revision
                             })
                         }}
                     >
-                        묶음 등록 해제
+                        {data.isUserAlbum ? '앨범 삭제' : '묶음 등록 해제'}
                     </button>
                 </>
             )}

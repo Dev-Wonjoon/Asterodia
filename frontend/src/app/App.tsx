@@ -13,10 +13,13 @@ import { useGlobalPaste } from './hooks/useGlobalPaste'
 import type { AppMenu } from './navigation'
 import { DownloadPage } from '@renderer/features/download/DownloadPage'
 import { LeaveGuardProvider } from './providers/LeaveGuardProvider'
+import { AppUpdateProvider } from '@renderer/features/settings/useAppUpdate'
+import { UpdateNotice } from '@renderer/features/settings/UpdateSettings'
 
 export default function App(): React.JSX.Element {
     const [activeMenu, setActiveMenu] = useState<AppMenu>('gallery')
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+    const [updateSettingsRequest, setUpdateSettingsRequest] = useState(0)
     const leaveGuard = useRef<(() => boolean | Promise<boolean>) | null>(null)
     const { startDownload } = useDownloadViewModel()
     const { isOpen: confirming } = useConfirm()
@@ -33,13 +36,13 @@ export default function App(): React.JSX.Element {
         favorites: <FavoritesPage />,
         settings: (
             <div className="h-full overflow-y-auto p-6">
-                <SettingsPage />
+                <SettingsPage updateRequest={updateSettingsRequest} />
             </div>
         )
     }
 
     return (
-        <div className="flex h-screen w-full bg-[var(--bg-app)] text-[var(--text-main)] overflow-hidden font-sans transition-colors duration-200">
+        <AppUpdateProvider><div className="flex h-screen w-full bg-[var(--bg-app)] text-[var(--text-main)] overflow-hidden font-sans transition-colors duration-200">
             <div
                 className={`motion-sidebar h-full shrink-0 ${
                     sidebarCollapsed ? 'w-20' : 'w-64'
@@ -63,6 +66,18 @@ export default function App(): React.JSX.Element {
                 <div className="flex-none p-4 h-20 border-b border-[var(--border-line)] bg-[var(--bg-app)]/95 backdrop-blur-sm z-10">
                     <DownloadBar />
                 </div>
+                <UpdateNotice onOpen={() => {
+                    if (navigating.current || confirming) return
+                    navigating.current = true
+                    void (async () => {
+                        try {
+                            if (!leaveGuard.current || await leaveGuard.current()) {
+                                if (alive.current) { setUpdateSettingsRequest(value => value + 1); setActiveMenu('settings') }
+                            }
+                        }
+                        finally { navigating.current = false }
+                    })()
+                }} />
                 <main className="min-h-0 flex-1 overflow-hidden">
                     <div key={activeMenu} className="motion-page h-full min-h-0">
                         <LeaveGuardProvider guard={leaveGuard}>{pages[activeMenu]}</LeaveGuardProvider>
@@ -70,6 +85,6 @@ export default function App(): React.JSX.Element {
                 </main>
             </div>
             {showSetup && <EngineSetupModal onComplete={closeSetup} />}
-        </div>
+        </div></AppUpdateProvider>
     )
 }

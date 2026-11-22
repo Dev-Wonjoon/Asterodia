@@ -3,18 +3,22 @@ import { toMediaUrl } from '@renderer/shared/utils/media'
 
 export function MediaPreview({
     path,
+    fallbackPath = null,
     title,
     className = ''
 }: {
     path: string | null
+    fallbackPath?: string | null
     title: string
     className?: string
 }) {
-    const url = toMediaUrl(path)
+    const candidates = [toMediaUrl(path), toMediaUrl(fallbackPath)]
+    const sourceKey = JSON.stringify(candidates)
+    const [failure, setFailure] = useState<{ sourceKey: string; urls: string[] } | null>(null)
+    const failedUrls = failure?.sourceKey === sourceKey ? failure.urls : []
+    const url = candidates.find(candidate => candidate && !failedUrls.includes(candidate))
 
-    const [failedUrl, setFailedUrl] = useState<string | null>(null)
-
-    if (!url || url === failedUrl) {
+    if (!url) {
         return (
             <div
                 className={
@@ -32,7 +36,10 @@ export function MediaPreview({
             alt={title}
             loading="lazy"
             className={className}
-            onError={() => setFailedUrl(url)}
+            onError={() => setFailure(previous => ({
+                sourceKey,
+                urls: [...(previous?.sourceKey === sourceKey ? previous.urls : []), url]
+            }))}
         />
     )
 }

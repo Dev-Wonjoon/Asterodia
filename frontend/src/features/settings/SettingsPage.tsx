@@ -1,4 +1,4 @@
-import { useState, useContext } from 'react'
+import { useState, useContext, useEffect } from 'react'
 import { LeaveGuardContext } from '@renderer/shared/hooks/leaveGuardContext'
 import { GeneralSettings } from '@renderer/features/settings/GeneralSettings'
 import { EngineSettings } from '@renderer/features/settings/EngineSettings'
@@ -93,9 +93,10 @@ const SETTINGS_TABS = [
     }
 ]
 
-export const SettingsPage = (): React.JSX.Element => {
+export const SettingsPage = ({ updateRequest = 0 }: { updateRequest?: number }): React.JSX.Element => {
     const leaveGuard = useContext(LeaveGuardContext)
     const [activeTab, setActiveTab] = useState('general')
+    useEffect(() => { setActiveTab('general') }, [updateRequest])
 
     const renderContent = (): React.JSX.Element => {
         switch (activeTab) {

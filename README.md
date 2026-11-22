@@ -34,6 +34,28 @@ engines. Some sources may require authentication or may be unavailable.
 Local folder imports register files in their existing locations without
 copying or moving the originals.
 
+### Gallery Pagination Rules
+
+Gallery pagination in both the desktop app and the web interface must use
+**infinite scrolling**. Load the next batch near the end of the list and append
+it to the existing items. Do not replace this with page numbers, page selectors,
+or first/previous/next/last page navigation controls. Provide a **Load more**
+button as a fallback and a **Retry** button when loading fails.
+
+Files from expanded albums share the same gallery feed with other albums.
+Preserve the album's position on screen when expanding or collapsing it, and
+fetch items incrementally.
+
+### User Albums and Media Viewing
+
+- Create an album with **새 앨범** and add selected groups or individual files from the gallery or detail view.
+- User albums reference originals across folders. A file can belong to multiple albums; removing a membership or deleting an album keeps the originals.
+- **앨범 편집** supports renaming, removing members, and drag or button reordering. Files initially follow addition order.
+- **감상하기** opens an image viewer, the shared video player, or an audio player. Arrow keys and previous/next buttons navigate within the album; Esc closes it, stops playback, and preserves the gallery position.
+- Auto next, shuffle, and album repeat are independent options, all off by default. Auto next advances finished videos and audio; images remain manual. Shuffle avoids duplicate items within a cycle and reshuffles for repeat.
+- **한 폴더에 모으기** copies or moves files to a registered folder. Copy is the default and preserves original references; rescan the destination to register copies. Moves verify the copy before cleaning the source and retain file IDs across all albums. Filename collisions receive a numeric suffix.
+- Schema 11 adds user albums and durable copy/move modes. Existing Wails databases migrate after a backup; Electron databases remain unsupported.
+
 ### Edit Media
 - Create GIFs and animated WebP images from videos.
 - Edit existing GIFs.
@@ -73,10 +95,15 @@ StorageBucket uses external tools for downloading, inspecting, and processing me
 
 Installing or updating these tools requires an internet connection.
 
-## Upgrading from 1.x
+## Importing a Wails Database
 
-Use Settings → General Settings → Import Database from an Earlier Version
-to merge an existing database into your current library.
+Use Settings → General Settings → Import Wails Database to merge a
+StorageBucket Wails database into your current library.
+
+**Starting with 2.1.0, automatic conversion and import of Electron databases are
+no longer supported.** Older Electron-only formats (schema versions 0–2) are
+rejected without modifying the source. Already converted Wails databases and
+upgrades from Wails schema version 3 onward remain supported.
 
 - A database backup is created before merging.
 - Import brings over library records and history; it does not copy or move media files.
@@ -94,6 +121,35 @@ from a mobile device.
 
 The server starts disabled each time the app launches and stops when
 the app closes.
+
+## App Updates
+
+Starting with 2.1.0, Windows portable builds check for stable GitHub releases
+after launch and every six hours while the app is running.
+Open Settings → General Settings → App Updates to check manually,
+review release notes, download an update, and restart to apply it.
+
+- Downloads are verified against the release's SHA256SUMS file before they are staged.
+- Restart is blocked while downloads, imports, file moves, editing, cleanup, or engine installation are in progress.
+- Updates replace the app executable and preserve the database, settings, media, and external tools.
+- The app's folder must be writable. Updating an installation in a protected folder may require a manual installation.
+- Versions without the updater, including 2.0.0, require one manual upgrade to 2.1.0 or later.
+
+### Preparing an Update Release
+
+On Windows, build the release assets with:
+
+```powershell
+.\tools\prepare-release.ps1 -Arch amd64
+```
+
+The script reads the version from `build/config.yml`, builds the application,
+and creates `StorageBucket-windows-amd64.exe` and `SHA256SUMS`
+under `dist/releases/v<version>/`.
+Upload both files to the same draft GitHub Release, use a matching `v<version>`
+tag, and publish it as a full release once all assets are ready.
+The updater selects the exact executable for its CPU architecture; installer
+files and archives are not used as update payloads.
 
 ## Development
 
@@ -118,7 +174,9 @@ wails3 build
 ```
 
 The current application lives in the repository root and `frontend/`.
-The previous Electron implementation is preserved in `legacy/electron/`.
+The archived Electron implementation and its database conversion assets have
+been removed starting with 2.1.0. Database tests cover rejection of Electron
+databases, Wails database upgrades and imports, and preservation of source data.
 
 ## Responsible Use
 

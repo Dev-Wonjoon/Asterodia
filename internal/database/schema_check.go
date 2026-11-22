@@ -3,8 +3,6 @@ package database
 import (
 	"context"
 	"database/sql"
-	"embed"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -13,38 +11,6 @@ import (
 	"github.com/google/uuid"
 )
 
-//go:embed legacy/*.sql legacy/journal.json
-var legacyFiles embed.FS
-
-type legacyMigration struct {
-	SQL, Hash string
-	When      int64
-}
-
-func legacyMigrations() ([]legacyMigration, error) {
-	var journal struct {
-		Entries []struct {
-			Tag  string `json:"tag"`
-			When int64  `json:"when"`
-		} `json:"entries"`
-	}
-	b, err := legacyFiles.ReadFile("legacy/journal.json")
-	if err != nil {
-		return nil, err
-	}
-	if err = json.Unmarshal(b, &journal); err != nil {
-		return nil, err
-	}
-	out := []legacyMigration{}
-	for _, entry := range journal.Entries {
-		b, e := legacyFiles.ReadFile("legacy/" + entry.Tag + ".sql")
-		if e != nil {
-			return nil, e
-		}
-		out = append(out, legacyMigration{string(b), hashBytes(b), entry.When})
-	}
-	return out, nil
-}
 func memoryDatabase() (*sql.DB, error) {
 	db, e := sql.Open("sqlite", "file:"+uuid.NewString()+"?mode=memory&cache=private&_pragma=temp_store(2)")
 	if e == nil {
@@ -157,109 +123,71 @@ func isSearchFTSTable(name string) bool {
 	}
 	return false
 }
-func baseSchema() string {
-	start := strings.Index(schemaV3SQL, "CREATE TABLE download_job_storage")
-	if start < 0 {
-		return schemaV3SQL
+func validateSchema(ctx context.Context, q connection, version int) error {
+	if err := supportedDatabaseVersion(version); err != nil {
+		return err
 	}
-	return schemaV3SQL[:start]
-}
-func validateSchema(ctx context.Context, q connection, version int) (int, error) {
 	expected, err := memoryDatabase()
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer expected.Close()
-	count := 0
-	if version == 0 || version == 1 {
-		if !tableExists(ctx, q, "__drizzle_migrations") {
-			return 0, fmt.Errorf("구버전 DB의 Drizzle 이력이 없습니다")
-		}
-		history, e := records(ctx, q, "SELECT hash,created_at FROM __drizzle_migrations ORDER BY created_at")
-		if e != nil {
-			return 0, e
-		}
-		migrations, e := legacyMigrations()
-		if e != nil {
-			return 0, e
-		}
-		if len(history) == 0 || len(history) > len(migrations) {
-			return 0, fmt.Errorf("지원하지 않는 구버전 이력입니다")
-		}
-		for i, row := range history {
-			n, e := integer(row["created_at"])
-			if e != nil || !migrationHashMatches(textValue(row["hash"]), migrations[i]) || n != migrations[i].When {
-				return 0, fmt.Errorf("구버전 DB의 이력이 배포된 마이그레이션과 다릅니다")
-			}
-			if _, e = expected.ExecContext(ctx, migrations[i].SQL); e != nil {
-				return 0, e
-			}
-		}
-		count = len(history)
-	} else if version >= 2 && version <= schemaVersion {
-		ddl := schemaV3SQL
-		if version == 4 {
-			ddl = schemaV4SQL
-		}
-		if version == 5 {
-			ddl = schemaV5SQL
-		}
-		if version == 6 {
-			ddl = schemaV6SQL
-		}
-		if version == 7 {
-			ddl = schemaV7SQL
-		}
-		if version == 8 {
-			ddl = schemaV8SQL
-		}
-		if version == 9 {
-			ddl = schemaV9SQL
-		}
-		if version == 10 {
-			ddl = schemaSQL
-		}
-		if version == 2 {
-			ddl = baseSchema()
-		}
-		if _, err = expected.ExecContext(ctx, ddl); err != nil {
-			return 0, err
-		}
-	} else {
-		return 0, fmt.Errorf("지원하지 않는 DB 버전 %d입니다", version)
+	ddl := schemaV3SQL
+	if version == 4 {
+		ddl = schemaV4SQL
+	}
+	if version == 5 {
+		ddl = schemaV5SQL
+	}
+	if version == 6 {
+		ddl = schemaV6SQL
+	}
+	if version == 7 {
+		ddl = schemaV7SQL
+	}
+	if version == 8 {
+		ddl = schemaV8SQL
+	}
+	if version == 9 {
+		ddl = schemaV9SQL
+	}
+	if version == 10 {
+		ddl = schemaV10SQL
+	}
+	if version == 11 {
+		ddl = schemaSQL
+	}
+	if _, err = expected.ExecContext(ctx, ddl); err != nil {
+		return err
 	}
 	actual, e := schemaObjects(ctx, q)
 	if e != nil {
-		return 0, e
+		return e
 	}
 	want, e := schemaObjects(ctx, expected)
 	if e != nil {
-		return 0, e
+		return e
 	}
 	if version == 9 && !sameSchemaObjects(actual, want) {
 		known, err := knownLegacySearchV9(ctx, actual)
 		if err != nil {
-			return 0, err
+			return err
 		}
 		if known {
-			return count, nil
+			return nil
 		}
 	}
 	if len(actual) != len(want) {
-		return 0, fmt.Errorf("DB 버전 %d의 테이블·인덱스 구성이 알려진 스키마와 다릅니다", version)
+		return fmt.Errorf("DB 버전 %d의 테이블·인덱스 구성이 알려진 스키마와 다릅니다", version)
 	}
 	for name, sql := range want {
 		if actual[name] != sql {
-			return 0, fmt.Errorf("DB 구조를 확인할 수 없습니다: %s", name)
+			return fmt.Errorf("DB 구조를 확인할 수 없습니다: %s", name)
 		}
 	}
-	return count, nil
+	return nil
 }
 
-func migrationHashMatches(hash string, migration legacyMigration) bool {
-	lf := strings.ReplaceAll(migration.SQL, "\r\n", "\n")
-	return hash == migration.Hash || hash == hashBytes([]byte(lf)) || hash == hashBytes([]byte(strings.ReplaceAll(lf, "\n", "\r\n")))
-}
 func allData(ctx context.Context, q connection) (map[string][]record, error) {
 	tables, err := records(ctx, q, "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
 	if err != nil {

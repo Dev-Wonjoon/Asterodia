@@ -7,14 +7,19 @@ import (
 
 	"log"
 
+	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/desktop"
+	"github.com/Dev-Wonjoon/StorageBucket/internal/update"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/updater"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
 func main() {
+	// The swap helper must run before acquiring the data lock or opening the DB.
+	updater.HandleHelperMode()
 	paths, err := desktop.ResolvePaths(
 		os.Getenv("STORAGEBUCKET_DATA_DIR"),
 	)
@@ -22,7 +27,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	services, middleware, closeAll, err := applicationServices(paths)
+	updateGate := &api.UpdateGate{}
+	updates := update.NewService(update.Version, updateGate)
+	services, middleware, closeAll, err := applicationServices(paths, updates, updateGate)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -43,6 +50,14 @@ func main() {
 			WebviewUserDataPath: filepath.Join(paths.Cache, "webview"),
 		},
 	})
+	provider, err := update.NewProvider("", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err = updates.Configure(app.Updater, provider); err != nil {
+		log.Fatal(err)
+	}
+	updates.Start()
 
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: "StorageBucket",

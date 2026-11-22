@@ -10,6 +10,11 @@ import (
 var errDeleteState = errors.New("정리가 끝난 실패·취소 요청 기록만 삭제할 수 있습니다")
 
 func (s *Service) Delete(ctx context.Context, req JobRequest) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	if req.JobID == "" {
 		return api.Failure("INVALID_ARGUMENT", "작업 ID가 필요합니다")
 	}

@@ -23,6 +23,7 @@ type workItem struct {
 	id, source, sourceKey, target, state, raw, verification, uuid, title, token, kind string
 	mediaID, fileID, directoryID                                                      int64
 	directory                                                                         string
+	operation                                                                         string
 }
 
 func (s *Service) run(ctx context.Context, job string, done chan struct{}) {
@@ -38,7 +39,7 @@ func (s *Service) run(ctx context.Context, job string, done chan struct{}) {
 	var after int64
 	for ctx.Err() == nil {
 		var w workItem
-		e := s.db.QueryRowContext(ctx, `SELECT i.rowid,i.id,i.source_path,i.source_key,coalesce(i.target_path,''),i.state,i.expected_stat_json,coalesce(i.verification_json,''),i.file_uuid_snapshot,coalesce(f.title,''),coalesce(f.filename_token,''),coalesce(f.kind,''),(f.detected_format IS NULL OR f.kind NOT IN ('image','video','audio') OR (f.kind IN ('image','video') AND (f.width IS NULL OR f.height IS NULL)) OR (f.kind IN ('video','audio') AND f.duration IS NULL)),i.media_id_snapshot,coalesce(i.file_id,0),j.target_directory_id,j.target_directory_snapshot FROM file_move_item i JOIN file_move_job j ON j.id=i.job_id LEFT JOIN media_file f ON f.id=i.file_id WHERE i.job_id=? AND i.rowid>? AND i.state IN ('pending','copying','verified','committed','cleanup_pending') ORDER BY i.rowid LIMIT 1`, job, after).Scan(&w.row, &w.id, &w.source, &w.sourceKey, &w.target, &w.state, &w.raw, &w.verification, &w.uuid, &w.title, &w.token, &w.kind, &w.metadataMissing, &w.mediaID, &w.fileID, &w.directoryID, &w.directory)
+		e := s.db.QueryRowContext(ctx, `SELECT i.rowid,i.id,i.source_path,i.source_key,coalesce(i.target_path,''),i.state,i.expected_stat_json,coalesce(i.verification_json,''),i.file_uuid_snapshot,coalesce(f.title,''),coalesce(f.filename_token,''),coalesce(f.kind,''),(f.detected_format IS NULL OR f.kind NOT IN ('image','video','audio') OR (f.kind IN ('image','video') AND (f.width IS NULL OR f.height IS NULL)) OR (f.kind IN ('video','audio') AND f.duration IS NULL)),i.media_id_snapshot,coalesce(i.file_id,0),j.target_directory_id,j.target_directory_snapshot,j.operation FROM file_move_item i JOIN file_move_job j ON j.id=i.job_id LEFT JOIN media_file f ON f.id=i.file_id WHERE i.job_id=? AND i.rowid>? AND i.state IN ('pending','copying','verified','committed','cleanup_pending') ORDER BY i.rowid LIMIT 1`, job, after).Scan(&w.row, &w.id, &w.source, &w.sourceKey, &w.target, &w.state, &w.raw, &w.verification, &w.uuid, &w.title, &w.token, &w.kind, &w.metadataMissing, &w.mediaID, &w.fileID, &w.directoryID, &w.directory, &w.operation)
 		if errors.Is(e, sql.ErrNoRows) {
 			break
 		}
@@ -112,6 +113,9 @@ func (s *Service) process(ctx context.Context, w workItem) error {
 		return fmt.Errorf("이전 작업 이력은 실행할 수 없습니다")
 	}
 	if w.state == "committed" || w.state == "cleanup_pending" {
+		if w.operation == "copy" {
+			return fmt.Errorf("복사 작업에서는 원본 정리를 실행할 수 없습니다")
+		}
 		return s.cleanup(ctx, w, stat)
 	}
 	if w.fileID == 0 {
@@ -187,6 +191,13 @@ func (s *Service) process(ctx context.Context, w workItem) error {
 		name, e = media.Filename(w.title, strings.TrimSuffix(filepath.Base(w.source), filepath.Ext(w.source)), filepath.Ext(w.source), token)
 		if e != nil {
 			return e
+		}
+		if stat.KeepName {
+			name = filepath.Base(w.source)
+			if trial > 0 {
+				ext := filepath.Ext(name)
+				name = strings.TrimSuffix(name, ext) + fmt.Sprintf(" (%d)", trial) + ext
+			}
 		}
 		reserved := proof{Token: token}
 		reservedRaw, _ := json.Marshal(reserved)
@@ -285,6 +296,28 @@ func (s *Service) process(ctx context.Context, w workItem) error {
 		return e
 	}
 	defer tx.Rollback()
+	if w.operation == "copy" {
+		var current string
+		if e = tx.QueryRowContext(ctx, "SELECT filepath FROM media_file WHERE id=? AND file_uuid=?", w.fileID, w.uuid).Scan(&current); e != nil {
+			return e
+		}
+		if current != w.source {
+			return fmt.Errorf("원본 DB 위치가 변경됐습니다")
+		}
+		result, err := tx.ExecContext(ctx, "UPDATE file_move_item SET state='completed',committed_at=?,finished_at=?,error_code=NULL,error_message=NULL WHERE id=? AND state='verified'", time.Now().UnixMilli(), time.Now().UnixMilli(), w.id)
+		if err != nil {
+			return err
+		}
+		n, err := result.RowsAffected()
+		if err != nil || n != 1 {
+			return fmt.Errorf("복사 작업 상태가 변경됐습니다")
+		}
+		if e = tx.Commit(); e != nil {
+			return e
+		}
+		committed = true
+		return nil
+	}
 	var refs int
 	if e = tx.QueryRowContext(ctx, "SELECT count(*) FROM media_file WHERE id<>? AND (filepath=? COLLATE NOCASE OR canonical_path_key=?)", w.fileID, w.source, w.sourceKey).Scan(&refs); e != nil {
 		return e

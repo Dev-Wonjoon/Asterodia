@@ -42,7 +42,7 @@ export function GalleryToolbar({ total, count, disabled, actionDisabled, importD
     return <div className="flex flex-wrap items-center justify-end gap-2">
         {count > 0 && <div className="motion-selection flex items-center gap-2">
             <Menu label="선택 작업" disabled={disabled || actionDisabled}>
-                <button type="button" role="menuitem" className={item} onClick={onMove}>파일 이동</button>
+                <button type="button" role="menuitem" className={item} onClick={onMove}>한 폴더에 모으기</button>
                 {([['favorite', '즐겨찾기 추가'], ['unfavorite', '즐겨찾기 해제'], ['addTags', '태그 추가'], ['removeTags', '태그 제거'], ['openFolders', '파일 위치 열기'], ['unregister', '등록 해제']] as const).map(([command, label]) => <button type="button" role="menuitem" key={command} className={item + (command === 'unregister' ? ' text-red-500' : '')} onClick={() => onBulk(command)}>{label}</button>)}
             </Menu>
             <span className="whitespace-nowrap text-right text-sm tabular-nums text-[var(--text-muted)]" style={{ minWidth: `${String(total ?? 0).length * 2 + 3}ch` }} role="status" aria-label={`전체 ${total ?? '확인 중'} / 선택 ${count}`} title="전체 수 / 선택한 수">{total ?? '–'} / {count}</span>

@@ -93,31 +93,9 @@ export function mountRangeControl(host, { label, count, values, change, format }
         track.append(handle);
         handles[side] = handle;
         function move(n, done = false) { const [start, end] = values(), max = count(); change(side === 'start' ? clamp(n, 0, end - 1) : start, side === 'end' ? clamp(n, start + 1, max) : end, side, done, before); update(); }
-        let pointer = null;
-        handle.addEventListener('pointerdown', event => {
-            if (event.button !== 0)
-                return;
-            before = [...values()];
-            pointer = event.pointerId;
-            handle.focus();
-            handle.setPointerCapture(event.pointerId);
-            event.preventDefault();
+        handle.addEventListener('focus', () => {
+            for (const [name, item] of Object.entries(handles)) item.style.zIndex = name === side ? '2' : '1';
         });
-        handle.addEventListener('pointermove', event => {
-            if (pointer !== event.pointerId)
-                return;
-            const r = track.getBoundingClientRect();
-            move((event.clientX - r.left) / r.width * count());
-        });
-        function finish(event) {
-            if (pointer !== event.pointerId)
-                return;
-            pointer = null;
-            move(values()[side === 'start' ? 0 : 1], true);
-            before = null;
-        }
-        handle.addEventListener('pointerup', finish);
-        handle.addEventListener('pointercancel', finish);
         handle.addEventListener('keydown', event => {
             if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key))
                 return;
@@ -147,10 +125,40 @@ export function mountRangeControl(host, { label, count, values, change, format }
             h.setAttribute('aria-valuetext', format(n));
         }
         value.textContent = format(start) + ' – ' + format(end);
-        track.classList.toggle('is-tight', (end - start) / max * track.getBoundingClientRect().width < 44);
         marker.hidden = current === null;
         marker.style.left = (current || 0) / max * 100 + '%';
     }
+    let drag = null;
+    track.addEventListener('pointerdown', event => {
+        if (event.button !== 0 || !event.target.closest('.sbe-range-handle')) return;
+        const rect = track.getBoundingClientRect(), [start, end] = values(), max = Math.max(1, count());
+        const left = rect.left + start / max * rect.width, right = rect.left + end / max * rect.width;
+        // At almost identical positions, drag left to grab start and right to grab end.
+        const side = Math.abs(right - left) < 8 ? null : Math.abs(event.clientX - left) <= Math.abs(event.clientX - right) ? 'start' : 'end';
+        before = [...values()];
+        drag = { id: event.pointerId, x: event.clientX, side, start, end, width: rect.width };
+        track.setPointerCapture(event.pointerId);
+        if (side) handles[side].focus();
+        event.preventDefault();
+    });
+    track.addEventListener('pointermove', event => {
+        if (!drag || drag.id !== event.pointerId || !drag.width) return;
+        const dx = event.clientX - drag.x;
+        if (!drag.side && Math.abs(dx) < 2) return;
+        if (!drag.side) { drag.side = dx < 0 ? 'start' : 'end'; handles[drag.side].focus(); }
+        const max = count(), n = (drag.side === 'start' ? drag.start : drag.end) + dx / drag.width * max;
+        const [start, end] = values();
+        change(drag.side === 'start' ? clamp(n, 0, end - 1) : start, drag.side === 'end' ? clamp(n, start + 1, max) : end, drag.side, false, before);
+        update();
+    });
+    function finishDrag(event) {
+        if (!drag || drag.id !== event.pointerId) return;
+        const [start, end] = values();
+        if (drag.side) change(start, end, drag.side, true, before);
+        drag = null; before = null;
+    }
+    track.addEventListener('pointerup', finishDrag);
+    track.addEventListener('pointercancel', finishDrag);
     host.append(root);
     update();
     return { root, update };

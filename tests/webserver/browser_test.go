@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
 )
 
 // Opt-in fixture bridge for the isolated browser test; never part of the app.
@@ -73,6 +74,14 @@ func TestBrowserFixture(t *testing.T) {
 		if _, err := f.db.Exec("INSERT INTO media_file(media_id,file_key,storage_kind,filepath,kind,position,created_at) VALUES(?,?,'unverified_legacy',?,?,?,0)", mixedID, kind, file, kind, index+1); err != nil {
 			t.Fatal(err)
 		}
+	}
+	var imageID, videoID, audioID int64
+	if err := f.db.QueryRow("SELECT min(CASE kind WHEN 'image' THEN id END),min(CASE kind WHEN 'video' THEN id END),min(CASE kind WHEN 'audio' THEN id END) FROM media_file WHERE media_id=?", mixedID).Scan(&imageID, &videoID, &audioID); err != nil {
+		t.Fatal(err)
+	}
+	albumName := "사용자 앨범 · 감상 테스트"
+	if result := media.NewService(f.db).SaveAlbum(t.Context(), media.AlbumRequest{Title: &albumName, AddFileIDs: []int64{videoID, audioID, imageID, 1}}); !result.OK {
+		t.Fatal(result.Error)
 	}
 	emit := func(id int, result any) {
 		data, _ := json.Marshal(map[string]any{"id": id, "result": result})

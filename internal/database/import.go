@@ -64,7 +64,7 @@ func (i *Importer) Import(ctx context.Context, sourcePath string) (ImportResult,
 	if err = source.QueryRowContext(ctx, "PRAGMA user_version").Scan(&result.SourceVersion); err != nil {
 		return result, fmt.Errorf("SQLite DB를 읽지 못했습니다: %w", err)
 	}
-	if _, err = validateSchema(ctx, source, result.SourceVersion); err != nil {
+	if err = validateSchema(ctx, source, result.SourceVersion); err != nil {
 		return result, err
 	}
 	if err = healthy(ctx, source); err != nil {
@@ -79,7 +79,7 @@ func (i *Importer) Import(ctx context.Context, sourcePath string) (ImportResult,
 		return result, err
 	}
 	defer snapshot.Close()
-	if _, err = Migrate(ctx, snapshot, MigrationOptions{BackupDirectory: i.backups, LegacyStorageRoot: filepath.Join(filepath.Dir(sourcePath), "downloads")}); err != nil {
+	if _, err = Migrate(ctx, snapshot, MigrationOptions{BackupDirectory: i.backups}); err != nil {
 		return result, err
 	}
 	data, err := allData(ctx, snapshot)
@@ -167,6 +167,8 @@ func sourceIdentity(data map[string][]record, path string) string {
 		}
 	}
 	for _, row := range data["migration_run"] {
+		// Preserve import identities of Wails databases converted before 2.1.0.
+		// This does not enable opening or converting Electron database formats.
 		if row["target_version"] == int64(2) && row["source_fingerprint"] != nil {
 			return digest([]any{"electron-v2", row["source_fingerprint"]})
 		}
@@ -295,7 +297,7 @@ func (m *merge) run() error {
 		if e != nil {
 			return e
 		}
-		if len(m.sourceFiles[id]) == 0 {
+		if len(m.sourceFiles[id]) == 0 && !m.isUserAlbum(id) {
 			return fmt.Errorf("파일이 없는 묶음은 가져올 수 없습니다")
 		}
 	}
@@ -355,6 +357,44 @@ func (m *merge) run() error {
 	for _, row := range m.data["media_file"] {
 		if err := m.file(row); err != nil {
 			return err
+		}
+	}
+	// Album membership follows remapped file IDs and never imports another physical copy.
+	for _, r := range m.data["user_album"] {
+		old, e := integer(r["media_id"])
+		if e != nil {
+			return e
+		}
+		target := m.maps["media"][old]
+		if !m.newMedia[target] {
+			continue
+		}
+		row := clone(r)
+		row["media_id"] = target
+		if e = m.remap(row, "cover_file_id", "media_file"); e != nil {
+			return e
+		}
+		if _, e = insert(m.ctx, m.q, "user_album", row); e != nil {
+			return e
+		}
+	}
+	for _, r := range m.data["user_album_file"] {
+		old, e := integer(r["album_id"])
+		if e != nil {
+			return e
+		}
+		if !m.newMedia[m.maps["media"][old]] {
+			continue
+		}
+		row := clone(r)
+		if e = m.remap(row, "album_id", "media"); e != nil {
+			return e
+		}
+		if e = m.remap(row, "file_id", "media_file"); e != nil {
+			return e
+		}
+		if _, e = insert(m.ctx, m.q, "user_album_file", row); e != nil {
+			return e
 		}
 	}
 	for _, table := range []string{"media_tag", "favorite"} {
@@ -795,4 +835,13 @@ func rebuildFTS(ctx context.Context, q connection) error {
 	}
 	_, err := q.ExecContext(ctx, `DELETE FROM media_fts; INSERT INTO media_fts(rowid,title,owner_name,url,tag_names) SELECT m.id,coalesce(m.custom_title,m.source_title,''),coalesce((SELECT group_concat(p.owner_name,' ') FROM media_file f JOIN profiles p ON p.id=f.profile_id WHERE f.media_id=m.id),''),coalesce(u.url,''),coalesce((SELECT group_concat(t.name,' ') FROM media_tag mt JOIN tag t ON t.id=mt.tag_id WHERE mt.media_id=m.id),'') FROM media m LEFT JOIN download_urls u ON u.id=m.request_url_id`)
 	return err
+}
+
+func (m *merge) isUserAlbum(id int64) bool {
+	for _, r := range m.data["user_album"] {
+		if r["media_id"] == id {
+			return true
+		}
+	}
+	return false
 }

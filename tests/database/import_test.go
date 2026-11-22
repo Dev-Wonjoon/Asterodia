@@ -128,24 +128,24 @@ func TestImportKeepsExistingEditsAndCover(t *testing.T) {
 	assertHealthyDB(t, target)
 }
 
-func TestLegacyImportAndReadOnlyHistory(t *testing.T) {
+func TestWailsImportAndReadOnlyHistory(t *testing.T) {
 	root := migrationRoot(t)
 	target, service, _ := importer(t, root)
 	sourcePath := filepath.Join(root, "legacy.db")
-	source := legacyDB(t, sourcePath, 7)
-	addLegacyMedia(t, source, filepath.Join(root, "original.mp4"))
-	execDB(t, source, "INSERT INTO download_queue(id,url,status,options,progress,created_at,updated_at) VALUES('pending-job','https://example.test/watch?v=one','pending','{}',0,1700000000,1700000000)")
+	source := latestDB(t, sourcePath)
+	addModernMedia(t, source, 7, "https://example.test/watch?v=one", "가져올 제목", filepath.Join(root, "original.mp4"), "video:fixture")
+	execDB(t, source, "INSERT INTO download_queue(id,request_url_id,original_url,mode,state,options_json,progress,created_at,updated_at) VALUES('pending-job',7,'https://example.test/watch?v=one','create','pending','{}',0,1700000000000,1700000000000)")
 	source.Close()
 	before := fileDigest(t, sourcePath)
 	result, e := service.Import(t.Context(), sourcePath)
 	if e != nil {
 		t.Fatal(e)
 	}
-	if result.SourceVersion != 0 || result.AddedMedia != 1 || result.AddedHistory != 1 {
+	if result.SourceVersion != 11 || result.AddedMedia != 1 || result.AddedHistory != 1 {
 		t.Fatal(result)
 	}
 	if before != fileDigest(t, sourcePath) {
-		t.Fatal("구버전 원본 DB가 변경되었습니다")
+		t.Fatal("원본 DB가 변경되었습니다")
 	}
 	var job string
 	if e = target.QueryRow("SELECT id FROM download_queue").Scan(&job); e != nil {
@@ -169,7 +169,7 @@ func TestLegacyImportAndReadOnlyHistory(t *testing.T) {
 		t.Fatal(e)
 	}
 	if result.AddedMedia != 0 || result.AddedFiles != 0 || result.AddedHistory != 0 {
-		t.Fatalf("구버전 반복 가져오기 중복 %+v", result)
+		t.Fatalf("Wails DB 반복 가져오기 중복 %+v", result)
 	}
 	copyPath := filepath.Join(root, "renamed-copy.db")
 	b, e := os.ReadFile(sourcePath)

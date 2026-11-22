@@ -19,6 +19,11 @@ import (
 const framePageSize = 48
 
 func (s *Service) Frames(ctx context.Context, req FramesRequest) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed || s.halted || !validID(req.ID) || req.Offset < 0 {

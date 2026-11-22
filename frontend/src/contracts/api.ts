@@ -6,12 +6,14 @@ import type { DatabaseApi } from "./database-api";
 import type { LocalImportApi } from "./local-import-api";
 import type { WebServerApi } from "./webserver-api";
 import type { MediaEditApi } from "./media-edit-api";
+import type { UpdateApi } from "./update-api";
 
 export type Unsubscribe = () => void;
 
 import type { FileMoveApi } from "./file-move-api";
 
 export interface AppApi {
+    updates: UpdateApi;
     mediaEdit: MediaEditApi;
     fileMove: FileMoveApi;
     webServer: WebServerApi;

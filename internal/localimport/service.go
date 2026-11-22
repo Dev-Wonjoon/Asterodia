@@ -86,6 +86,7 @@ type FilePage struct {
 	HasNextPage bool   `json:"hasNextPage"`
 }
 type Service struct {
+	UpdateGate  *api.UpdateGate
 	db          *sql.DB
 	inspector   Inspector
 	choose      func() (string, error)
@@ -113,6 +114,11 @@ func bounds(req Request) (int, error) {
 	return req.Limit, nil
 }
 func (s *Service) Choose(ctx context.Context) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	if s.choose == nil {
 		return fail(fmt.Errorf("폴더 선택 창을 사용할 수 없습니다"))
 	}
@@ -126,6 +132,11 @@ func (s *Service) Choose(ctx context.Context) api.Result {
 	return s.startScan(ctx, path)
 }
 func (s *Service) Rescan(ctx context.Context, req Request) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	var root, state string
 	if err := s.db.QueryRowContext(ctx, "SELECT root_path,state FROM local_import_job WHERE id=?", req.JobID).Scan(&root, &state); err != nil {
 		return fail(err)
@@ -308,6 +319,11 @@ func (s *Service) Files(ctx context.Context, req Request) api.Result {
 func (s *Service) Run(ctx context.Context, req Request) api.Result    { return s.begin(ctx, req, false) }
 func (s *Service) Resume(ctx context.Context, req Request) api.Result { return s.begin(ctx, req, true) }
 func (s *Service) begin(ctx context.Context, req Request, resume bool) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed || s.active != "" {
@@ -342,6 +358,11 @@ func (s *Service) begin(ctx context.Context, req Request, resume bool) api.Resul
 func (s *Service) Pause(ctx context.Context, req Request) api.Result  { return s.stop(ctx, req, false) }
 func (s *Service) Cancel(ctx context.Context, req Request) api.Result { return s.stop(ctx, req, true) }
 func (s *Service) stop(ctx context.Context, req Request, cancelled bool) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	column, next := "pause_requested_at", "paused"
@@ -375,6 +396,11 @@ func (s *Service) Exclude(ctx context.Context, req Request) api.Result {
 	return s.changeTargets(ctx, req, false)
 }
 func (s *Service) changeTargets(ctx context.Context, req Request, retry bool) api.Result {
+	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
+	if !updateAllowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leaveUpdate()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed || s.active != "" {
