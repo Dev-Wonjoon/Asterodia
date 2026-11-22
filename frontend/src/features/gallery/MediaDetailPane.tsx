@@ -7,6 +7,8 @@ import { MediaPlayer } from '@renderer/shared/components/media/MediaPlayer'
 import { MEDIA_PAGE_SIZE, type GallerySnapshot, type GalleryStore } from './galleryStore'
 import { MediaThumbnailStatus } from './MediaThumbnailStatus'
 import { MediaEditLauncher } from '../mediaedit/MediaEditLauncher'
+import { ActionButton } from '@renderer/shared/components/ui/ActionButton'
+import { Play, ListPlus, FolderInput } from 'lucide-react'
 
 export interface MediaDetailFocusRequest {
     mediaId: number
@@ -19,13 +21,14 @@ export function MediaDetailPane({
     store,
     onDirtyChange,
     focusRequest,
-    onViewFile, onAddFiles, onGatherFiles
+    onViewFile, onAddFiles, onAddMedia, onGatherFiles
 }: {
     state: GallerySnapshot
     store: GalleryStore
     onDirtyChange: (dirty: boolean) => void
     onViewFile?: (fileId: number) => void
     onAddFiles?: (fileIds: number[]) => void
+    onAddMedia?: (mediaId: number) => void
     onGatherFiles?: (fileIds: number[]) => void
     focusRequest?: MediaDetailFocusRequest | null
 }) {
@@ -392,6 +395,7 @@ export function MediaDetailPane({
 
                     <div className="space-y-3">
                         <h3 className="font-medium">파일 {data.files.total}개</h3>
+                        {onAddMedia && <ActionButton icon={<ListPlus />} label="전체 추가" title={`파일 ${data.fileCount}개 전체를 앨범에 추가`} disabled={disabled || hasDraft || data.fileCount === 0} onClick={() => onAddMedia(data.id)} />}
 
                         {data.files.data.map((file) => (
                             <article
@@ -399,9 +403,9 @@ export function MediaDetailPane({
                                 className="flex flex-col gap-3 rounded-lg border border-[var(--border-line)] p-3"
                             >
                                 <div className="flex flex-wrap gap-2">
-                                    {onViewFile && <button type="button" className={button} disabled={disabled} onClick={() => onViewFile(file.id)}>감상하기</button>}
-                                    {onAddFiles && <button type="button" className={button} disabled={disabled} onClick={() => onAddFiles([file.id])}>앨범에 추가</button>}
-                                    {onGatherFiles && <button type="button" className={button} disabled={disabled} onClick={() => onGatherFiles([file.id])}>한 폴더에 모으기</button>}
+                                    {onViewFile && <ActionButton icon={<Play />} label="감상하기" disabled={disabled} onClick={() => onViewFile(file.id)} />}
+                                    {onAddFiles && <ActionButton icon={<ListPlus />} label="앨범에 추가" disabled={disabled || hasDraft} onClick={() => onAddFiles([file.id])} />}
+                                    {onGatherFiles && <ActionButton icon={<FolderInput />} label="한 폴더에 모으기" disabled={disabled} onClick={() => onGatherFiles([file.id])} />}
                                 </div>
                                 {(file.kind === 'video' || file.kind === 'audio') && <MediaPlayer key={`${file.id}:${data.revision}`} path={file.filepath} kind={file.kind} title={file.title ?? file.fileKey} poster={file.thumbnailPath} />}
                                 {file.kind !== 'video' && file.kind !== 'audio' && <MediaPreview

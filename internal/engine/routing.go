@@ -65,6 +65,9 @@ func Select(rawURL string, options Options) (Kind, error) {
 			return KindGalleryDL, nil
 		}
 	}
+	if isPinterestHost(host) {
+		return KindGalleryDL, nil
+	}
 
 	return KindYtdlp, nil
 }

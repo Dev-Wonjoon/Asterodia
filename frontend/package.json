@@ -7,8 +7,9 @@
     "test": "vitest run --config vitest.config.ts",
     "test:coverage": "vitest run --config vitest.config.ts --coverage",
     "dev": "vite",
-    "build:dev": "tsc && vite build --minify false --mode development",
-    "build": "tsc && vite build --mode production",
+    "build:dev": "tsc && vite build --minify false --mode development && npm run build:web",
+    "build": "tsc && vite build --mode production && npm run build:web",
+    "build:web": "vite build --config vite.web.config.ts",
     "preview": "vite preview"
   },
   "dependencies": {

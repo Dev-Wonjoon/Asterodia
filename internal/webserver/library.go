@@ -12,15 +12,19 @@ import (
 )
 
 func publicSummary(row map[string]any) map[string]any {
-	result := map[string]any{"id": row["id"], "title": row["title"], "isUserAlbum": row["isUserAlbum"], "fileCount": row["fileCount"], "createdAt": row["createdAt"], "cover": nil}
+	result := map[string]any{"id": row["id"], "title": row["title"], "isUserAlbum": row["isUserAlbum"], "fileCount": row["fileCount"], "createdAt": row["createdAt"], "sourceKind": row["sourceKind"], "isFavorite": row["isFavorite"], "revision": row["revision"], "cover": nil}
 	if cover, ok := row["cover"].(map[string]any); ok {
 		result["cover"] = map[string]any{"fileId": cover["fileId"], "kind": cover["kind"]}
 	}
 	if file, ok := row["galleryFile"].(map[string]any); ok {
-		result["galleryFile"] = map[string]any{"id": file["id"], "title": file["title"], "kind": file["kind"]}
+		result["galleryFile"] = publicFile(file)
 		result["galleryFileOffset"] = row["galleryFileOffset"]
 	}
 	return result
+}
+
+func publicFile(file map[string]any) map[string]any {
+	return map[string]any{"id": file["id"], "title": file["title"], "kind": file["kind"], "width": file["width"], "height": file["height"], "duration": file["duration"], "detectedFormat": file["detectedFormat"]}
 }
 
 func (s *Service) sequence(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +55,7 @@ func (s *Service) fileInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	file := result.Data.(media.Object)
-	respond(w, r, map[string]any{"id": file["id"], "title": file["title"], "kind": file["kind"], "duration": file["duration"]})
+	respond(w, r, publicFile(file))
 }
 
 func apiError(w http.ResponseWriter, r *http.Request, result api.Result) bool {
@@ -115,7 +119,25 @@ func (s *Service) list(w http.ResponseWriter, r *http.Request) {
 
 func mobileSearchFilter(r *http.Request) media.Filter {
 	query := r.URL.Query()
-	return media.Filter{Tags: query["tag"], Authors: query["author"], Platforms: query["platform"], TagMode: "and"}
+	mode := query.Get("tagMode")
+	if mode == "" {
+		mode = "and"
+	}
+	return media.Filter{Tags: query["tag"], Authors: query["author"], Platforms: query["platform"], TagMode: mode}
+}
+
+func (s *Service) filterSuggestions(w http.ResponseWriter, r *http.Request) {
+	limit, err := integer(r, "limit", 10)
+	if err != nil || limit < 1 || limit > 50 {
+		http.Error(w, "조회 범위를 확인하세요", 400)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	result := s.library.Suggest(ctx, media.SuggestRequest{Kind: r.URL.Query().Get("kind"), Text: r.URL.Query().Get("q"), Limit: limit})
+	if !apiError(w, r, result) {
+		respond(w, r, result.Data)
+	}
 }
 
 func (s *Service) searchSuggestions(w http.ResponseWriter, r *http.Request) {
@@ -127,7 +149,7 @@ func (s *Service) searchSuggestions(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
-	result := s.library.SearchSuggest(ctx, media.SearchSuggestRequest{Text: r.URL.Query().Get("q"), Limit: limit, Offset: offset, Filter: mobileSearchFilter(r)})
+	result := s.library.SearchSuggest(ctx, media.SearchSuggestRequest{Text: r.URL.Query().Get("q"), Kind: r.URL.Query().Get("kind"), Limit: limit, Offset: offset, Filter: mobileSearchFilter(r)})
 	if apiError(w, r, result) {
 		return
 	}
@@ -152,7 +174,7 @@ func (s *Service) detail(w http.ResponseWriter, r *http.Request) {
 	page := row["files"].(media.Object)
 	files := []map[string]any{}
 	for _, file := range page["data"].([]media.Object) {
-		files = append(files, map[string]any{"id": file["id"], "title": file["title"], "kind": file["kind"], "width": file["width"], "height": file["height"], "duration": file["duration"], "detectedFormat": file["detectedFormat"]})
+		files = append(files, publicFile(file))
 	}
 	detail["files"] = map[string]any{"data": files, "total": page["total"], "hasNextPage": page["hasNextPage"]}
 	respond(w, r, detail)

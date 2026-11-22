@@ -160,7 +160,7 @@ func (s *Service) Resources(ctx context.Context, req CreateRequest) api.Result {
 	available, total, disk, memoryKnown, diskKnown := systemResources(s.output())
 	r := ResourceEstimate{MemoryKnown: memoryKnown, AvailableRAM: available, TotalRAM: total, DiskKnown: diskKnown, DiskAvailable: disk, Basis: "calculated", Note: "버퍼 계산에 따른 참고 범위입니다. 전체 작업의 최대 사용량을 보장하지 않습니다."}
 	r.LowRAM, r.HighRAM, r.EstimateKnown = estimateBase(v.Width, v.Height, req.Crop.Width, req.Crop.Height, req.Kind, v.FrameCount)
-	if v.Options.NativeGIF && r.EstimateKnown {
+	if (v.Options.NativeGIF || v.Options.NativeVideo) && r.EstimateKnown {
 		factor := 128.0
 		low := float64(r.LowRAM) + float64(v.FrameCount)*24
 		high := float64(r.HighRAM) + float64(v.FrameCount)*factor

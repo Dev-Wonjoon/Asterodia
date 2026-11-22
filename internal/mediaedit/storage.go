@@ -86,7 +86,35 @@ func (s *Service) render(ctx context.Context, id string) (err error) {
 	staged := filepath.Join(actual, stagedRel)
 	count := 0
 	expectedDuration := 0.0
-	if j.Options.Kind != "trim" {
+	if j.Options.Kind != "trim" && v.Options.QuickVideo {
+		pin, path, e := s.source(ctx, v.ID)
+		if e != nil {
+			return e
+		}
+		defer pin.Close()
+		start, end, e := trimBounds(v, j.Options)
+		if e != nil {
+			return e
+		}
+		if j.Preview {
+			end = min(end, start+2)
+		}
+		duration, width, height := v.Options.End, v.Width, v.Height
+		timeline, e := s.editor.ReadVideoClipTimeline(ctx, path, engine.LocalMetadata{Width: &width, Height: &height, Duration: &duration}, start, end)
+		if e != nil {
+			return e
+		}
+		if j.Options.Kind == "gif" {
+			for _, delay := range timeline.Delays {
+				if delay < 10 || delay > 655350 {
+					return errGIFFrameTiming
+				}
+			}
+		}
+		count, expectedDuration = len(timeline.Delays), timeline.Duration()
+		request := engine.AnimationRequest{Source: path, Start: start, End: end, FPS: 1000, FrameCount: count, ExpectedFrames: count, Crop: j.Options.Crop, Format: j.Options.Kind, Quality: j.Options.Quality, NativeVideo: true, DelayRate: timeline.Rate(), Delays: timeline.Delays, Duration: expectedDuration}
+		err = s.editor.Animation(ctx, request, staged, s.progress("media_edit_job", id, 0, 88))
+	} else if j.Options.Kind != "trim" {
 		first, end, expected, factory, planErr := s.framePlan(v, j.Options)
 		if planErr != nil {
 			return planErr
@@ -103,12 +131,14 @@ func (s *Service) render(ctx context.Context, id string) (err error) {
 		}
 		request := engine.AnimationRequest{Source: sourcePath, Start: v.Options.Start, End: v.Options.End, FPS: v.Options.FPS, FrameCount: end, FirstFrame: first, ExpectedFrames: expected, Crop: j.Options.Crop, Format: j.Options.Kind, Quality: j.Options.Quality, NewSkip: factory, PictureSequence: v.RenderVersion == 1}
 		expectedDuration = float64(expected) / float64(v.Options.FPS)
-		if v.Options.NativeGIF {
-			timeline, e := s.gifTimeline(v.ID)
+		if v.Options.NativeGIF || v.Options.NativeVideo {
+			timeline, e := s.timing(v)
 			if e != nil {
 				return e
 			}
-			request.NativeGIF = true
+			request.NativeGIF = v.Options.NativeGIF
+			request.NativeVideo = v.Options.NativeVideo
+			request.DelayRate = timeline.Rate()
 			request.Delays = timeline.Delays
 			skip := factory()
 			ticks := 0
@@ -124,11 +154,11 @@ func (s *Service) render(ctx context.Context, id string) (err error) {
 					return fmt.Errorf("GIF 재생 정보 오류")
 				}
 				if j.Preview {
-					request.Delays[n] = min(request.Delays[n], 200-ticks)
+					request.Delays[n] = min(request.Delays[n], 2*timeline.Rate()-ticks)
 				}
 				ticks += request.Delays[n]
 			}
-			expectedDuration = float64(ticks) / 100
+			expectedDuration = float64(ticks) / float64(timeline.Rate())
 		}
 		err = s.editor.Animation(ctx, request, staged, s.progress("media_edit_job", id, 0, 88))
 	} else {

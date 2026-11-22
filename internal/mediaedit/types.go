@@ -3,14 +3,18 @@ package mediaedit
 import "github.com/Dev-Wonjoon/StorageBucket/internal/engine"
 
 type PrepareRequest struct {
-	NativeGIF bool    `json:"nativeGIF,omitempty"`
-	RequestID string  `json:"requestId"`
-	FileID    int64   `json:"fileId"`
-	Start     float64 `json:"start"`
-	End       float64 `json:"end"`
-	FPS       int     `json:"fps"`
-	Width     int     `json:"width"`
-	Kind      string  `json:"kind"`
+	QuickVideo     bool    `json:"quickVideo,omitempty"`
+	OriginalFrames bool    `json:"originalFrames,omitempty"`
+	FullSource     bool    `json:"fullSource,omitempty"`
+	NativeVideo    bool    `json:"nativeVideo,omitempty"`
+	NativeGIF      bool    `json:"nativeGIF,omitempty"`
+	RequestID      string  `json:"requestId"`
+	FileID         int64   `json:"fileId"`
+	Start          float64 `json:"start"`
+	End            float64 `json:"end"`
+	FPS            int     `json:"fps"`
+	Width          int     `json:"width"`
+	Kind           string  `json:"kind"`
 }
 type CreateRequest struct {
 	TrimStart    *float64                `json:"trimStart,omitempty"`

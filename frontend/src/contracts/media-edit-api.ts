@@ -1,5 +1,9 @@
 import type { WebServerResult } from './webserver-api';
 export interface EditPrepare {
+    quickVideo?: boolean;
+    originalFrames?: boolean;
+    fullSource?: boolean;
+    nativeVideo?: boolean;
     nativeGIF?: boolean;
     requestId: string;
     fileId: number;
@@ -10,10 +14,12 @@ export interface EditPrepare {
     kind: 'gif' | 'webp' | 'trim';
 }
 export interface EditQuality {
-    preset: 'small' | 'balanced' | 'high' | 'custom';
+    preset: 'small' | 'balanced' | 'high' | 'max' | 'custom';
     quality: number;
     effort: 'fast' | 'normal' | 'precise';
     lossless: boolean;
+    dither?: 'auto' | 'sierra2_4a' | 'sierra3' | 'floyd_steinberg' | 'bayer' | 'atkinson' | 'none';
+    webpPreset?: 'none' | 'photo' | 'drawing' | 'icon' | 'text';
 }
 export interface EditUsage {
     known: boolean;

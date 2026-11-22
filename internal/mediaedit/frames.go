@@ -121,10 +121,34 @@ func (s *Service) prepareTimeline(ctx context.Context, id string) error {
 		if e != nil {
 			return e
 		}
-		if v.Options.End > *metadata.Duration+0.001 {
+		if v.Options.FullSource {
+			v.Options.Start, v.Options.End = 0, *metadata.Duration
+		}
+		if (v.Options.FullSource || v.Options.OriginalFrames) && !v.Options.QuickVideo {
+			if v.Options.Kind != "trim" {
+				var native engine.GIFTimeline
+				var err error
+				if v.Options.OriginalFrames {
+					native, err = s.editor.ReadVideoClipTimeline(ctx, path, metadata, v.Options.Start, v.Options.End)
+				} else {
+					native, err = s.editor.ReadVideoTimeline(ctx, path, metadata)
+				}
+				if err != nil {
+					return err
+				}
+				timeline = &native
+				v.Options.NativeVideo = true
+				if !v.Options.OriginalFrames {
+					v.Options.End = native.Duration()
+				}
+				v.Options.FPS = 1000
+				count = len(native.Delays)
+			}
+		}
+		if !v.Options.FullSource && v.Options.End > *metadata.Duration+0.001 {
 			return fmt.Errorf("선택 구간이 원본 재생 시간을 초과합니다")
 		}
-		if v.Options.Kind != "trim" {
+		if v.Options.Kind != "trim" && !v.Options.NativeVideo && !v.Options.QuickVideo {
 			count = int(math.Ceil((v.Options.End-v.Options.Start)*float64(v.Options.FPS) - 1e-9))
 			if count < 1 {
 				return fmt.Errorf("선택 구간에 프레임이 없습니다")
@@ -140,7 +164,7 @@ func (s *Service) prepareTimeline(ctx context.Context, id string) error {
 		return e
 	}
 	if timeline != nil {
-		file, err := cache.OpenFile(filepath.Join(id, "gif-timeline.json"), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+		file, err := cache.OpenFile(filepath.Join(id, timelineName(v)), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 		if err != nil {
 			return err
 		}
@@ -159,7 +183,7 @@ func (s *Service) prepareTimeline(ctx context.Context, id string) error {
 	if _, e = s.store.db.ExecContext(ctx, "UPDATE media_edit_session SET width=?,height=?,frame_count=?,progress=15,request_json=? WHERE id=?", *metadata.Width, *metadata.Height, count, raw(v.Options), id); e != nil {
 		return e
 	}
-	if v.Options.Kind != "trim" {
+	if v.Options.Kind != "trim" && !v.Options.QuickVideo {
 		if e = s.buildPage(ctx, id, 0); e != nil {
 			return e
 		}
@@ -210,6 +234,8 @@ func (s *Service) buildPage(ctx context.Context, id string, offset int) error {
 	}
 	if v.Options.NativeGIF {
 		e = s.editor.GIFFramePage(ctx, path, filepath.Join(s.cache, rel), v.FrameCount, offset, framePageSize)
+	} else if v.Options.NativeVideo {
+		e = s.editor.VideoClipFramePage(ctx, path, filepath.Join(s.cache, rel), v.FrameCount, offset, framePageSize, v.Options.Start, v.Options.End)
 	} else {
 		e = s.editor.FramePage(ctx, path, filepath.Join(s.cache, rel), v.Options.Start, v.Options.End, v.Options.FPS, v.FrameCount, offset, framePageSize)
 	}
@@ -320,13 +346,25 @@ func (s *Service) runNextPage(ctx context.Context) bool {
 func isStopUnconfirmed(err error) bool { return errors.Is(err, engine.ErrStopUnconfirmed) }
 
 func (s *Service) gifTimeline(id string) (engine.GIFTimeline, error) {
+	return s.readTimeline(id, "gif-timeline.json")
+}
+func timelineName(v Session) string {
+	if v.Options.NativeVideo {
+		return "video-timeline.json"
+	}
+	return "gif-timeline.json"
+}
+func (s *Service) timing(v Session) (engine.GIFTimeline, error) {
+	return s.readTimeline(v.ID, timelineName(v))
+}
+func (s *Service) readTimeline(id, name string) (engine.GIFTimeline, error) {
 	var value engine.GIFTimeline
 	root, err := os.OpenRoot(s.cache)
 	if err != nil {
 		return value, err
 	}
 	defer root.Close()
-	f, err := root.Open(filepath.Join(id, "gif-timeline.json"))
+	f, err := root.Open(filepath.Join(id, name))
 	if err != nil {
 		return value, err
 	}
@@ -335,18 +373,18 @@ func (s *Service) gifTimeline(id string) (engine.GIFTimeline, error) {
 	return value, err
 }
 func (s *Service) pageTiming(v Session, p *FramePage) {
-	if !v.Options.NativeGIF {
+	if !v.Options.NativeGIF && !v.Options.NativeVideo {
 		return
 	}
-	g, err := s.gifTimeline(v.ID)
+	g, err := s.timing(v)
 	if err != nil {
 		return
 	}
 	ticks := int64(0)
 	for n, d := range g.Delays {
 		if n >= p.Offset && n < p.Offset+p.Count {
-			p.Times = append(p.Times, float64(ticks)/100)
-			p.Durations = append(p.Durations, float64(d)/100)
+			p.Times = append(p.Times, g.StartTime+float64(ticks)/float64(g.Rate()))
+			p.Durations = append(p.Durations, float64(d)/float64(g.Rate()))
 		}
 		ticks += int64(d)
 		if n >= p.Offset+p.Count {

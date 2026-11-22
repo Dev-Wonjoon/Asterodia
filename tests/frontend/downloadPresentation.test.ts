@@ -24,6 +24,11 @@ const job: DownloadJobDto = {
 }
 
 describe('download presentation', () => {
+    it('identifies Pinterest links and Weverse without matching lookalike hosts', () => {
+        for (const url of ['https://pin.it/fixture','https://kr.pinterest.com/pin/123','https://www.pinterest.co.kr/pin/123']) expect(downloadPlatform(url)).toBe('Pinterest')
+        expect(downloadPlatform('https://weverse.io/artist/media/123')).toBe('Weverse')
+        expect(downloadPlatform('https://pinterest.com.evil.test/pin/123')).toBe('pinterest.com.evil.test')
+    })
     it('shows only active, non-history jobs in the gallery', () => {
         for (const state of ['pending', 'running'] as const) expect(isGalleryDownload({ ...job, state })).toBe(true)
         for (const state of ['failed', 'cancelled', 'interrupted', 'completed'] as const) expect(isGalleryDownload({ ...job, state })).toBe(false)

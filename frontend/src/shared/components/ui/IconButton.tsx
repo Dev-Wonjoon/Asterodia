@@ -1,4 +1,5 @@
 import { type ButtonHTMLAttributes, type ReactElement } from 'react'
+import { ActionContent } from './ActionButton'
 
 interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
     size?: 'sm' | 'md'
@@ -10,11 +11,12 @@ export const IconButton = ({
     active = false,
     className = '',
     children,
+    title,
     ...props
 }: IconButtonProps): ReactElement => {
     const sizes = {
-        sm: 'h-8 w-8',
-        md: 'h-9 w-9'
+        sm: 'min-h-8 min-w-8 px-2',
+        md: 'min-h-9 min-w-9 px-2'
     }
 
     const state = active
@@ -24,10 +26,11 @@ export const IconButton = ({
     return (
         <button
             type="button"
+            title={title}
             className={`motion-control inline-grid place-items-center rounded-lg border disabled:cursor-not-allowed disabled:opacity-50 ${sizes[size]} ${state} ${className}`}
             {...props}
         >
-            {children}
+            {title ? <ActionContent icon={children} label={title} /> : children}
         </button>
     )
 }

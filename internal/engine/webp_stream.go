@@ -40,7 +40,11 @@ func (e VideoEditor) gifWebP(ctx context.Context, req AnimationRequest, destinat
 	} else if q.Effort == "precise" {
 		level = 6
 	}
-	args := []string{"-c:v", "libwebp", "-quality", strconv.Itoa(q.Quality), "-lossless", lossless, "-compression_level", strconv.Itoa(level), "-pix_fmt", pixel, "-frames:v", strconv.Itoa(req.ExpectedFrames), "-f", "image2pipe", "pipe:1"}
+	args := []string{"-c:v", "libwebp"}
+	if q.WebPPreset != "" {
+		args = append(args, "-preset", q.WebPPreset)
+	}
+	args = append(args, "-quality", strconv.Itoa(q.Quality), "-lossless", lossless, "-compression_level", strconv.Itoa(level), "-pix_fmt", pixel, "-frames:v", strconv.Itoa(req.ExpectedFrames), "-f", "image2pipe", "pipe:1")
 	err := e.animationPass(ctx, req, filepath.Dir(destination), args, progress)
 	writer.CloseWithError(err)
 	return errors.Join(err, <-done)
@@ -86,7 +90,11 @@ func muxGIFWebP(ctx context.Context, input io.Reader, path string, req Animation
 		if index >= req.FrameCount || index >= len(req.Delays) {
 			return fmt.Errorf("WebP 출력 프레임 정보 오류")
 		}
-		delay := req.Delays[index] * 10
+		rate := req.DelayRate
+		if rate <= 0 {
+			rate = 100
+		}
+		delay := req.Delays[index] * 1000 / rate
 		index++
 		var riff [12]byte
 		if _, err = io.ReadFull(input, riff[:]); err != nil {

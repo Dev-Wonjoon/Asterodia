@@ -15,10 +15,12 @@ import (
 )
 
 type AnimationQuality struct {
-	Preset   string `json:"preset"`
-	Quality  int    `json:"quality"`
-	Effort   string `json:"effort"`
-	Lossless bool   `json:"lossless"`
+	Preset     string `json:"preset"`
+	Quality    int    `json:"quality"`
+	Effort     string `json:"effort"`
+	Lossless   bool   `json:"lossless"`
+	Dither     string `json:"dither,omitempty"`
+	WebPPreset string `json:"webpPreset,omitempty"`
 }
 type FrameRange struct {
 	First int `json:"first"`
@@ -37,6 +39,8 @@ type AnimationRequest struct {
 	FirstFrame      int
 	Output          io.Writer
 	NativeGIF       bool
+	NativeVideo     bool
+	DelayRate       int
 	Delays          []int
 	Duration        float64
 	PictureSequence bool
@@ -134,7 +138,7 @@ func (e VideoEditor) animationPass(ctx context.Context, req AnimationRequest, di
 	}
 	pixelFormat := "rgb24"
 	channels := int64(3)
-	if req.NativeGIF {
+	if req.NativeGIF || req.NativeVideo {
 		pixelFormat = "rgba"
 		channels = 4
 	}
@@ -151,7 +155,15 @@ func (e VideoEditor) animationPass(ctx context.Context, req AnimationRequest, di
 		filter = fmt.Sprintf("trim=start_frame=%d:end_frame=%d,setpts=N/(100*TB),crop=%d:%d:%d:%d:exact=1,setsar=1,format=rgba", req.FirstFrame, req.FrameCount, req.Crop.Width, req.Crop.Height, req.Crop.X, req.Crop.Y)
 		decode = []string{"-ignore_loop", "1", "-min_delay", "0", "-default_delay", "1", "-protocol_whitelist", "file,pipe", "-i", req.Source, "-an", "-vf", filter, "-fps_mode", "passthrough", "-frames:v", strconv.Itoa(req.FrameCount - req.FirstFrame), "-f", "rawvideo", "-pix_fmt", "rgba", "pipe:1"}
 	}
-	input := []string{"-f", "rawvideo", "-pixel_format", pixelFormat, "-video_size", fmt.Sprintf("%dx%d", req.Crop.Width, req.Crop.Height), "-framerate", strconv.Itoa(req.FPS), "-i", "pipe:0"}
+	if req.NativeVideo {
+		filter = fmt.Sprintf("trim=start_frame=%d:end_frame=%d,setpts=N/TB,crop=%d:%d:%d:%d:exact=1,setsar=1,format=rgba", req.FirstFrame, req.FrameCount, req.Crop.Width, req.Crop.Height, req.Crop.X, req.Crop.Y)
+		decode = []string{"-ss", number(req.Start), "-t", number(req.End - req.Start), "-protocol_whitelist", "file,pipe", "-i", req.Source, "-map", "0:V:0", "-an", "-sn", "-dn", "-vf", filter, "-fps_mode", "passthrough", "-frames:v", strconv.Itoa(req.FrameCount - req.FirstFrame), "-f", "rawvideo", "-pix_fmt", "rgba", "pipe:1"}
+	}
+	inputFPS := req.FPS
+	if req.NativeVideo {
+		inputFPS = 100
+	} // Exact delays are applied by the GIF/WebP container writer.
+	input := []string{"-f", "rawvideo", "-pixel_format", pixelFormat, "-video_size", fmt.Sprintf("%dx%d", req.Crop.Width, req.Crop.Height), "-framerate", strconv.Itoa(inputFPS), "-i", "pipe:0"}
 	var decodeErr error
 	var wait sync.WaitGroup
 	wait.Add(1)
@@ -164,7 +176,7 @@ func (e VideoEditor) animationPass(ctx context.Context, req AnimationRequest, di
 		writer.CloseWithError(decodeErr)
 	}()
 	duration := float64(req.ExpectedFrames) / float64(req.FPS)
-	if req.NativeGIF {
+	if req.NativeGIF || req.NativeVideo {
 		duration = req.Duration
 	}
 	err := e.streamRun(ctx, dir, append(input, encoderArgs...), reader, req.Output, duration, progress)
@@ -184,6 +196,25 @@ func (e VideoEditor) animationPass(ctx context.Context, req AnimationRequest, di
 }
 
 func NormalizeAnimationQuality(format string, q AnimationQuality) (AnimationQuality, error) {
+	if q.Dither == "auto" {
+		q.Dither = ""
+	}
+	if q.WebPPreset == "none" {
+		q.WebPPreset = ""
+	}
+	switch q.Dither {
+	case "", "sierra2_4a", "sierra3", "floyd_steinberg", "bayer", "atkinson", "none":
+	default:
+		return q, fmt.Errorf("GIF 디더링 방식을 확인하세요")
+	}
+	switch q.WebPPreset {
+	case "", "photo", "drawing", "icon", "text":
+	default:
+		return q, fmt.Errorf("WebP 최적화 유형을 확인하세요")
+	}
+	if format != "gif" && q.Dither != "" || format != "webp" && q.WebPPreset != "" {
+		return q, fmt.Errorf("출력 형식에 맞는 고급 설정을 선택하세요")
+	}
 	if q.Preset == "" {
 		q.Preset = "balanced"
 	}
@@ -200,6 +231,8 @@ func NormalizeAnimationQuality(format string, q AnimationQuality) (AnimationQual
 		q.Quality = 80
 	case "high":
 		q.Quality = 95
+	case "max":
+		q.Quality = 100
 	case "lossless":
 		q.Quality = 80
 		q.Lossless = true
@@ -209,6 +242,12 @@ func NormalizeAnimationQuality(format string, q AnimationQuality) (AnimationQual
 	}
 	if q.Quality < 1 || q.Quality > 100 || q.Lossless && format != "webp" {
 		return q, fmt.Errorf("화질 또는 무손실 옵션을 확인하세요")
+	}
+	if q.Lossless && q.WebPPreset != "" {
+		return q, fmt.Errorf("WebP 무손실에서는 최적화 유형을 기본으로 선택하세요")
+	}
+	if q.WebPPreset != "" {
+		q.Effort = "normal"
 	}
 	return q, nil
 }
@@ -222,15 +261,22 @@ func (e VideoEditor) Animation(ctx context.Context, req AnimationRequest, destin
 		return err
 	}
 	dir := filepath.Dir(destination)
+	if req.NativeVideo && req.Format == "gif" {
+		var err error
+		req, err = videoGIFTiming(ctx, req)
+		if err != nil {
+			return err
+		}
+	}
 	lastDelay := 0
-	if req.NativeGIF {
+	if req.NativeGIF || req.NativeVideo {
 		req.Duration, lastDelay, err = gifTiming(ctx, req)
 		if err != nil {
 			return err
 		}
 	}
 	if req.Format == "webp" {
-		if req.NativeGIF {
+		if req.NativeGIF || req.NativeVideo {
 			return e.gifWebP(ctx, req, destination, q, progress)
 		}
 		level := 4
@@ -250,7 +296,11 @@ func (e VideoEditor) Animation(ctx context.Context, req AnimationRequest, destin
 		if q.Lossless {
 			pixelFormat = "bgra"
 		}
-		args := []string{"-c:v", "libwebp_anim", "-lossless", lossless, "-quality", strconv.Itoa(q.Quality), "-compression_level", strconv.Itoa(level), "-pix_fmt", pixelFormat, "-loop", "0", "-threads", "2", destination}
+		args := []string{"-c:v", "libwebp_anim"}
+		if q.WebPPreset != "" {
+			args = append(args, "-preset", q.WebPPreset)
+		}
+		args = append(args, "-lossless", lossless, "-quality", strconv.Itoa(q.Quality), "-compression_level", strconv.Itoa(level), "-pix_fmt", pixelFormat, "-loop", "0", "-threads", "2", destination)
 		if err = e.animationPass(ctx, req, dir, args, progress); err != nil {
 			return err
 		}
@@ -282,8 +332,17 @@ func (e VideoEditor) Animation(ctx context.Context, req AnimationRequest, destin
 	} else if q.Effort == "precise" {
 		dither = "sierra3"
 	}
+	if q.Dither != "" {
+		dither = q.Dither
+	}
+	if dither == "none" {
+		dither = "0"
+	}
+	if q.Dither == "bayer" {
+		dither = "bayer:bayer_scale=3"
+	}
 	second := []string{"-i", palette, "-filter_complex", "[0:v][1:v]paletteuse=dither=" + dither, "-loop", "0", "-gifflags", "-offsetting", "-threads", "2", destination}
-	if req.NativeGIF {
+	if req.NativeGIF || req.NativeVideo {
 		second = []string{"-i", palette, "-filter_complex", "[0:v][1:v]paletteuse=dither=" + dither, "-fps_mode", "passthrough", "-enc_time_base", "1:100", "-frames:v", strconv.Itoa(req.ExpectedFrames), "-final_delay", strconv.Itoa(lastDelay), "-loop", "0", "-gifflags", "-offsetting", "-threads", "2", destination}
 	}
 	err = e.animationPass(ctx, req, dir, second, func(p int) {
@@ -294,7 +353,7 @@ func (e VideoEditor) Animation(ctx context.Context, req AnimationRequest, destin
 	if err != nil {
 		return err
 	}
-	if req.NativeGIF {
+	if req.NativeGIF || req.NativeVideo {
 		return fixGIFDelays(ctx, destination, req)
 	}
 	return nil

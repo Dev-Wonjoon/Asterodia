@@ -4,15 +4,17 @@ import { toMediaUrl } from '@renderer/shared/utils/media'
 export function MediaPreview({
     path,
     fallbackPath = null,
+    resolveUrl = toMediaUrl,
     title,
     className = ''
 }: {
     path: string | null
     fallbackPath?: string | null
+    resolveUrl?: typeof toMediaUrl
     title: string
     className?: string
 }) {
-    const candidates = [toMediaUrl(path), toMediaUrl(fallbackPath)]
+    const candidates = [resolveUrl(path), resolveUrl(fallbackPath)]
     const sourceKey = JSON.stringify(candidates)
     const [failure, setFailure] = useState<{ sourceKey: string; urls: string[] } | null>(null)
     const failedUrls = failure?.sourceKey === sourceKey ? failure.urls : []

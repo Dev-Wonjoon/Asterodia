@@ -87,6 +87,12 @@ func (d GalleryDLDiscovery) Targets(originalURL string) ([]MediaTarget, error) {
 		// A generic `id` can name a file rather than its post. Only explicit
 		// post fields define a post identity; otherwise the source link does.
 		postID := metadataText(data, "tweet_id", "post_id", "status_id", "submission_id", "post_shortcode", "shortcode", "uri")
+		if cat == "pinterest" {
+			postID = metadataText(data, "id", "post_id")
+			if !galleryDLNumericID.MatchString(postID) {
+				return nil, fmt.Errorf("Pinterest 핀 식별 정보가 없습니다")
+			}
+		}
 		if postID == "" {
 			postID = fmt.Sprintf("url-%x", sha256.Sum256([]byte(originalURL)))
 		}
@@ -113,7 +119,7 @@ func (d GalleryDLDiscovery) Targets(originalURL string) ([]MediaTarget, error) {
 			return nil, fmt.Errorf("추출 결과에 중복 파일 식별 정보가 있습니다")
 		}
 		seen[key] = true
-		title := metadataText(data, "title", "content", "caption", "description", "filename")
+		title := metadataText(data, "title", "grid_title", "content", "caption", "description", "filename")
 		if title == "" {
 			title = cat + " " + postID
 		}
@@ -121,13 +127,16 @@ func (d GalleryDLDiscovery) Targets(originalURL string) ([]MediaTarget, error) {
 		if len(owner) == 0 {
 			owner = decodeMetadata(data["user"])
 		}
+		if len(owner) == 0 {
+			owner = decodeMetadata(data["pinner"])
+		}
 		ownerID := metadataText(data, "owner_id", "user_id", "author_id", "username", "uploader_id")
 		if ownerID == "" {
 			ownerID = metadataText(owner, "id", "id_str", "user_id", "did", "screen_name", "handle")
 		}
 		ownerName := metadataText(data, "fullname", "uploader", "username", "author")
 		if ownerName == "" {
-			ownerName = metadataText(owner, "name", "nick", "display_name", "screen_name", "handle")
+			ownerName = metadataText(owner, "name", "full_name", "nick", "display_name", "screen_name", "handle", "username")
 		}
 		platform := strings.ToUpper(cat[:1]) + cat[1:]
 		targets = append(targets, MediaTarget{TargetKey: key, PostKey: post, SourceURL: originalURL, Kind: kind, Title: title, ExternalID: id, PlatformName: platform, OwnerID: ownerID, OwnerName: ownerName, FileIndex: i})

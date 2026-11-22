@@ -65,6 +65,9 @@ func (s *Service) work(ctx context.Context) {
 			if err != nil {
 				var message string
 				state, message = "failed", "미디어 처리에 실패했습니다. 원본 파일·엔진 설치·저장 공간을 확인하세요."
+				if errors.Is(err, errGIFFrameTiming) {
+					message = errGIFFrameTiming.Error()
+				}
 				if errors.Is(err, context.Canceled) {
 					state, message = "cancelled", ""
 				}

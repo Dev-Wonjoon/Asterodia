@@ -1,6 +1,7 @@
 import { downloadFailure } from '@contracts/download-api'
 import { useDownloadViewModel } from '../useDownloadViewModel'
-import { downloadPlatform, downloadStatus, visibleProgress } from '../downloadPresentation'
+import { downloadPlatform, downloadStatus } from '../downloadPresentation'
+import { DownloadProgress } from './DownloadProgress'
 import { DownloadJobActions } from './DownloadJobActions'
 import { DownloadThumbnail } from './DownloadThumbnail'
 import { DownloadLogPane } from './DownloadLogPane'
@@ -23,7 +24,6 @@ export function DownloadDetailPane(): React.JSX.Element | null {
             </div>
         )
     if (!job) return null
-    const progress = visibleProgress(job)
     const failure = job.errorCode ? downloadFailure(job.errorCode) : null
     return (
         <section className="space-y-5" aria-label="선택한 다운로드 작업">
@@ -38,8 +38,8 @@ export function DownloadDetailPane(): React.JSX.Element | null {
             <div className="rounded-xl border border-[var(--border-line)] p-4 space-y-2">
                 <p className="font-medium">
                     {downloadStatus(job)}
-                    {progress !== null ? ` · ${progress}%` : ''}
                 </p>
+                <DownloadProgress job={job} />
                 {vm.requestedIds.includes(job.id) && job.state === 'pending' && (
                     <p className="text-sm">실행 요청 대기</p>
                 )}

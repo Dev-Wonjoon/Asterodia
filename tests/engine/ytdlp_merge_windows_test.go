@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -211,14 +212,27 @@ func TestYtdlpDownloadMerge(t *testing.T) {
 			downloadCtx, stop := context.WithCancel(ctx)
 			defer stop()
 			var cancelledDuringSleep atomic.Bool
-			if tc.availability == "cancel" {
-				downloadCtx = engine.WithOutputObserver(downloadCtx, func(output engine.Output) {
-					if strings.Contains(output.Text, "Sleeping") {
-						cancelledDuringSleep.Store(true)
-						stop()
+			var finishedTransfers sync.Map
+			downloadCtx = engine.WithOutputObserver(downloadCtx, func(output engine.Output) {
+				if tc.availability == "cancel" && strings.Contains(output.Text, "Sleeping") {
+					cancelledDuringSleep.Store(true)
+					stop()
+				}
+				const prefix = "__STORAGEBUCKET_PROGRESS__:"
+				if strings.HasPrefix(output.Text, prefix) {
+					var frame struct {
+						Streams  int    `json:"streams"`
+						FormatID string `json:"formatId"`
+						Download struct {
+							Status string `json:"status"`
+							Bytes  int64  `json:"downloaded_bytes"`
+						} `json:"download"`
 					}
-				})
-			}
+					if json.Unmarshal([]byte(strings.TrimPrefix(output.Text, prefix)), &frame) == nil && frame.Download.Status == "finished" && frame.Download.Bytes > 0 {
+						finishedTransfers.Store(frame.FormatID, frame.Streams)
+					}
+				}
+			})
 			options := engine.Options{Quality: tc.quality}
 			if tc.audioOnly {
 				options.Type = "audio"
@@ -243,6 +257,20 @@ func TestYtdlpDownloadMerge(t *testing.T) {
 			}
 			if err != nil {
 				t.Fatalf("병합 실패: %v", err)
+			}
+			wantTransfers, transferCount := 2, 0
+			if tc.audioOnly {
+				wantTransfers = 1
+			}
+			finishedTransfers.Range(func(key, value any) bool {
+				transferCount++
+				if key == "" || value != wantTransfers {
+					t.Errorf("진행률 스트림 식별 불일치: %v / %v", key, value)
+				}
+				return true
+			})
+			if transferCount != wantTransfers {
+				t.Fatalf("영상·오디오 진행률 누락: %d / %d", transferCount, wantTransfers)
 			}
 			if earlyRequests.Load() != 0 {
 				t.Fatalf("다운로드 가능 시각 전 요청: %d회", earlyRequests.Load())

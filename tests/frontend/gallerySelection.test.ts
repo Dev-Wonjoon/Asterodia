@@ -1,11 +1,12 @@
 // @vitest-environment happy-dom
 import { act, createElement as h } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { cleanupReact, clickButton, mount } from './reactHarness'
+import { cleanupReact, clickButton, deferred, mount } from './reactHarness'
 import { GalleryPage } from '@renderer/features/gallery/GalleryPage'
 import { useInfiniteScroll } from '@renderer/shared/hooks/useInfiniteScroll'
-const mocks = vi.hoisted(() => ({ bulk: vi.fn(), unregister: vi.fn(), confirm: vi.fn(async () => true), refresh: vi.fn(), getSnapshot: vi.fn(), get: vi.fn(), create: vi.fn(), run: vi.fn(), directories: vi.fn(), on: vi.fn(), state: null as any }))
-const api = {fileMove:{get:mocks.get,create:mocks.create,run:mocks.run},media:{directories:mocks.directories},onMediaThumbnailUpdated:mocks.on}
+const mocks = vi.hoisted(() => ({ bulk: vi.fn(), unregister: vi.fn(), confirm: vi.fn(async () => true), refresh: vi.fn(), getSnapshot: vi.fn(), get: vi.fn(), create: vi.fn(), run: vi.fn(), directories: vi.fn(), on: vi.fn(), mediaGet: vi.fn(), mountEditor: vi.fn(), destroyEditor: vi.fn(), state: null as any }))
+const api = {fileMove:{get:mocks.get,create:mocks.create,run:mocks.run},media:{directories:mocks.directories,albums:vi.fn(),saveAlbum:vi.fn(),get:mocks.mediaGet},onMediaThumbnailUpdated:mocks.on}
+vi.mock('../../internal/webserver/web/editor.js',()=>({mountMediaEditor:mocks.mountEditor}))
 vi.mock('@renderer/shared/hooks/useConfirm',()=>({useConfirm:()=>({confirm:mocks.confirm,isOpen:false})}))
 vi.mock('@renderer/shared/api',()=>({getApi:()=>api}))
 const store = {refresh:mocks.refresh,getSnapshot:mocks.getSnapshot,unregisterMedia:mocks.unregister,bulk:mocks.bulk,closeDetail:vi.fn(),toggleAlbum:vi.fn(),loadMore:vi.fn(),openDetail:vi.fn()}
@@ -16,14 +17,127 @@ vi.mock('@renderer/shared/hooks/useInfiniteScroll',()=>({useInfiniteScroll:vi.fn
 vi.mock('@renderer/features/download/components/DownloadThumbnail',()=>({DownloadThumbnail:()=>h('div',null,'작업 썸네일')}))
 vi.mock('@renderer/features/download/components/DownloadDetailPane',()=>({DownloadDetailPane:()=>h('div',null,'선택한 다운로드 작업')}))
 vi.mock('@renderer/features/localimport/LocalImportPanel',()=>({LocalImportPanel:()=>null}))
+vi.mock('@renderer/features/gallery/MediaViewer',()=>({MediaViewer:({mediaId,fileId,onClose}:any)=>h('div',{role:'dialog','aria-label':`감상 ${mediaId} ${fileId ?? ''}`},h('button',{onClick:onClose},'감상 닫기'))}))
 afterEach(cleanupReact)
 function setup(){
+ mocks.mediaGet.mockReset();mocks.destroyEditor.mockReset()
+ mocks.mountEditor.mockReset().mockImplementation((host:HTMLElement,options:any)=>{
+  const dialog=document.createElement('dialog');dialog.open=true;dialog.setAttribute('aria-label','편집 테스트 창')
+  const close=document.createElement('button');close.textContent='테스트 편집기 닫기';close.onclick=options.onClose;dialog.append(close);host.append(dialog)
+  return {destroy:()=>{mocks.destroyEditor();dialog.remove()}}
+ })
+ api.media.albums.mockReset().mockResolvedValue({ok:true,data:{data:[{id:9,title:'여행',revision:3,fileCount:0,isUserAlbum:true}],hasNextPage:false}})
+ api.media.saveAlbum.mockReset().mockResolvedValue({ok:true,data:{id:9,revision:4}})
  downloads.activeJobs=[]; downloads.openDetail.mockClear(); downloads.closeDetail.mockClear(); downloads.cancelDownload.mockClear()
  mocks.confirm.mockReset().mockResolvedValue(true);mocks.unregister.mockReset().mockResolvedValue(true)
  mocks.bulk.mockReset().mockResolvedValue({succeeded:[1],failed:[{mediaId:2,message:'시험 오류'}]})
  mocks.state={busy:false,needsRefresh:false,detail:{mediaId:null},list:{status:'ready',page:{data:[1,2].map(id=>({id,title:'게시글 '+id,sourceKind:'download',revision:4,createdAt:1,isFavorite:false,fileCount:2})),total:2,hasNextPage:false}}}
  mocks.getSnapshot.mockImplementation(()=>mocks.state);mocks.on.mockReturnValue(()=>{});mocks.get.mockResolvedValue({ok:true,data:null});mocks.directories.mockResolvedValue({ok:true,data:{data:[{id:7,directoryPath:'C:/B'}],hasNextPage:false}});mocks.create.mockResolvedValue({ok:true,data:{jobId:'job'}});mocks.run.mockResolvedValue({ok:true,data:{jobId:'job'}})
 }
+function singleVideo(){
+ const file={id:11,mediaId:1,title:'선택한 동영상',fileKey:'video',filepath:'C:/fixture/video.mp4',duration:2.5,kind:'video',detectedFormat:'mp4'}
+ const media=mocks.state.list.page.data[0]
+ Object.assign(media,{fileCount:1,cover:{fileId:file.id,path:null,kind:'video'}})
+ const result={ok:true,data:{...media,files:{data:[file],total:1,hasNextPage:false}}}
+ mocks.mediaGet.mockResolvedValue(result)
+ return {file,result}
+}
+it('opens the renamed editor from the main menu and keeps it mounted after the menu closes',async()=>{
+ setup();await mount(h(GalleryPage))
+ expect(document.body.textContent).not.toContain('GIF, WebP로 만들기')
+ expect(document.body.textContent).not.toContain('미디어 편집 작업')
+ await clickButton('메뉴');await clickButton('GIF, WebP로 만들기')
+ expect(document.querySelector('[role=menu]')).toBeNull()
+ expect(document.querySelector('[aria-label="편집 테스트 창"]')).not.toBeNull()
+ expect(mocks.mountEditor).toHaveBeenCalledOnce()
+ expect(mocks.mountEditor.mock.lastCall![1].file).toBeUndefined()
+ expect(mocks.destroyEditor).not.toHaveBeenCalled()
+ await clickButton('테스트 편집기 닫기')
+ expect(mocks.destroyEditor).toHaveBeenCalledOnce()
+ expect(document.querySelector('[aria-label="편집 테스트 창"]')).toBeNull()
+})
+it('loads a single video from its card and opens a blank editor separately from the main menu',async()=>{
+ setup();const {file}=singleVideo();await mount(h(GalleryPage))
+ await clickButton('게시글 1 더보기');await clickButton('GIF, WebP로 만들기')
+ expect(mocks.mediaGet).toHaveBeenCalledExactlyOnceWith({mediaId:1,fileLimit:1,fileOffset:0})
+ expect(document.querySelector('[role=menu]')).toBeNull()
+ expect(document.querySelector('[aria-label="편집 테스트 창"]')).not.toBeNull()
+ expect(mocks.mountEditor.mock.lastCall![1].file).toEqual(expect.objectContaining({id:file.id,title:file.title,duration:file.duration,kind:'video',src:'/media?path='+encodeURIComponent(file.filepath)}))
+ expect(mocks.destroyEditor).not.toHaveBeenCalled()
+ await clickButton('테스트 편집기 닫기');await clickButton('메뉴');await clickButton('GIF, WebP로 만들기')
+ expect(mocks.mountEditor).toHaveBeenCalledTimes(2)
+ expect(mocks.mountEditor.mock.lastCall![1].file).toBeUndefined()
+})
+it('passes an expanded video directly to the editor without fetching the first file in its group',async()=>{
+ setup();const {file}=singleVideo()
+ Object.assign(mocks.state.list.page.data[0],{fileCount:20,galleryFileOffset:7,galleryFile:{...file,id:18,title:'여덟 번째 동영상'}})
+ await mount(h(GalleryPage));await clickButton('여덟 번째 동영상 더보기');await clickButton('GIF, WebP로 만들기')
+ expect(mocks.mediaGet).not.toHaveBeenCalled()
+ expect(mocks.mountEditor.mock.lastCall![1].file).toEqual(expect.objectContaining({id:18,title:'여덟 번째 동영상'}))
+ expect(document.querySelector('[aria-label="편집 테스트 창"]')).not.toBeNull()
+})
+it.each(['image','audio','group'])('does not offer a video conversion for a %s card',async kind=>{
+ setup();const {file}=singleVideo()
+ Object.assign(mocks.state.list.page.data[0],kind==='group'?{fileCount:2}:{galleryFile:{...file,kind}})
+ await mount(h(GalleryPage));await clickButton(kind==='group'?'게시글 1 더보기':file.title+' 더보기')
+ expect(document.querySelector('[role=menu]')?.textContent).not.toContain('GIF, WebP로 만들기')
+ expect(mocks.mountEditor).not.toHaveBeenCalled()
+})
+it('shows a video loading failure and allows another attempt',async()=>{
+ setup();singleVideo();mocks.mediaGet.mockResolvedValueOnce({ok:false,error:{message:'파일을 불러올 수 없습니다.'}})
+ await mount(h(GalleryPage));await clickButton('게시글 1 더보기');await clickButton('GIF, WebP로 만들기')
+ expect(document.querySelector('[role=alert]')?.textContent).toBe('파일을 불러올 수 없습니다.')
+ expect(mocks.mountEditor).not.toHaveBeenCalled()
+ await clickButton('게시글 1 더보기');await clickButton('GIF, WebP로 만들기')
+ expect(document.querySelector('[role=alert]')).toBeNull()
+ expect(mocks.mountEditor).toHaveBeenCalledOnce()
+})
+it.each(['revision','file'])('rejects a changed %s instead of editing a different video',async change=>{
+ setup();const {result}=singleVideo()
+ if(change==='revision')result.data.revision++
+ else result.data.files.data[0].id++
+ await mount(h(GalleryPage));await clickButton('게시글 1 더보기');await clickButton('GIF, WebP로 만들기')
+ expect(document.querySelector('[role=alert]')?.textContent).toContain('미디어가 변경되었습니다.')
+ expect(mocks.mountEditor).not.toHaveBeenCalled()
+})
+it.each(['changed','closed'])('ignores a pending video response after its target is %s',async change=>{
+ setup();const {result}=singleVideo(),pending=deferred<typeof result>()
+ mocks.mediaGet.mockReturnValueOnce(pending.promise)
+ const stop=await mount(h(GalleryPage));await clickButton('게시글 1 더보기');await clickButton('GIF, WebP로 만들기')
+ expect(document.querySelector('[role=status]')?.textContent).toBe('동영상 불러오는 중…')
+ await clickButton('메뉴')
+ expect([...document.querySelectorAll<HTMLButtonElement>('[role=menuitem]')].find(item=>item.textContent==='GIF, WebP로 만들기')?.disabled).toBe(true)
+ if(change==='closed')await stop()
+ else mocks.state.list.page.data[0]={...mocks.state.list.page.data[0],revision:5}
+ await act(async()=>pending.resolve(result))
+ expect(mocks.mountEditor).not.toHaveBeenCalled()
+ expect(document.body.textContent).not.toContain('동영상 불러오는 중…')
+})
+it('hides the completed gallery footer while preserving loading and retry feedback',async()=>{
+ setup();const stop=await mount(h(GalleryPage))
+ expect(document.body.textContent).not.toContain('개 항목')
+ expect(document.body.textContent).not.toContain('모든 항목을 불러왔습니다.')
+ expect([...document.querySelectorAll('button')].some(item=>item.textContent==='더 불러오기')).toBe(false)
+ await stop();mocks.state.list.loadingMore=true;mocks.state.list.page.hasNextPage=true
+ const stopLoading=await mount(h(GalleryPage))
+ expect(document.querySelector('[role=status]')?.textContent).toBe('불러오는 중…')
+ expect([...document.querySelectorAll('button')].find(item=>item.textContent==='더 불러오기')?.disabled).toBe(true)
+ await stopLoading();mocks.state.list.loadingMore=false;mocks.state.list.moreError={message:'추가 목록 오류'};store.loadMore.mockClear()
+ await mount(h(GalleryPage))
+ expect(document.querySelector('[role=alert]')?.textContent).toBe('추가 목록 오류')
+ await clickButton('다시 시도');expect(store.loadMore).toHaveBeenCalledOnce()
+ expect(vi.mocked(useInfiniteScroll).mock.lastCall![0].enabled).toBe(false)
+})
+it.each([1, 3])('adds a download with %i files from its card without opening details', async count => {
+ setup();mocks.state.list.page.data[0].fileCount=count;store.openDetail.mockClear()
+ await mount(h(GalleryPage))
+ await clickButton(`게시글 1 ${count === 1 ? '앨범에 추가' : '전체 추가'}`)
+ const select=document.querySelector<HTMLSelectElement>('select[aria-label="추가할 앨범"]')!
+ await act(async()=>{select.value='9';select.dispatchEvent(new Event('change',{bubbles:true}))})
+ await clickButton('선택한 앨범에 추가')
+ expect(api.media.saveAlbum).toHaveBeenCalledExactlyOnceWith({albumId:9,expectedRevision:3,addFileIds:[],addMediaIds:[1]})
+ expect(store.openDetail).not.toHaveBeenCalled()
+})
 it('shows active downloads before registered media and connects cancellation and detail', async () => {
  setup(); downloads.activeJobs=[{id:'queued',title:'새 영상',url:'https://example.invalid/a',state:'pending',phase:null,progress:0,cleanupRequired:false}]
  await mount(h(GalleryPage))
@@ -42,8 +156,8 @@ it('connects gallery checkboxes to one multi-post move request',async()=>{
  await mount(h(GalleryPage))
  expect(document.querySelectorAll('input[type=checkbox]')).toHaveLength(2)
  const checks=[...document.querySelectorAll<HTMLInputElement>('input[type=checkbox]')];expect(checks).toHaveLength(2)
- await act(async()=>{checks[0].click();checks[1].click()});expect(document.querySelector('[aria-label="전체 2 / 선택 2"]')?.textContent).toBe('2 / 2')
- await clickButton('선택 작업');await clickButton('한 폴더에 모으기');const select=document.querySelector('select[aria-label="이동할 폴더"]')!;await act(async()=>{select.value='7';select.dispatchEvent(new Event('change',{bubbles:true}))});await clickButton('복사 시작')
+ await act(async()=>{checks[0].click();checks[1].click()});expect(document.querySelector('[aria-label="전체 2 / 선택 2"]')?.textContent).toBe('2개 선택')
+ await clickButton('한 폴더에 모으기');const select=document.querySelector('select[aria-label="이동할 폴더"]')!;await act(async()=>{select.value='7';select.dispatchEvent(new Event('change',{bubbles:true}))});await clickButton('복사 시작')
  expect(mocks.create).toHaveBeenCalledWith({selection:[{mediaId:1,revision:4},{mediaId:2,revision:4}],directoryId:7,operation:'copy'});expect(document.querySelector('header [role=status]')).toBeNull()
 })
 
@@ -51,7 +165,7 @@ it('selects the loaded list, keeps failures selected and clears selection',async
  setup();await mount(h(GalleryPage));await clickButton('메뉴');await clickButton('현재 목록 전체 선택')
  await clickButton('선택 작업');expect(document.body.textContent).not.toContain('제목 편집');await clickButton('즐겨찾기 추가')
  expect(mocks.bulk).toHaveBeenCalledWith([{mediaId:1,revision:4},{mediaId:2,revision:4}],{kind:'favorite',value:true},expect.any(Function))
- expect(document.body.textContent).toContain('성공 1개 · 실패 1개');expect(document.querySelector('[aria-label="전체 2 / 선택 1"]')?.textContent).toBe('2 / 1')
+ expect(document.body.textContent).toContain('성공 1개 · 실패 1개');expect(document.querySelector('[aria-label="전체 2 / 선택 1"]')?.textContent).toBe('1개 선택')
  expect([...document.querySelectorAll<HTMLInputElement>('input[type=checkbox]')].map(item=>item.checked)).toEqual([false,true])
  await clickButton('메뉴');await clickButton('선택 해제');expect([...document.querySelectorAll('button')].find(item=>item.textContent==='선택 작업')).toBeUndefined()
  expect(document.querySelectorAll('input[type=checkbox]')).toHaveLength(2)
@@ -67,7 +181,7 @@ it('adds and removes named tags through one dialog without a title bulk action',
 
 it('supports menu keyboard navigation and escape',async()=>{
  setup();await mount(h(GalleryPage));await clickButton('메뉴')
- expect(document.activeElement?.textContent).toBe('폴더 가져오기')
+ expect(document.activeElement?.textContent).toBe('GIF, WebP로 만들기')
  await act(async()=>document.activeElement?.dispatchEvent(new KeyboardEvent('keydown',{key:'End',bubbles:true})))
  expect(document.activeElement?.textContent).toBe('현재 목록 전체 선택')
  await act(async()=>document.activeElement?.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true})))
@@ -80,21 +194,22 @@ it('keeps refresh available after a list error while blocking selection',async()
  await clickButton('메뉴');expect([...document.querySelectorAll('button')].find(item=>item.textContent==='현재 목록 전체 선택')?.disabled).toBe(true)
 })
 
-it('shows selection actions and counts on the left only while items are selected',async()=>{
+it('shows a unified selection bar while keeping the main toolbar stable',async()=>{
  setup();await mount(h(GalleryPage))
  const header=document.querySelector('header')!
  const initialControls=[...header.querySelectorAll('button')].map(item=>item.textContent)
- expect(initialControls).toEqual(['미디어 편집 작업','새로고침','메뉴'])
+ expect(initialControls).toEqual(['새로고침','메뉴'])
  expect(header.querySelector('[role=status]')).toBeNull();expect(header.querySelector('.invisible')).toBeNull()
  expect(header.textContent).not.toContain('묶음');expect(header.textContent).not.toContain('게시글')
  await act(async()=>document.querySelector<HTMLInputElement>('input[type=checkbox]')!.click())
- expect(header.querySelector('[role=status]')?.textContent).toBe('2 / 1')
+ const bar=document.querySelector('[aria-label="선택 항목 작업"]')!
+ expect(bar.querySelector('[role=status]')?.textContent).toBe('1개 선택')
  expect([...document.querySelectorAll('button')].some(item=>item.getAttribute('aria-label')==='게시글 1 더보기')).toBe(true)
- expect([...header.querySelectorAll('button')].map(item=>item.textContent)).toEqual(['미디어 편집 작업','선택 작업','새로고침','메뉴'])
- expect(header.textContent!.indexOf('선택 작업')).toBeLessThan(header.textContent!.indexOf('2 / 1'))
- expect(header.textContent!.indexOf('2 / 1')).toBeLessThan(header.textContent!.indexOf('새로고침'))
+ expect([...header.querySelectorAll('button')].map(item=>item.textContent)).toEqual(initialControls)
+ expect([...bar.querySelectorAll('button')].map(item=>item.textContent)).toEqual(['앨범에 추가','한 폴더에 모으기','선택 작업','선택 해제'])
  await clickButton('메뉴');await clickButton('선택 해제')
  expect(header.querySelector('[role=status]')).toBeNull()
+ expect(document.querySelector('[aria-label="선택 항목 작업"]')).toBeNull()
  expect([...header.querySelectorAll('button')].map(item=>item.textContent)).toEqual(initialControls)
 })
 
@@ -125,11 +240,56 @@ it('opens an expanded file at its own offset and retains infinite scrolling with
  expect(document.querySelectorAll('article')).toHaveLength(1)
  expect(document.querySelector('input[type=checkbox]')?.getAttribute('aria-label')).toContain('앨범 추가 선택')
  await clickButton('선택 영상 상세보기');expect(store.openDetail).toHaveBeenCalledExactlyOnceWith(1,51)
- await clickButton('앨범 앨범 닫기');expect(store.toggleAlbum).toHaveBeenCalledExactlyOnceWith(1)
+ await clickButton('앨범 파일 접기');expect(store.toggleAlbum).toHaveBeenCalledExactlyOnceWith(1)
  await clickButton('더 불러오기');expect(store.loadMore).toHaveBeenCalledOnce()
  const options=vi.mocked(useInfiniteScroll).mock.lastCall![0]
  expect(options.enabled).toBe(true)
  await options.onLoadMore();expect(store.loadMore).toHaveBeenCalledTimes(2)
  expect(document.querySelector('[aria-label="갤러리 페이지"]')).toBeNull()
- expect(document.body.textContent).toContain('1 / 101개 항목')
+ expect(document.body.textContent).not.toContain('개 항목')
+})
+
+it('opens playback from the thumbnail and details from the title or named menu',async()=>{
+ setup();store.openDetail.mockClear();await mount(h(GalleryPage))
+ await clickButton('게시글 1 감상하기')
+ expect(document.querySelector('[aria-label="감상 1 "]')).not.toBeNull()
+ expect(store.openDetail).not.toHaveBeenCalled()
+ await clickButton('감상 닫기');await clickButton('게시글 1 상세보기')
+ expect(store.openDetail).toHaveBeenCalledExactlyOnceWith(1,undefined)
+ store.openDetail.mockClear();await clickButton('게시글 2 더보기')
+ expect([...document.querySelectorAll('[role=menuitem]')].map(item=>item.textContent)).toEqual(expect.arrayContaining(['감상하기','상세 정보','앨범에 추가','파일 펼치기','즐겨찾기 추가','파일 위치 열기','제목 편집','태그 편집']))
+ await clickButton('상세 정보');expect(store.openDetail).toHaveBeenCalledExactlyOnceWith(2,undefined)
+})
+
+it('distinguishes album controls from download file controls and keeps album editing in the menu',async()=>{
+ setup();mocks.state.list.page.data[0].isUserAlbum=true;await mount(h(GalleryPage))
+ expect(document.querySelector('[aria-label="게시글 1 앨범 펼치기"]')).not.toBeNull()
+ expect(document.querySelector('[aria-label="게시글 2 파일 펼치기"]')).not.toBeNull()
+ expect(document.body.textContent).toContain('사용자 앨범');expect(document.body.textContent).toContain('다운로드 묶음')
+ expect([...document.querySelectorAll('button')].some(button=>button.getAttribute('aria-label')==='앨범 편집')).toBe(false)
+ await clickButton('게시글 1 더보기');expect([...document.querySelectorAll('[role=menuitem]')].map(item=>item.textContent)).toContain('앨범 편집')
+})
+
+it('adds a mixed selection of groups and expanded files through the same selection bar',async()=>{
+ setup();mocks.state.list.page.data[1]={...mocks.state.list.page.data[1],galleryFileOffset:0,galleryFile:{id:22,title:'개별 영상',kind:'video'}}
+ await mount(h(GalleryPage));const checks=[...document.querySelectorAll<HTMLInputElement>('input[type=checkbox]')]
+ await act(async()=>{checks[0].click();checks[1].click()})
+ const bar=document.querySelector('[aria-label="선택 항목 작업"]')!
+ expect(bar.textContent).toContain('2개 선택');expect(bar.textContent).toContain('묶음 1개 · 개별 파일 1개')
+ await act(async()=>bar.querySelector<HTMLButtonElement>('button')!.click())
+ const select=document.querySelector<HTMLSelectElement>('[aria-label="추가할 앨범"]')!
+ await act(async()=>{select.value='9';select.dispatchEvent(new Event('change',{bubbles:true}))});await clickButton('선택한 앨범에 추가')
+ expect(api.media.saveAlbum).toHaveBeenCalledExactlyOnceWith({albumId:9,expectedRevision:3,addFileIds:[22],addMediaIds:[1]})
+ expect(document.querySelector('[aria-label="선택 항목 작업"]')).toBeNull()
+ expect(checks.every(check=>!check.checked)).toBe(true)
+})
+
+it('moves a mixed selection with per-file scope and clears every kind of selection together',async()=>{
+ setup();mocks.state.list.page.data[1]={...mocks.state.list.page.data[1],galleryFileOffset:0,galleryFile:{id:22,title:'개별 영상',kind:'video'}}
+ await mount(h(GalleryPage));const checks=[...document.querySelectorAll<HTMLInputElement>('input[type=checkbox]')]
+ await act(async()=>{checks[0].click();checks[1].click()});await clickButton('한 폴더에 모으기')
+ const select=document.querySelector<HTMLSelectElement>('[aria-label="이동할 폴더"]')!
+ await act(async()=>{select.value='7';select.dispatchEvent(new Event('change',{bubbles:true}))});await clickButton('복사 시작')
+ expect(mocks.create).toHaveBeenCalledWith({selection:[{mediaId:1,revision:4},{mediaId:2,revision:4,fileIds:[22]}],directoryId:7,operation:'copy'})
+ expect(document.querySelector('[aria-label="선택 항목 작업"]')).toBeNull()
 })

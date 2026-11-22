@@ -13,6 +13,8 @@ import (
 
 // GIFTimeline reads container timing without allocating decoded source frames.
 type GIFTimeline struct {
+	StartTime    float64 `json:"startTime,omitempty"`
+	TickRate     int     `json:"tickRate,omitempty"`
 	Width        int     `json:"width"`
 	Height       int     `json:"height"`
 	DelayOffsets []int64 `json:"-"`
@@ -134,7 +136,14 @@ func (g GIFTimeline) Duration() float64 {
 	for _, d := range g.Delays {
 		ticks += int64(d)
 	}
-	return float64(ticks) / 100
+	return float64(ticks) / float64(g.Rate())
+}
+
+func (g GIFTimeline) Rate() int {
+	if g.TickRate > 0 {
+		return g.TickRate
+	}
+	return 100
 }
 
 func (e VideoEditor) GIFFramePage(ctx context.Context, source, dir string, count, offset, limit int) error {
@@ -176,7 +185,11 @@ func gifTiming(ctx context.Context, req AnimationRequest) (float64, int, error) 
 		if drop {
 			continue
 		}
-		if index >= len(req.Delays) || req.Delays[index] < 1 || req.Delays[index] > 65535 {
+		maximum := 65535
+		if req.NativeVideo && req.Format == "webp" {
+			maximum = 0xffffff
+		}
+		if index >= len(req.Delays) || req.Delays[index] < 1 || req.Delays[index] > maximum {
 			return 0, 0, fmt.Errorf("GIF 재생 시간 정보 오류")
 		}
 		last = req.Delays[index]
@@ -186,7 +199,47 @@ func gifTiming(ctx context.Context, req AnimationRequest) (float64, int, error) 
 	if n != req.ExpectedFrames {
 		return 0, 0, fmt.Errorf("GIF 출력 프레임 수가 다릅니다")
 	}
-	return float64(ticks) / 100, last, nil
+	rate := req.DelayRate
+	if rate <= 0 {
+		rate = 100
+	}
+	return float64(ticks) / float64(rate), last, nil
+}
+
+// GIF stores centiseconds; quantize the retained timeline cumulatively so
+// fractional frame rates do not accumulate a rounding error per frame.
+func videoGIFTiming(ctx context.Context, req AnimationRequest) (AnimationRequest, error) {
+	req.Delays = append([]int(nil), req.Delays...)
+	skip := func(int) (bool, error) { return false, nil }
+	if req.NewSkip != nil {
+		skip = req.NewSkip()
+	}
+	var millis, written int64
+	for n := req.FirstFrame; n < req.FrameCount; n++ {
+		if err := ctx.Err(); err != nil {
+			return req, err
+		}
+		drop, err := skip(n)
+		if err != nil {
+			return req, err
+		}
+		if drop {
+			continue
+		}
+		if n >= len(req.Delays) || req.Delays[n] < 10 {
+			return req, fmt.Errorf("GIF는 10ms보다 짧은 프레임 간격을 유지할 수 없습니다. WebP로 저장하세요")
+		}
+		millis += int64(req.Delays[n])
+		next := (millis + 5) / 10
+		delay := next - written
+		if delay < 1 || delay > 65535 {
+			return req, fmt.Errorf("GIF 프레임 재생 시간 표현 범위를 초과했습니다. WebP로 저장하세요")
+		}
+		req.Delays[n] = int(delay)
+		written = next
+	}
+	req.DelayRate = 100
+	return req, nil
 }
 
 func fixGIFDelays(ctx context.Context, path string, req AnimationRequest) error {

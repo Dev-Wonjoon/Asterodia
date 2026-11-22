@@ -1,10 +1,10 @@
 import { DOWNLOAD_PAGE_SIZE } from '../downloadStore'
 import { useDownloadViewModel } from '../useDownloadViewModel'
-import { canDeleteDownload, downloadPlatform, downloadStatus, visibleProgress } from '../downloadPresentation'
+import { canDeleteDownload, downloadPlatform, downloadStatus } from '../downloadPresentation'
 import { X } from 'lucide-react'
 import { DownloadJobActions } from './DownloadJobActions'
 import { DownloadThumbnail } from './DownloadThumbnail'
-import { ProgressBar } from '@renderer/shared/components/ui/ProgressBar'
+import { DownloadProgress } from './DownloadProgress'
 
 export function DownloadQueue(): React.JSX.Element {
     const vm = useDownloadViewModel()
@@ -23,7 +23,6 @@ export function DownloadQueue(): React.JSX.Element {
             <ul className="space-y-3">
                 {vm.queue.map((job) => {
                     const selected = vm.detail.jobId === job.id
-                    const progress = visibleProgress(job)
                     return (
                         <li
                             key={job.id}
@@ -49,16 +48,13 @@ export function DownloadQueue(): React.JSX.Element {
                                 </p>
                                 <p className="text-sm">
                                     {downloadStatus(job)}
-                                    {progress !== null ? ` · ${progress}%` : ''}
                                     {vm.requestedIds.includes(job.id) && job.state === 'pending'
                                         ? ' · 실행 요청 대기'
                                         : ''}
                                     {job.cleanupRequired ? ' · 정리 필요' : ''}
                                     {job.options === null ? ' · 이전 옵션 확인 필요' : ''}
                                 </p>
-                                {job.state === 'running' && job.phase !== 'finished' && (
-                                    <ProgressBar label="다운로드 진행률" value={progress ?? undefined} />
-                                )}
+                                <DownloadProgress job={job} />
                                 <div className="flex flex-wrap gap-2">
                                     <button
                                         type="button"

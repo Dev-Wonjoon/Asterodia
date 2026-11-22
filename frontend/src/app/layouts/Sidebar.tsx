@@ -1,9 +1,10 @@
 import type { AppMenu } from '../navigation'
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { SidebarItem } from '@renderer/app/layouts/SidebarItem'
 import { useTheme } from '@renderer/shared/hooks/useTheme'
 import appIcon from '@renderer/assets/icon.ico?url'
-import { Download, Moon, PanelLeftClose, PanelLeftOpen, Settings, Sun } from 'lucide-react'
+import { Download, Moon, PanelLeftClose, PanelLeftOpen, Settings, Sun, TextCursorInput, Grid2X2 } from 'lucide-react'
+import { useActionDisplay } from '@renderer/shared/hooks/useActionDisplay'
 import { useDownloadViewModel } from '@renderer/features/download/useDownloadViewModel'
 
 const SIDEBAR_MENUS: Array<{ id: AppMenu; label: string; icon: ReactNode }> = [
@@ -88,6 +89,13 @@ export const Sidebar = ({
     onToggle
 }: SidebarProps): React.JSX.Element => {
     const { theme, toggleTheme } = useTheme()
+    const { mode, toggle: toggleActionDisplay } = useActionDisplay()
+    const [modeNotice, setModeNotice] = useState('')
+    useEffect(() => {
+        if (!modeNotice) return
+        const timer = setTimeout(() => setModeNotice(''), 1800)
+        return () => clearTimeout(timer)
+    }, [modeNotice])
     const { requestedIds } = useDownloadViewModel()
     const themeLabel = theme === 'dark' ? '라이트모드 전환' : '다크모드 전환'
     const toggleLabel = collapsed ? '사이드바 펼치기' : '사이드바 접기'
@@ -170,19 +178,32 @@ export const Sidebar = ({
                     />
                 </div>
 
-                <button
-                    type="button"
-                    onClick={toggleTheme}
-                    aria-label={themeLabel}
-                    title={themeLabel}
-                    className="size-11 shrink-0 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)]"
-                >
-                    {theme === 'dark' ? (
-                        <Sun className="size-5" aria-hidden="true" />
-                    ) : (
-                        <Moon className="size-5" aria-hidden="true" />
-                    )}
-                </button>
+                <div className={'relative flex shrink-0 items-center ' + (collapsed ? 'gap-0' : 'gap-1')}>
+                    {modeNotice && <p role="status" className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 w-64 max-w-[80vw] rounded-lg border border-[var(--border-line)] bg-[var(--bg-sidebar)] px-3 py-2 text-xs shadow-lg">{modeNotice}</p>}
+                    <button
+                        type="button"
+                        onClick={toggleTheme}
+                        aria-label={themeLabel}
+                        title={themeLabel}
+                        className={(collapsed ? 'size-7' : 'size-9') + ' shrink-0 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)]'}
+                    >
+                        {theme === 'dark' ? (
+                            <Sun className="size-5" aria-hidden="true" />
+                        ) : (
+                            <Moon className="size-5" aria-hidden="true" />
+                        )}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => { setModeNotice(mode === 'icons' ? '설명 모드 · 버튼에 마우스를 올리거나 포커스하면 기능명이 표시됩니다.' : '아이콘 모드'); toggleActionDisplay() }}
+                        aria-label="기능 버튼 설명 모드"
+                        aria-pressed={mode === 'details'}
+                        title={mode === 'icons' ? '아이콘 모드 · 설명 모드로 전환' : '설명 모드 · 아이콘 모드로 전환'}
+                        className={(collapsed ? 'size-7' : 'size-9') + ' shrink-0 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)]'}
+                    >
+                        {mode === 'icons' ? <TextCursorInput className="size-5" aria-hidden="true" /> : <Grid2X2 className="size-5" aria-hidden="true" />}
+                    </button>
+                </div>
             </div>
         </aside>
     )

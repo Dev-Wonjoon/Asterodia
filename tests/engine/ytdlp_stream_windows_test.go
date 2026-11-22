@@ -129,6 +129,22 @@ func TestYtdlpDownloadStreams(t *testing.T) {
 					cancelDownload = cancel
 					blocking.Store(mode == "cancel")
 					before := segments.Load()
+					var progressFrames atomic.Int32
+					ctx = engine.WithOutputObserver(ctx, func(output engine.Output) {
+						const prefix = "__STORAGEBUCKET_PROGRESS__:"
+						if !strings.HasPrefix(output.Text, prefix) {
+							return
+						}
+						var frame struct {
+							Streams  int `json:"streams"`
+							Download struct {
+								Bytes int64 `json:"downloaded_bytes"`
+							} `json:"download"`
+						}
+						if json.Unmarshal([]byte(strings.TrimPrefix(output.Text, prefix)), &frame) == nil && frame.Streams > 0 && frame.Download.Bytes > 0 {
+							progressFrames.Add(1)
+						}
+					})
 					path, err := y.DownloadSingle(ctx, targets[0], stage, options)
 					if mode == "missing" || mode == "cancel" {
 						if err == nil || path != "" {
@@ -147,6 +163,9 @@ func TestYtdlpDownloadStreams(t *testing.T) {
 					}
 					if segments.Load() <= before {
 						t.Fatal("세그먼트 요청 누락")
+					}
+					if progressFrames.Load() == 0 {
+						t.Fatal("실제 HLS·DASH 다운로드 진행 수치 누락")
 					}
 					probe, err := runner.Run(t.Context(), engine.ProcessRequest{Executable: probePath, Directory: stage, Timeout: 15 * time.Second, Arguments: []string{"-v", "error", "-show_entries", "stream=codec_type:format=duration,format_name", "-of", "json", path}})
 					if err != nil {

@@ -35,6 +35,7 @@ type Service struct {
 	closed         bool
 	wg             sync.WaitGroup
 	logWarnings    sync.Map
+	transfers      sync.Map
 }
 
 //wails:ignore
@@ -58,6 +59,7 @@ func (s *Service) ConfigurePreviewLookup(lookup func(context.Context, string) (*
 }
 
 func (s *Service) attachPreview(ctx context.Context, job *Job) {
+	s.attachTransfer(job)
 	if s.previewLookup != nil {
 		job.ThumbnailPath, _ = s.previewLookup(ctx, job.URL)
 	}
@@ -68,19 +70,20 @@ func NewService(db *sql.DB, path func() string, factory func(string, engine.Opti
 }
 
 type Job struct {
-	HistoryOnly      bool            `json:"historyOnly"`
-	ID               string          `json:"id"`
-	URL              string          `json:"url"`
-	ThumbnailPath    *string         `json:"thumbnailPath"`
-	Title            *string         `json:"title"`
-	State            string          `json:"state"`
-	Phase            *string         `json:"phase"`
-	Progress         int             `json:"progress"`
-	Options          *engine.Options `json:"options"`
-	CleanupRequired  bool            `json:"cleanupRequired"`
-	CurrentAttemptID *string         `json:"currentAttemptId"`
-	ErrorCode        *string         `json:"errorCode"`
-	ErrorMessage     *string         `json:"errorMessage"`
+	HistoryOnly      bool              `json:"historyOnly"`
+	ID               string            `json:"id"`
+	URL              string            `json:"url"`
+	ThumbnailPath    *string           `json:"thumbnailPath"`
+	Title            *string           `json:"title"`
+	State            string            `json:"state"`
+	Phase            *string           `json:"phase"`
+	Progress         int               `json:"progress"`
+	Transfer         *TransferProgress `json:"transfer,omitempty"`
+	Options          *engine.Options   `json:"options"`
+	CleanupRequired  bool              `json:"cleanupRequired"`
+	CurrentAttemptID *string           `json:"currentAttemptId"`
+	ErrorCode        *string           `json:"errorCode"`
+	ErrorMessage     *string           `json:"errorMessage"`
 }
 type JobRequest struct {
 	JobID string `json:"jobId"`
@@ -316,8 +319,16 @@ func (s *Service) Run(ctx context.Context, req RunRequest) api.Result {
 	defer func() { cancel(); s.mu.Lock(); delete(s.active, req.JobID); s.mu.Unlock(); s.wg.Done() }()
 	journal := newLogRecorder(NewStore(s.db), req.JobID, attempt, func(e error) { s.logWarning(req.JobID, e) })
 	defer journal.close()
+	transfer := &transferTracker{attempt: attempt}
+	s.transfers.Store(req.JobID, transfer)
+	defer s.transfers.Delete(req.JobID)
+	workCtx = context.WithValue(workCtx, transferKey{}, transfer)
 	journal.note("실행 시도 시작 · 엔진 실행 순서를 기다립니다")
-	workCtx = engine.WithOutputObserver(workCtx, journal.write)
+	workCtx = engine.WithOutputObserver(workCtx, func(output engine.Output) {
+		if !transfer.output(output) {
+			journal.write(output)
+		}
+	})
 	select {
 	case s.runSlot <- struct{}{}:
 		defer func() { <-s.runSlot }()

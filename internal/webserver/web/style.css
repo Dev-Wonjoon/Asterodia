@@ -3,3 +3,9 @@
 .album-card{min-width:0;display:flex;flex-direction:column;gap:6px}.album-card>.card{width:100%;flex:1}.album-toggle{width:100%;min-height:40px;font-size:13px}
 
 #gallery-sentinel{width:1px;height:1px;flex-shrink:0}
+
+:root{--button-hover-brightness:.96}
+button{transition:filter 120ms ease}
+@media(prefers-color-scheme:dark){:root{--button-hover-brightness:1.12}}
+@media(hover:hover){button:enabled:not([aria-disabled="true"]):hover{filter:brightness(var(--button-hover-brightness))}}
+@media(prefers-reduced-motion:reduce){button{transition:none}}

@@ -35,6 +35,7 @@ type AttemptDiscovery struct {
 	attemptID     string
 	YtdlpTargets  []engine.YtdlpTarget
 	GalleryResult engine.GalleryDLDiscovery
+	galleryVideos map[int]engine.YtdlpTarget
 }
 
 func (r Runner) DiscoverAttempt(
@@ -86,6 +87,12 @@ func (r Runner) DiscoverAttempt(
 				break
 			}
 			result.GalleryResult, err = r.GalleryDL.Discover(ctx, originalURL, stageDir)
+			if err == nil {
+				result.galleryVideos, err = r.resolvePinterestVideos(ctx, result.GalleryResult, originalURL, stageDir, options)
+				if err != nil {
+					return result, err
+				}
+			}
 		}
 		if err == nil {
 			return result, nil
@@ -187,6 +194,11 @@ func (a AttemptDiscovery) targetInputs() ([]TargetInput, error) {
 		if err != nil {
 			return nil, fmt.Errorf("%w: %v", ErrUnsupportedTargetDiscovery, err)
 		}
+		for _, target := range a.galleryVideos {
+			if err := target.ValidateDirectDownload(a.Options); err != nil {
+				return nil, err
+			}
+		}
 
 		targets := make([]TargetInput, 0, len(media))
 		for _, item := range media {
@@ -226,6 +238,7 @@ func (r Runner) StageAttempt(ctx context.Context, attempt AttemptDiscovery) ([]S
 			if err != nil {
 				return nil, fmt.Errorf("yt-dlp %d번째 대상: %w", i+1, err)
 			}
+			transferFrom(ctx).beginFile(i+1, len(attempt.YtdlpTargets))
 			path, err := r.Ytdlp.DownloadSingle(ctx, target, itemDir, attempt.Options)
 			if err != nil {
 				return nil, fmt.Errorf("yt-dlp 대상 %s 저장 실패: %w", target.TargetKey, err)
@@ -238,7 +251,13 @@ func (r Runner) StageAttempt(ctx context.Context, attempt AttemptDiscovery) ([]S
 		if r.GalleryDL == nil {
 			return nil, fmt.Errorf("gallery-dl 엔진이 연결되지 않았습니다")
 		}
-		paths, err = r.GalleryDL.Download(ctx, attempt.OriginalURL, attempt.GalleryResult, attempt.stageDir)
+		stopProgress := watchGalleryTransfer(ctx, attempt.stageDir, len(attempt.GalleryResult.Files))
+		defer stopProgress()
+		if len(attempt.galleryVideos) > 0 {
+			paths, err = r.stagePinterest(ctx, attempt)
+		} else {
+			paths, err = r.GalleryDL.Download(ctx, attempt.OriginalURL, attempt.GalleryResult, attempt.stageDir)
+		}
 		if err != nil {
 			return nil, err
 		}

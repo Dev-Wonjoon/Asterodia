@@ -333,8 +333,9 @@ func ParseGalleryDLDiscovery(raw []byte) (GalleryDLDiscovery, error) {
 				return GalleryDLDiscovery{}, fmt.Errorf("gallery-dl %d번째 파일 URL 해석 실패: %w", i+1, err)
 			}
 			mediaURL, err := url.Parse(address)
-			if err != nil || mediaURL.Hostname() == "" || mediaURL.User != nil ||
-				(mediaURL.Scheme != "http" && mediaURL.Scheme != "https") {
+			_, pinterestHLS := pinterestManifest(address, discovery.pinterestMetadata(GalleryDLFile{Metadata: message[2]}))
+			if !pinterestHLS && (err != nil || mediaURL.Hostname() == "" || mediaURL.User != nil ||
+				(mediaURL.Scheme != "http" && mediaURL.Scheme != "https")) {
 				return GalleryDLDiscovery{}, fmt.Errorf("gallery-dl %d번째 파일 URL이 잘못되었습니다", i+1)
 			}
 			discovery.Files = append(discovery.Files, GalleryDLFile{

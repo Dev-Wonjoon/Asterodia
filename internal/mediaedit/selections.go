@@ -198,13 +198,13 @@ func (s *Service) framePlan(v Session, req CreateRequest) (int, int, int, func()
 	if req.Preview {
 		reader := &rangeReader{store: s.store, id: req.SelectionID, legacy: req.Deleted}
 		n, taken := start, 0
-		if v.Options.NativeGIF {
-			g, err := s.gifTimeline(v.ID)
+		if v.Options.NativeGIF || v.Options.NativeVideo {
+			g, err := s.timing(v)
 			if err != nil {
 				return 0, 0, 0, nil, err
 			}
 			ticks := 0
-			for n < end && ticks < 200 {
+			for n < end && ticks < 2*g.Rate() {
 				drop, err := reader.skip(n)
 				if err != nil {
 					return 0, 0, 0, nil, err
@@ -215,6 +215,9 @@ func (s *Service) framePlan(v Session, req CreateRequest) (int, int, int, func()
 				}
 				if n >= len(g.Delays) {
 					return 0, 0, 0, nil, fmt.Errorf("GIF 재생 시간 정보 오류")
+				}
+				if v.Options.NativeVideo && req.Kind == "gif" && taken > 0 && ticks+g.Delays[n] > 2*g.Rate() {
+					break // Keep complete source frames within the two-second GIF preview.
 				}
 				taken++
 				ticks += g.Delays[n]

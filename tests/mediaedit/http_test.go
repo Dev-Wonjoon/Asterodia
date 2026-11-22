@@ -72,7 +72,7 @@ func TestMobileWriteBoundaryAndSharedJobs(t *testing.T) {
 			t.Fatalf("검증 기대 %d 실제 %d", bad.code, code)
 		}
 	}
-	req := mediaedit.PrepareRequest{RequestID: uuid.NewString(), FileID: f.fileID, Kind: "gif", Start: 0, End: 1, FPS: 10, Width: 160}
+	req := mediaedit.PrepareRequest{RequestID: uuid.NewString(), FileID: f.fileID, Kind: "gif", FullSource: true}
 	encoded, _ := json.Marshal(req)
 	code, body, _ = request("POST", "/api/edit/prepare", string(encoded), access.CSRF, state.URL)
 	if code != 200 {

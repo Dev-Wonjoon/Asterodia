@@ -257,7 +257,7 @@ func (r *logRecorder) write(output engine.Output) {
 	}
 	// Structured extractor metadata and private result frames are transport,
 	// not console diagnostics; they may contain signed media addresses.
-	if output.Stream == "stdout" && (strings.HasPrefix(line, "__STORAGEBUCKET_RESULT__:") || json.Valid([]byte(line))) {
+	if strings.HasPrefix(line, transferPrefix) || output.Stream == "stdout" && (strings.HasPrefix(line, "__STORAGEBUCKET_RESULT__:") || json.Valid([]byte(line))) {
 		return
 	}
 	text := cleanLogText(line)

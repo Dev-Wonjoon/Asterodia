@@ -20,6 +20,13 @@ func (g *GalleryDL) Download(ctx context.Context, originalURL string, expected G
 	if err != nil {
 		return nil, err
 	}
+	if len(expected.PinterestVideoURLs()) > 0 {
+		return nil, fmt.Errorf("Pinterest 스트리밍 영상은 yt-dlp 엔진으로 저장해야 합니다")
+	}
+	filter, err := expected.pinterestFileFilter()
+	if err != nil {
+		return nil, err
+	}
 	if !filepath.IsAbs(stageDir) {
 		return nil, fmt.Errorf("작업 폴더는 절대 경로여야 합니다")
 	}
@@ -42,6 +49,9 @@ func (g *GalleryDL) Download(ctx context.Context, originalURL string, expected G
 		defer os.Remove(filepath.Join(stageDir, "cookies.txt"))
 	}
 	args := g.arguments()
+	if filter != "" {
+		args = append(args, "--filter", filter)
+	}
 	args = append(args, auth...)
 	args = append(args, "--windows-filenames", "-D", out, "-o", `extractor.postprocessors=[{"name":"metadata","mode":"json","filename":"{_path.filename}.info.json","event":"after","private":false}]`, "--", originalURL)
 	result, err := g.runner.Run(ctx, ProcessRequest{Executable: g.Executable, Arguments: args, Directory: stageDir, Timeout: 10 * time.Minute, StreamOutput: true})

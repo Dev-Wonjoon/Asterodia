@@ -29,19 +29,20 @@
 
 /* Limit transitions to visual feedback; layout and polling remain immediate. */
 :where(button), .motion-control {
-    transition-property: background-color, color, border-color, box-shadow, opacity, transform;
+    transition-property: background-color, color, border-color, box-shadow, opacity, transform, filter;
     transition-duration: var(--motion-fast);
     transition-timing-function: var(--motion-ease);
 }
 :where(button):enabled:active { transform: scale(0.98); }
 .motion-card {
-    transition: border-color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease);
+    transition: border-color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease), filter var(--motion-fast) var(--motion-ease);
 }
 .motion-card[data-selected="true"] {
     border-color: var(--color-primary);
     box-shadow: 0 0 0 1px var(--color-primary);
 }
 @media (hover: hover) {
+    :where(button):enabled:not([aria-disabled="true"]):hover { filter: brightness(var(--button-hover-brightness, 0.96)); }
     .motion-card:hover { box-shadow: 0 3px 12px rgb(0 0 0 / 0.12); }
     .motion-card[data-selected="true"]:hover { box-shadow: 0 0 0 1px var(--color-primary), 0 3px 12px rgb(0 0 0 / 0.12); }
 }

@@ -16,6 +16,10 @@ import (
 func TestMain(m *testing.M) {
 	if len(os.Args) > 1 && os.Args[1] == "--config-ignore" && os.Getenv("STORAGEBUCKET_GALLERYDL_FIXTURE") == "1" {
 		args := strings.Join(os.Args[1:], "\n")
+		if filter := os.Getenv("STORAGEBUCKET_GALLERYDL_EXPECT_FILTER"); filter != "" && !strings.Contains(args, "--filter\n"+filter+"\n") {
+			fmt.Fprintln(os.Stderr, "Pinterest 파일 필터 누락")
+			os.Exit(2)
+		}
 		for _, required := range []string{"extractor.instagram.videos=merged", "extractor.instagram.audio=true", "extractor.instagram.previews=false", "output.private=true"} {
 			if !strings.Contains(args, required) {
 				fmt.Fprintln(os.Stderr, "필수 조회 옵션 누락")

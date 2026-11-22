@@ -40,7 +40,7 @@ export function SearchSuggestions({ value, filter, onChange, onSubmit, onSelect,
                     if (visible && active >= 0 && vm.data[active]) choose(vm.data[active])
                     else { setOpen(false); onSubmit(value) }
                 }
-            }} placeholder="제목·태그·작성자로 검색…" className="w-full rounded-lg border border-[var(--border-line)] bg-[var(--bg-hover)] px-4 py-2 text-[var(--text-main)] placeholder-[var(--text-placeholder)] focus:border-[var(--color-primary)] focus:outline-none" />
+            }} placeholder="제목·태그·작성자·플랫폼으로 검색…" className="w-full rounded-lg border border-[var(--border-line)] bg-[var(--bg-hover)] px-4 py-2 text-[var(--text-main)] placeholder-[var(--text-placeholder)] focus:border-[var(--color-primary)] focus:outline-none" />
         {visible && <div className="absolute top-full z-30 mt-1 w-full rounded-lg border border-[var(--border-line)] bg-[var(--bg-sidebar)] shadow-lg">
             <div id={listId} role="listbox" aria-label="검색 추천" aria-busy={vm.loading} className="max-h-80 overflow-auto overscroll-contain" onScroll={event => { const node = event.currentTarget; if (node.scrollHeight - node.scrollTop - node.clientHeight < 48) vm.more() }}>
                 {vm.data.map((item, index) => <button key={item.kind + ':' + item.value} id={listId + '-' + index} type="button" role="option" tabIndex={-1} aria-selected={index === active} onMouseDown={event => event.preventDefault()} onClick={() => choose(item)} className={'flex w-full items-start gap-3 px-3 py-2 text-left hover:bg-[var(--bg-hover)] ' + (index === active ? 'bg-[var(--bg-hover)]' : '')}><span className="shrink-0 text-xs text-[var(--text-muted)]">{labels[item.kind]}</span><span className="min-w-0 break-words text-sm">{item.value}</span></button>)}

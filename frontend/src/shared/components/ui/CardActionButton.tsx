@@ -34,7 +34,8 @@ export const CardActionButtons = ({
 
     return (
         <div
-            className={`flex gap-1 ${
+            data-action-boundary
+            className={`flex flex-nowrap items-center gap-1 ${
                 align === 'end' ? 'justify-end' : 'justify-start'
             } ${className}`}
         >

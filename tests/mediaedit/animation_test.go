@@ -2,11 +2,14 @@ package mediaedit_test
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"image/gif"
 	"image/jpeg"
+	"math"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +17,290 @@ import (
 	"github.com/Dev-Wonjoon/StorageBucket/internal/mediaedit"
 	"github.com/google/uuid"
 )
+
+func prepareWholeVideo(t *testing.T, f *fixture, kind string) mediaedit.Session {
+	t.Helper()
+	req := mediaedit.PrepareRequest{RequestID: uuid.NewString(), FileID: f.fileID, Kind: kind, FullSource: true, FPS: 1}
+	v := success[mediaedit.Session](t, f.service.Prepare(t.Context(), req))
+	for until := time.Now().Add(20 * time.Second); time.Now().Before(until); time.Sleep(20 * time.Millisecond) {
+		v = success[mediaedit.Session](t, f.service.GetSession(t.Context(), mediaedit.Request{ID: v.ID}))
+		if v.State == "ready" {
+			replay := success[mediaedit.Session](t, f.service.Prepare(t.Context(), req))
+			if replay.ID != v.ID {
+				t.Fatal("whole-source retry created another session")
+			}
+			return v
+		}
+		if v.State == "failed" {
+			var diagnostic string
+			f.db.QueryRow("SELECT diagnostic FROM media_edit_session WHERE id=?", v.ID).Scan(&diagnostic)
+			t.Fatal(v.Error, diagnostic)
+		}
+	}
+	t.Fatal("whole video preparation timed out")
+	return v
+}
+
+func TestWholeVideoIncludesEveryFrameAndEditsPastThreeSeconds(t *testing.T) {
+	f := newFixture(t)
+	source := filepath.Join(f.root, "whole-source.mp4")
+	_, err := new(engine.ProcessRunner).Run(t.Context(), engine.ProcessRequest{Executable: f.ffmpeg, Directory: f.root, Timeout: time.Minute, Arguments: []string{"-nostdin", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=160x120:rate=30000/1001", "-frames:v", "127", "-c:v", "libx264", "-pix_fmt", "yuv420p", source}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = f.db.Exec("UPDATE media_file SET filepath=?,duration=NULL WHERE id=?", source, f.fileID); err != nil {
+		t.Fatal(err)
+	}
+	v := prepareWholeVideo(t, f, "gif")
+	if !v.Options.FullSource || !v.Options.NativeVideo || v.FrameCount != 127 || v.Options.Start != 0 || v.Options.End < 4.23 {
+		t.Fatalf("missing original frames: %+v", v)
+	}
+	p := success[mediaedit.FramePage](t, f.service.Frames(t.Context(), mediaedit.FramesRequest{ID: v.ID, Offset: 126}))
+	for until := time.Now().Add(15 * time.Second); p.State != "ready" && time.Now().Before(until); time.Sleep(20 * time.Millisecond) {
+		p = success[mediaedit.FramePage](t, f.service.FrameStatus(t.Context(), mediaedit.FramesRequest{ID: v.ID, Offset: 126}))
+	}
+	if p.State != "ready" || p.Offset != 96 || p.Count != 31 || len(p.Times) != 31 || p.Times[30] < 4.2 {
+		t.Fatalf("last original page: %+v", p)
+	}
+	for _, format := range []string{"gif", "webp"} {
+		j := success[mediaedit.Job](t, f.service.Create(t.Context(), mediaedit.CreateRequest{RequestID: uuid.NewString(), SessionID: v.ID, Kind: format, RangeStart: 100, RangeEnd: 120, Deleted: []int{110}, Crop: engine.EditCrop{Width: 160, Height: 120}}))
+		j = f.waitJob(t, j.ID, "completed")
+		output := success[string](t, f.service.ResultPath(t.Context(), mediaedit.Request{ID: j.ID}))
+		editor := engine.VideoEditor{FFmpeg: f.ffmpeg, FFprobe: f.probe}
+		metadata, count, err := editor.Verify(t.Context(), output)
+		if err != nil || count != 19 || math.Abs(*metadata.Duration-.634) > .011 {
+			t.Fatalf("native %s kept range: %+v frames=%d err=%v", format, metadata, count, err)
+		}
+	}
+	j := success[mediaedit.Job](t, f.service.Create(t.Context(), mediaedit.CreateRequest{RequestID: uuid.NewString(), SessionID: v.ID, Kind: "gif", Preview: true, PreviewStart: 1, Crop: engine.EditCrop{Width: 160, Height: 120}}))
+	j = f.waitJob(t, j.ID, "completed")
+	response := httptest.NewRecorder()
+	f.service.Assets().ServeHTTP(response, httptest.NewRequest("GET", "/edit-assets/jobs/"+j.ID, nil))
+	g, err := gif.DecodeAll(bytes.NewReader(response.Body.Bytes()))
+	if err != nil || len(g.Image) < 1 || len(g.Image) > 60 {
+		t.Fatalf("whole-source quality preview: %v", err)
+	}
+	var ticks int
+	for _, delay := range g.Delay {
+		ticks += delay
+	}
+	if ticks > 200 {
+		t.Fatal("quality preview exceeded two seconds", ticks)
+	}
+}
+
+func TestWholeHighRateVideoUsesWebPWithoutDroppingFrames(t *testing.T) {
+	f := newFixture(t)
+	source := filepath.Join(f.root, "high-rate.mp4")
+	_, err := new(engine.ProcessRunner).Run(t.Context(), engine.ProcessRequest{Executable: f.ffmpeg, Directory: f.root, Timeout: time.Minute, Arguments: []string{"-nostdin", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=160x120:rate=120", "-frames:v", "30", "-c:v", "libx264", source}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = f.db.Exec("UPDATE media_file SET filepath=? WHERE id=?", source, f.fileID); err != nil {
+		t.Fatal(err)
+	}
+	v := prepareWholeVideo(t, f, "gif")
+	if v.FrameCount != 30 {
+		t.Fatal("high rate source frames dropped", v.FrameCount)
+	}
+	req := mediaedit.CreateRequest{RequestID: uuid.NewString(), SessionID: v.ID, Kind: "gif", RangeStart: 3, RangeEnd: 18, Crop: engine.EditCrop{Width: 160, Height: 120}}
+	if result := f.service.Create(t.Context(), req); result.OK || result.Error.Code != "INVALID_ARGUMENT" || !strings.Contains(result.Error.Message, "WebP") {
+		t.Fatal("GIF timing limit was hidden", result)
+	}
+	req.Kind = "webp"
+	j := success[mediaedit.Job](t, f.service.Create(t.Context(), req))
+	j = f.waitJob(t, j.ID, "completed")
+	output := success[string](t, f.service.ResultPath(t.Context(), mediaedit.Request{ID: j.ID}))
+	meta, count, err := (engine.VideoEditor{FFmpeg: f.ffmpeg, FFprobe: f.probe}).Verify(t.Context(), output)
+	if err != nil || count != 15 || math.Abs(*meta.Duration-.125) > .001 {
+		t.Fatalf("high rate WebP: %+v %d %v", meta, count, err)
+	}
+}
+
+func TestWholeVideoCanBeTrimmedAfterPreparation(t *testing.T) {
+	f := newFixture(t)
+	v := prepareWholeVideo(t, f, "trim")
+	if v.Options.Start != 0 || math.Abs(v.Options.End-1) > .05 {
+		t.Fatal("whole trim duration", v.Options)
+	}
+	start, end := .2, .8
+	j := success[mediaedit.Job](t, f.service.Create(t.Context(), mediaedit.CreateRequest{RequestID: uuid.NewString(), SessionID: v.ID, Kind: "trim", TrimStart: &start, TrimEnd: &end}))
+	j = f.waitJob(t, j.ID, "completed")
+	output := success[string](t, f.service.ResultPath(t.Context(), mediaedit.Request{ID: j.ID}))
+	meta, _, err := (engine.VideoEditor{FFmpeg: f.ffmpeg, FFprobe: f.probe}).Verify(t.Context(), output)
+	if err != nil || math.Abs(*meta.Duration-.6) > .05 {
+		t.Fatalf("whole source trim: %+v %v", meta, err)
+	}
+}
+
+func TestWholeVariableRateVideoKeepsNativeTiming(t *testing.T) {
+	f := newFixture(t)
+	source := filepath.Join(f.root, "variable-source.mp4")
+	_, err := new(engine.ProcessRunner).Run(t.Context(), engine.ProcessRequest{Executable: f.ffmpeg, Directory: f.root, Timeout: time.Minute, Arguments: []string{"-nostdin", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=160x120:rate=10:duration=1", "-vf", "setpts=(N+floor(N/3))/(10*TB)", "-fps_mode", "vfr", "-c:v", "libx264", source}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = f.db.Exec("UPDATE media_file SET filepath=? WHERE id=?", source, f.fileID); err != nil {
+		t.Fatal(err)
+	}
+	v := prepareWholeVideo(t, f, "gif")
+	p := success[mediaedit.FramePage](t, f.service.FrameStatus(t.Context(), mediaedit.FramesRequest{ID: v.ID}))
+	if v.FrameCount != 10 || len(p.Durations) != 10 || p.Durations[0] != .1 || p.Durations[2] != .2 || math.Abs(v.Options.End-1.4) > .001 {
+		t.Fatalf("variable timing: %+v %+v", v, p)
+	}
+	for _, format := range []string{"gif", "webp"} {
+		j := success[mediaedit.Job](t, f.service.Create(t.Context(), mediaedit.CreateRequest{RequestID: uuid.NewString(), SessionID: v.ID, Kind: format, Crop: engine.EditCrop{Width: 160, Height: 120}}))
+		j = f.waitJob(t, j.ID, "completed")
+		output := success[string](t, f.service.ResultPath(t.Context(), mediaedit.Request{ID: j.ID}))
+		meta, count, err := (engine.VideoEditor{FFmpeg: f.ffmpeg, FFprobe: f.probe}).Verify(t.Context(), output)
+		if err != nil || count != 10 || math.Abs(*meta.Duration-1.4) > .001 {
+			t.Fatalf("%s variable timing %+v %d %v", format, meta, count, err)
+		}
+	}
+}
+
+func TestMaximumAnimationQuality(t *testing.T) {
+	for _, format := range []string{"gif", "webp"} {
+		for _, input := range []int{0, 65, 200} {
+			q, err := engine.NormalizeAnimationQuality(format, engine.AnimationQuality{Preset: "max", Quality: input})
+			if err != nil || q.Preset != "max" || q.Quality != 100 || q.Effort != "normal" || q.Lossless {
+				t.Fatalf("maximum %s input=%d: %+v %v", format, input, q, err)
+			}
+		}
+	}
+	q, err := engine.NormalizeAnimationQuality("webp", engine.AnimationQuality{Preset: "max", Lossless: true, Effort: "precise"})
+	if err != nil || !q.Lossless || q.Quality != 100 || q.Effort != "precise" {
+		t.Fatalf("independent WebP lossless and effort: %+v %v", q, err)
+	}
+	if _, err = engine.NormalizeAnimationQuality("gif", engine.AnimationQuality{Preset: "max", Lossless: true}); err == nil {
+		t.Fatal("maximum GIF must still reject WebP-only lossless mode")
+	}
+}
+
+func TestAnimationAlgorithmValidation(t *testing.T) {
+	legacy := engine.AnimationQuality{Preset: "balanced", Quality: 80, Effort: "normal"}
+	for _, format := range []string{"gif", "webp"} {
+		q, err := engine.NormalizeAnimationQuality(format, engine.AnimationQuality{Dither: "auto", WebPPreset: "none"})
+		if err != nil || q != legacy {
+			t.Fatalf("legacy defaults changed: %+v %v", q, err)
+		}
+	}
+	for _, dither := range []string{"sierra2_4a", "sierra3", "floyd_steinberg", "bayer", "atkinson", "none"} {
+		q, err := engine.NormalizeAnimationQuality("gif", engine.AnimationQuality{Preset: "max", Dither: dither, Effort: "fast"})
+		if err != nil || q.Dither != dither || q.Quality != 100 {
+			t.Fatal(q, err)
+		}
+	}
+	for _, preset := range []string{"photo", "drawing", "icon", "text"} {
+		q, err := engine.NormalizeAnimationQuality("webp", engine.AnimationQuality{WebPPreset: preset, Effort: "fast"})
+		if err != nil || q.WebPPreset != preset || q.Effort != "normal" {
+			t.Fatal(q, err)
+		}
+	}
+	for _, invalid := range []struct {
+		format string
+		q      engine.AnimationQuality
+	}{
+		{"gif", engine.AnimationQuality{Dither: "invalid"}},
+		{"gif", engine.AnimationQuality{Dither: "bayer:bayer_scale=0"}},
+		{"webp", engine.AnimationQuality{WebPPreset: "invalid"}},
+		{"gif", engine.AnimationQuality{WebPPreset: "photo"}},
+		{"webp", engine.AnimationQuality{Dither: "none"}},
+		{"webp", engine.AnimationQuality{Lossless: true, WebPPreset: "photo"}},
+	} {
+		if _, err := engine.NormalizeAnimationQuality(invalid.format, invalid.q); err == nil {
+			t.Fatalf("accepted invalid advanced settings: %+v", invalid)
+		}
+	}
+}
+
+func TestGIFDitheringAlgorithmsApplyToNativeFrames(t *testing.T) {
+	f := newFixture(t)
+	v := prepareWholeVideo(t, f, "gif")
+	outputs := map[[32]byte]bool{}
+	for _, dither := range []string{"sierra2_4a", "sierra3", "floyd_steinberg", "bayer", "atkinson", "none"} {
+		t.Run(dither, func(t *testing.T) {
+			job := success[mediaedit.Job](t, f.service.Create(t.Context(), mediaedit.CreateRequest{RequestID: uuid.NewString(), SessionID: v.ID, Kind: "gif", RangeStart: 1, RangeEnd: 7, Deleted: []int{3}, Crop: engine.EditCrop{Width: 160, Height: 120}, Quality: engine.AnimationQuality{Preset: "custom", Quality: 45, Effort: "fast", Dither: dither}}))
+			job = f.waitJob(t, job.ID, "completed")
+			if job.Options.Quality.Dither != dither {
+				t.Fatal("dither selection lost", job.Options.Quality)
+			}
+			output := success[string](t, f.service.ResultPath(t.Context(), mediaedit.Request{ID: job.ID}))
+			data := readFile(t, output)
+			g, err := gif.DecodeAll(bytes.NewReader(data))
+			if err != nil || len(g.Image) != 5 || g.Config.Width != 160 || g.Config.Height != 120 {
+				t.Fatalf("dither changed edit: %+v %v", g, err)
+			}
+			outputs[sha256.Sum256(data)] = true
+		})
+	}
+	if len(outputs) < 3 {
+		t.Fatal("dithering choices did not affect output", len(outputs))
+	}
+}
+
+func TestWebPOptimizationAndLosslessWithBothFramePipelines(t *testing.T) {
+	for _, native := range []bool{false, true} {
+		name := "sampled"
+		if native {
+			name = "native"
+		}
+		t.Run(name, func(t *testing.T) {
+			f := newFixture(t)
+			var v mediaedit.Session
+			if native {
+				v = prepareWholeVideo(t, f, "gif")
+			} else {
+				v = f.prepare(t, "gif")
+			}
+			cases := []engine.AnimationQuality{{Preset: "custom", Quality: 80, Lossless: true}}
+			for _, preset := range []string{"photo", "drawing", "icon", "text"} {
+				cases = append(cases, engine.AnimationQuality{Preset: "custom", Quality: 80, WebPPreset: preset})
+			}
+			for _, q := range cases {
+				job := success[mediaedit.Job](t, f.service.Create(t.Context(), mediaedit.CreateRequest{RequestID: uuid.NewString(), SessionID: v.ID, Kind: "webp", RangeStart: 1, RangeEnd: 7, Deleted: []int{3}, Crop: engine.EditCrop{Width: 160, Height: 120}, Quality: q}))
+				job = f.waitJob(t, job.ID, "completed")
+				output := success[string](t, f.service.ResultPath(t.Context(), mediaedit.Request{ID: job.ID}))
+				data := readFile(t, output)
+				meta, count, err := (engine.VideoEditor{FFmpeg: f.ffmpeg, FFprobe: f.probe}).VerifyWebP(t.Context(), output)
+				if err != nil || count != 5 || *meta.Width != 160 || *meta.Height != 120 || math.Abs(*meta.Duration-.5) > .001 {
+					t.Fatalf("WebP preset changed edit: %+v frames=%d err=%v", meta, count, err)
+				}
+				if q.Lossless && !bytes.Contains(data, []byte("VP8L")) || !q.Lossless && !bytes.Contains(data, []byte("VP8 ")) {
+					t.Fatalf("wrong WebP compression mode: %+v", q)
+				}
+				if job.Options.Quality.WebPPreset != q.WebPPreset {
+					t.Fatal("WebP optimization selection lost")
+				}
+			}
+		})
+	}
+}
+
+func TestMaximumPresetPreviewAndSave(t *testing.T) {
+	f := newFixture(t)
+	v := f.prepare(t, "gif")
+	for _, format := range []string{"gif", "webp"} {
+		for _, mode := range []struct {
+			name    string
+			preview bool
+		}{{"save", false}, {"preview", true}} {
+			t.Run(format+"/"+mode.name, func(t *testing.T) {
+				request := mediaedit.CreateRequest{RequestID: uuid.NewString(), SessionID: v.ID, Kind: format, Crop: engine.EditCrop{Width: 160, Height: 120}, Preview: mode.preview, Quality: engine.AnimationQuality{Preset: "max", Quality: 5}}
+				job := success[mediaedit.Job](t, f.service.Create(t.Context(), request))
+				job = f.waitJob(t, job.ID, "completed")
+				if job.Options.Quality.Preset != "max" || job.Options.Quality.Quality != 100 || job.Options.Quality.Lossless {
+					t.Fatalf("maximum preset was not preserved: %+v", job.Options.Quality)
+				}
+				response := httptest.NewRecorder()
+				f.service.Assets().ServeHTTP(response, httptest.NewRequest("GET", "/edit-assets/jobs/"+job.ID, nil))
+				if response.Code != 200 || response.Body.Len() == 0 || response.Header().Get("Content-Type") != "image/"+format {
+					t.Fatalf("missing maximum quality output: status=%d type=%s bytes=%d", response.Code, response.Header().Get("Content-Type"), response.Body.Len())
+				}
+			})
+		}
+	}
+}
 
 func TestAnimatedWebPQualityAndPreview(t *testing.T) {
 	f := newFixture(t)

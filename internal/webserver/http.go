@@ -80,6 +80,7 @@ func (s *Service) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/library", s.list)
 	mux.HandleFunc("GET /api/search-suggestions", s.searchSuggestions)
+	mux.HandleFunc("GET /api/suggestions", s.filterSuggestions)
 	mux.HandleFunc("GET /api/library/{id}", s.detail)
 	mux.HandleFunc("GET /api/library/{id}/sequence", s.sequence)
 	mux.HandleFunc("GET /api/files/{id}/info", s.fileInfo)
@@ -88,13 +89,19 @@ func (s *Service) routes() http.Handler {
 	mux.HandleFunc("GET /licenses.txt", s.licenseText)
 	s.editRoutes(mux)
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-		data, _ := assets.ReadFile("web/index.html")
+		data, err := assets.ReadFile("web/dist/web.html")
+		if err != nil {
+			http.Error(w, "웹 화면 빌드가 필요합니다. frontend에서 npm run build를 실행하세요.", http.StatusServiceUnavailable)
+			return
+		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if r.Method != "HEAD" {
 			_, _ = w.Write(data)
 		}
 	})
 	web, _ := fs.Sub(assets, "web")
+	ui, _ := fs.Sub(assets, "web/dist")
+	mux.Handle("GET /ui/", http.StripPrefix("/ui/", http.FileServerFS(ui)))
 	for _, path := range []string{"/app.js", "/style.css", "/favicon.ico", "/editor.js", "/editor.css", "/search.js", "/search.css", "/licenses.css", "/player.js", "/player.css", "/album-state.js", "/viewer.js", "/viewer-queue.js", "/viewer.css"} {
 		mux.Handle("GET "+path, http.FileServerFS(web))
 	}

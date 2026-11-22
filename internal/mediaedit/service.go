@@ -17,6 +17,8 @@ import (
 	"github.com/google/uuid"
 )
 
+var errGIFFrameTiming = errors.New("GIF로 유지할 수 없는 프레임 간격입니다. WebP로 저장하세요.")
+
 type Service struct {
 	UpdateGate   *api.UpdateGate
 	store        Store
@@ -65,6 +67,13 @@ func (s *Service) Prepare(ctx context.Context, req PrepareRequest) api.Result {
 	}
 	defer leaveUpdate()
 	req.NativeGIF = false
+	req.NativeVideo = false
+	if req.QuickVideo && (!req.FullSource || req.OriginalFrames) || req.OriginalFrames && req.Kind == "trim" {
+		return invalid("영상 편집 방식을 확인하세요")
+	}
+	if req.FullSource {
+		req.Start, req.End, req.FPS = 0, 0, 1000
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed || s.halted || s.done == nil {
@@ -76,13 +85,21 @@ func (s *Service) Prepare(ctx context.Context, req PrepareRequest) api.Result {
 	if req.Kind == "webp" || req.Kind == "animation" {
 		req.Kind = "gif"
 	}
-	if !validID(req.RequestID) || req.FileID <= 0 || (req.Kind != "gif" && req.Kind != "trim") || math.IsNaN(req.Start) || math.IsNaN(req.End) || math.IsInf(req.Start, 0) || math.IsInf(req.End, 0) || req.Start < 0 || req.End <= req.Start || req.FPS < 1 || math.Ceil((req.End-req.Start)*float64(req.FPS)) > 9007199254740991 {
+	if !validID(req.RequestID) || req.FileID <= 0 || (req.Kind != "gif" && req.Kind != "trim") || math.IsNaN(req.Start) || math.IsNaN(req.End) || math.IsInf(req.Start, 0) || math.IsInf(req.End, 0) || req.Start < 0 || (!req.FullSource && req.End <= req.Start) || req.FPS < 1 || math.Ceil((req.End-req.Start)*float64(req.FPS)) > 9007199254740991 {
 		return invalid("구간과 FPS를 확인하세요. 원본 재생 시간 안에서 선택해야 합니다.")
 	}
 	if existing, e := s.store.session(ctx, req.RequestID); e == nil {
 		compared := req
 		if existing.RenderVersion >= 2 {
 			compared.Width = 0
+			if compared.OriginalFrames {
+				compared.FPS, compared.NativeVideo = existing.Options.FPS, existing.Options.NativeVideo
+			}
+			if compared.FullSource {
+				compared.End = existing.Options.End
+				compared.FPS = existing.Options.FPS
+				compared.NativeVideo = existing.Options.NativeVideo
+			}
 			if existing.Options.NativeGIF {
 				compared.NativeGIF = true
 				compared.FPS = 100
@@ -144,6 +161,9 @@ func (s *Service) Prepare(ctx context.Context, req PrepareRequest) api.Result {
 	}
 	defer f.Close()
 	if kind == "image" {
+		if req.QuickVideo || req.OriginalFrames {
+			return invalid("영상 파일에서 사용할 수 있는 편집 방식입니다")
+		}
 		var signature [6]byte
 		if _, err = f.ReadAt(signature[:], 0); err != nil {
 			return fail(err)
@@ -166,6 +186,20 @@ func (s *Service) Prepare(ctx context.Context, req PrepareRequest) api.Result {
 	_, err = tx.ExecContext(ctx, `INSERT INTO media_edit_session(id,source_file_id,source_uuid,source_path,source_title,source_identity,source_size,source_mtime,request_json,state,created_at,updated_at,render_version) VALUES(?,?,?,?,?,?,?,?,?,'pending',?,?,2)`, req.RequestID, req.FileID, sourceUUID, path, title, identity, info.Size(), fmt.Sprint(info.ModTime().UnixNano()), raw(req), now(), now())
 	if err != nil {
 		return fail(err)
+	}
+	if req.QuickVideo {
+		// Basic metadata does not wait behind queued encodes or index frames.
+		metadata, probeErr := s.editor.ProbeVideo(ctx, path)
+		if probeErr != nil {
+			if errors.Is(probeErr, engine.ErrStopUnconfirmed) {
+				s.halted = true
+			}
+			return fail(probeErr)
+		}
+		req.Start, req.End = 0, *metadata.Duration
+		if _, err = tx.ExecContext(ctx, "UPDATE media_edit_session SET state='ready',width=?,height=?,progress=100,request_json=? WHERE id=?", *metadata.Width, *metadata.Height, raw(req), req.RequestID); err != nil {
+			return fail(err)
+		}
 	}
 	if err = tx.Commit(); err != nil {
 		return fail(err)
@@ -293,17 +327,20 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) api.Result {
 	if v.State != "ready" {
 		return invalid("프레임 또는 영상 준비가 완료된 뒤 저장하세요")
 	}
-	if (req.Kind == "trim") != (v.Options.Kind == "trim") {
+	if !v.Options.QuickVideo && (req.Kind == "trim") != (v.Options.Kind == "trim") {
 		return invalid("준비한 편집 종류와 출력 종류가 다릅니다")
 	}
-	if req.Kind == "trim" {
+	if req.Kind == "trim" || v.Options.QuickVideo {
 		if _, _, e = trimBounds(v, req); e != nil {
 			return invalid(e.Error())
+		}
+		if v.Options.QuickVideo && (len(req.Deleted) > 0 || req.SelectionID != "") {
+			return invalid("프레임 삭제는 프레임 정밀 편집에서 지정하세요")
 		}
 	} else if req.TrimStart != nil || req.TrimEnd != nil {
 		return invalid("영상 자르기 시간은 영상 출력에서만 지정하세요")
 	}
-	if req.Kind == "gif" && v.Options.FPS > 100 {
+	if req.Kind == "gif" && !v.Options.NativeVideo && !v.Options.QuickVideo && v.Options.FPS > 100 {
 		return invalid("GIF의 시간 단위로는 100FPS 초과를 표현할 수 없습니다. WebP를 선택하거나 새 자료의 FPS를 조정하세요.")
 	}
 	if req.Kind == "webp" && v.Options.FPS > 1000 {
@@ -314,11 +351,11 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) api.Result {
 		if rangeEnd == 0 {
 			rangeEnd = v.FrameCount
 		}
-		if req.RangeStart < 0 || rangeEnd > v.FrameCount || rangeEnd <= req.RangeStart {
+		if !v.Options.QuickVideo && (req.RangeStart < 0 || rangeEnd > v.FrameCount || rangeEnd <= req.RangeStart) {
 			return invalid("남길 프레임 구간을 확인하세요")
 		}
 		c := req.Crop
-		if c.X < 0 || c.Y < 0 || c.Width < 1 || c.Height < 1 || c.Width > v.Width || c.Height > v.Height || c.X > v.Width-c.Width || c.Y > v.Height-c.Height || len(req.Deleted) >= v.FrameCount {
+		if c.X < 0 || c.Y < 0 || c.Width < 1 || c.Height < 1 || c.Width > v.Width || c.Height > v.Height || c.X > v.Width-c.Width || c.Y > v.Height-c.Height || !v.Options.QuickVideo && len(req.Deleted) >= v.FrameCount {
 			return invalid("크롭 영역과 남길 프레임을 확인하세요")
 		}
 		for i, n := range req.Deleted {
@@ -340,12 +377,32 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) api.Result {
 			}
 		}
 	}
-	if req.Kind != "trim" {
-		if _, _, _, _, e = s.framePlan(v, req); e != nil {
-			return invalid(e.Error())
+	if req.Kind != "trim" && !v.Options.QuickVideo {
+		first, end, _, factory, planErr := s.framePlan(v, req)
+		if planErr != nil {
+			return invalid(planErr.Error())
+		}
+		if req.Kind == "gif" && v.Options.NativeVideo {
+			timeline, err := s.timing(v)
+			if err != nil {
+				return fail(err)
+			}
+			skip := factory()
+			for n := first; n < end; n++ {
+				drop, err := skip(n)
+				if err != nil {
+					return fail(err)
+				}
+				if !drop && (n >= len(timeline.Delays) || timeline.Delays[n] < 10 || timeline.Delays[n] > 655350) {
+					return invalid("GIF로 유지할 수 없는 프레임 간격입니다. WebP로 저장하세요.")
+				}
+			}
+		}
+		if e = ctx.Err(); e != nil {
+			return fail(e)
 		}
 	}
-	if req.Preview && (req.Kind == "trim" || req.PreviewStart < 0 || req.PreviewStart >= v.FrameCount) {
+	if req.Preview && (req.Kind == "trim" || req.PreviewStart < 0 || !v.Options.QuickVideo && req.PreviewStart >= v.FrameCount) {
 		return invalid("화질 미리보기 위치를 확인하세요")
 	}
 	var count int

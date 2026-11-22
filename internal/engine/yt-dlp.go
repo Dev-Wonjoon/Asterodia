@@ -256,6 +256,7 @@ func (y *Ytdlp) DownloadSingle(
 			"--no-js-runtimes", "--no-remote-components",
 			"--encoding", "utf-8", "--abort-on-error",
 			"--no-simulate", "--no-quiet", "--progress", "--newline", "--progress-delta", "0.5",
+			"--progress-template", fmt.Sprintf(`download:__STORAGEBUCKET_PROGRESS__:{"streams":%d,"formatId":%%(info.format_id)j,"download":%%(progress.{status,downloaded_bytes,total_bytes,total_bytes_estimate,speed,eta})j}`, len(selected)),
 			"--abort-on-unavailable-fragments", "--fixup", "detect_or_warn",
 			"--downloader", "m3u8:native",
 			"--paths", "home:" + stageDir,

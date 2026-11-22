@@ -1,9 +1,9 @@
-import { GalleryPage } from '@renderer/features/gallery/GalleryPage'
-import { useState } from 'react'
+import { useState, type ComponentType } from 'react'
+import type { MediaFilter } from '@contracts/media-v2'
 import { useSearchViewModel } from '@renderer/features/search/useSearchViewModel'
 import { SearchSuggestions } from './SearchSuggestions'
 
-export const SearchPage = (): React.JSX.Element => {
+export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string; filter: MediaFilter; emptyMessage: string }> }): React.JSX.Element => {
     const vm = useSearchViewModel()
     const [tagInput, setTagInput] = useState('')
     const [platformInput, setPlatformInput] = useState('')
@@ -16,7 +16,7 @@ export const SearchPage = (): React.JSX.Element => {
     }
 
     const handleTagKeyDown = (e: React.KeyboardEvent): void => {
-        if (e.key === 'Enter' && tagInput.trim()) {
+        if (!e.nativeEvent.isComposing && e.keyCode !== 229 && e.key === 'Enter' && tagInput.trim()) {
             vm.addTag(tagInput.trim())
             setTagInput('')
         }
@@ -29,7 +29,7 @@ export const SearchPage = (): React.JSX.Element => {
     }
 
     const handlePlatformKeyDown = (e: React.KeyboardEvent): void => {
-        if (e.key === 'Enter' && platformInput.trim()) {
+        if (!e.nativeEvent.isComposing && e.keyCode !== 229 && e.key === 'Enter' && platformInput.trim()) {
             vm.addPlatform(platformInput.trim())
             setPlatformInput('')
         }
@@ -42,16 +42,16 @@ export const SearchPage = (): React.JSX.Element => {
     }
 
     const handleAuthorKeyDown = (e: React.KeyboardEvent): void => {
-        if (e.key === 'Enter' && authorInput.trim()) {
+        if (!e.nativeEvent.isComposing && e.keyCode !== 229 && e.key === 'Enter' && authorInput.trim()) {
             vm.addAuthor(authorInput.trim())
             setAuthorInput('')
         }
     }
 
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex h-full min-h-0 min-w-0 flex-col">
             {/* 검색 영역 */}
-            <div className="p-4 border-b border-[var(--border-line)] space-y-3">
+            <div className="shrink-0 p-4 border-b border-[var(--border-line)] space-y-3">
                 {/* 키워드 검색 */}
                 <SearchSuggestions value={vm.keyword} filter={vm.filter} onChange={vm.setKeyword} onSubmit={vm.submitKeyword} onCompositionChange={vm.setSearchComposing} onSelect={item => {
                     if (item.kind === 'title') vm.submitKeyword(item.value)
@@ -59,18 +59,19 @@ export const SearchPage = (): React.JSX.Element => {
                 }} />
 
                 {/* 필터 입력 영역 */}
-                <div className="flex gap-3">
+                <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3">
                     {/* 태그 필터 */}
-                    <div className="flex-1 relative">
+                    <div className="min-w-0 relative">
                         <div className="flex items-center gap-2">
                             <input
                                 type="text"
+                                aria-label="태그 추가"
                                 value={tagInput}
                                 maxLength={200}
                                 onChange={(e) => handleTagInput(e.target.value)}
                                 onKeyDown={handleTagKeyDown}
                                 placeholder="태그 추가..."
-                                className="flex-1 px-3 py-1.5 text-sm rounded-lg
+                                className="min-w-0 flex-1 px-3 py-1.5 text-sm rounded-lg
                                     bg-[var(--bg-hover)] text-[var(--text-main)]
                                     placeholder-[var(--text-placeholder)]
                                     border border-[var(--border-line)]
@@ -113,9 +114,10 @@ export const SearchPage = (): React.JSX.Element => {
                     </div>
 
                     {/* 플랫폼 필터 */}
-                    <div className="flex-1 relative">
+                    <div className="min-w-0 relative">
                         <input
                             type="text"
+                            aria-label="플랫폼 추가"
                             maxLength={200}
                             value={platformInput}
                             onChange={(e) => handlePlatformInput(e.target.value)}
@@ -146,9 +148,10 @@ export const SearchPage = (): React.JSX.Element => {
                     </div>
 
                     {/* 작성자 필터 */}
-                    <div className="flex-1 relative">
+                    <div className="min-w-0 relative">
                         <input
                             type="text"
+                            aria-label="작성자 추가"
                             maxLength={200}
                             value={authorInput}
                             onChange={(e) => handleAuthorInput(e.target.value)}
@@ -191,6 +194,7 @@ export const SearchPage = (): React.JSX.Element => {
                             >
                                 {tag}
                                 <button
+                                    aria-label={`태그 ${tag} 제거`}
                                     onClick={() => vm.removeTag(tag)}
                                     className="hover:opacity-70"
                                 >
@@ -205,6 +209,7 @@ export const SearchPage = (): React.JSX.Element => {
                             >
                                 {p}
                                 <button
+                                    aria-label={`플랫폼 ${p} 제거`}
                                     onClick={() => vm.removePlatform(p)}
                                     className="hover:opacity-70"
                                 >
@@ -219,6 +224,7 @@ export const SearchPage = (): React.JSX.Element => {
                             >
                                 {a}
                                 <button
+                                    aria-label={`작성자 ${a} 제거`}
                                     onClick={() => vm.removeAuthor(a)}
                                     className="hover:opacity-70"
                                 >
@@ -227,7 +233,7 @@ export const SearchPage = (): React.JSX.Element => {
                             </span>
                         ))}
                         <button
-                            onClick={vm.clearAll}
+                            onClick={() => { vm.clearAll(); setTagInput(''); setPlatformInput(''); setAuthorInput('') }}
                             className="text-xs text-[var(--text-muted)] hover:text-[var(--text-main)]"
                         >
                             초기화
@@ -244,7 +250,7 @@ export const SearchPage = (): React.JSX.Element => {
             )}
 
             <div className="flex-1 min-h-0 overflow-hidden">
-                <GalleryPage
+                <Gallery
                     title="검색 결과"
                     filter={vm.filter}
                     emptyMessage="검색 결과가 없습니다."

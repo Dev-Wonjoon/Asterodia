@@ -43,6 +43,19 @@ export type DownloadEnqueueRequest = {
       }
 )
 
+export interface DownloadTransferProgress {
+    downloaded: number
+    total: number | null
+    estimated: boolean
+    speed: number | null
+    eta: number | null
+    percent: number | null
+    fileIndex: number
+    fileCount: number
+    processing: boolean
+    batch: boolean
+}
+
 export interface DownloadJobDto {
     historyOnly?: boolean
     id: string
@@ -52,6 +65,7 @@ export interface DownloadJobDto {
     state: DownloadState
     phase: DownloadPhase | null
     progress: number
+    transfer?: DownloadTransferProgress | null
 
     // null은 기존 옵션을 현재 실행기가 지원하지 않는 상태다.
     options: DownloadJobOptions | null
