@@ -1,6 +1,6 @@
 package update
 
-// Version is overridden from build/config.yml by the release build.
+// Version is injected from the root VERSION file by production builds.
 var Version = "dev"
 
 const Repository = "Dev-Wonjoon/StorageBucket"

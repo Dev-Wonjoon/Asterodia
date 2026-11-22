@@ -1,0 +1,120 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+  # A manual run verifies and packages both architectures, without publishing.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Check release version
+    runs-on: windows-2025
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.22.2'
+      - id: version
+        shell: pwsh
+        run: |
+          $version = (node tools/release-version.mjs).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'VERSION is invalid.' }
+          if ($env:GITHUB_EVENT_NAME -eq 'push') {
+            node tools/release-version.mjs --tag $env:GITHUB_REF_NAME
+            if ($LASTEXITCODE -ne 0) { throw 'Release tag does not match VERSION.' }
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=v$version" >> $env:GITHUB_OUTPUT
+  verify:
+    name: Verify tagged commit
+    needs: version
+    uses: ./.github/workflows/ci.yml
+  arm64:
+    name: Build Windows arm64
+    needs: [version, verify]
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-build
+      - name: Build verified Windows arm64 executable
+        shell: pwsh
+        run: ./tools/prepare-release.ps1 -Arch arm64
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: release-windows-arm64
+          path: dist/releases/v${{ needs.version.outputs.version }}/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+  package:
+    name: Assemble checked release assets
+    needs: [version, verify, arm64]
+    runs-on: windows-2025
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.22.2'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: ci-windows-amd64
+          path: .test-data/release-assets/amd64
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: release-windows-arm64
+          path: .test-data/release-assets/arm64
+      - name: Verify both executables and generate combined checksums
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ needs.version.outputs.tag }}
+        run: ./tools/verify-release.ps1 -InputDirectory .test-data/release-assets -OutputDirectory dist/release-ready -Tag $env:RELEASE_TAG
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: release-ready
+          path: dist/release-ready/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+  publish:
+    name: Publish GitHub Release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [version, package]
+    runs-on: windows-2025
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: release-ready
+          path: release
+      - name: Publish complete release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.version.outputs.tag }}
+        run: |
+          # gh creates a draft, uploads all three assets, then publishes it.
+          # Existing releases are not overwritten on reruns.
+          gh release create $env:RELEASE_TAG release/StorageBucket-windows-amd64.exe release/StorageBucket-windows-arm64.exe release/SHA256SUMS --verify-tag --generate-notes --title $env:RELEASE_TAG
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed. Inspect the existing draft before retrying.' }

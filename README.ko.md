@@ -140,13 +140,49 @@ Windows에서 다음 명령으로 배포 파일을 만듭니다.
 .\tools\prepare-release.ps1 -Arch amd64
 ```
 
-스크립트는 `build/config.yml`의 버전으로 앱을 빌드하고,
+스크립트는 루트 `VERSION`의 버전으로 앱을 빌드하고,
 `dist/releases/v<버전>/`에 `StorageBucket-windows-amd64.exe`와
 `SHA256SUMS`를 생성합니다.
 두 파일을 같은 GitHub Release 초안에 첨부하고, 일치하는 `v<버전>` 태그를
 사용해 모든 파일을 준비한 뒤 정식 릴리스로 공개하세요.
 업데이트에는 현재 CPU에 맞는 정확한 이름의 실행 파일만 사용하며,
 설치 프로그램이나 압축 파일은 업데이트 파일로 선택하지 않습니다.
+
+### 버전 관리와 GitHub Actions
+
+앱 배포 버전은 루트 [`VERSION`](./VERSION) 한 곳에서 관리합니다. 예를 들어
+`2.2.0`으로 배포하려면 이 파일의 한 줄만 변경합니다. 일반 빌드와 배포 준비는
+Windows 버전 리소스, macOS·iOS plist, Linux 패키지 정보, Android versionName과 Wails 설정을 자동으로
+동기화하고, 같은 버전을 앱의 Go 빌드에 주입합니다. 개발 실행은 `dev`를 사용합니다.
+플랫폼 파일의 버전은 생성된 값이므로 직접 따로 올리지 않습니다.
+
+```powershell
+node tools/release-version.mjs --sync   # VERSION을 모든 플랫폼 정보에 반영
+node tools/release-version.mjs --check  # 동기화 상태 확인
+```
+
+- **CI** (`.github/workflows/ci.yml`): 브랜치 push·PR·수동 실행 시 워크플로 검증,
+  프런트엔드 테스트·빌드, 전체 Go 테스트·정적 검사와 Windows amd64 배포 빌드를 실행합니다.
+- **Release** (`.github/workflows/release.yml`): `v<버전>` 태그를 push하면 태그와 `VERSION`의
+  일치를 먼저 확인하고, CI에서 검증한 amd64 파일과 추가로 빌드한 arm64 파일을 모읍니다.
+  두 파일의 PE 아키텍처·내장 버전·SHA-256을 검사한 뒤 통합 `SHA256SUMS`와 함께
+  GitHub Release에 공개합니다. 일부 빌드나 검증이 실패하면 공개하지 않습니다.
+- Release 워크플로의 **수동 실행은 공개 없는 빌드 검증**입니다. 두 아키텍처의 결과는
+  실행의 `release-ready` 아티팩트에서 받을 수 있습니다. 정식 공개는 태그 push에서만 수행합니다.
+- 일반 CI와 빌드는 읽기 권한만 사용하고, 릴리스 공개 작업만 `contents: write`를 사용합니다.
+  별도의 개인 토큰은 필요하지 않습니다. 이미 존재하는 릴리스는 덮어쓰지 않습니다.
+- Go SDK는 라이선스 고지에 기록된 정확한 버전, Wails CLI는 `go.mod`의 버전을 사용합니다.
+  미디어 테스트 도구와 actionlint의 다운로드·해시는 `tools/ci-tools.json`에 고정되어 있습니다.
+  외부 사이트 실시간 테스트는 CI에서 실행하지 않으며, 로컬 미디어·HTTP 테스트는 실행합니다.
+
+로컬에서 CI의 도구 설치와 배포 검증을 실행하려면 Windows의 PowerShell 7에서 다음을 사용합니다.
+도구·테스트 파일은 저장소의 `.test-data/`에만 생성됩니다.
+
+```powershell
+./tools/setup-ci-tools.ps1
+actionlint
+./tests/packaging/verify-release.test.ps1
+```
 
 ## 개발
 

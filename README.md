@@ -143,13 +143,51 @@ On Windows, build the release assets with:
 .\tools\prepare-release.ps1 -Arch amd64
 ```
 
-The script reads the version from `build/config.yml`, builds the application,
+The script reads the version from the root `VERSION` file, builds the application,
 and creates `StorageBucket-windows-amd64.exe` and `SHA256SUMS`
 under `dist/releases/v<version>/`.
 Upload both files to the same draft GitHub Release, use a matching `v<version>`
 tag, and publish it as a full release once all assets are ready.
 The updater selects the exact executable for its CPU architecture; installer
 files and archives are not used as update payloads.
+
+### Versioning and GitHub Actions
+
+The root [`VERSION`](./VERSION) is the single source for the application release
+version. Change only that line, for example to `2.2.0`. Normal builds and release
+preparation synchronize Wails configuration, Windows resources, macOS/iOS plists,
+Linux package metadata and Android versionName, and inject the same version into production Go builds.
+Development runs use `dev`. Platform version fields are generated values.
+
+```powershell
+node tools/release-version.mjs --sync
+node tools/release-version.mjs --check
+```
+
+- **CI** (`.github/workflows/ci.yml`) runs on branch pushes, pull requests, and
+  manual dispatch: workflow validation, frontend tests/build, all Go test groups,
+  static analysis, and a Windows amd64 release build.
+- **Release** (`.github/workflows/release.yml`) runs on `v<version>` tags. The tag
+  must match `VERSION`. It reuses the amd64 executable tested by CI, builds arm64,
+  verifies both PE architectures, embedded versions and SHA-256 hashes, then
+  publishes both executables and the combined `SHA256SUMS` to GitHub Releases.
+  Failed builds or verification prevent publication.
+- A **manual Release run builds and verifies without publishing**. Download its
+  `release-ready` artifact to inspect both architectures. Only tag pushes publish.
+- CI and builds use read-only permissions; only the publication job receives
+  `contents: write`. No personal token is required. Existing releases are not overwritten.
+- Go matches the exact SDK in the license catalog, and the Wails CLI matches
+  `go.mod`. Media test tools and actionlint are pinned by URL and SHA-256 in
+  `tools/ci-tools.json`. Live external-site tests are excluded; local media and HTTP tests run.
+
+To install the same test tools and check release packaging locally, use PowerShell 7
+on Windows. Downloaded tools and test data stay under the repository's `.test-data/`.
+
+```powershell
+./tools/setup-ci-tools.ps1
+actionlint
+./tests/packaging/verify-release.test.ps1
+```
 
 ## Development
 

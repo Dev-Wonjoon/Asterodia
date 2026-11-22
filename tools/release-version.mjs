@@ -1,23 +1,90 @@
 import { readFileSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const config = readFileSync(new URL('../build/config.yml', import.meta.url), 'utf8')
-const version = config.match(/^  version: "([^"]+)"/m)?.[1]
-if (!version || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) {
-    throw new Error('build/config.yml must contain a stable major.minor.patch version.')
+const repository = fileURLToPath(new URL('../', import.meta.url))
+
+export function parseVersion(value) {
+    const version = value.trim()
+    if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version) || version.split('.').some(part => Number(part) > 65535)) {
+        throw new Error('VERSION must contain one stable major.minor.patch version (each component 0–65535).')
+    }
+    return version
 }
-if (process.argv.includes('--sync-windows')) {
-    const infoURL = new URL('../build/windows/info.json', import.meta.url)
-    const info = JSON.parse(readFileSync(infoURL, 'utf8'))
+
+export function readVersion(root = repository) {
+    return parseVersion(readFileSync(path.join(root, 'VERSION'), 'utf8'))
+}
+
+export function validateTag(tag, version) {
+    if (tag !== `v${version}`) throw new Error(`Release tag ${JSON.stringify(tag)} must match VERSION: v${version}`)
+}
+
+function replaceOne(text, pattern, replacement, filename) {
+    if (!pattern.test(text)) throw new Error(`Version field is missing in ${filename}`)
+    return text.replace(pattern, replacement)
+}
+
+export function versionResources(root = repository) {
+    const version = readVersion(root), files = new Map()
+    const read = name => readFileSync(path.join(root, name), 'utf8')
+    const config = 'build/config.yml'
+    files.set(config, replaceOne(read(config), /^(  version: ")[^"]+(".*)$/m, (_, before, after) => `${before}${version}${after}`, config))
+    const infoName = 'build/windows/info.json', info = JSON.parse(read(infoName))
     info.fixed = { ...info.fixed, file_version: `${version}.0`, product_version: `${version}.0` }
     for (const locale of Object.values(info.info)) {
         locale.FileVersion = version
         locale.ProductVersion = version
     }
-    writeFileSync(infoURL, JSON.stringify(info, null, '\t') + '\n')
-    const manifestURL = new URL('../build/windows/wails.exe.manifest', import.meta.url)
-    const manifest = readFileSync(manifestURL, 'utf8').replace(/(<assemblyIdentity type="win32" name="com\.storagebucket\.app" version=")[^"]+/, (_, prefix) => `${prefix}${version}.0`)
-    writeFileSync(manifestURL, manifest)
-    const nsisURL = new URL('../build/windows/nsis/wails_tools.nsh', import.meta.url)
-    writeFileSync(nsisURL, readFileSync(nsisURL, 'utf8').replace(/(!define INFO_PRODUCTVERSION ")[^"]+/, (_, prefix) => `${prefix}${version}`))
-    process.stdout.write(`Windows version resources: ${version}\n`)
-} else process.stdout.write(version)
+    files.set(infoName, JSON.stringify(info, null, '\t') + '\n')
+    const manifest = 'build/windows/wails.exe.manifest'
+    files.set(manifest, replaceOne(read(manifest), /(<assemblyIdentity type="win32" name="com\.storagebucket\.app" version=")[^"]+/, (_, before) => `${before}${version}.0`, manifest))
+    for (const msix of ['build/windows/msix/app_manifest.xml', 'build/windows/msix/template.xml']) {
+        files.set(msix, replaceOne(read(msix), /(\bVersion=")[^"]+/, (_, before) => `${before}${version}.0`, msix))
+    }
+    const nsis = 'build/windows/nsis/wails_tools.nsh'
+    files.set(nsis, replaceOne(read(nsis), /(!define INFO_PRODUCTVERSION ")[^"]+/, (_, before) => `${before}${version}`, nsis))
+    for (const name of ['build/darwin/Info.plist', 'build/darwin/Info.dev.plist', 'build/ios/Info.plist', 'build/ios/Info.dev.plist']) {
+        let text = read(name)
+        for (const key of ['CFBundleShortVersionString', 'CFBundleVersion']) {
+            const value = name === 'build/ios/Info.dev.plist' && key === 'CFBundleShortVersionString' ? `${version}-dev` : version
+            text = replaceOne(text, new RegExp(`(<key>${key}</key>\\s*<string>)[^<]+`), (_, before) => before + value, name)
+        }
+        files.set(name, text)
+    }
+    const linux = 'build/linux/nfpm/nfpm.yaml'
+    files.set(linux, replaceOne(read(linux), /^(version: ")[^"]+(")/m, (_, before, after) => before + version + after, linux))
+    const android = 'build/android/app/build.gradle'
+    files.set(android, replaceOne(read(android), /^(\s*versionName ")[^"]+(")/m, (_, before, after) => before + version + after, android))
+    return { version, files }
+}
+
+export function syncVersionResources(root = repository, check = false) {
+    const { version, files } = versionResources(root), changed = []
+    for (const [name, expected] of files) {
+        if (readFileSync(path.join(root, name), 'utf8').replaceAll('\r\n', '\n') === expected.replaceAll('\r\n', '\n')) continue
+        changed.push(name)
+        if (!check) writeFileSync(path.join(root, name), expected)
+    }
+    if (check && changed.length) throw new Error(`Version resources differ from VERSION. Run node tools/release-version.mjs --sync: ${changed.join(', ')}`)
+    return version
+}
+
+function main(args) {
+    let sync = false, check = false, tag
+    for (let i = 0; i < args.length; i++) {
+        if (args[i] === '--sync' || args[i] === '--sync-windows') sync = true
+        else if (args[i] === '--check') check = true
+        else if (args[i] === '--tag' && args[i + 1]) tag = args[++i]
+        else throw new Error(`Unknown or incomplete argument: ${args[i]}`)
+    }
+    const version = readVersion()
+    if (tag !== undefined) validateTag(tag, version)
+    if (sync && check) throw new Error('Use --sync or --check, not both.')
+    if (sync || check) syncVersionResources(repository, check)
+    process.stdout.write(version)
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+    try { main(process.argv.slice(2)) } catch (error) { console.error(error.message); process.exitCode = 1 }
+}

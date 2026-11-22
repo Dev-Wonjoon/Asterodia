@@ -3,27 +3,18 @@ param(
     [switch]$SkipBuild
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'release-files.ps1')
 $releaseRepository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 Push-Location $releaseRepository
 try {
-    $releaseVersion = (& node (Join-Path $PSScriptRoot 'release-version.mjs')).Trim()
+    $releaseVersion = (& node (Join-Path $PSScriptRoot 'release-version.mjs') --sync).Trim()
     if ($LASTEXITCODE -ne 0) { throw 'Could not resolve release version.' }
     if (-not $SkipBuild) {
-        & wails3 build "ARCH=$Arch"
+        & wails3 build "GOARCH=$Arch"
         if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
     }
     $releaseBinary = Join-Path $releaseRepository 'dist/StorageBucket.exe'
-    if (-not (Test-Path -LiteralPath $releaseBinary -PathType Leaf)) { throw 'dist/StorageBucket.exe is missing.' }
-    $releaseBytes = [IO.File]::ReadAllBytes($releaseBinary)
-    if ($releaseBytes.Length -lt 64 -or $releaseBytes[0] -ne 0x4d -or $releaseBytes[1] -ne 0x5a) { throw 'Not a Windows executable.' }
-    $releasePE = [BitConverter]::ToInt32($releaseBytes, 0x3c)
-    if ($releasePE -lt 0 -or $releasePE + 6 -gt $releaseBytes.Length -or [BitConverter]::ToUInt32($releaseBytes, $releasePE) -ne 0x4550) { throw 'Invalid PE header.' }
-    $releaseMachine = [BitConverter]::ToUInt16($releaseBytes, $releasePE + 4)
-    $releaseExpectedMachine = if ($Arch -eq 'amd64') { 0x8664 } else { 0xaa64 }
-    if ($releaseMachine -ne $releaseExpectedMachine) { throw "Executable architecture does not match $Arch." }
-    $releaseInfo = [Diagnostics.FileVersionInfo]::GetVersionInfo($releaseBinary)
-    $releaseProductVersion = '{0}.{1}.{2}' -f $releaseInfo.ProductMajorPart, $releaseInfo.ProductMinorPart, $releaseInfo.ProductBuildPart
-    if ($releaseProductVersion -ne $releaseVersion -or $releaseInfo.ProductPrivatePart -ne 0) { throw "Executable version $releaseProductVersion does not match $releaseVersion." }
+    $verified = Get-VerifiedReleaseFile -Path $releaseBinary -Arch $Arch -Version $releaseVersion
     $releaseOutput = Join-Path $releaseRepository "dist/releases/v$releaseVersion"
     New-Item -ItemType Directory -Force -Path $releaseOutput | Out-Null
     $releaseAsset = Join-Path $releaseOutput "StorageBucket-windows-$Arch.exe"

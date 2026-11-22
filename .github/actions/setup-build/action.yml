@@ -1,0 +1,48 @@
+name: Set up StorageBucket build
+description: Install the SDK, frontend dependencies, and optional verified media test tools.
+inputs:
+  test-tools:
+    description: Install media test tools and actionlint.
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      with:
+        node-version: '24.22.2'
+        cache: npm
+        cache-dependency-path: frontend/package-lock.json
+    - id: sdk
+      shell: pwsh
+      run: |
+        $catalog = Get-Content internal/licenses/catalog.json -Raw | ConvertFrom-Json
+        $sdk = @($catalog.entries | Where-Object name -eq 'Go standard library and runtime')
+        if ($sdk.Count -ne 1 -or $sdk[0].version -notmatch '^go\d+\.\d+\.\d+$') { throw 'Go SDK notice is missing or invalid.' }
+        "version=$($sdk[0].version.Substring(2))" >> $env:GITHUB_OUTPUT
+    - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      with:
+        go-version: ${{ steps.sdk.outputs.version }}
+        cache-dependency-path: go.sum
+    - name: Prepare frontend and Wails
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        go mod download
+        if ($LASTEXITCODE -ne 0) { throw 'Go dependency download failed.' }
+        $wailsVersion = (go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3).Trim()
+        if ($LASTEXITCODE -ne 0) { throw 'Could not resolve the pinned Wails version.' }
+        go install "github.com/wailsapp/wails/v3/cmd/wails3@$wailsVersion"
+        if ($LASTEXITCODE -ne 0) { throw 'Wails installation failed.' }
+        npm --prefix frontend ci
+        if ($LASTEXITCODE -ne 0) { throw 'Frontend dependency installation failed.' }
+        # Main embeds frontend/dist; a clean checkout has no generated bundle yet.
+        New-Item -ItemType Directory -Force frontend/dist | Out-Null
+        if (-not (Test-Path frontend/dist/index.html)) { Set-Content frontend/dist/index.html '<!doctype html><title>Build placeholder</title>' }
+        node tools/release-version.mjs --sync
+        if ($LASTEXITCODE -ne 0) { throw 'Version synchronization failed.' }
+        wails3 generate bindings -ts -i
+        if ($LASTEXITCODE -ne 0) { throw 'Wails bindings generation failed.' }
+    - name: Install verified media test tools
+      if: inputs.test-tools == 'true'
+      shell: pwsh
+      run: ./tools/setup-ci-tools.ps1

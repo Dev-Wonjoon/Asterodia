@@ -108,7 +108,7 @@ tasks:
     summary: Generates Windows `.syso` file
     dir: build
     cmds:
-      - node "{{.ROOT_DIR}}/tools/release-version.mjs" --sync-windows
+      - node "{{.ROOT_DIR}}/tools/release-version.mjs" --sync
       - wails3 generate syso -arch {{.ARCH}} -icon windows/icon.ico -manifest windows/wails.exe.manifest -info windows/info.json -out ../wails_windows_{{.ARCH}}.syso
     vars:
       ARCH: '{{.ARCH | default ARCH}}'

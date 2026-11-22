@@ -203,6 +203,8 @@ if [ "$GOOS" = "windows" ]; then
     EXT=".exe"
     LDFLAGS="-s -w -H windowsgui"
 fi
+APP_VERSION=$(node tools/release-version.mjs --sync)
+LDFLAGS="$LDFLAGS -X github.com/Dev-Wonjoon/StorageBucket/internal/update.Version=$APP_VERSION"
 
 TAGS="production"
 if [ -n "$EXTRA_TAGS" ]; then
