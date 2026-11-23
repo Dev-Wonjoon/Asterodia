@@ -1,15 +1,14 @@
 import { translateError, translateMessage, translate, useLanguage } from '@renderer/shared/i18n'
-import { useGallerySelection, gallerySelectionKey } from './useGallerySelection'
+import { useGallerySelection, gallerySelectionKey, albumDragType } from './useGallerySelection'
 import { useGalleryExpansionMotion } from './useGalleryExpansionMotion'
 import { FolderMergeDialog } from './FolderMergeDialog'
 import { AlbumManager, type AlbumControls } from './AlbumManager'
-import { AlbumDropPanel } from './AlbumDropPanel'
 import { MediaViewer } from './MediaViewer'
 import { useConfirm } from '@renderer/shared/hooks/useConfirm'
 import { MediaEditLauncher, type MediaEditControls } from '../mediaedit/MediaEditLauncher'
 import { FileMovePanel, type FileMoveControls } from "./FileMovePanel"
 import type { MoveSelection } from "@contracts/file-move-api"
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent } from 'react'
 import { useInfiniteScroll } from '@renderer/shared/hooks/useInfiniteScroll'
 import { ListDetailLayout } from '@renderer/shared/components/layout/ListDetailLayout'
 import { useLeaveGuard } from '@renderer/shared/hooks/useLeaveGuard'
@@ -77,7 +76,9 @@ export const GalleryPage = ({
     const [hasImportResult, setHasImportResult] = useState(false)
     const [moveBusy, setMoveBusy] = useState(false)
     const [albumDropBusy, setAlbumDropBusy] = useState(false)
-    const [albumRefresh, setAlbumRefresh] = useState(0)
+    const albumDropPending = useRef(false), albumDropRequest = useRef(0)
+    const [hoveredAlbumId, setHoveredAlbumId] = useState<number | null>(null)
+    const [albumDropError, setAlbumDropError] = useState(''), [albumDropNotice, setAlbumDropNotice] = useState('')
     const [mergeSelection, setMergeSelection] = useState<MoveSelection[] | null>(null)
     const bulk = useGalleryBulkActions(store, selection, pointerSelection.removeMedia)
     const [draftDirty, setDraftDirty] = useState(false)
@@ -144,6 +145,9 @@ export const GalleryPage = ({
     useEffect(() => {
         listScrollRef.current?.scrollTo({ top: 0 })
         pointerSelection.clear(); setTagCommand(null)
+        albumDropRequest.current++; albumDropPending.current = false
+        setAlbumDropBusy(false); setHoveredAlbumId(null); setAlbumDropError(''); setAlbumDropNotice('')
+        return () => { albumDropRequest.current++ }
     }, [filterKey, favoritesOnly, store, galleryView, showAlbumFiles])
 
     const list = state.list
@@ -226,6 +230,7 @@ export const GalleryPage = ({
     const toolbarDisabled = disabled || moveBusy || draftDirty || state.needsRefresh || mergeSelection !== null
     const pageDisabled = toolbarDisabled || list.refreshing
     selectionLocked.current = pageDisabled || tagCommand !== null || viewer !== null
+    useEffect(() => { if (!pointerSelection.albumDrag || pageDisabled) setHoveredAlbumId(null) }, [pointerSelection.albumDrag, pageDisabled])
     async function openAnimationEditor(media: MediaSummaryDto) {
         if (pageDisabled || mediaEditPending.current) return
         setMediaEditError('')
@@ -251,6 +256,32 @@ export const GalleryPage = ({
         }
     }
     const clearSelection = pointerSelection.clear
+    function acceptsAlbumDrop(album: MediaSummaryDto, event: DragEvent<HTMLElement>) {
+        const drag = pointerSelection.albumDrag
+        return Boolean(drag && !selectionLocked.current && !albumDropPending.current && album.isUserAlbum && !album.galleryFile &&
+            !drag.mediaIds.includes(album.id) && event.dataTransfer.types.includes(albumDragType))
+    }
+    async function dropOnAlbum(album: MediaSummaryDto, event: DragEvent<HTMLElement>) {
+        event.preventDefault(); event.stopPropagation(); setHoveredAlbumId(null)
+        if (!acceptsAlbumDrop(album, event) || !pointerSelection.albumDrag) return
+        const drag = pointerSelection.albumDrag, own = ++albumDropRequest.current
+        albumDropPending.current = true; setAlbumDropBusy(true); setAlbumDropError(''); setAlbumDropNotice('')
+        pointerSelection.endAlbumDrag()
+        try {
+            const result = await getApi().media.saveAlbum({
+                albumId: album.id, expectedRevision: album.revision,
+                addFileIds: drag.fileIds, addMediaIds: drag.mediaIds,
+            })
+            if (own !== albumDropRequest.current) return
+            if (!result.ok) throw new Error(translateError(result.error))
+            setAlbumDropNotice(translate("‘{0}’ 앨범에 추가했습니다.", { "0": album.title }))
+            clearSelection(); void store.refresh()
+        } catch (error) {
+            if (own === albumDropRequest.current) setAlbumDropError(error instanceof Error ? error.message : translate("앨범 변경을 저장하지 못했습니다. 새로고침 후 확인하세요."))
+        } finally {
+            if (own === albumDropRequest.current) { albumDropPending.current = false; setAlbumDropBusy(false) }
+        }
+    }
     const selectedTargets = () => {
         const grouped = new Map<number, MoveSelection>(selection.map(item => [item.mediaId, { ...item }]))
         for (const value of pointerSelection.fileSelections) {
@@ -334,10 +365,10 @@ export const GalleryPage = ({
                 {mediaEditError && <p role="alert" className="text-sm text-red-500">{translateMessage(mediaEditError)}</p>}
 
                 <AlbumManager selection={selection} fileIds={albumFileIds} disabled={toolbarDisabled} controlRef={albumControls} showSelectionActions={false}
-                    onChanged={(id, deleted) => { if (deleted && store.getSnapshot().detail.mediaId === id) store.closeDetail(); setAlbumRefresh(value => value + 1); void store.refresh() }} onClear={clearSelection} />
+                    onChanged={(id, deleted) => { if (deleted && store.getSnapshot().detail.mediaId === id) store.closeDetail(); void store.refresh() }} onClear={clearSelection} />
 
                 {!favoritesOnly && <LocalImportPanel compact controlRef={importControls} onBusyChange={setImportBusy} onHasResultChange={setHasImportResult} disabled={draftDirty || state.busy || bulk.busy || moveBusy || albumDropBusy} onComplete={() => { thumbnailRefreshPending.current = true; refreshThumbnails() }} />}
-                <FileMovePanel compact controlRef={moveControls} onBusyChange={setMoveBusy} selection={selection} disabled={draftDirty || state.busy || bulk.busy || albumDropBusy || state.needsRefresh} onCreated={clearSelection} onChanged={() => { thumbnailRefreshPending.current = true; setAlbumRefresh(value => value + 1); refreshThumbnails() }} />
+                <FileMovePanel compact controlRef={moveControls} onBusyChange={setMoveBusy} selection={selection} disabled={draftDirty || state.busy || bulk.busy || albumDropBusy || state.needsRefresh} onCreated={clearSelection} onChanged={() => { thumbnailRefreshPending.current = true; refreshThumbnails() }} />
                 {bulk.progress && <p role="status" className="text-sm">{translate("일괄 처리 중 · {0} / {1}개", { "0": bulk.progress.done, "1": bulk.progress.total })}</p>}
                 {bulk.result && <section aria-label={translate("일괄 처리 결과")} className="rounded-lg border border-[var(--border-line)] p-3 text-sm">
                     <p role="status">{translate("성공 {0}개 · 실패 {1}개", { "0": bulk.result.succeeded.length, "1": bulk.result.failed.length })}</p>
@@ -350,6 +381,8 @@ export const GalleryPage = ({
                         {state.notice}
                     </p>
                 )}
+                {albumDropNotice && <p role="status" className="text-sm">{translateMessage(albumDropNotice)}</p>}
+                {albumDropError && <p role="alert" className="text-sm text-red-500">{translateMessage(albumDropError)} {translate("갤러리를 새로고침한 뒤 다시 놓아 주세요.")}</p>}
 
                 {state.writeError && (
                     <p role="alert" className="text-sm">
@@ -378,9 +411,9 @@ export const GalleryPage = ({
                 )}
 
                 {pointerSelection.rectangle && <div aria-hidden="true" className="pointer-events-none fixed z-50 border border-[var(--color-primary)] bg-[var(--color-primary)]/15" style={pointerSelection.rectangle} />}
-                <div className="flex flex-col-reverse items-start gap-4 lg:flex-row">
-                <div className="w-full min-w-0 flex-1">
-                <div ref={pointerSelection.gridRef} className={galleryGridClass + ' motion-gallery-grid min-h-32'}>
+                <div ref={pointerSelection.gridRef} className={galleryGridClass + ' motion-gallery-grid min-h-32'}
+                    onDragOver={event => { if (!event.defaultPrevented) event.dataTransfer.dropEffect = 'none' }}
+                    onDrop={event => event.preventDefault()}>
                     {activeJobs.map(job => <GalleryDownloadCard key={'download:' + job.id} job={job} selected={downloadDetailId === job.id} disabled={disabled || moveBusy || tagCommand !== null} cancelling={downloads.cancellingIds.includes(job.id)} onOpen={() => { void openDownload(job.id) }} onCancel={() => downloads.cancelDownload(job.id)} />)}
                     {list.page.data.map((media) => (
                         <GalleryCard
@@ -391,6 +424,15 @@ export const GalleryPage = ({
                             onSelect={event => pointerSelection.select(media, event)}
                             onAlbumDragStart={event => pointerSelection.startAlbumDrag(media, event)}
                             onAlbumDragEnd={pointerSelection.endAlbumDrag}
+                            albumDropActive={Boolean(pointerSelection.albumDrag) && hoveredAlbumId === media.id && !media.galleryFile}
+                            onAlbumDragOver={media.isUserAlbum && !media.galleryFile ? event => {
+                                if (!acceptsAlbumDrop(media, event)) { event.dataTransfer.dropEffect = 'none'; return }
+                                event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; setHoveredAlbumId(media.id)
+                            } : undefined}
+                            onAlbumDragLeave={media.isUserAlbum && !media.galleryFile ? event => {
+                                if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setHoveredAlbumId(previous => previous === media.id ? null : previous)
+                            } : undefined}
+                            onAlbumDrop={media.isUserAlbum && !media.galleryFile ? event => { void dropOnAlbum(media, event) } : undefined}
                             active={state.detail.mediaId === media.id}
                             disabled={disabled} viewDisabled={pageDisabled}
                             previewPath={media.galleryFile ? media.galleryFile.thumbnailPath ?? media.galleryFile.previewPath ?? (media.galleryFile.kind === 'image' ? media.galleryFile.filepath : null) : media.cover?.path ?? null}
@@ -445,11 +487,6 @@ export const GalleryPage = ({
                         {list.page.hasNextPage && !list.error && <button type="button" data-detail-trigger className={button} disabled={pageDisabled || list.loadingMore} onClick={() => { void store.loadMore() }}>{list.moreError ? translate("다시 시도") : translate("더 불러오기")}</button>}
                     </div>
                 )}
-                </div>
-                <AlbumDropPanel drag={pointerSelection.albumDrag} disabled={pageDisabled || tagCommand !== null || viewer !== null || pointerSelection.dragging}
-                    refreshKey={albumRefresh} onDragEnd={pointerSelection.endAlbumDrag} onBusyChange={setAlbumDropBusy}
-                    onChanged={() => { clearSelection(); void store.refresh() }} />
-                </div>
             </div>
         </ListDetailLayout>
         </>

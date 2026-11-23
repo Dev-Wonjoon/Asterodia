@@ -176,3 +176,14 @@ it('keeps native scrollbars available instead of starting a marquee from them', 
         expect(selection.dragging).toBe(false); expect(keys()).toEqual(['media:2'])
     }
 })
+
+it.each(['pointercancel', 'blur'])('restores the previous marquee selection on %s', async eventType => {
+    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1)); vi.stubGlobal('cancelAnimationFrame', vi.fn())
+    await mount(h(Harness)); const { grid } = geometry(); await click(5)
+    await pointer('pointerdown', grid, 5, 5); await pointer('pointermove', window, 140, 70)
+    expect(keys()).toEqual(['media:1', 'media:2'])
+    await act(async () => window.dispatchEvent(eventType === 'pointercancel'
+        ? new PointerEvent('pointercancel', { bubbles: true, pointerId: 1, pointerType: 'mouse' })
+        : new Event('blur')))
+    expect(keys()).toEqual(['media:5']); expect(selection.dragging).toBe(false); expect(selection.rectangle).toBeNull()
+})

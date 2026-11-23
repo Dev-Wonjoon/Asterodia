@@ -169,7 +169,10 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
             }
             if (event.type === 'click' && event.detail === 1) suppressRepeatedClick.current = false
         }
-        function cancel() { if (gesture.current) stop(true); if (albumDragRef.current) endAlbumDrag() }
+        // Native HTML dragging ends the pointer stream with pointercancel after
+        // dragstart. Only cancel a marquee here; the album drag is still active.
+        function cancelPointer() { if (gesture.current) stop(true) }
+        function cancel() { cancelPointer(); if (albumDragRef.current) endAlbumDrag() }
         function lost(event: globalThis.PointerEvent) { if (gesture.current?.active && gesture.current.id === event.pointerId && event.target === root) stop(true) }
         function escape(event: KeyboardEvent) {
             if (event.key === 'Escape' && albumDragRef.current) { event.preventDefault(); event.stopPropagation(); endAlbumDrag(); return }
@@ -180,7 +183,7 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
             }
         }
         window.addEventListener('pointermove', move, { passive: false }); window.addEventListener('pointerup', up)
-        window.addEventListener('pointercancel', cancel); window.addEventListener('blur', cancel); window.addEventListener('keydown', escape, true)
+        window.addEventListener('pointercancel', cancelPointer); window.addEventListener('blur', cancel); window.addEventListener('keydown', escape, true)
         window.addEventListener('lostpointercapture', lost)
         // Listen on the scroll pane, including empty space below the card grid.
         root?.addEventListener('pointerdown', onPointerDown)
@@ -188,7 +191,7 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
         return () => {
             cancelAnimationFrame(frame.current); gesture.current = null
             window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up)
-            window.removeEventListener('pointercancel', cancel); window.removeEventListener('blur', cancel); window.removeEventListener('keydown', escape, true)
+            window.removeEventListener('pointercancel', cancelPointer); window.removeEventListener('blur', cancel); window.removeEventListener('keydown', escape, true)
             window.removeEventListener('lostpointercapture', lost)
             root?.removeEventListener('pointerdown', onPointerDown)
             window.removeEventListener('click', click, true); window.removeEventListener('dblclick', click, true)

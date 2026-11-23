@@ -1,12 +1,6 @@
 // Korean source phrases are stable translation keys. Add another catalog to extend supported languages.
 const en = {
-  "드래그해서 앨범에 추가": "Drag to add to an album",
-  "앨범에 놓기": "Drop into an album",
-  "드롭할 앨범 새로고침": "Refresh destination albums",
-  "드롭할 앨범 검색": "Search destination albums",
-  "드롭할 앨범 찾기": "Find destination albums",
-  "앨범 목록을 새로고침한 뒤 다시 놓아 주세요.": "Refresh the album list, then drop the selection again.",
-  "파일을 하나 또는 여러 개 선택해 앨범 위에 놓으세요. 원본은 유지됩니다.": "Select one or more files and drop them onto an album. Originals are kept.",
+  "갤러리를 새로고침한 뒤 다시 놓아 주세요.": "Refresh the gallery, then drop the selection again.",
   "‘{0}’ 앨범에 추가했습니다.": "Added to the ‘{0}’ album.",
   "엔진 상태를 확인하지 못했습니다.": "Could not check engine status.",
   "갤러리": "Gallery",
