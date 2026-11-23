@@ -362,16 +362,72 @@ export function mountMediaEditor(host, options) {
     const timeMode = value => value?.options.quickVideo || value?.options.kind === 'trim';
     if (file?.src && !sourceGIF) {
         source = node('video');
+        source.preload = 'metadata';
         source.src = file.src;
         source.controls = true;
         source.playsInline = true;
-        source.preload = 'auto';
         source.className = 'sbe-source';
         sourceSurface.append(source);
         source.addEventListener('error', () => report(translate("이 브라우저는 원본을 재생하지 못합니다. 프레임 정밀 편집에서 편집용 미리보기로 확인할 수 있습니다.")));
     }
     const cropPlaceholder = node('p', () => (file ? translate("원본 영상을 읽고 있습니다. 재생 정보가 준비되면 바로 구간을 선택할 수 있습니다.") : translate("영상 카드의 ⋯ 메뉴에서 “GIF, WebP로 만들기”를 선택해 주세요. 기존 편집 자료는 아래에서 다시 열 수 있습니다.")), 'sbe-crop-placeholder');
     sourceSurface.append(cropPlaceholder);
+    const overview = node('section', undefined, 'sbe-overview');
+    bindAttribute(overview, 'aria-label', () => translate("전체 영상 미리보기"));
+    overview.append(node('h3', () => translate("전체 영상 미리보기")));
+    const overviewStatus = node('p', () => translate("대표 화면을 먼저 표시합니다. 선택한 구간만 정밀 프레임으로 불러옵니다."), 'sbe-hint');
+    const overviewGrid = node('div', undefined, 'sbe-overview-grid');
+    overview.append(overviewStatus, overviewGrid);
+    sourceSurface.append(overview);
+    let overviewDuration = file?.duration || 0, overviewFrameCount = 0;
+    function selectOverview(index) {
+        if (dead || busy || session && (!timeMode(session) || session.fileId !== file?.id)) return;
+        const duration = overviewDuration || source?.duration;
+        if (!Number.isFinite(duration) || duration <= 0) return;
+        const a = duration * index / 12;
+        const span = Math.min(duration / 12, overviewFrameCount > 0 ? 1000 * duration / overviewFrameCount : duration / 12);
+        const b = Math.min(duration, a + span);
+        start.value = String(a); end.value = String(b); sourceRangeTouched = true;
+        if (session?.state === 'ready' && timeMode(session)) {
+            clipStart = clamp(Math.round((a-session.options.start)*1000), 0, editableCount(session)-1);
+            clipEnd = clamp(Math.round((b-session.options.start)*1000), clipStart+1, editableCount(session));
+            createRetry = null;
+        }
+        if (source) { source.pause(); try { source.currentTime = a; } catch {} }
+        sync();
+    }
+    async function loadOverview() {
+        if (!source || !api.overview) return;
+        const tiles = Array.from({length:12}, (_, index) => {
+            const tile = button(() => formatEditTime(overviewDuration * index / 12), () => selectOverview(index), overviewGrid);
+            tile.className = 'sbe-overview-frame';
+            bindAttribute(tile, 'aria-label', () => translate("{0} 구간 선택", {"0":formatEditTime(overviewDuration * index / 12)}));
+            const image = node('img'); image.hidden = true; image.draggable = false; image.alt = '';
+            tile.prepend(image);
+            return {tile,image};
+        });
+        // Show the beginning, end and middle first; each response updates one
+        // tile without waiting for all frames, a session, or an encode worker.
+        for (const index of [0,11,6,3,9,1,2,4,5,7,8,10]) {
+            if (dead || session && !timeMode(session)) return;
+            try {
+                const value = await unwrap(api.overview({fileId:file.id,index}));
+                if (dead || session && !timeMode(session)) return;
+                overviewDuration = value.duration; overviewFrameCount = value.frameCount;
+                if (!value.image?.startsWith('data:image/jpeg;base64,')) throw new Error('Invalid overview image');
+                tiles[index].image.src = value.image; tiles[index].image.hidden = false;
+                // Rebind only captions; replacing tile contents would discard images.
+                for (const [n, {tile}] of tiles.entries()) {
+                    const text = [...tile.childNodes].find(child => child.nodeType === 3);
+                    if (text) text.textContent = formatEditTime(overviewDuration * n / 12);
+                    bindAttribute(tile, 'aria-label', () => translate("{0} 구간 선택", {"0":formatEditTime(overviewDuration * n / 12)}));
+                }
+            } catch {
+                if (dead) return;
+                tiles[index].tile.classList.add('is-unavailable');
+            }
+        }
+    }
     const fields = node('div', undefined, 'sbe-fields');
     setup.append(fields);
     function field(label, element, parent = fields) { const wrap = node('label', label); wrap.append(element); parent.append(wrap); return element; }
@@ -1415,6 +1471,7 @@ export function mountMediaEditor(host, options) {
         const trimMode = (quick ? kind.value : session?.options.kind ?? kind.value) === 'trim';
         const cropEditing = frameEditing || quick && quickCrop && !trimMode;
         const sourceMatches = !session || session.fileId === file?.id;
+        overview.hidden = !source || !api.overview || !sourceMatches || !!session && !timeMode(session);
         sourceSurface.hidden = false;
         if (source) {
             if ((cropEditing || !sourceMatches) && !source.paused) source.pause();
@@ -1775,6 +1832,7 @@ export function mountMediaEditor(host, options) {
         view.removeEventListener('blur', cancelCropPointer);
         resourceSerial++;
         imageCache.clear();
+        overviewGrid.replaceChildren();
         if (source) {
             source.pause();
             source.removeAttribute('src');
@@ -1795,5 +1853,6 @@ export function mountMediaEditor(host, options) {
     sync();
     void refresh();
     const stopLanguage = localizeWidget(dialog);
+    void loadOverview();
     return { destroy };
 }

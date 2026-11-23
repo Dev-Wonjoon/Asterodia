@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { createElement as h } from 'react'
+import { act, createElement as h, useState } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { DownloadJobDto, DownloadTransferProgress } from '@contracts/download-api'
 import { DownloadProgress } from '@renderer/features/download/components/DownloadProgress'
@@ -17,6 +17,27 @@ const job: DownloadJobDto = {
 }
 
 describe('live media download progress', () => {
+    it.each(['pending', 'running'] as const)('shows only the waiting status for a %s job waiting for a slot', async state => {
+        const waiting = { ...job, state, phase: 'discovering' as const, waiting: true }
+        await mount(h('div', null, h('p', {role:'status'}, downloadStatus(waiting)), h(DownloadProgress, {job:waiting})))
+        expect(document.body.textContent).toBe('다운로드 대기 중...')
+        expect(document.querySelector('[role="progressbar"]')).toBeNull()
+        expect(visibleProgress(waiting)).toBeNull()
+    })
+    it('shows progress after a waiting job obtains a download slot', async () => {
+        let update!: (next: DownloadJobDto) => void
+        function Host() {
+            const [current, setCurrent] = useState<DownloadJobDto>({...job, phase:'discovering', waiting:true})
+            update = setCurrent
+            return h('div', null, h('p', null, downloadStatus(current)), h(DownloadProgress, {job:current}))
+        }
+        await mount(h(Host))
+        expect(document.querySelector('[role="progressbar"]')).toBeNull()
+        await act(async () => update({...job, waiting:false}))
+        expect(document.body.textContent).not.toContain('다운로드 대기 중...')
+        expect(document.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('25')
+        expect(document.body.textContent).toContain('25.0%')
+    })
     it('renders the same determinate bar and byte details used during engine installation', async () => {
         await mount(h(DownloadProgress, { job }))
         const bar = document.querySelector('[role="progressbar"]')!
@@ -32,6 +53,36 @@ describe('live media download progress', () => {
         expect(document.body.textContent).toContain('1.0 MB 다운로드')
         expect(document.body.textContent).not.toContain('%')
         expect(document.body.textContent).not.toContain('남음')
+    })
+    it('updates unknown transfers and switches between moving and measured progress on the same bar', async () => {
+        let update!: (next: DownloadJobDto) => void
+        const unknown = { ...job, transfer: { ...transfer, total: null, percent: null, eta: null } }
+        function Host() {
+            const [current, setCurrent] = useState<DownloadJobDto>(unknown)
+            update = setCurrent
+            return h(DownloadProgress, { job: current })
+        }
+        await mount(h(Host))
+        const bar = document.querySelector('[role="progressbar"]')!
+        const fill = bar.firstElementChild as HTMLElement
+        expect(fill.classList.contains('motion-progress-indeterminate')).toBe(true)
+        expect(bar.hasAttribute('aria-valuenow')).toBe(false)
+        await act(async () => update({ ...unknown, transfer: { ...unknown.transfer, downloaded: 2 * 1024 ** 2, speed: 512 * 1024 } }))
+        expect(document.body.textContent).toContain('2.0 MB 다운로드')
+        expect(document.body.textContent).toContain('512.0 KB/s')
+        expect(document.body.textContent).not.toContain('%')
+        expect(bar.firstElementChild).toBe(fill)
+        await act(async () => update({ ...job, transfer: { ...transfer, percent: 50 } }))
+        expect(bar.firstElementChild).toBe(fill)
+        expect(fill.classList.contains('motion-progress-indeterminate')).toBe(false)
+        expect(fill.style.width).toBe('50%')
+        expect(bar.getAttribute('aria-valuenow')).toBe('50')
+        expect(document.body.textContent).toContain('50.0%')
+        await act(async () => update(unknown))
+        expect(fill.classList.contains('motion-progress-indeterminate')).toBe(true)
+        expect(fill.style.width).toBe('')
+        expect(bar.hasAttribute('aria-valuenow')).toBe(false)
+        expect(document.body.textContent).not.toContain('%')
     })
     it('labels estimated sizes and sampled gallery bytes explicitly', () => {
         expect(downloadProgressView({ ...job, transfer: { ...transfer, estimated: true } })).toMatchObject({

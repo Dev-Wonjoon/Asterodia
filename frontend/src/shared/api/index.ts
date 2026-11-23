@@ -34,6 +34,7 @@ const api: AppApi = {
         restart: () => response(UpdateService.Restart()),
     },
     mediaEdit: {
+        overview: request => response(MediaEditService.Overview(wire(request))),
         frames: request => response(MediaEditService.Frames(wire(request))),
         frameStatus: request => response(MediaEditService.FrameStatus(wire(request))),
         selection: request => response(MediaEditService.Selection(wire(request))),

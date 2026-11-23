@@ -397,6 +397,30 @@ func (m *merge) run() error {
 			return e
 		}
 	}
+	for _, r := range m.data["gallery_pin"] {
+		row := clone(r)
+		if err := m.remap(row, "media_id", "media"); err != nil {
+			return err
+		}
+		if err := m.remap(row, "file_id", "media_file"); err != nil {
+			return err
+		}
+		var owner int64
+		if row["media_id"] != nil {
+			owner, err = integer(row["media_id"])
+		} else {
+			err = m.q.QueryRowContext(m.ctx, "SELECT media_id FROM media_file WHERE id=?", row["file_id"]).Scan(&owner)
+		}
+		if err != nil {
+			return err
+		}
+		// Preserve local choices when importing an already known group again.
+		if m.newMedia[owner] {
+			if _, err = m.q.ExecContext(m.ctx, "INSERT INTO gallery_pin(media_id,file_id,created_at) VALUES(?,?,?) ON CONFLICT DO NOTHING", row["media_id"], row["file_id"], row["created_at"]); err != nil {
+				return err
+			}
+		}
+	}
 	for _, table := range []string{"media_tag", "favorite"} {
 		for _, r := range m.data[table] {
 			row := clone(r)

@@ -40,9 +40,6 @@ export function DownloadDetailPane(): React.JSX.Element | null {
                     {downloadStatus(job)}
                 </p>
                 <DownloadProgress job={job} />
-                {vm.requestedIds.includes(job.id) && job.state === 'pending' && (
-                    <p className="text-sm">{translate("실행 요청 대기")}</p>
-                )}
                 {job.phase === 'committing' && job.state === 'running' && (
                     <p className="text-sm text-[var(--text-muted)]">{translate("저장 중에는 취소할 수 없습니다.")}</p>
                 )}

@@ -7,11 +7,11 @@ import { albumDragType } from '@renderer/features/gallery/useGallerySelection'
 import { useInfiniteScroll } from '@renderer/shared/hooks/useInfiniteScroll'
 import { useGalleryViewModel } from '@renderer/features/gallery/useGalleryViewModel'
 const mocks = vi.hoisted(() => ({ bulk: vi.fn(), unregister: vi.fn(), confirm: vi.fn(async () => true), refresh: vi.fn(), getSnapshot: vi.fn(), get: vi.fn(), create: vi.fn(), run: vi.fn(), directories: vi.fn(), on: vi.fn(), mediaGet: vi.fn(), mountEditor: vi.fn(), destroyEditor: vi.fn(), state: null as any }))
-const api = {fileMove:{get:mocks.get,create:mocks.create,run:mocks.run},media:{directories:mocks.directories,albums:vi.fn(),saveAlbum:vi.fn(),mergeAlbum:vi.fn(),get:mocks.mediaGet},onMediaThumbnailUpdated:mocks.on}
+const api = {fileMove:{get:mocks.get,create:mocks.create,run:mocks.run},media:{directories:mocks.directories,albums:vi.fn(),saveAlbum:vi.fn(),mergeAlbum:vi.fn(),get:mocks.mediaGet},onMediaThumbnailUpdated:mocks.on,showItemInFolder:vi.fn()}
 vi.mock('../../internal/webserver/web/editor.js',()=>({mountMediaEditor:mocks.mountEditor}))
 vi.mock('@renderer/shared/hooks/useConfirm',()=>({useConfirm:()=>({confirm:mocks.confirm,isOpen:false})}))
 vi.mock('@renderer/shared/api',()=>({getApi:()=>api}))
-const store = {refresh:mocks.refresh,getSnapshot:mocks.getSnapshot,unregisterMedia:mocks.unregister,bulk:mocks.bulk,closeDetail:vi.fn(),toggleAlbum:vi.fn(),loadMore:vi.fn(),openDetail:vi.fn()}
+const store = {refresh:mocks.refresh,getSnapshot:mocks.getSnapshot,unregisterMedia:mocks.unregister,bulk:mocks.bulk,closeDetail:vi.fn(),toggleAlbum:vi.fn(),loadMore:vi.fn(),openDetail:vi.fn(),edit:vi.fn()}
 const downloads = { activeJobs: [] as any[], cancellingIds: [], openDetail: vi.fn(), closeDetail: vi.fn(), cancelDownload: vi.fn() }
 vi.mock('@renderer/features/gallery/useGalleryViewModel',()=>({useGalleryViewModel:vi.fn(()=>({store,snapshot:mocks.state,openInFolder:vi.fn(),downloads}))}))
 vi.mock('@renderer/shared/hooks/useLeaveGuard',()=>({useLeaveGuard:vi.fn()}))
@@ -22,9 +22,10 @@ vi.mock('@renderer/features/localimport/LocalImportPanel',()=>({LocalImportPanel
 vi.mock('@renderer/features/gallery/MediaViewer',()=>({MediaViewer:({mediaId,fileId,onClose}:any)=>h('div',{role:'dialog','aria-label':`감상 ${mediaId} ${fileId ?? ''}`},h('button',{onClick:onClose},'감상 닫기'))}))
 afterEach(cleanupReact)
 function setup(){
+ store.edit.mockReset().mockResolvedValue(true)
  mocks.refresh.mockReset()
  vi.mocked(useGalleryViewModel).mockClear()
- mocks.mediaGet.mockReset();mocks.destroyEditor.mockReset()
+ mocks.mediaGet.mockReset().mockResolvedValue({ok:false,error:{code:'NOT_FOUND',message:'찾지 못했습니다.'}});mocks.destroyEditor.mockReset();api.showItemInFolder.mockReset()
  mocks.mountEditor.mockReset().mockImplementation((host:HTMLElement,options:any)=>{
   const dialog=document.createElement('dialog');dialog.open=true;dialog.setAttribute('aria-label','편집 테스트 창')
   const close=document.createElement('button');close.textContent='테스트 편집기 닫기';close.onclick=options.onClose;dialog.append(close);host.append(dialog)
@@ -46,6 +47,28 @@ function singleVideo(){
  mocks.mediaGet.mockResolvedValue(result)
  return {file,result}
 }
+it('pins groups and individual files through the direct card action',async()=>{
+ setup();const {file}=singleVideo()
+ Object.assign(mocks.state.list.page.data[1],{isPinned:true,galleryFile:{...file,id:12,title:'고정한 파일'}})
+ await mount(h(GalleryPage))
+ await clickButton('게시글 1 고정')
+ expect(store.edit).toHaveBeenLastCalledWith({mediaId:1,expectedRevision:4,isPinned:true})
+ await clickButton('고정한 파일 고정 해제')
+ expect(store.edit).toHaveBeenLastCalledWith({mediaId:2,expectedRevision:4,isPinned:false,pinFileId:12})
+ expect(document.querySelector('[role=menu]')).toBeNull()
+})
+it('opens the animation editor directly from the card film icon',async()=>{
+ setup();singleVideo();await mount(h(GalleryPage))
+ await clickButton('게시글 1 GIF, WebP로 만들기')
+ expect(document.querySelector('[aria-label="편집 테스트 창"]')).not.toBeNull()
+ expect(mocks.mountEditor.mock.lastCall![1].file.id).toBe(11)
+})
+it('places pinned cards ahead of active downloads in the same scrolling grid',async()=>{
+ setup();Object.assign(mocks.state.list.page.data[0],{isPinned:true,galleryPinned:true})
+ downloads.activeJobs=[{id:'queued',title:'새 영상',state:'pending',phase:'queued',downloadedBytes:0,revision:1}]
+ await mount(h(GalleryPage))
+ expect([...document.querySelectorAll('article')].map(item=>item.textContent)).toEqual([expect.stringContaining('게시글 1'),expect.stringContaining('새 영상'),expect.stringContaining('게시글 2')])
+})
 it('switches gallery views, clears selection and exposes hidden files through the view menu',async()=>{
  setup();await mount(h(GalleryPage))
  expect(vi.mocked(useGalleryViewModel).mock.lastCall).toEqual([false,undefined,'all',false])
@@ -406,6 +429,100 @@ it('accepts an album drop after the pointercancel emitted by native dragstart', 
  expect(api.media.saveAlbum).toHaveBeenCalledExactlyOnceWith({ albumId: 9, expectedRevision: 3, addFileIds: [11], addMediaIds: [] })
 })
 
+it('accepts the first drop before React commits drag state and keeps the toolbar layout stable', async () => {
+ setup(); expandedRows()
+ Object.assign(mocks.state.list.page.data[0].galleryFile, {thumbnailPath:'C:/fixture/thumb.jpg'})
+ await mount(h(GalleryPage)); const transfer = dragTransfer()
+ expect(sourceCard(1).querySelector('img')?.getAttribute('draggable')).toBe('false')
+ const over = new Event('dragover', {bubbles:true,cancelable:true})
+ await act(async () => {
+  for (const [type, target] of [['dragstart',sourceCard(1).querySelector('img')!],['dragover',dropAlbum()],['drop',dropAlbum()]] as const) {
+   const event = type === 'dragover' ? over : new Event(type,{bubbles:true,cancelable:true})
+   Object.defineProperty(event,'dataTransfer',{value:transfer});target.dispatchEvent(event)
+  }
+ })
+ expect(over.defaultPrevented).toBe(true)
+ expect(api.media.saveAlbum).toHaveBeenCalledExactlyOnceWith({albumId:9,expectedRevision:3,addFileIds:[11],addMediaIds:[]})
+ expect(mocks.refresh).toHaveBeenCalledOnce()
+})
+
+it('preserves a native drag through focus changes without inserting a selection toolbar', async () => {
+ setup(); expandedRows(); await mount(h(GalleryPage)); const transfer = dragTransfer()
+ await dragEvent('dragstart',sourceCard(1),transfer)
+ expect(document.querySelector('[aria-label="선택 항목 작업"]')).toBeNull()
+ expect(sourceCard(1).dataset.selected).toBe('true')
+ await act(async () => window.dispatchEvent(new Event('blur')))
+ await dragEvent('dragover',dropAlbum(),transfer)
+ expect(dropAlbum().dataset.dropActive).toBe('true')
+ await dragEvent('drop',dropAlbum(),transfer)
+ expect(api.media.saveAlbum).toHaveBeenCalledOnce()
+})
+
+it('retries an additive drop once using the current album revision', async () => {
+ setup(); expandedRows()
+ api.media.saveAlbum.mockResolvedValueOnce({ok:false,error:{code:'REVISION_CONFLICT',message:'앨범이 변경되었습니다.'}})
+ mocks.mediaGet.mockResolvedValueOnce({ok:true,data:{id:9,revision:8,isUserAlbum:true}})
+ await mount(h(GalleryPage))
+ await act(async () => { sourceCard(1).querySelector<HTMLInputElement>('input')!.click();sourceCard(2).querySelector<HTMLInputElement>('input')!.click() })
+ const transfer=dragTransfer();await dragEvent('dragstart',sourceCard(1),transfer);await dragEvent('drop',dropAlbum(),transfer)
+ expect(mocks.mediaGet).toHaveBeenCalledExactlyOnceWith({mediaId:9,fileLimit:1,fileOffset:0})
+ expect(api.media.saveAlbum).toHaveBeenCalledTimes(2)
+ expect(api.media.saveAlbum).toHaveBeenLastCalledWith({albumId:9,expectedRevision:8,addFileIds:[11,22],addMediaIds:[]})
+ expect(document.querySelector('[role="alert"]')).toBeNull()
+ expect(mocks.refresh).toHaveBeenCalledOnce()
+})
+
+it('waits for the new revision before accepting the next drop', async () => {
+ setup(); expandedRows(); const refresh=deferred<boolean>();mocks.refresh.mockReturnValueOnce(refresh.promise)
+ await mount(h(GalleryPage));const transfer=dragTransfer()
+ await dragEvent('dragstart',sourceCard(1),transfer);await dragEvent('drop',dropAlbum(),transfer)
+ expect(sourceCard(2).getAttribute('draggable')).toBe('false')
+ await dragEvent('dragstart',sourceCard(2),transfer);await dragEvent('drop',dropAlbum(),transfer)
+ expect(api.media.saveAlbum).toHaveBeenCalledOnce()
+ await act(async () => { mocks.state.list.page.data.find((item:any)=>item.id===9).revision=8;refresh.resolve(true) })
+ await dragEvent('dragstart',sourceCard(2),transfer);await dragEvent('drop',dropAlbum(),transfer)
+ expect(api.media.saveAlbum).toHaveBeenCalledTimes(2)
+ expect(api.media.saveAlbum).toHaveBeenLastCalledWith({albumId:9,expectedRevision:8,addFileIds:[22],addMediaIds:[]})
+})
+
+it('shows file actions in an expanded album and removes only that membership', async () => {
+ setup(); expandedRows()
+ Object.assign(mocks.state.list.page.data[0],{isUserAlbum:true,title:'사진 앨범',galleryFile:{id:11,mediaId:77,title:'사진 11',kind:'image',filepath:'C:/fixture/second.jpg'}})
+ await mount(h(GalleryPage));await clickButton('사진 11 더보기')
+ const labels=[...document.querySelectorAll('[role="menuitem"]')].map(item=>item.textContent)
+ expect(labels).toEqual(expect.arrayContaining(['감상하기','상세 정보','앨범에 추가','파일 위치 열기','앨범에서 제외']))
+ for(const label of ['앨범 편집','앨범 접기','등록 해제','제목 편집','즐겨찾기 추가']) expect(labels).not.toContain(label)
+ await clickButton('파일 위치 열기')
+ expect(api.showItemInFolder).toHaveBeenCalledExactlyOnceWith('C:/fixture/second.jpg')
+ expect(mocks.mediaGet).not.toHaveBeenCalled()
+ await clickButton('사진 11 더보기');await clickButton('앨범에서 제외')
+ expect(api.media.saveAlbum).toHaveBeenCalledExactlyOnceWith({albumId:1,expectedRevision:4,removeFileIds:[11]})
+ expect(mocks.unregister).not.toHaveBeenCalled()
+ expect(mocks.refresh).toHaveBeenCalledOnce()
+ expect(document.body.textContent).toContain('‘사진 앨범’ 앨범에서 제외했습니다.')
+})
+
+it('keeps album actions on the album card and does not remove a file from a normal group', async () => {
+ setup();expandedRows();await mount(h(GalleryPage))
+ await clickButton('여행 더보기')
+ expect(document.querySelector('[role="menu"]')?.textContent).toContain('앨범 편집')
+ expect(document.querySelector('[role="menu"]')?.textContent).not.toContain('앨범에서 제외')
+ await clickButton('여행 더보기');await clickButton('사진 11 더보기')
+ expect(document.querySelector('[role="menu"]')?.textContent).not.toContain('앨범에서 제외')
+})
+
+it('preserves an album file when removing it has a revision conflict', async () => {
+ setup();expandedRows();mocks.state.list.page.data[0].isUserAlbum=true
+ api.media.saveAlbum.mockResolvedValueOnce({ok:false,error:{code:'REVISION_CONFLICT',message:'앨범이 변경되었습니다.'}})
+ await mount(h(GalleryPage));await clickButton('사진 11 더보기');await clickButton('앨범에서 제외')
+ expect(api.media.saveAlbum).toHaveBeenCalledOnce()
+ expect(mocks.mediaGet).not.toHaveBeenCalled()
+ expect(mocks.refresh).not.toHaveBeenCalled()
+ expect(sourceCard(1)).not.toBeNull()
+ expect(document.querySelector('[role="alert"]')?.textContent).toContain('새로고침')
+ expect(mocks.unregister).not.toHaveBeenCalled()
+})
+
 it('drags one expanded file without starting a marquee or including unrelated selections', async () => {
  setup(); expandedRows(); await mount(h(GalleryPage))
  expect(document.querySelector('aside')).toBeNull()
@@ -518,7 +635,7 @@ it('defers thumbnail refreshes until the active album drag ends', async () => {
   await dragEvent('dragstart', sourceCard(1), transfer)
   await act(async () => { mocks.on.mock.lastCall![0](); await vi.advanceTimersByTimeAsync(100) })
   expect(mocks.refresh).not.toHaveBeenCalled()
-  expect(document.querySelector('[aria-label="선택 항목 작업"]')?.textContent).toContain('1개 선택')
+  expect(document.querySelector('[aria-label="선택 항목 작업"]')).toBeNull()
   await dragEvent('dragend', sourceCard(1), transfer)
   expect(mocks.refresh).toHaveBeenCalledOnce()
  } finally { vi.useRealTimers() }

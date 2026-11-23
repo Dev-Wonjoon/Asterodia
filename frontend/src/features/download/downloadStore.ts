@@ -333,7 +333,7 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000, confirm: Co
         publishRequested()
 
         try {
-            // 순차 실행은 main의 DownloadService가 소유한다.
+            // 동시 실행 한도와 대기는 백엔드 DownloadService가 관리한다.
             const result = await api.run({ jobId, trigger })
 
             if (!result.ok) {

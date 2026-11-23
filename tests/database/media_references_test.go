@@ -30,7 +30,7 @@ func TestV3MediaReferencesMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if countDB(t, db, "PRAGMA user_version") != 11 || countDB(t, db, "SELECT count(*) FROM media WHERE id=7 AND custom_title='사용자 제목' AND cover_file_id=12") != 1 || countDB(t, db, "SELECT seq FROM sqlite_sequence WHERE name='media_file'") != 1000 {
+	if countDB(t, db, "PRAGMA user_version") != 12 || countDB(t, db, "SELECT count(*) FROM media WHERE id=7 AND custom_title='사용자 제목' AND cover_file_id=12") != 1 || countDB(t, db, "SELECT seq FROM sqlite_sequence WHERE name='media_file'") != 1000 {
 		t.Fatal("기존 식별자/표지/시퀀스가 변경됐습니다")
 	}
 	for _, kind := range []string{"video", "audio"} {
@@ -38,7 +38,7 @@ func TestV3MediaReferencesMigration(t *testing.T) {
 	}
 	assertHealthyDB(t, db)
 	var backupPath string
-	if err = db.QueryRow("SELECT backup_path FROM migration_run WHERE target_version=11").Scan(&backupPath); err != nil {
+	if err = db.QueryRow("SELECT backup_path FROM migration_run WHERE target_version=12").Scan(&backupPath); err != nil {
 		t.Fatal(err)
 	}
 	backup := rawDB(t, backupPath)

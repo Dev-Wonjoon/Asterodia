@@ -94,6 +94,8 @@ export interface MediaEditRequest {
         removeIds?: number[]
     }
     isFavorite?: boolean
+    isPinned?: boolean
+    pinFileId?: number
 }
 
 export interface MediaUnregisterRequest {
@@ -106,10 +108,12 @@ export interface MediaUnregisterFilesRequest extends MediaUnregisterRequest {
 }
 
 export interface MediaSummaryDto {
+    isPinned?: boolean
     isUserAlbum?: boolean
     galleryFile?: MediaFileDto
     galleryFileOffset?: number
     galleryCanCollapse?: boolean
+    galleryPinned?: boolean
     id: number
     sourceKind: MediaSourceKind
     requestUrl: string | null

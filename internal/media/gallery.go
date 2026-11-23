@@ -28,9 +28,17 @@ func listGallery(ctx context.Context, q queryer, req ListRequest, where string, 
 	raw, _ := json.Marshal(ids)
 	// Omitted visibility options retain the original API behavior for older clients.
 	hideFiles := req.ShowAlbumFiles != nil && !*req.ShowAlbumFiles
+	// File pins occupy one global slot, even if multiple expanded albums refer
+	// to that file. Album-only views keep their original album contents.
+	pinFiles := req.GalleryView != "albums"
+	unpinnedWhere, pinEnabled := "", "0"
+	if pinFiles {
+		unpinnedWhere = " AND NOT EXISTS(SELECT 1 FROM gallery_pin p WHERE p.file_id=f.id)"
+		pinEnabled = "1"
+	}
 	visibleWhere := ""
 	if hideFiles {
-		visibleWhere = " AND NOT EXISTS(SELECT 1 FROM user_album_file a WHERE a.file_id=f.id)"
+		visibleWhere = " AND (EXISTS(SELECT 1 FROM gallery_pin WHERE media_id=m.id) OR NOT EXISTS(SELECT 1 FROM user_album_file a WHERE a.file_id=f.id))"
 	}
 	viewWhere, forceFiles := "1=1", "0"
 	switch req.GalleryView {
@@ -39,29 +47,39 @@ func listGallery(ctx context.Context, q queryer, req ListRequest, where string, 
 	case "files":
 		viewWhere, forceFiles = "userAlbum=0 AND visibleFiles>0", "1"
 	}
-	if hideFiles && req.GalleryView != "albums" {
-		viewWhere += " AND (userAlbum=1 OR totalFiles=0 OR visibleFiles>0)"
+	if pinFiles {
+		viewWhere += " AND (userAlbum=1 OR totalFiles=0 OR visibleFiles>0 OR pinnedAt IS NOT NULL)"
 	}
 	// A partially hidden source group is rendered as its remaining file cards, so
 	// its cover and group-level actions cannot expose or select hidden files.
-	forced := "userAlbum=0 AND (" + forceFiles + " OR visibleFiles<totalFiles)"
+	forced := "userAlbum=0 AND visibleFiles>0 AND (" + forceFiles + " OR (visibleFiles<totalFiles AND pinnedAt IS NULL))"
 	cte := fmt.Sprintf(`WITH candidates AS (
-        SELECT m.id,m.created_at,
+        SELECT m.id,m.created_at,(SELECT created_at FROM gallery_pin WHERE media_id=m.id) AS pinnedAt,
           EXISTS(SELECT 1 FROM user_album WHERE media_id=m.id) AS userAlbum,
           m.id IN (SELECT value FROM json_each(?)) AS requestedExpanded,
           ((SELECT count(*) FROM media_file WHERE media_id=m.id)+(SELECT count(*) FROM user_album_file WHERE album_id=m.id)) AS totalFiles,
-          (SELECT count(*) FROM media_file f WHERE f.media_id=m.id%s) AS visibleFiles
+          (SELECT count(*) FROM media_file f WHERE f.media_id=m.id%s%s) AS visibleFiles,
+          ((SELECT count(*) FROM media_file f WHERE f.media_id=m.id%s)+
+           (SELECT count(*) FROM user_album_file a JOIN media_file f ON f.id=a.file_id WHERE a.album_id=m.id%s)) AS remainingFiles
         FROM media m WHERE %s
+    ), pinnedFiles AS (
+        SELECT f.id AS fileId,p.created_at AS pinnedAt,
+          coalesce((SELECT id FROM candidates WHERE id=f.media_id),
+            (SELECT min(c.id) FROM candidates c JOIN user_album_file a ON a.album_id=c.id WHERE a.file_id=f.id)) AS id
+        FROM gallery_pin p JOIN media_file f ON f.id=p.file_id WHERE %s
     ), albums AS (
-        SELECT id,created_at,userAlbum,
-          CASE WHEN %s THEN visibleFiles WHEN requestedExpanded THEN max(1,totalFiles) ELSE 1 END AS slots,
-          CASE WHEN %s THEN 1 ELSE requestedExpanded END AS expanded,
+        SELECT id,created_at,userAlbum,pinnedAt,0 AS fileId,
+          CASE WHEN %s THEN visibleFiles WHEN requestedExpanded THEN max(1,remainingFiles) ELSE 1 END AS slots,
+          CASE WHEN remainingFiles=0 THEN 0 WHEN %s THEN 1 ELSE requestedExpanded END AS expanded,
           CASE WHEN %s THEN 0 ELSE 1 END AS canCollapse
         FROM candidates WHERE %s
+        UNION ALL
+        SELECT c.id,c.created_at,c.userAlbum,p.pinnedAt,p.fileId,1,1,0
+        FROM pinnedFiles p JOIN candidates c ON c.id=p.id
     ), positioned AS (
-        SELECT id,slots,userAlbum,expanded,canCollapse,coalesce(sum(slots) OVER (ORDER BY created_at DESC,id DESC ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING),0) AS first
+        SELECT id,fileId,slots,userAlbum,expanded,canCollapse,pinnedAt IS NOT NULL AS pinned,coalesce(sum(slots) OVER (ORDER BY pinnedAt IS NOT NULL DESC,pinnedAt DESC,created_at DESC,id DESC,fileId DESC ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING),0) AS first
         FROM albums
-    ) `, visibleWhere, where, forced, forced, forced, viewWhere)
+    ) `, visibleWhere, unpinnedWhere, unpinnedWhere, unpinnedWhere, where, pinEnabled, forced, forced, forced, viewWhere)
 	params := append([]any{string(raw)}, args...)
 	var total int64
 	if err := q.QueryRowContext(ctx, cte+"SELECT coalesce(sum(slots),0) FROM positioned", params...).Scan(&total); err != nil {
@@ -80,7 +98,7 @@ func listGallery(ctx context.Context, q queryer, req ListRequest, where string, 
 	if int64(offset) >= total {
 		offset = max(0, (int(total)-1)/limit*limit)
 	}
-	slices, err := objects(ctx, q, cte+"SELECT id,slots,first,userAlbum,expanded,canCollapse FROM positioned WHERE first < ? AND first+slots > ? ORDER BY first", append(append([]any{}, params...), offset+limit, offset)...)
+	slices, err := objects(ctx, q, cte+"SELECT id,fileId,slots,first,userAlbum,expanded,canCollapse,pinned FROM positioned WHERE first < ? AND first+slots > ? ORDER BY first", append(append([]any{}, params...), offset+limit, offset)...)
 	if err != nil {
 		return failure(err)
 	}
@@ -91,22 +109,18 @@ func listGallery(ctx context.Context, q queryer, req ListRequest, where string, 
 		if err != nil {
 			return failure(err)
 		}
+		album["galleryPinned"] = slice["pinned"] == int64(1)
 		if slice["expanded"] == int64(0) || album["fileCount"].(int64) == 0 {
+			if pinFiles && album["fileCount"].(int64) > 0 && slice["expanded"] == int64(0) && seen[id] {
+				album["galleryCanCollapse"] = false
+			}
 			data = append(data, album)
 			continue
 		}
 		first, slots := int(slice["first"].(int64)), int(slice["slots"].(int64))
 		start, end := max(0, offset-first), min(slots, offset+limit-first)
 		var files []Object
-		if hideFiles && slice["userAlbum"] == int64(0) {
-			// Count the original position only for this bounded visible page. Detail
-			// panes still use the complete source order, including hidden files.
-			files, err = objects(ctx, q, `SELECT visible.*,
-                (SELECT count(*) FROM media_file prior WHERE prior.media_id=visible.mediaId AND (prior.position<visible.position OR (prior.position=visible.position AND prior.id<visible.id))) AS originalOffset
-                FROM (`+fileSQL+` WHERE media_id=? AND NOT EXISTS(SELECT 1 FROM user_album_file a WHERE a.file_id=media_file.id) ORDER BY position,id LIMIT ? OFFSET ?) visible`, id, end-start, start)
-		} else {
-			files, err = albumFiles(ctx, q, id, end-start, start)
-		}
+		files, err = galleryFiles(ctx, q, id, end-start, start, hideFiles && slice["userAlbum"] == int64(0) && album["isPinned"] != true, pinFiles, slice["fileId"].(int64))
 		if err != nil {
 			return failure(err)
 		}
@@ -121,6 +135,11 @@ func listGallery(ctx context.Context, q queryer, req ListRequest, where string, 
 				delete(file, "originalOffset")
 			}
 			item["galleryFile"], item["galleryFileOffset"] = file, fileOffset
+			var pinned bool
+			if err = q.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM gallery_pin WHERE file_id=?)", file["id"]).Scan(&pinned); err != nil {
+				return failure(err)
+			}
+			item["isPinned"] = pinned
 			if slice["canCollapse"] == int64(0) {
 				item["galleryCanCollapse"] = false
 			}
@@ -128,4 +147,46 @@ func listGallery(ctx context.Context, q queryer, req ListRequest, where string, 
 		}
 	}
 	return api.Success(Object{"data": data, "total": total, "hasNextPage": int64(offset+len(data)) < total, "offset": offset})
+}
+
+// Read only the requested slice. Count each returned file's original offset
+// without loading every file into Go, preserving viewer/detail navigation.
+func galleryFiles(ctx context.Context, q queryer, id int64, limit, offset int, hideFiles, excludePins bool, pinnedFileID int64) ([]Object, error) {
+	if pinnedFileID == 0 && !hideFiles {
+		var hasPins bool
+		if excludePins {
+			if err := q.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM gallery_pin WHERE file_id IN (SELECT id FROM media_file WHERE media_id=? UNION ALL SELECT file_id FROM user_album_file WHERE album_id=?))", id, id).Scan(&hasPins); err != nil {
+				return nil, err
+			}
+		}
+		if !hasPins {
+			return albumFiles(ctx, q, id, limit, offset)
+		}
+	}
+	where := albumFileWhere
+	args := []any{id, id}
+	if pinnedFileID != 0 {
+		where += " AND id=?"
+		args = append(args, pinnedFileID)
+	} else {
+		if hideFiles {
+			where += " AND NOT EXISTS(SELECT 1 FROM user_album_file a WHERE a.file_id=media_file.id)"
+		}
+		if excludePins {
+			where += " AND NOT EXISTS(SELECT 1 FROM gallery_pin p WHERE p.file_id=media_file.id)"
+		}
+	}
+	args = append(args, id, limit, offset)
+	query := `SELECT visible.*,
+      (SELECT count(*) FROM (
+         SELECT id,position FROM media_file WHERE media_id=?
+         UNION ALL SELECT file_id,position FROM user_album_file WHERE album_id=?
+       ) prior WHERE prior.position<visible.albumPosition OR (prior.position=visible.albumPosition AND prior.id<visible.id)) AS originalOffset
+      FROM (SELECT page.*,coalesce((SELECT position FROM user_album_file WHERE album_id=? AND file_id=page.id),page.position) AS albumPosition
+        FROM (` + fileSQL + " WHERE " + where + albumFileOrder + ` LIMIT ? OFFSET ?) page) visible`
+	files, err := objects(ctx, q, query, append([]any{id, id, id}, args...)...)
+	for _, file := range files {
+		delete(file, "albumPosition")
+	}
+	return files, err
 }

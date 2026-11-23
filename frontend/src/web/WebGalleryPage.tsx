@@ -108,11 +108,12 @@ export function WebGalleryPage({ title, filter, emptyMessage }: { title: string;
                         selectionKey={media.galleryFile ? `file:${media.galleryFile.id}` : `media:${media.id}`}
                         previewPath={media.galleryFile?.thumbnailPath ?? media.cover?.path ?? null} resolveUrl={toMediaUrl}
                         onView={() => openViewer(media)} onDetails={() => void store.openDetail(media.id, media.galleryFileOffset)}>
-                        <div className="relative flex flex-nowrap items-center gap-1 px-2 pb-1" data-detail-trigger data-action-boundary>
-                            <ActionButton className="gallery-card-action" icon={<Play />} label={translate("감상하기")} disabled={busy || !media.fileCount} onClick={() => openViewer(media)} />
-                            {(media.fileCount > 1 || media.galleryFile) && <ActionButton className="gallery-card-action" icon={media.galleryFile ? <ChevronUp /> : <ChevronDown />} label={`${media.isUserAlbum ? translate("앨범") : translate("파일")} ${media.galleryFile ? translate("접기") : translate("펼치기")}`} aria-label={`${media.title} ${media.isUserAlbum ? translate("앨범") : translate("파일")} ${media.galleryFile ? translate("접기") : translate("펼치기")}`} aria-expanded={!!media.galleryFile} disabled={busy} onClick={event => toggle(media, event.currentTarget)} />}
-                        </div>
-                        <GalleryCardActions title={media.galleryFile?.title || media.title} isFavorite={media.isFavorite} disabled={busy} mutationDisabled={busy} readOnly
+                        <GalleryCardActions
+                            primaryActions={<>
+                                <ActionButton className="gallery-card-action" icon={<Play />} label={translate("감상하기")} disabled={busy || !media.fileCount} onClick={() => openViewer(media)} />
+                                {(media.fileCount > 1 || media.galleryFile) && <ActionButton className="gallery-card-action" icon={media.galleryFile ? <ChevronUp /> : <ChevronDown />} label={`${media.isUserAlbum ? translate("앨범") : translate("파일")} ${media.galleryFile ? translate("접기") : translate("펼치기")}`} aria-label={`${media.title} ${media.isUserAlbum ? translate("앨범") : translate("파일")} ${media.galleryFile ? translate("접기") : translate("펼치기")}`} aria-expanded={!!media.galleryFile} disabled={busy} onClick={event => toggle(media, event.currentTarget)} />}
+                            </>}
+                            title={media.galleryFile?.title || media.title} isFavorite={media.isFavorite} disabled={busy} mutationDisabled={busy} readOnly
                             onToggleFavorite={noop} onOpenFolder={noop} onEdit={noop} onUnregister={noop}
                             onView={media.fileCount ? () => openViewer(media) : undefined} onDetails={() => void store.openDetail(media.id, media.galleryFileOffset)}
                             onToggleFiles={media.fileCount > 1 || media.galleryFile ? event => toggle(media, event.currentTarget) : undefined}

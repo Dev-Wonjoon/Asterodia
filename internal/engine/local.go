@@ -15,11 +15,13 @@ import (
 )
 
 type LocalMetadata struct {
-	Kind     string   `json:"kind"`
-	Format   string   `json:"format"`
-	Width    *int     `json:"width"`
-	Height   *int     `json:"height"`
-	Duration *float64 `json:"duration"`
+	FrameCount *int     `json:"frameCount,omitempty"`
+	VideoCodec string   `json:"-"`
+	Kind       string   `json:"kind"`
+	Format     string   `json:"format"`
+	Width      *int     `json:"width"`
+	Height     *int     `json:"height"`
+	Duration   *float64 `json:"duration"`
 }
 type LocalInspector struct{ FFprobe, FFmpeg, ImageMagick, Cache string }
 

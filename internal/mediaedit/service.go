@@ -39,10 +39,16 @@ type Service struct {
 	usageMu      sync.Mutex
 	usage        map[string]*usageTracker
 	activePage   bool
+	timelineMu   sync.Mutex
+	timelines    map[string]engine.GIFTimeline
+	overviewCtx  context.Context
+	overviewWG   sync.WaitGroup
+	overviewSlot chan struct{}
+	overviews    map[string]*overviewCache
 }
 
 func NewService(db *sql.DB, cache string, editor engine.VideoEditor, output func() string, changed func(int64)) *Service {
-	return &Service{store: Store{db}, cache: cache, editor: editor, output: output, changed: changed, wake: make(chan struct{}, 1)}
+	return &Service{store: Store{db}, cache: cache, editor: editor, output: output, changed: changed, wake: make(chan struct{}, 1), overviewSlot: make(chan struct{}, 1), overviews: make(map[string]*overviewCache), timelines: make(map[string]engine.GIFTimeline)}
 }
 func validID(id string) bool {
 	parsed, e := uuid.Parse(id)
@@ -539,6 +545,7 @@ func (s *Service) Start() error {
 	}
 	_ = s.pruneHistory(context.Background(), "")
 	ctx, cancel := context.WithCancel(context.Background())
+	s.overviewCtx = ctx
 	s.stop = cancel
 	s.done = make(chan struct{})
 	go s.work(ctx)
@@ -558,6 +565,7 @@ func (s *Service) Close() {
 	if done != nil {
 		<-done
 	}
+	s.overviewWG.Wait()
 }
 
 func trimBounds(v Session, req CreateRequest) (float64, float64, error) {

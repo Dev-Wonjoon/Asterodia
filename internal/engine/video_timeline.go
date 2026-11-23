@@ -3,9 +3,11 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -48,6 +50,14 @@ func (e VideoEditor) ReadVideoClipTimeline(ctx context.Context, source string, m
 }
 
 func (e VideoEditor) readVideoTimeline(ctx context.Context, source string, metadata LocalMetadata, extra []string, start, end float64) (GIFTimeline, error) {
+	small := metadata.FrameCount != nil && *metadata.FrameCount > 0 && (*metadata.FrameCount <= 1000 || extra != nil && (end-start)*float64(*metadata.FrameCount) / *metadata.Duration <= 1001)
+	if small && (metadata.VideoCodec == "h264" || metadata.VideoCodec == "hevc" || metadata.VideoCodec == "mpeg4" || metadata.VideoCodec == "av1") {
+		if value, err := e.packetVideoTimeline(ctx, source, metadata, extra != nil, start, end); err == nil {
+			return value, nil
+		} else if ctx.Err() != nil || errors.Is(err, ErrStopUnconfirmed) {
+			return GIFTimeline{}, err
+		}
+	}
 	result := GIFTimeline{Width: *metadata.Width, Height: *metadata.Height, TickRate: 1000}
 	first, previous, finalDuration := math.NaN(), 0.0, 0.0
 	boundary := int64(0)
@@ -102,6 +112,7 @@ func (e VideoEditor) readVideoTimeline(ctx context.Context, source string, metad
 				boundary = next
 			}
 			previous, finalDuration = pts, duration
+			result.FrameTimes = append(result.FrameTimes, pts-first)
 			return ctx.Err()
 		},
 	})
@@ -132,15 +143,105 @@ func (e VideoEditor) VideoFramePage(ctx context.Context, source, dir string, cou
 	return e.VideoClipFramePage(ctx, source, dir, count, offset, limit, 0, 0)
 }
 
-func (e VideoEditor) VideoClipFramePage(ctx context.Context, source, dir string, count, offset, limit int, start, end float64) error {
+func (e VideoEditor) VideoClipFramePage(ctx context.Context, source, dir string, count, offset, limit int, start, end float64, exactTime ...float64) error {
 	if count < 1 || offset < 0 || offset >= count || limit < 1 {
 		return fmt.Errorf("영상 프레임 범위를 확인하세요")
 	}
 	filter := fmt.Sprintf("trim=start_frame=%d:end_frame=%d,setpts=N/TB,scale=480:480:force_original_aspect_ratio=decrease,setsar=1", offset, min(count, offset+limit))
+	if len(exactTime) == 1 && end > start && !math.IsNaN(exactTime[0]) && !math.IsInf(exactTime[0], 0) && exactTime[0] >= start && exactTime[0] < end {
+		// Accurate input seeking decodes only from the preceding keyframe. A
+		// one-microsecond margin avoids rounding past the indexed source frame.
+		start = math.Max(start, exactTime[0]-0.000001)
+		filter = "setpts=N/TB,scale=480:480:force_original_aspect_ratio=decrease,setsar=1"
+	}
 	args := []string{}
 	if end > start {
 		args = append(args, "-ss", number(start), "-t", number(end-start))
 	}
 	args = append(args, "-protocol_whitelist", "file,pipe", "-i", source, "-map", "0:V:0", "-an", "-sn", "-dn", "-vf", filter, "-fps_mode", "passthrough", "-frames:v", strconv.Itoa(min(limit, count-offset)), "-start_number", strconv.Itoa(offset), "-q:v", "3", filepath.Join(dir, "%012d.jpg"))
 	return e.streamRun(ctx, dir, args, nil, nil, 0, nil)
+}
+
+// Indexed H.264/HEVC/MPEG-4/AV1 clips can use one packet per displayed frame.
+// Validate the complete container count and all PTS values, retaining only the
+// requested interval. Other layouts fall back to decoded frame timestamps.
+func (e VideoEditor) packetVideoTimeline(ctx context.Context, source string, metadata LocalMetadata, clipped bool, start, end float64) (GIFTimeline, error) {
+	result := GIFTimeline{Width: *metadata.Width, Height: *metadata.Height, TickRate: 1000}
+	type packet struct{ pts, duration float64 }
+	packets := make([]packet, 0, min(1000, *metadata.FrameCount))
+	seen := 0
+	_, err := new(ProcessRunner).Run(ctx, ProcessRequest{Executable: e.FFprobe, Directory: filepath.Dir(source), Timeout: 30 * time.Second, StreamOutput: true,
+		Arguments: []string{"-v", "error", "-protocol_whitelist", "file,pipe", "-select_streams", "V:0", "-show_packets", "-show_entries", "packet=pts_time,duration_time,flags", "-of", "compact=p=0", source},
+		OnStdoutLine: func(line string) error {
+			p := packet{pts: math.NaN()}
+			for _, field := range strings.Split(line, "|") {
+				key, value, _ := strings.Cut(field, "=")
+				if key == "flags" && strings.Contains(value, "D") {
+					return fmt.Errorf("discarded packet")
+				}
+				if key == "pts_time" {
+					var parseErr error
+					p.pts, parseErr = strconv.ParseFloat(value, 64)
+					if parseErr != nil {
+						p.pts = math.NaN()
+					}
+				}
+				if key == "duration_time" {
+					p.duration, _ = strconv.ParseFloat(value, 64)
+				}
+			}
+			if math.IsNaN(p.pts) || math.IsInf(p.pts, 0) || seen >= *metadata.FrameCount {
+				return fmt.Errorf("packet layout does not match frames")
+			}
+			seen++
+			if !clipped || p.pts >= start-0.000001 && p.pts < end-0.000001 {
+				packets = append(packets, p)
+			}
+			return ctx.Err()
+		}})
+	if err != nil {
+		return result, err
+	}
+	if seen != *metadata.FrameCount {
+		return result, fmt.Errorf("packet count does not match frames")
+	}
+	sort.Slice(packets, func(i, j int) bool { return packets[i].pts < packets[j].pts })
+	if len(packets) == 0 {
+		return result, fmt.Errorf("no displayed frames")
+	}
+	first, boundary := packets[0].pts, int64(0)
+	if clipped {
+		result.StartTime = first
+	}
+	for i, p := range packets {
+		if i > 0 && p.pts <= packets[i-1].pts {
+			return result, fmt.Errorf("ambiguous frame timestamps")
+		}
+		result.FrameTimes = append(result.FrameTimes, p.pts-first)
+		next := p.pts + p.duration
+		if i+1 < len(packets) {
+			next = packets[i+1].pts
+		}
+		ticks := int64(math.Round((next - first) * 1000))
+		delay := ticks - boundary
+		if i+1 == len(packets) {
+			duration := p.duration
+			if duration <= 0 && len(result.Delays) > 0 {
+				duration = float64(result.Delays[len(result.Delays)-1]) / 1000
+			}
+			if duration <= 0 {
+				duration = *metadata.Duration - (p.pts - first)
+			}
+			if clipped {
+				duration = math.Min(duration, end-p.pts)
+			}
+			delay = int64(math.Round(duration * 1000))
+		}
+		if delay < 1 || delay > 0xffffff {
+			return result, fmt.Errorf("invalid frame duration")
+		}
+		result.Delays = append(result.Delays, int(delay))
+		boundary = ticks
+	}
+	return result, nil
 }

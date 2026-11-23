@@ -364,12 +364,14 @@ func (e VideoEditor) ProbeVideo(ctx context.Context, path string) (LocalMetadata
 	var data struct {
 		Streams []struct {
 			CodecType     string `json:"codec_type"`
+			CodecName     string `json:"codec_name"`
+			FrameCount    string `json:"nb_frames"`
 			Width, Height int
 			SideData      []struct{ Rotation int } `json:"side_data_list"`
 		}
 		Format struct{ Duration string }
 	}
-	result, err := new(ProcessRunner).Run(ctx, ProcessRequest{Executable: e.FFprobe, Directory: filepath.Dir(path), Timeout: 30 * time.Second, Arguments: []string{"-v", "error", "-protocol_whitelist", "file,pipe", "-show_entries", "stream=codec_type,width,height:stream_side_data=rotation:format=duration", "-of", "json", path}})
+	result, err := new(ProcessRunner).Run(ctx, ProcessRequest{Executable: e.FFprobe, Directory: filepath.Dir(path), Timeout: 30 * time.Second, Arguments: []string{"-v", "error", "-protocol_whitelist", "file,pipe", "-show_entries", "stream=codec_type,codec_name,width,height,nb_frames:stream_side_data=rotation:format=duration", "-of", "json", path}})
 	if err != nil {
 		return LocalMetadata{}, err
 	}
@@ -388,7 +390,11 @@ func (e VideoEditor) ProbeVideo(ctx context.Context, path string) (LocalMetadata
 			if err != nil || !finiteRange(0, d) {
 				return LocalMetadata{}, fmt.Errorf("재생 시간을 확인할 수 없습니다")
 			}
-			return LocalMetadata{Kind: "video", Width: &v.Width, Height: &v.Height, Duration: &d}, nil
+			metadata := LocalMetadata{Kind: "video", Width: &v.Width, Height: &v.Height, Duration: &d, VideoCodec: v.CodecName}
+			if count, err := strconv.Atoi(v.FrameCount); err == nil && count > 0 {
+				metadata.FrameCount = &count
+			}
+			return metadata, nil
 		}
 	}
 	return LocalMetadata{}, fmt.Errorf("영상 스트림을 찾지 못했습니다")

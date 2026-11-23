@@ -133,7 +133,7 @@ func TestV4MigrationProcessCrash(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if countDB(t, db, "PRAGMA user_version") != 11 || countDB(t, db, "SELECT count(*) FROM media_file WHERE media_id=7 AND directory_id IS NOT NULL AND length(file_uuid)=36 AND length(filename_token)=8") != 1 {
+	if countDB(t, db, "PRAGMA user_version") != 12 || countDB(t, db, "SELECT count(*) FROM media_file WHERE media_id=7 AND directory_id IS NOT NULL AND length(file_uuid)=36 AND length(filename_token)=8") != 1 {
 		t.Fatal("v4 이관 재시작 실패")
 	}
 	assertHealthyDB(t, db)

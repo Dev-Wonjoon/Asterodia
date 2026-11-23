@@ -71,6 +71,14 @@ func (s *Service) editAPI(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			result = editor.FrameStatus(r.Context(), mediaedit.FramesRequest{ID: r.URL.Query().Get("id"), Offset: offset})
+		case "/api/edit/overview":
+			fileID, e := integer(r, "fileId", 0)
+			index, ie := integer(r, "index", 0)
+			if e != nil || ie != nil {
+				http.Error(w, "미리보기 위치를 확인하세요", 400)
+				return
+			}
+			result = editor.Overview(r.Context(), mediaedit.OverviewRequest{FileID: int64(fileID), Index: index})
 		default:
 			http.NotFound(w, r)
 			return

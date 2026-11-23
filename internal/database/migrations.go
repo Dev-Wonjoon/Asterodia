@@ -134,6 +134,11 @@ func Migrate(ctx context.Context, db *sql.DB, options MigrationOptions) (Migrati
 			return result, err
 		}
 	}
+	if result.FromVersion < 12 {
+		if _, err = conn.ExecContext(ctx, galleryPinDDL); err != nil {
+			return result, err
+		}
+	}
 	if _, err = insert(ctx, conn, "migration_run", record{"id": uuid.NewString(), "target_version": schemaVersion, "source_fingerprint": fingerprint, "schema_hash": hashBytes([]byte(schemaSQL)), "backup_path": result.BackupPath, "completed_at": now}); err != nil {
 		return result, err
 	}

@@ -19,7 +19,7 @@ import { GalleryCardActions } from './GalleryCardActions'
 import { useGalleryViewModel } from './useGalleryViewModel'
 import { GalleryDownloadCard } from './GalleryDownloadCard'
 import { DownloadDetailPane } from '../download/components/DownloadDetailPane'
-import type { GalleryView, MediaFilter, MediaSummaryDto } from '@contracts/media-v2'
+import type { AlbumRequest, GalleryView, MediaFilter, MediaSummaryDto } from '@contracts/media-v2'
 import { getApi } from '@renderer/shared/api'
 import { LocalImportPanel, type LocalImportControls } from '@renderer/features/localimport/LocalImportPanel'
 import { GalleryToolbar } from './GalleryToolbar'
@@ -27,7 +27,14 @@ import { GallerySelectionBar } from './GallerySelectionBar'
 import { GalleryBulkDialog } from './GalleryBulkDialog'
 import { useGalleryBulkActions, type BulkCommand } from './useGalleryBulkActions'
 import { ActionButton } from '@renderer/shared/components/ui/ActionButton'
-import { Play, ListPlus, ChevronDown, ChevronUp } from 'lucide-react'
+import { Play, ChevronDown, ChevronUp, Square, SquareCheck } from 'lucide-react'
+
+function CardSelectionIcon({ selected }: { selected: boolean }) {
+    const Icon = selected ? SquareCheck : Square
+    return <span aria-hidden="true" className="pointer-events-none flex size-[18px] items-center justify-center rounded-[3px] text-[var(--text-muted)] peer-checked:text-[var(--color-primary)] peer-disabled:opacity-40 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--color-primary)]">
+        <Icon className="size-[18px]" />
+    </span>
+}
 
 export const GalleryPage = ({
     favoritesOnly = false,
@@ -79,6 +86,7 @@ export const GalleryPage = ({
     const albumDropPending = useRef(false), albumDropRequest = useRef(0)
     const [hoveredAlbumId, setHoveredAlbumId] = useState<number | null>(null)
     const [albumDropError, setAlbumDropError] = useState(''), [albumDropNotice, setAlbumDropNotice] = useState('')
+    const [cardError, setCardError] = useState('')
     const [mergeSelection, setMergeSelection] = useState<MoveSelection[] | null>(null)
     const bulk = useGalleryBulkActions(store, selection, pointerSelection.removeMedia)
     const [draftDirty, setDraftDirty] = useState(false)
@@ -146,7 +154,7 @@ export const GalleryPage = ({
         listScrollRef.current?.scrollTo({ top: 0 })
         pointerSelection.clear(); setTagCommand(null)
         albumDropRequest.current++; albumDropPending.current = false
-        setAlbumDropBusy(false); setHoveredAlbumId(null); setAlbumDropError(''); setAlbumDropNotice('')
+        setAlbumDropBusy(false); setHoveredAlbumId(null); setAlbumDropError(''); setAlbumDropNotice(''); setCardError('')
         return () => { albumDropRequest.current++ }
     }, [filterKey, favoritesOnly, store, galleryView, showAlbumFiles])
 
@@ -200,6 +208,14 @@ export const GalleryPage = ({
             isFavorite: !media.isFavorite
         })
     }
+    function togglePin(media: MediaSummaryDto): void {
+        const current = store.getSnapshot()
+        if (current.busy || current.needsRefresh || dirtyRef.current) return
+        const listed = current.list.page.data.find(item => gallerySelectionKey(item) === gallerySelectionKey(media))
+        if (!listed) return
+        void store.edit({ mediaId: listed.id, expectedRevision: listed.revision,
+            isPinned: !listed.isPinned, ...(listed.galleryFile ? { pinFileId: listed.galleryFile.id } : {}) })
+    }
     async function unregisterMedia(mediaId: number): Promise<void> {
         const current = store.getSnapshot(), own = generation.current
         if (current.busy || current.needsRefresh) return
@@ -229,6 +245,8 @@ export const GalleryPage = ({
     const disabled = state.busy || bulk.busy || albumDropBusy || list.status !== 'ready'
     const toolbarDisabled = disabled || moveBusy || draftDirty || state.needsRefresh || mergeSelection !== null
     const pageDisabled = toolbarDisabled || list.refreshing
+    const firstUnpinnedIndex = list.page.data.findIndex(media => !media.galleryPinned && !media.isPinned)
+    const downloadCards = activeJobs.map(job => <GalleryDownloadCard key={'download:' + job.id} job={job} selected={downloadDetailId === job.id} disabled={disabled || moveBusy || tagCommand !== null} cancelling={downloads.cancellingIds.includes(job.id)} onOpen={() => { void openDownload(job.id) }} onCancel={() => downloads.cancelDownload(job.id)} />)
     selectionLocked.current = pageDisabled || tagCommand !== null || viewer !== null
     useEffect(() => { if (!pointerSelection.albumDrag || pageDisabled) setHoveredAlbumId(null) }, [pointerSelection.albumDrag, pageDisabled])
     async function openAnimationEditor(media: MediaSummaryDto) {
@@ -257,30 +275,59 @@ export const GalleryPage = ({
     }
     const clearSelection = pointerSelection.clear
     function acceptsAlbumDrop(album: MediaSummaryDto, event: DragEvent<HTMLElement>) {
-        const drag = pointerSelection.albumDrag
+        const drag = pointerSelection.getAlbumDrag()
         return Boolean(drag && !selectionLocked.current && !albumDropPending.current && album.isUserAlbum && !album.galleryFile &&
             !drag.mediaIds.includes(album.id) && event.dataTransfer.types.includes(albumDragType))
     }
     async function dropOnAlbum(album: MediaSummaryDto, event: DragEvent<HTMLElement>) {
         event.preventDefault(); event.stopPropagation(); setHoveredAlbumId(null)
-        if (!acceptsAlbumDrop(album, event) || !pointerSelection.albumDrag) return
-        const drag = pointerSelection.albumDrag, own = ++albumDropRequest.current
+        const drag = pointerSelection.getAlbumDrag()
+        if (!acceptsAlbumDrop(album, event) || !drag) return
+        await saveAlbumChange(album, { addFileIds: drag.fileIds, addMediaIds: drag.mediaIds }, translate("‘{0}’ 앨범에 추가했습니다.", { "0": album.title }))
+    }
+    async function saveAlbumChange(album: MediaSummaryDto, changes: Pick<AlbumRequest, 'addFileIds' | 'addMediaIds' | 'removeFileIds'>, notice: string) {
+        if (selectionLocked.current || albumDropPending.current) return
+        const own = ++albumDropRequest.current
         albumDropPending.current = true; setAlbumDropBusy(true); setAlbumDropError(''); setAlbumDropNotice('')
         pointerSelection.endAlbumDrag()
         try {
-            const result = await getApi().media.saveAlbum({
+            let result = await getApi().media.saveAlbum({
                 albumId: album.id, expectedRevision: album.revision,
-                addFileIds: drag.fileIds, addMediaIds: drag.mediaIds,
+                ...changes,
             })
             if (own !== albumDropRequest.current) return
+            // Adding memberships is idempotent. If a background update changed
+            // only the target revision, retry once with its current revision.
+            if (!result.ok && result.error.code === 'REVISION_CONFLICT' && !changes.removeFileIds) {
+                const latest = await getApi().media.get({ mediaId: album.id, fileLimit: 1, fileOffset: 0 })
+                if (own !== albumDropRequest.current) return
+                if (latest.ok && latest.data.isUserAlbum && latest.data.id === album.id) {
+                    result = await getApi().media.saveAlbum({ albumId: album.id, expectedRevision: latest.data.revision, ...changes })
+                    if (own !== albumDropRequest.current) return
+                }
+            }
             if (!result.ok) throw new Error(translateError(result.error))
-            setAlbumDropNotice(translate("‘{0}’ 앨범에 추가했습니다.", { "0": album.title }))
-            clearSelection(); void store.refresh()
+            setAlbumDropNotice(notice)
+            clearSelection()
+            // Keep the next write blocked until the new album revision is visible.
+            const refreshed = await store.refresh()
+            if (own === albumDropRequest.current && refreshed === false) setAlbumDropError(translate("앨범 변경은 저장했지만 목록을 갱신하지 못했습니다."))
         } catch (error) {
             if (own === albumDropRequest.current) setAlbumDropError(error instanceof Error ? error.message : translate("앨범 변경을 저장하지 못했습니다. 새로고침 후 확인하세요."))
         } finally {
             if (own === albumDropRequest.current) { albumDropPending.current = false; setAlbumDropBusy(false) }
         }
+    }
+    function removeFromAlbum(media: MediaSummaryDto) {
+        if (!media.isUserAlbum || !media.galleryFile) return
+        void saveAlbumChange(media, { removeFileIds: [media.galleryFile.id] }, translate("‘{0}’ 앨범에서 제외했습니다.", { "0": media.title }))
+    }
+    async function openCardFolder(media: MediaSummaryDto) {
+        setCardError('')
+        try {
+            if (media.galleryFile) await getApi().showItemInFolder(media.galleryFile.filepath)
+            else await openInFolder(media.id)
+        } catch { setCardError(translate("파일 위치를 열지 못했습니다.")) }
     }
     const selectedTargets = () => {
         const grouped = new Map<number, MoveSelection>(selection.map(item => [item.mediaId, { ...item }]))
@@ -363,6 +410,7 @@ export const GalleryPage = ({
                 </header>
                 {mediaEditLoading && <p role="status" className="text-sm text-[var(--text-muted)]">{translate("동영상 불러오는 중…")}</p>}
                 {mediaEditError && <p role="alert" className="text-sm text-red-500">{translateMessage(mediaEditError)}</p>}
+                {cardError && <p role="alert" className="text-sm text-red-500">{translateMessage(cardError)}</p>}
 
                 <AlbumManager selection={selection} fileIds={albumFileIds} disabled={toolbarDisabled} controlRef={albumControls} showSelectionActions={false}
                     onChanged={(id, deleted) => { if (deleted && store.getSnapshot().detail.mediaId === id) store.closeDetail(); void store.refresh() }} onClear={clearSelection} />
@@ -382,7 +430,7 @@ export const GalleryPage = ({
                     </p>
                 )}
                 {albumDropNotice && <p role="status" className="text-sm">{translateMessage(albumDropNotice)}</p>}
-                {albumDropError && <p role="alert" className="text-sm text-red-500">{translateMessage(albumDropError)} {translate("갤러리를 새로고침한 뒤 다시 놓아 주세요.")}</p>}
+                {albumDropError && <p role="alert" className="text-sm text-red-500">{translateMessage(albumDropError)} {translate("갤러리를 새로고침한 뒤 확인해 주세요.")}</p>}
 
                 {state.writeError && (
                     <p role="alert" className="text-sm">
@@ -414,8 +462,8 @@ export const GalleryPage = ({
                 <div ref={pointerSelection.gridRef} className={galleryGridClass + ' motion-gallery-grid min-h-32'}
                     onDragOver={event => { if (!event.defaultPrevented) event.dataTransfer.dropEffect = 'none' }}
                     onDrop={event => event.preventDefault()}>
-                    {activeJobs.map(job => <GalleryDownloadCard key={'download:' + job.id} job={job} selected={downloadDetailId === job.id} disabled={disabled || moveBusy || tagCommand !== null} cancelling={downloads.cancellingIds.includes(job.id)} onOpen={() => { void openDownload(job.id) }} onCancel={() => downloads.cancelDownload(job.id)} />)}
-                    {list.page.data.map((media) => (
+                    {list.page.data.flatMap((media, index) => [
+                        ...(index === firstUnpinnedIndex ? downloadCards : []),
                         <GalleryCard
                             key={media.galleryFile ? `album:${media.id}:file:${media.galleryFile.id}` : `album:${media.id}`}
                             media={media}
@@ -438,21 +486,26 @@ export const GalleryPage = ({
                             previewPath={media.galleryFile ? media.galleryFile.thumbnailPath ?? media.galleryFile.previewPath ?? (media.galleryFile.kind === 'image' ? media.galleryFile.filepath : null) : media.cover?.path ?? null}
                             onView={() => setViewer({ mediaId: media.id, fileId: media.galleryFile?.id })}
                             onDetails={() => { void selectDetail(media.id, media.galleryFileOffset) }}
-                            selection={!media.galleryFile && <label className="absolute right-2 top-2 z-10 flex size-7 items-center justify-center rounded bg-[var(--bg-sidebar)] shadow-sm" onClick={event => event.stopPropagation()}>
-                                <input type="checkbox" className="size-4 accent-[var(--color-primary)]" aria-label={media.title + translate(" 선택")} checked={pointerSelection.entries.has(gallerySelectionKey(media))} disabled={toolbarDisabled} onChange={() => {}} onClick={event => pointerSelection.select(media, event, true)} />
+                            selection={!media.galleryFile && <label className="absolute right-2 top-2 z-10 flex size-7 items-center justify-center rounded-lg bg-[var(--bg-sidebar)] shadow-sm hover:bg-[var(--bg-hover)]" onClick={event => event.stopPropagation()}>
+                                <input type="checkbox" className="peer absolute inset-0 m-0 size-full cursor-pointer opacity-0 disabled:cursor-default" aria-label={media.title + translate(" 선택")} checked={pointerSelection.entries.has(gallerySelectionKey(media))} disabled={toolbarDisabled} onChange={() => {}} onClick={event => pointerSelection.select(media, event, true)} />
+                                <CardSelectionIcon selected={pointerSelection.entries.has(gallerySelectionKey(media))} />
                             </label>}
                         >
-                            <div className="relative flex flex-nowrap items-center gap-1 px-2 pb-1" data-detail-trigger data-action-boundary>
-                                <ActionButton className="gallery-card-action" icon={<Play />} label={translate("감상하기")} disabled={pageDisabled || media.fileCount === 0} onClick={() => setViewer({ mediaId: media.id, fileId: media.galleryFile?.id })} />
-                                {!media.galleryFile && <ActionButton className="gallery-card-action" icon={<ListPlus />} label={media.fileCount === 1 ? translate("앨범에 추가") : translate("전체 추가")} aria-label={`${media.title} ${media.fileCount === 1 ? translate("앨범에 추가") : translate("전체 추가")}`} title={media.fileCount === 1 ? translate("앨범에 추가") : translate("파일 {0}개 전체를 앨범에 추가", { "0": media.fileCount })} disabled={toolbarDisabled || media.fileCount === 0} onClick={() => albumControls.current?.addMedia(media.id)} />}
-                                {media.galleryFile && <label title={translate("앨범에 추가할 파일 선택")} className="flex size-8 shrink-0 items-center justify-center"><input type="checkbox" aria-label={translate("{0} 앨범 추가 선택", { "0": media.galleryFile.title || translate("파일") })} disabled={pageDisabled} checked={pointerSelection.entries.has(gallerySelectionKey(media))} onChange={() => {}} onClick={event => pointerSelection.select(media, event, true)} /></label>}
-                                {media.galleryCanCollapse !== false && (media.fileCount > 1 || media.galleryFile) && <ActionButton icon={media.galleryFile ? <ChevronUp /> : <ChevronDown />} label={`${media.isUserAlbum ? translate("앨범") : translate("파일")} ${media.galleryFile ? translate("접기") : translate("펼치기")}`} className="gallery-card-action" disabled={pageDisabled} aria-expanded={Boolean(media.galleryFile)} aria-label={`${media.title} ${media.isUserAlbum ? translate("앨범") : translate("파일")} ${media.galleryFile ? translate("접기") : translate("펼치기")}`} onClick={event => {
-                                    toggleFiles(media.id, event.currentTarget)
-                                }} />}
-                            </div>
                             <GalleryCardActions
+                                primaryActions={<>
+                                    <ActionButton className="gallery-card-action" icon={<Play />} label={translate("감상하기")} disabled={pageDisabled || media.fileCount === 0} onClick={() => setViewer({ mediaId: media.id, fileId: media.galleryFile?.id })} />
+                                    {media.galleryFile && <label title={translate("앨범에 추가할 파일 선택")} className="relative flex size-8 shrink-0 items-center justify-center rounded-lg hover:bg-[var(--bg-hover)]">
+                                        <input type="checkbox" className="peer absolute inset-0 m-0 size-full cursor-pointer opacity-0 disabled:cursor-default" aria-label={translate("{0} 앨범 추가 선택", { "0": media.galleryFile.title || translate("파일") })} disabled={pageDisabled} checked={pointerSelection.entries.has(gallerySelectionKey(media))} onChange={() => {}} onClick={event => pointerSelection.select(media, event, true)} />
+                                        <CardSelectionIcon selected={pointerSelection.entries.has(gallerySelectionKey(media))} />
+                                    </label>}
+                                    {media.galleryCanCollapse !== false && (media.fileCount > 1 || media.galleryFile) && <ActionButton icon={media.galleryFile ? <ChevronUp /> : <ChevronDown />} label={`${media.isUserAlbum ? translate("앨범") : translate("파일")} ${media.galleryFile ? translate("접기") : translate("펼치기")}`} className="gallery-card-action" disabled={pageDisabled} aria-expanded={Boolean(media.galleryFile)} aria-label={`${media.title} ${media.isUserAlbum ? translate("앨범") : translate("파일")} ${media.galleryFile ? translate("접기") : translate("펼치기")}`} onClick={event => {
+                                        toggleFiles(media.id, event.currentTarget)
+                                    }} />}
+                                </>}
                                 title={media.galleryFile?.title || media.title}
                                 isFavorite={media.isFavorite}
+                                isPinned={media.isPinned}
+                                onTogglePin={() => togglePin(media)}
                                 disabled={disabled || moveBusy}
                                 mutationDisabled={pageDisabled}
                                 favoriteDisabledReason={
@@ -461,14 +514,16 @@ export const GalleryPage = ({
                                         : undefined
                                 }
                                 onToggleFavorite={() => toggleFavorite(media.id)}
-                                onOpenFolder={() => void openInFolder(media.id)}
+                                onOpenFolder={() => void openCardFolder(media)}
                                 onView={media.fileCount > 0 ? () => setViewer({ mediaId: media.id, fileId: media.galleryFile?.id }) : undefined}
                                 onDetails={() => { void selectDetail(media.id, media.galleryFileOffset) }}
                                 onCreateAnimation={media.galleryFile ? media.galleryFile.kind === 'video' ? () => { void openAnimationEditor(media) } : undefined : media.fileCount === 1 && media.cover?.kind === 'video' ? () => { void openAnimationEditor(media) } : undefined}
                                 editorDisabled={mediaEditLoading}
                                 onAdd={media.fileCount > 0 ? () => media.galleryFile ? albumControls.current?.addFiles([media.galleryFile.id]) : albumControls.current?.addMedia(media.id) : undefined}
-                                onEditAlbum={media.isUserAlbum ? () => albumControls.current?.edit(media) : undefined}
-                                onToggleFiles={media.galleryCanCollapse !== false && (media.fileCount > 1 || media.galleryFile) ? event => toggleFiles(media.id, event.currentTarget) : undefined}
+                                addLabel={!media.galleryFile && media.fileCount > 1 ? translate("전체 추가") : translate("앨범에 추가")}
+                                onEditAlbum={media.isUserAlbum && !media.galleryFile ? () => albumControls.current?.edit(media) : undefined}
+                                onRemoveFromAlbum={media.isUserAlbum && media.galleryFile ? () => removeFromAlbum(media) : undefined}
+                                onToggleFiles={!media.galleryFile && media.galleryCanCollapse !== false && media.fileCount > 1 ? event => toggleFiles(media.id, event.currentTarget) : undefined}
                                 filesLabel={`${media.isUserAlbum ? translate("앨범") : translate("파일")} ${media.galleryFile ? translate("접기") : translate("펼치기")}`}
                                 filesExpanded={Boolean(media.galleryFile)}
                                 fileOnly={Boolean(media.galleryFile)}
@@ -476,7 +531,8 @@ export const GalleryPage = ({
                                 onUnregister={() => unregisterMedia(media.id)}
                             />
                         </GalleryCard>
-                    ))}
+                    ])}
+                    {firstUnpinnedIndex === -1 && downloadCards}
                 </div>
 
                 {list.page.total > 0 && (

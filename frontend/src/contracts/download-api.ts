@@ -66,6 +66,7 @@ export interface DownloadJobDto {
     state: DownloadState
     phase: DownloadPhase | null
     progress: number
+    waiting?: boolean
     transfer?: DownloadTransferProgress | null
 
     // null은 기존 옵션을 현재 실행기가 지원하지 않는 상태다.

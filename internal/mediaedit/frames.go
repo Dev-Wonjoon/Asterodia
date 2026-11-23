@@ -235,7 +235,11 @@ func (s *Service) buildPage(ctx context.Context, id string, offset int) error {
 	if v.Options.NativeGIF {
 		e = s.editor.GIFFramePage(ctx, path, filepath.Join(s.cache, rel), v.FrameCount, offset, framePageSize)
 	} else if v.Options.NativeVideo {
-		e = s.editor.VideoClipFramePage(ctx, path, filepath.Join(s.cache, rel), v.FrameCount, offset, framePageSize, v.Options.Start, v.Options.End)
+		var exactTime []float64
+		if timing, err := s.timing(v); err == nil && len(timing.FrameTimes) == v.FrameCount {
+			exactTime = []float64{timing.StartTime + timing.FrameTimes[offset]}
+		}
+		e = s.editor.VideoClipFramePage(ctx, path, filepath.Join(s.cache, rel), v.FrameCount, offset, framePageSize, v.Options.Start, v.Options.End, exactTime...)
 	} else {
 		e = s.editor.FramePage(ctx, path, filepath.Join(s.cache, rel), v.Options.Start, v.Options.End, v.Options.FPS, v.FrameCount, offset, framePageSize)
 	}
@@ -273,7 +277,8 @@ func (s *Service) buildPage(ctx context.Context, id string, offset int) error {
 		return e
 	}
 	// A small LRU bounds preview disk use without bounding media dimensions or length.
-	rows, e := s.store.db.QueryContext(ctx, "SELECT session_id,page_offset FROM media_edit_page WHERE state='ready' ORDER BY accessed_at DESC LIMIT -1 OFFSET 8")
+	// Twenty-one pages cover 1,000 frames; retain them for immediate revisits.
+	rows, e := s.store.db.QueryContext(ctx, "SELECT session_id,page_offset FROM media_edit_page WHERE state='ready' ORDER BY accessed_at DESC LIMIT -1 OFFSET 24")
 	if e != nil {
 		return e
 	}
@@ -358,6 +363,12 @@ func (s *Service) timing(v Session) (engine.GIFTimeline, error) {
 	return s.readTimeline(v.ID, timelineName(v))
 }
 func (s *Service) readTimeline(id, name string) (engine.GIFTimeline, error) {
+	key := id + ":" + name
+	s.timelineMu.Lock()
+	defer s.timelineMu.Unlock()
+	if value, ok := s.timelines[key]; ok {
+		return value, nil
+	}
 	var value engine.GIFTimeline
 	root, err := os.OpenRoot(s.cache)
 	if err != nil {
@@ -370,6 +381,16 @@ func (s *Service) readTimeline(id, name string) (engine.GIFTimeline, error) {
 	}
 	defer f.Close()
 	err = json.NewDecoder(f).Decode(&value)
+	// Bound in-memory timing caches independently of source length.
+	if err == nil && len(value.Delays) <= 100000 {
+		if len(s.timelines) >= 2 {
+			for old := range s.timelines {
+				delete(s.timelines, old)
+				break
+			}
+		}
+		s.timelines[key] = value
+	}
 	return value, err
 }
 func (s *Service) pageTiming(v Session, p *FramePage) {

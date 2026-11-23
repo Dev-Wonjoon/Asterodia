@@ -97,6 +97,13 @@
 .sbe-resources .sbe-resource-warning p{margin:4px 0 0;line-height:1.6}
 @media(max-width:600px){.sbe-resources{padding:12px}.sbe-resource-grid{grid-template-columns:minmax(0,1fr);gap:10px}.sbe-resource-card{padding:14px}.sbe-resource-value strong{font-size:28px}}
 
+.sbe-overview{margin-top:12px}
+.sbe-overview-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+.sbe-overview-frame{display:flex;min-width:0;min-height:56px;flex-direction:column;justify-content:center;gap:4px;padding:4px;font-variant-numeric:tabular-nums}
+.sbe-overview-frame img{width:100%;aspect-ratio:16/9;object-fit:contain;background:#111c24}
+.sbe-overview-frame.is-unavailable{border-style:dashed}
+@media(max-width:600px){.sbe-overview-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
 .sb-editor{--scrollbar-thumb:#526a79;--scrollbar-thumb-hover:#7894a3}
 .sb-editor,.sb-editor *{scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) transparent}
 @supports selector(::-webkit-scrollbar){

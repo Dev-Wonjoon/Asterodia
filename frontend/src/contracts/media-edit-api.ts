@@ -107,6 +107,9 @@ export interface EditJob {
     createdAt: number;
 }
 export interface MediaEditApi {
+    overview(request: { fileId: number; index: number }): Promise<WebServerResult<{
+        index: number; count: number; time: number; duration: number; frameCount: number; image: string;
+    }>>;
     frames(request: {
         id: string;
         offset: number;

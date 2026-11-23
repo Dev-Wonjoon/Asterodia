@@ -16,10 +16,15 @@ button:focus-visible .action-content[data-display='details'] .action-label-text 
     button:hover .action-content[data-display='details'] .action-label { grid-template-columns: 1fr; }
     button:hover .action-content[data-display='details'] .action-label-text { opacity: 1; transform: translateX(0); }
 }
-.gallery-card-action.action-button { width: 32px; min-width: 32px; height: 36px; padding: 0; border-color: transparent; }
+.gallery-card-action.action-button { border-color: transparent; }
 .gallery-card-action.action-button:hover { background: var(--bg-hover); }
+.gallery-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+.gallery-grid > article { width: 100%; max-width: 320px; }
+.gallery-card-utilities > button,
+.gallery-card-utilities > label { flex: 0 1 32px; width: 32px; min-width: 24px; height: 36px; min-height: 36px; padding: 0; }
 @media (pointer: coarse) {
-    .gallery-card-action.action-button, .gallery-card-utilities > button { width: 44px; min-width: 44px; height: 44px; }
+    .gallery-card-utilities > button,
+    .gallery-card-utilities > label { flex-basis: 44px; width: 44px; min-width: 24px; height: 44px; }
     .gallery-card-utilities [role='menuitem'] { min-height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -1,11 +1,11 @@
 import { translate, useLanguage } from '@renderer/shared/i18n'
 import type { DownloadJobDto } from '@contracts/download-api'
 import { ProgressBar } from '@renderer/shared/components/ui/ProgressBar'
-import { downloadProgressView } from '../downloadPresentation'
+import { downloadProgressView, isDownloadWaiting } from '../downloadPresentation'
 
 export function DownloadProgress({ job }: { job: DownloadJobDto }) {
     useLanguage()
-    if (job.state !== 'running' || job.phase === 'finished') return null
+    if (job.state !== 'running' || job.phase === 'finished' || isDownloadWaiting(job)) return null
     const view = downloadProgressView(job)
     return <div className="space-y-1" aria-label={translate("미디어 다운로드 진행 상태")}>
         <ProgressBar label={job.transfer && job.transfer.fileCount > 1 ? translate("현재 파일 다운로드 진행률") : translate("다운로드 진행률")} value={view.percent} />

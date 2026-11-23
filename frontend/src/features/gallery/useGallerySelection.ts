@@ -29,10 +29,12 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
     const latest = useRef({ items }); latest.current = { items }
     function replace(next: Map<string, MoveSelection>) { selected.current = next; setEntries(next) }
     function clear() { anchor.current = null; rangeBase.current = new Map(); replace(new Map()) }
-    function endAlbumDrag() { albumDragRef.current = null; setAlbumDrag(null) }
+    function endAlbumDrag() { albumDragRef.current = null; setAlbumDrag(null); setDragBase(null) }
     function startAlbumDrag(item: MediaSummaryDto, event: DragEvent<HTMLElement>) {
         if (blocked.current || item.fileCount === 0) { event.preventDefault(); return }
         stop()
+        // Keep the action bar's layout unchanged until the native drag ends.
+        setDragBase(new Map(selected.current))
         const key = gallerySelectionKey(item)
         if (!selected.current.has(key)) {
             const next = new Map([[key, target(item)]])
@@ -172,7 +174,6 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
         // Native HTML dragging ends the pointer stream with pointercancel after
         // dragstart. Only cancel a marquee here; the album drag is still active.
         function cancelPointer() { if (gesture.current) stop(true) }
-        function cancel() { cancelPointer(); if (albumDragRef.current) endAlbumDrag() }
         function lost(event: globalThis.PointerEvent) { if (gesture.current?.active && gesture.current.id === event.pointerId && event.target === root) stop(true) }
         function escape(event: KeyboardEvent) {
             if (event.key === 'Escape' && albumDragRef.current) { event.preventDefault(); event.stopPropagation(); endAlbumDrag(); return }
@@ -183,7 +184,10 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
             }
         }
         window.addEventListener('pointermove', move, { passive: false }); window.addEventListener('pointerup', up)
-        window.addEventListener('pointercancel', cancelPointer); window.addEventListener('blur', cancel); window.addEventListener('keydown', escape, true)
+        // Windows native dragging can temporarily move focus away from the
+        // WebView. Native dragend also covers a drop outside the gallery.
+        window.addEventListener('pointercancel', cancelPointer); window.addEventListener('blur', cancelPointer); window.addEventListener('keydown', escape, true)
+        window.addEventListener('dragend', endAlbumDrag)
         window.addEventListener('lostpointercapture', lost)
         // Listen on the scroll pane, including empty space below the card grid.
         root?.addEventListener('pointerdown', onPointerDown)
@@ -191,15 +195,16 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
         return () => {
             cancelAnimationFrame(frame.current); gesture.current = null
             window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up)
-            window.removeEventListener('pointercancel', cancelPointer); window.removeEventListener('blur', cancel); window.removeEventListener('keydown', escape, true)
+            window.removeEventListener('pointercancel', cancelPointer); window.removeEventListener('blur', cancelPointer); window.removeEventListener('keydown', escape, true)
+            window.removeEventListener('dragend', endAlbumDrag)
             window.removeEventListener('lostpointercapture', lost)
             root?.removeEventListener('pointerdown', onPointerDown)
             window.removeEventListener('click', click, true); window.removeEventListener('dblclick', click, true)
         }
     }, [])
     // Keep the action bar's layout fixed while previews change under a marquee.
-    const committed = dragging && dragBase ? dragBase : entries
+    const committed = (dragging || albumDrag) && dragBase ? dragBase : entries
     const groups = [...committed.values()].filter(value => !value.fileIds)
     const fileSelections = [...committed.values()].filter(value => value.fileIds)
-    return { entries, groups, fileSelections, fileIds: fileSelections.flatMap(value => value.fileIds!), gridRef, rectangle, dragging, select, clear, all, removeMedia, albumDrag, startAlbumDrag, endAlbumDrag }
+    return { entries, groups, fileSelections, fileIds: fileSelections.flatMap(value => value.fileIds!), gridRef, rectangle, dragging, select, clear, all, removeMedia, albumDrag, getAlbumDrag: () => albumDragRef.current, startAlbumDrag, endAlbumDrag }
 }

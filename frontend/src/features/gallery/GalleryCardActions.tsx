@@ -1,11 +1,14 @@
 import { translate, useLanguage } from '@renderer/shared/i18n'
-import { useEffect, useId, useRef, useState, type MouseEvent } from 'react'
-import { Ellipsis, FolderOpen, Pencil, Star, Tags, Trash2, Info, Play, ListPlus, ChevronDown, ChevronUp, Film } from 'lucide-react'
+import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { Ellipsis, FolderOpen, Pencil, Star, Pin, Tags, Trash2, Info, Play, ListPlus, ChevronDown, ChevronUp, Film, ListMinus } from 'lucide-react'
 import { ActionContent } from '@renderer/shared/components/ui/ActionButton'
 
 interface GalleryCardActionsProps {
+    primaryActions?: ReactNode
     title: string
     isFavorite: boolean
+    isPinned?: boolean
+    onTogglePin?: () => void
     disabled: boolean
     mutationDisabled: boolean
     favoriteDisabledReason?: string
@@ -16,7 +19,9 @@ interface GalleryCardActionsProps {
     onView?: () => void
     onDetails?: () => void
     onAdd?: () => void
+    addLabel?: string
     onEditAlbum?: () => void
+    onRemoveFromAlbum?: () => void
     fileOnly?: boolean
     onToggleFiles?: (event: MouseEvent<HTMLButtonElement>) => void
     filesLabel?: string
@@ -27,15 +32,18 @@ interface GalleryCardActionsProps {
 }
 
 export function GalleryCardActions({
+    primaryActions,
     title,
     isFavorite,
+    isPinned = false,
+    onTogglePin,
     disabled,
     mutationDisabled,
     favoriteDisabledReason,
     onToggleFavorite,
     onOpenFolder,
     onEdit,
-    onUnregister, onView, onDetails, onAdd, onEditAlbum, fileOnly = false, onToggleFiles, filesLabel, filesExpanded, onCreateAnimation, editorDisabled, readOnly = false
+    onUnregister, onView, onDetails, onAdd, addLabel = translate("앨범에 추가"), onEditAlbum, onRemoveFromAlbum, fileOnly = false, onToggleFiles, filesLabel, filesExpanded, onCreateAnimation, editorDisabled, readOnly = false
 }: GalleryCardActionsProps): React.JSX.Element {
     useLanguage()
     const [open, setOpen] = useState(false)
@@ -76,7 +84,7 @@ export function GalleryCardActions({
             ref={root}
             data-detail-trigger
             data-action-boundary
-            className="gallery-card-utilities relative flex flex-nowrap items-center justify-end gap-1 border-t border-[var(--border-line)] px-2 py-1.5 text-sm"
+            className="gallery-card-utilities relative flex flex-nowrap items-center gap-0.5 border-t border-[var(--border-line)] px-2 py-1.5 text-sm"
             onClick={(event) => event.stopPropagation()}
             onKeyDown={(event) => {
                 if (!open) return
@@ -105,6 +113,7 @@ export function GalleryCardActions({
                 }
             }}
         >
+            {primaryActions}
             {!fileOnly && !readOnly && <button
                 type="button"
                 className={
@@ -125,7 +134,29 @@ export function GalleryCardActions({
                     aria-hidden="true"
                 />} />
             </button>}
-            {!fileOnly && !readOnly && <button
+            {!readOnly && onTogglePin && <button type="button" className={iconButton + (isPinned ? ' text-[var(--color-primary)]' : ' text-[var(--text-muted)]')}
+                disabled={disabled || mutationDisabled} aria-label={title + (isPinned ? translate(" 고정 해제") : translate(" 고정"))}
+                aria-pressed={isPinned} title={isPinned ? translate("고정 해제") : translate("갤러리 맨 위에 고정")}
+                onClick={() => { closeMenu(); onTogglePin() }}>
+                <ActionContent icon={<Pin className="size-[18px]" fill={isPinned ? 'currentColor' : 'none'} />} label={isPinned ? translate("고정 해제") : translate("갤러리 맨 위에 고정")} />
+            </button>}
+            {!readOnly && <button type="button" className={iconButton + ' text-[var(--text-muted)]'}
+                disabled={disabled || mutationDisabled} aria-label={title + translate(" 태그 편집")}
+                title={fileOnly ? translate("소속 묶음 태그 편집") : translate("태그 편집")}
+                onClick={() => { closeMenu(); onEdit('tags') }}>
+                <ActionContent icon={<Tags className="size-[18px]" />} label={fileOnly ? translate("소속 묶음 태그 편집") : translate("태그 편집")} />
+            </button>}
+            {!readOnly && onAdd && <button type="button" className={iconButton + ' text-[var(--text-muted)]'}
+                disabled={disabled || mutationDisabled} aria-label={title + ' ' + addLabel} title={addLabel}
+                onClick={() => { closeMenu(); onAdd() }}>
+                <ActionContent icon={<ListPlus className="size-[18px]" />} label={addLabel} />
+            </button>}
+            {onCreateAnimation && <button type="button" className={iconButton + ' text-[var(--text-muted)]'}
+                disabled={disabled || mutationDisabled || editorDisabled} aria-label={title + translate(" GIF, WebP로 만들기")} title={translate("GIF, WebP로 만들기")}
+                onClick={() => { closeMenu(); onCreateAnimation() }}>
+                <ActionContent icon={<Film className="size-[18px]" />} label={translate("GIF, WebP로 만들기")} />
+            </button>}
+            {!readOnly && <button
                 type="button"
                 className={iconButton + ' text-[var(--text-muted)]'}
                 disabled={disabled}
@@ -182,8 +213,10 @@ export function GalleryCardActions({
                     {onDetails && <button type="button" role="menuitem" className={menuItem} onClick={() => { closeMenu(); onDetails() }}><Info className="size-4" aria-hidden="true" />{translate("상세 정보")}</button>}
                     {onCreateAnimation && <button type="button" role="menuitem" className={menuItem} disabled={mutationDisabled || editorDisabled} onClick={() => { closeMenu(); onCreateAnimation() }}><Film className="size-4" aria-hidden="true" />{translate("GIF, WebP로 만들기")}</button>}
                     {onAdd && <button type="button" role="menuitem" className={menuItem} disabled={mutationDisabled} onClick={() => { closeMenu(); onAdd() }}><ListPlus className="size-4" aria-hidden="true" />{translate("앨범에 추가")}</button>}
-                    {onToggleFiles && <button type="button" role="menuitem" className={menuItem} disabled={mutationDisabled} aria-expanded={filesExpanded} onClick={event => { closeMenu(); onToggleFiles(event) }}>{filesExpanded ? <ChevronUp className="size-4" aria-hidden="true" /> : <ChevronDown className="size-4" aria-hidden="true" />}{filesLabel}</button>}
-                    {onEditAlbum && <button type="button" role="menuitem" className={menuItem} disabled={mutationDisabled} onClick={() => { closeMenu(); onEditAlbum() }}><Pencil className="size-4" aria-hidden="true" />{translate("앨범 편집")}</button>}
+                    {!fileOnly && onToggleFiles && <button type="button" role="menuitem" className={menuItem} disabled={mutationDisabled} aria-expanded={filesExpanded} onClick={event => { closeMenu(); onToggleFiles(event) }}>{filesExpanded ? <ChevronUp className="size-4" aria-hidden="true" /> : <ChevronDown className="size-4" aria-hidden="true" />}{filesLabel}</button>}
+                    {!fileOnly && onEditAlbum && <button type="button" role="menuitem" className={menuItem} disabled={mutationDisabled} onClick={() => { closeMenu(); onEditAlbum() }}><Pencil className="size-4" aria-hidden="true" />{translate("앨범 편집")}</button>}
+                    {fileOnly && !readOnly && <button type="button" role="menuitem" className={menuItem} onClick={() => { closeMenu(); onOpenFolder() }}><FolderOpen className="size-4" aria-hidden="true" />{translate("파일 위치 열기")}</button>}
+                    {!readOnly && onRemoveFromAlbum && <button type="button" role="menuitem" className={menuItem} disabled={mutationDisabled} onClick={() => { closeMenu(); onRemoveFromAlbum() }}><ListMinus className="size-4" aria-hidden="true" />{translate("앨범에서 제외")}</button>}
                     {!fileOnly && !readOnly && <>
                     <button type="button" role="menuitem" className={menuItem} disabled={mutationDisabled || Boolean(favoriteDisabledReason)} title={favoriteDisabledReason} onClick={() => { closeMenu(); onToggleFavorite() }}><Star className="size-4" aria-hidden="true" />{isFavorite ? translate("즐겨찾기 해제") : translate("즐겨찾기 추가")}</button>
                     <button type="button" role="menuitem" className={menuItem} onClick={() => { closeMenu(); onOpenFolder() }}><FolderOpen className="size-4" aria-hidden="true" />{translate("파일 위치 열기")}</button>

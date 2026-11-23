@@ -2,8 +2,9 @@ import { getLocale, translate, useLanguage } from '@renderer/shared/i18n'
 import type { DragEvent, MouseEvent, ReactNode } from 'react'
 import type { MediaSummaryDto } from '@contracts/media-v2'
 import { MediaPreview } from '@renderer/shared/components/media/MediaPreview'
+import { Pin } from 'lucide-react'
 
-export const galleryGridClass = 'grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(min(100%,200px),1fr))] items-start gap-4'
+export const galleryGridClass = 'gallery-grid grid items-start gap-4'
 
 /** The desktop and HTTP clients render this same card. Actions depend on the client. */
 export function GalleryCard({ media, previewPath, resolveUrl, selected, active, selection, disabled, viewDisabled, onView, onDetails, onSelect, selectionKey, onAlbumDragStart, onAlbumDragEnd, onAlbumDragOver, onAlbumDragLeave, onAlbumDrop, albumDropActive, children }: {
@@ -48,9 +49,10 @@ export function GalleryCard({ media, previewPath, resolveUrl, selected, active, 
             <span className="rounded-lg bg-[var(--color-primary)] px-3 py-2 text-sm font-semibold text-white">{translate("앨범에 추가")}</span>
         </div>}
         {selection}
+        {media.isPinned && <span title={translate("고정됨")} aria-label={translate("고정됨")} className="pointer-events-none absolute left-2 top-2 z-10 flex size-7 items-center justify-center rounded bg-[var(--bg-sidebar)] text-[var(--color-primary)] shadow-sm"><Pin className="size-4" fill="currentColor" aria-hidden="true" /></span>}
         <button type="button" data-card-select disabled={viewDisabled || (!onSelect && media.fileCount === 0)} aria-label={title + (onSelect ? translate(" 선택 · 두 번 클릭하여 감상") : translate(" 감상하기"))} onClick={event => { if (!onSelect || event.detail === 0 && !event.ctrlKey && !event.shiftKey && !event.metaKey) onView(); else if (event.detail < 2) onSelect(event) }}
             className="block w-full overflow-hidden rounded-t-xl text-left disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]">
-            <MediaPreview path={previewPath} resolveUrl={resolveUrl} title={media.title} className="aspect-video w-full bg-[var(--bg-active)] object-cover" />
+            <MediaPreview draggable={false} path={previewPath} resolveUrl={resolveUrl} title={media.title} className="aspect-video w-full bg-[var(--bg-active)] object-cover" />
         </button>
         <div className="space-y-1 p-3">
             <h2 className="truncate font-medium"><button type="button" data-card-select aria-label={title + translate(" 상세보기")} disabled={onSelect ? viewDisabled : disabled} onClick={event => { if (!onSelect || event.detail === 0 && !event.ctrlKey && !event.shiftKey && !event.metaKey) onDetails(); else if (event.detail < 2) onSelect(event) }}

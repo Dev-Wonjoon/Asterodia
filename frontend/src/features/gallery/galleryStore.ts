@@ -472,7 +472,7 @@ export function createGalleryStore(
 
         const data = removeFromList
             ? page.data.filter((previous) => previous.id !== media.id)
-            : page.data.map((previous) => (previous.id === media.id ? { ...previous, ...media } : previous))
+            : page.data.map((previous) => (previous.id === media.id ? { ...previous, ...media, ...(previous.galleryFile ? { isPinned: previous.isPinned } : {}) } : previous))
 
         const total = removeFromList && listed ? Math.max(0, page.total - 1) : page.total
 
@@ -685,7 +685,14 @@ export function createGalleryStore(
                 Object.keys(input).every((key) =>
                     ['mediaId', 'expectedRevision', 'isFavorite'].includes(key)
                 )
-            return mutate(() => api.edit(input), edited, favoriteOnly ? null : undefined)
+            return mutate(() => api.edit(input), media => {
+                edited(media)
+                if (input.isPinned !== undefined && input.pinFileId) {
+                    publish({ ...snapshot, list: { ...snapshot.list, page: { ...snapshot.list.page,
+                        data: snapshot.list.page.data.map(item => item.galleryFile?.id === input.pinFileId ? { ...item, isPinned: input.isPinned } : item)
+                    } } })
+                }
+            }, favoriteOnly || input.isPinned !== undefined ? null : undefined)
         },
 
         unregisterFiles: (input: MediaUnregisterFilesRequest) =>

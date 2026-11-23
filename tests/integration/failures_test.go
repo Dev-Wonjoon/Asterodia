@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/Dev-Wonjoon/StorageBucket/internal/database"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
@@ -16,52 +14,6 @@ import (
 	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/thumbnail"
 )
-
-func TestQueueSerializesEnginesAndCancelsWaitingJob(t *testing.T) {
-	f := newFixture(t)
-	started := make(chan struct{})
-	var calls atomic.Int32
-	f.gallery = func(ctx context.Context, _ string, _ string) (engine.GalleryDLDiscovery, error) {
-		if calls.Add(1) == 1 {
-			close(started)
-		}
-		<-ctx.Done()
-		return engine.GalleryDLDiscovery{}, ctx.Err()
-	}
-	first := f.enqueue(t)
-	second := success(t, f.service.Enqueue(t.Context(), download.EnqueueRequest{Mode: "create", URL: "https://www.instagram.com/p/SecondFixture/?second=1"})).(download.Job)
-	result1, result2 := make(chan struct{}, 1), make(chan struct{}, 1)
-	go func() {
-		f.service.Run(context.Background(), download.RunRequest{JobID: first.ID, Trigger: "manual_initial"})
-		result1 <- struct{}{}
-	}()
-	select {
-	case <-started:
-	case <-time.After(5 * time.Second):
-		t.Fatal("첫 엔진 시작 실패")
-	}
-	go func() {
-		f.service.Run(context.Background(), download.RunRequest{JobID: second.ID, Trigger: "manual_initial"})
-		result2 <- struct{}{}
-	}()
-	// The second job may be cancelled either before or after it enters the slot wait.
-	success(t, f.service.Cancel(t.Context(), download.JobRequest{JobID: second.ID}))
-	select {
-	case <-result2:
-	case <-time.After(5 * time.Second):
-		t.Fatal("대기 작업 취소 실패")
-	}
-	if calls.Load() != 1 {
-		t.Fatal("여러 엔진이 동시에 실행됐습니다")
-	}
-	success(t, f.service.Cancel(t.Context(), download.JobRequest{JobID: first.ID}))
-	select {
-	case <-result1:
-	case <-time.After(5 * time.Second):
-		t.Fatal("실행 작업 취소 실패")
-	}
-	assertFK(t, f.db)
-}
 
 func TestReplacementCommitFailureKeepsOldLibrary(t *testing.T) {
 	for _, mode := range []string{"db-insert-failure", "revision-conflict"} {

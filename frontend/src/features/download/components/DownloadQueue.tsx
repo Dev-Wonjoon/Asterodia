@@ -48,9 +48,6 @@ export function DownloadQueue(): React.JSX.Element {
                                 </p>
                                 <p className="text-sm">
                                     {downloadStatus(job)}
-                                    {vm.requestedIds.includes(job.id) && job.state === 'pending'
-                                        ? translate(" · 실행 요청 대기")
-                                        : ''}
                                     {job.cleanupRequired ? translate(" · 정리 필요") : ''}
                                     {job.options === null ? translate(" · 이전 옵션 확인 필요") : ''}
                                 </p>

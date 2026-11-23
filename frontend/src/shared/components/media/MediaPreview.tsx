@@ -7,12 +7,14 @@ export function MediaPreview({
     fallbackPath = null,
     resolveUrl = toMediaUrl,
     title,
+    draggable,
     className = ''
 }: {
     path: string | null
     fallbackPath?: string | null
     resolveUrl?: typeof toMediaUrl
     title: string
+    draggable?: boolean
     className?: string
 }) {
     useLanguage()
@@ -34,6 +36,7 @@ export function MediaPreview({
 
     return (
         <img
+            draggable={draggable}
             src={url}
             alt={title}
             loading="lazy"

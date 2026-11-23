@@ -63,6 +63,8 @@ type EditRequest struct {
 		RemoveIDs []int64  `json:"removeIds"`
 	} `json:"tagChange"`
 	IsFavorite *bool `json:"isFavorite"`
+	IsPinned   *bool `json:"isPinned"`
+	PinFileID  int64 `json:"pinFileId"`
 }
 type UnregisterRequest struct {
 	MediaID          int64   `json:"mediaId"`
@@ -150,6 +152,11 @@ func summary(ctx context.Context, q queryer, id int64) (Object, error) {
 	}
 	obj := rows[0]
 	obj["isFavorite"] = obj["isFavorite"] == int64(1)
+	var pinned bool
+	if err = q.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM gallery_pin WHERE media_id=?)", id).Scan(&pinned); err != nil {
+		return nil, err
+	}
+	obj["isPinned"] = pinned
 	obj["isUserAlbum"] = obj["isUserAlbum"] == int64(1)
 	covers, err := objects(ctx, q, `SELECT f.id AS fileId,coalesce(f.thumbnail_path,f.preview_path,CASE WHEN f.kind='image' THEN f.filepath END) AS path,f.kind FROM media_file f WHERE f.media_id=? OR f.id IN (SELECT file_id FROM user_album_file WHERE album_id=?) ORDER BY CASE WHEN f.id=coalesce((SELECT cover_file_id FROM user_album WHERE media_id=?),(SELECT cover_file_id FROM media WHERE id=?)) THEN 0 ELSE 1 END,CASE WHEN f.thumbnail_path IS NOT NULL OR f.kind='image' THEN 0 ELSE 1 END,coalesce((SELECT position FROM user_album_file WHERE album_id=? AND file_id=f.id),f.position),f.id LIMIT 1`, id, id, id, id, id)
 	if obj["isUserAlbum"] == true {
@@ -408,6 +415,9 @@ func (s *Service) Edit(ctx context.Context, req EditRequest) api.Result {
 	if req.TagIDs != nil && req.TagChange != nil {
 		return failure(domainError("INVALID_ARGUMENT"))
 	}
+	if req.PinFileID < 0 || (req.PinFileID != 0 && req.IsPinned == nil) {
+		return failure(domainError("INVALID_ARGUMENT"))
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return failure(err)
@@ -514,6 +524,34 @@ func (s *Service) Edit(ctx context.Context, req EditRequest) api.Result {
 		}
 		if err != nil {
 			return failure(err)
+		}
+	}
+	if req.IsPinned != nil {
+		column, id := "media_id", req.MediaID
+		if req.PinFileID != 0 {
+			var owner, revision int64
+			if err = tx.QueryRowContext(ctx, "SELECT f.media_id,m.revision FROM media_file f JOIN media m ON m.id=f.media_id WHERE f.id=? AND (f.media_id=? OR EXISTS(SELECT 1 FROM user_album_file WHERE album_id=? AND file_id=f.id))", req.PinFileID, req.MediaID, req.MediaID).Scan(&owner, &revision); err != nil {
+				return failure(err)
+			}
+			if err = checkWrite(ctx, tx, owner, revision); err != nil {
+				return failure(err)
+			}
+			column, id = "file_id", req.PinFileID
+		}
+		if *req.IsPinned {
+			_, err = tx.ExecContext(ctx, "INSERT INTO gallery_pin("+column+",created_at) VALUES(?,?) ON CONFLICT("+column+") DO NOTHING", id, now)
+		} else {
+			_, err = tx.ExecContext(ctx, "DELETE FROM gallery_pin WHERE "+column+"=?", id)
+		}
+		if err != nil {
+			return failure(err)
+		}
+		if req.PinFileID != 0 {
+			// Invalidate every representation, including the source group, so a
+			// stale card cannot overwrite a pin toggled through another album.
+			if _, err = tx.ExecContext(ctx, `UPDATE media SET revision=revision+1 WHERE id<>? AND (id=(SELECT media_id FROM media_file WHERE id=?) OR id IN (SELECT album_id FROM user_album_file WHERE file_id=?))`, req.MediaID, req.PinFileID, req.PinFileID); err != nil {
+				return failure(err)
+			}
 		}
 	}
 	if _, err = tx.ExecContext(ctx, "UPDATE media SET revision=revision+1,updated_at=? WHERE id=?", now, req.MediaID); err != nil {

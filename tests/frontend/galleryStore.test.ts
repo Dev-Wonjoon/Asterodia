@@ -107,6 +107,39 @@ function detail(id = 1, revision = 0, offset = 0, total = 1): MediaDetailDto {
     }
 }
 
+it('preserves per-file pin state when a group edit is followed by a refresh failure', async () => {
+    let saved = false
+    const { store } = fixture({
+        list: async () => saved ? fail('INTERNAL_ERROR') : ok({ data: [
+            { ...summary(), isPinned: false, galleryFile: file(1) },
+            { ...summary(), isPinned: true, galleryFile: file(2) }
+        ], total: 2, hasNextPage: false }),
+        edit: async () => { saved = true; return ok({ ...summary(1, 1), isPinned: true, isFavorite: true }) }
+    })
+    await store.refresh()
+    await store.edit({ mediaId: 1, expectedRevision: 0, isFavorite: true })
+    assert.deepEqual(store.getSnapshot().list.page.data.map(row => row.isPinned), [false, true])
+    assert.equal(store.getSnapshot().needsRefresh, true)
+})
+
+it('updates only the pinned file and keeps a failed follow-up refresh visible', async () => {
+    let saved = false
+    const { store, calls } = fixture({
+        list: async () => saved ? fail('INTERNAL_ERROR') : ok({ data: [
+            { ...summary(), isPinned: false, galleryFile: file(1) },
+            { ...summary(), isPinned: false, galleryFile: file(2) }
+        ], total: 2, hasNextPage: false }),
+        edit: async () => { saved = true; return ok({ ...summary(1, 1), isPinned: false }) }
+    })
+    await store.refresh()
+    const input = { mediaId: 1, expectedRevision: 0, isPinned: true, pinFileId: 2 }
+    assert.equal(await store.edit(input), true)
+    assert.deepEqual(calls.edit, [input])
+    assert.deepEqual(store.getSnapshot().list.page.data.map(row => row.isPinned), [false, true])
+    assert.equal(store.getSnapshot().needsRefresh, true)
+    assert.match(store.getSnapshot().notice!, /변경은 반영됐지만/)
+})
+
 function fixture(overrides: Partial<MediaApi> = {}) {
     const calls = {
         list: [] as number[],

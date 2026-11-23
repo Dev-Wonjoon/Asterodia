@@ -13,12 +13,13 @@ import (
 
 // GIFTimeline reads container timing without allocating decoded source frames.
 type GIFTimeline struct {
-	StartTime    float64 `json:"startTime,omitempty"`
-	TickRate     int     `json:"tickRate,omitempty"`
-	Width        int     `json:"width"`
-	Height       int     `json:"height"`
-	DelayOffsets []int64 `json:"-"`
-	Delays       []int   `json:"delays"` // hundredths of a second
+	FrameTimes   []float64 `json:"frameTimes,omitempty"` // exact video timestamps relative to StartTime
+	StartTime    float64   `json:"startTime,omitempty"`
+	TickRate     int       `json:"tickRate,omitempty"`
+	Width        int       `json:"width"`
+	Height       int       `json:"height"`
+	DelayOffsets []int64   `json:"-"`
+	Delays       []int     `json:"delays"` // hundredths of a second
 }
 
 func ReadGIFTimeline(ctx context.Context, path string) (GIFTimeline, error) {

@@ -37,7 +37,7 @@ func TestOpenExisting(t *testing.T) {
 	t.Run("v5-connection", func(t *testing.T) {
 		ctx := t.Context()
 		filename := filepath.Join(root, "fixture #한글.sqlite")
-		createSQLiteFixture(t, filename, "PRAGMA user_version = 11",
+		createSQLiteFixture(t, filename, "PRAGMA user_version = 12",
 			"CREATE TABLE parent (id INTEGER PRIMARY KEY)",
 			"CREATE TABLE child (parent_id INTEGER REFERENCES parent(id))",
 			"INSERT INTO parent (id) VALUES (1)",

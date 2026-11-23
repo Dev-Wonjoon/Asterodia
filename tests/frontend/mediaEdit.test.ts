@@ -6,6 +6,7 @@ const draft = () => ({ id:'a7b4c924-c2eb-4c50-8795-83272a0aad49',fileId:1,title:
 let instance: { destroy(): void } | undefined
 const ok = (data: unknown) => ({ok:true,data})
 const flush = async () => { for(let i=0;i<12;i++)await Promise.resolve() }
+function pendingResult<T>() { let resolve!: (value:T)=>void; const promise=new Promise<T>(done=>{resolve=done}); return {promise,resolve}; }
 const button = (label: string) => [...document.querySelectorAll('button')].find(el=>el.textContent===label)!
 const context = {clearRect:vi.fn(),drawImage:vi.fn(),beginPath:vi.fn(),rect:vi.fn(),fill:vi.fn(),strokeRect:vi.fn(),fillRect:vi.fn()}
 function editorLayoutHarness() {
@@ -36,6 +37,50 @@ async function setup(session = draft(), file?: unknown) {
     const api = {list:vi.fn(async()=>ok({sessions:[session],jobs:[]})),prepare:vi.fn(),create:vi.fn(async()=>ok({id:'job'})),cancel:vi.fn(async()=>ok(null)),release:vi.fn(async()=>ok(null)),frameStatus:vi.fn(async()=>ok({offset:0,count:6,state:'ready',times:[0,.03,.14,.21,.46,.55],durations:[.03,.11,.07,.25,.09,.12]}))}
     const host=document.createElement('div');document.body.append(host);instance=mountMediaEditor(host,{api,file});await flush();button('열기').click();await flush();return api
 }
+
+it('shows an overview for a 1000-frame video without preparing all precise frames',async()=>{
+    const first=pendingResult<any>(),last=pendingResult<any>()
+    const api={list:vi.fn(async()=>ok({sessions:[],jobs:[]})),prepare:vi.fn(),frames:vi.fn(),
+        overview:vi.fn(({index}:any)=>index===0?first.promise:last.promise)}
+    const host=document.createElement('div');document.body.append(host)
+    instance=mountMediaEditor(host,{api,file:{id:1,title:'1000 프레임',kind:'video',duration:40,src:'/video'}})
+    await flush()
+    expect(document.querySelectorAll('.sbe-overview-frame')).toHaveLength(12)
+    expect(document.querySelector('.sbe-overview')?.hasAttribute('hidden')).toBe(false)
+    expect(api.overview).toHaveBeenCalledExactlyOnceWith({fileId:1,index:0})
+    expect(api.prepare).not.toHaveBeenCalled();expect(api.frames).not.toHaveBeenCalled()
+    first.resolve(ok({index:0,count:12,time:0,duration:40,frameCount:1000,image:'data:image/jpeg;base64,/9j/'}));await flush()
+    expect(document.querySelector<HTMLImageElement>('.sbe-overview-frame img')!.hidden).toBe(false)
+    expect(document.querySelectorAll('.sbe-overview-frame img:not([hidden])')).toHaveLength(1)
+    expect(api.overview).toHaveBeenLastCalledWith({fileId:1,index:11})
+    expect(api.prepare).not.toHaveBeenCalled()
+    instance.destroy();instance=undefined
+    last.resolve(ok({index:11,count:12,time:36.67,duration:40,frameCount:1000,image:'data:image/jpeg;base64,/9j/'}));await flush()
+    expect(api.overview).toHaveBeenCalledTimes(2)
+})
+
+it('selects a small overview interval and prepares only that interval on demand',async()=>{
+    let prepared:any=null
+    const remaining=pendingResult<any>()
+    const api={list:vi.fn(async()=>ok({sessions:prepared?[prepared]:[],jobs:[]})),
+        overview:vi.fn(async({index}:any)=>index===0?ok({index,count:12,time:0,duration:1200,frameCount:36000,image:'data:image/jpeg;base64,/9j/'}):remaining.promise),
+        prepare:vi.fn(async(req:any)=>{prepared={...draft(),options:{...req,quickVideo:false},frameCount:1000};return ok(prepared)})}
+    const host=document.createElement('div');document.body.append(host)
+    instance=mountMediaEditor(host,{api,file:{id:1,title:'긴 영상',kind:'video',duration:1200,src:'/video'}})
+    const source=document.querySelector<HTMLVideoElement>('.sbe-source')!
+    Object.defineProperties(source,{duration:{value:1200},videoWidth:{value:160},videoHeight:{value:120}})
+    source.dispatchEvent(new Event('loadedmetadata'));await flush()
+    document.querySelectorAll<HTMLButtonElement>('.sbe-overview-frame')[6].click();await flush()
+    expect(source.currentTime).toBe(600)
+    expect(api.prepare).not.toHaveBeenCalled()
+    button('프레임 정밀 편집').click();await flush()
+    const request=api.prepare.mock.calls[0][0]
+    expect(request).toMatchObject({fileId:1,start:600,fullSource:false,originalFrames:true})
+    expect(request.end-request.start).toBeCloseTo(1000/30,2)
+    expect(document.querySelector<HTMLElement>('.sbe-overview')!.hidden).toBe(true)
+    remaining.resolve(ok({index:11,count:12,time:1100,duration:1200,frameCount:36000,image:'data:image/jpeg;base64,/9j/'}));await flush()
+    expect(api.overview).toHaveBeenCalledTimes(2)
+})
 it('separates available RAM and disk from estimates and keeps unavailable readings distinct from zero',async()=>{
     vi.useFakeTimers()
     const api=await setup()

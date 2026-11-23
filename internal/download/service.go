@@ -15,6 +15,8 @@ import (
 
 var ErrRevisionConflict = errors.New("묶음 정보가 변경되었습니다. 새로고침 후 다시 확인하세요")
 
+const maxConcurrentDownloads = 3
+
 type ImageInspector interface {
 	Inspect(context.Context, string, string) (engine.LocalMetadata, error)
 }
@@ -36,6 +38,7 @@ type Service struct {
 	wg             sync.WaitGroup
 	logWarnings    sync.Map
 	transfers      sync.Map
+	executing      sync.Map // attempt IDs that hold a download slot
 }
 
 //wails:ignore
@@ -59,6 +62,14 @@ func (s *Service) ConfigurePreviewLookup(lookup func(context.Context, string) (*
 }
 
 func (s *Service) attachPreview(ctx context.Context, job *Job) {
+	job.Waiting = !job.HistoryOnly && !job.CleanupRequired && job.State == "pending"
+	if !job.HistoryOnly && !job.CleanupRequired && job.State == "running" && job.Phase != nil && *job.Phase == "discovering" {
+		var executing bool
+		if job.CurrentAttemptID != nil {
+			_, executing = s.executing.Load(*job.CurrentAttemptID)
+		}
+		job.Waiting = !executing
+	}
 	s.attachTransfer(job)
 	if s.previewLookup != nil {
 		job.ThumbnailPath, _ = s.previewLookup(ctx, job.URL)
@@ -66,7 +77,7 @@ func (s *Service) attachPreview(ctx context.Context, job *Job) {
 }
 
 func NewService(db *sql.DB, path func() string, factory func(string, engine.Options) Runner, afterCommit func(int64)) *Service {
-	return &Service{db: db, downloadPath: path, factory: factory, afterCommit: afterCommit, active: map[string]context.CancelFunc{}, runSlot: make(chan struct{}, 1)}
+	return &Service{db: db, downloadPath: path, factory: factory, afterCommit: afterCommit, active: map[string]context.CancelFunc{}, runSlot: make(chan struct{}, maxConcurrentDownloads)}
 }
 
 type Job struct {
@@ -78,6 +89,7 @@ type Job struct {
 	State            string            `json:"state"`
 	Phase            *string           `json:"phase"`
 	Progress         int               `json:"progress"`
+	Waiting          bool              `json:"waiting"`
 	Transfer         *TransferProgress `json:"transfer,omitempty"`
 	Options          *engine.Options   `json:"options"`
 	CleanupRequired  bool              `json:"cleanupRequired"`
@@ -333,6 +345,8 @@ func (s *Service) Run(ctx context.Context, req RunRequest) api.Result {
 	select {
 	case s.runSlot <- struct{}{}:
 		defer func() { <-s.runSlot }()
+		s.executing.Store(attempt, struct{}{})
+		defer s.executing.Delete(attempt)
 		if workCtx.Err() != nil {
 			err = workCtx.Err()
 		} else {

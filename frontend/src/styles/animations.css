@@ -27,6 +27,10 @@
     from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: none; }
 }
+@keyframes motion-progress-indeterminate {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(300%); }
+}
 
 /* Limit transitions to visual feedback; layout and polling remain immediate. */
 :where(button), .motion-control {
@@ -60,6 +64,9 @@
 .animate-slide-up { animation: slide-up var(--motion-page) var(--motion-ease); }
 .motion-sidebar { transition: width var(--motion-panel) var(--motion-ease); }
 .motion-progress { transition: width var(--motion-panel) linear; }
+.motion-progress-indeterminate {
+    animation: motion-progress-indeterminate 1.4s ease-in-out infinite;
+}
 
 /* Album layout effects are started explicitly by the gallery expansion hook. */
 .motion-gallery-scroll { scrollbar-gutter: stable; }
@@ -71,4 +78,5 @@
     .motion-panel, .motion-selection, .animate-slide-up { animation: none; }
     :where(button), .motion-control, .motion-card, .motion-sidebar, .motion-progress { transition: none; }
     :where(button):enabled:active { transform: none; }
+    .motion-progress-indeterminate { animation: none; transform: translateX(100%); }
 }

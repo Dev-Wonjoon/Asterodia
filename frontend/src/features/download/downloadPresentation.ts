@@ -31,6 +31,7 @@ export function downloadPlatform(url: string): string {
     }
 }
 export function downloadStatus(job: DownloadJobDto): string {
+    if (isDownloadWaiting(job)) return translate("다운로드 대기 중...")
     if (job.state === 'running' && job.phase === 'downloading' && job.transfer?.processing)
         return translate("변환·병합 중")
     if (job.state === 'running' && job.phase && job.phase !== 'finished')
@@ -38,6 +39,7 @@ export function downloadStatus(job: DownloadJobDto): string {
     return downloadStates[job.state]
 }
 export function visibleProgress(job: DownloadJobDto): number | null {
+    if (isDownloadWaiting(job)) return null
     if (job.state === 'running' && job.phase === 'downloading' && job.transfer) {
         const percent = job.transfer.percent
         return percent !== null && Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : null
@@ -50,6 +52,11 @@ export function visibleProgress(job: DownloadJobDto): number | null {
         job.progress < 100
         ? job.progress
         : null
+}
+
+export function isDownloadWaiting(job: DownloadJobDto): boolean {
+    return !job.historyOnly && !job.cleanupRequired &&
+        (job.state === 'pending' || job.state === 'running' && job.waiting === true)
 }
 
 export function downloadProgressView(job: DownloadJobDto) {
