@@ -36,9 +36,79 @@ async function setup(session = draft(), file?: unknown) {
     const api = {list:vi.fn(async()=>ok({sessions:[session],jobs:[]})),prepare:vi.fn(),create:vi.fn(async()=>ok({id:'job'})),cancel:vi.fn(async()=>ok(null)),release:vi.fn(async()=>ok(null)),frameStatus:vi.fn(async()=>ok({offset:0,count:6,state:'ready',times:[0,.03,.14,.21,.46,.55],durations:[.03,.11,.07,.25,.09,.12]}))}
     const host=document.createElement('div');document.body.append(host);instance=mountMediaEditor(host,{api,file});await flush();button('열기').click();await flush();return api
 }
+it('separates available RAM and disk from estimates and keeps unavailable readings distinct from zero',async()=>{
+    vi.useFakeTimers()
+    const api=await setup()
+    const resources=vi.fn(async()=>ok({memoryKnown:true,availableRam:10.81*1024**3,totalRam:31.10*1024**3,estimateKnown:true,lowRam:106*1024**2,highRam:286*1024**2,basis:'sampled',diskKnown:true,diskAvailable:133.31*1024**3,diskEstimateKnown:true,diskEstimate:26*1024**2,note:'미리보기 실측을 반영했습니다.',pressure:false,live:{known:false}}))
+    Object.assign(api,{resources})
+    await vi.advanceTimersByTimeAsync(450);await flush()
+    const box=document.querySelector<HTMLElement>('[aria-label="처리 PC 자원"]')!
+    const memory=box.querySelector<HTMLElement>('[aria-label="메모리 · RAM"]')!,disk=box.querySelector<HTMLElement>('[aria-label="저장 공간"]')!
+    expect(memory.querySelector('strong')?.textContent).toBe('10.81')
+    expect(memory.textContent).toContain('전체 31.10 GiB')
+    expect(memory.querySelector('dd')?.textContent).toBe('106–286 MiB')
+    expect(disk.querySelector('strong')?.textContent).toBe('133.31')
+    expect(disk.querySelector('dd')?.textContent).toBe('26 MiB')
+    expect(box.querySelector('.sbe-resource-badge')?.textContent).toBe('미리보기 실측 반영')
+    expect(box.querySelector('.sbe-resource-warning')).toBeNull()
+    resources.mockResolvedValue(ok({memoryKnown:false,availableRam:0,totalRam:0,estimateKnown:false,lowRam:0,highRam:0,basis:'calculated',diskKnown:false,diskAvailable:0,diskEstimateKnown:false,diskEstimate:0,note:'정보 확인 중',pressure:false,live:{known:false}}))
+    await vi.advanceTimersByTimeAsync(2100);await flush()
+    expect(box.querySelectorAll('.sbe-resource-value.is-unknown')).toHaveLength(2)
+    expect(box.textContent).not.toContain('0 B')
+    expect(box.textContent).toContain('추정 불가');expect(box.textContent).toContain('화질 확인 후 추정')
+    expect(box.querySelector('.sbe-resource-badge')).toBeNull()
+})
+it('emphasizes RAM pressure and preserves live encoder readings without blocking save',async()=>{
+    vi.useFakeTimers()
+    const api=await setup()
+    Object.assign(api,{resources:vi.fn(async()=>ok({memoryKnown:true,availableRam:100*1024**2,totalRam:8*1024**3,estimateKnown:true,lowRam:106*1024**2,highRam:286*1024**2,basis:'calculated',diskKnown:true,diskAvailable:20*1024**3,diskEstimateKnown:false,pressure:true,live:{known:true,currentBytes:48*1024**2,observedPeakBytes:64*1024**2}}))})
+    await vi.advanceTimersByTimeAsync(450);await flush()
+    const box=document.querySelector<HTMLElement>('[aria-label="처리 PC 자원"]')!
+    expect(box.querySelector('.sbe-resource-memory')?.classList.contains('is-warning')).toBe(true)
+    expect(box.querySelector('.sbe-resource-warning')?.textContent).toContain('메모리 여유 부족 예상')
+    expect(box.querySelector('.sbe-resource-warning')?.textContent).toContain('그대로 실행할 수도 있습니다.')
+    expect(box.querySelector('.sbe-resource-live')?.textContent).toContain('48 MiB')
+    expect(box.querySelector('.sbe-resource-live')?.textContent).toContain('관측 최대 64 MiB')
+    expect(box.querySelector('.sbe-resource-badge')?.textContent).toBe('계산 추정')
+    expect(button('GIF 저장').disabled).toBe(false)
+})
 it('keeps immutable output-frame IDs and bounds arbitrary crop coordinates',()=>{
     expect(keptFrames(6,[1,3])).toEqual([0,2,4,5])
     expect(boundedCrop({x:100,y:-5,width:80,height:999},160,120)).toEqual({x:80,y:0,width:80,height:120})
+})
+it('shows automatic retention for both drafts and jobs and still allows manual deletion',async()=>{
+    const api=await setup()
+    const count=document.querySelector<HTMLElement>('[aria-label="편집 초안 보관 개수"]')!
+    const jobs=document.querySelector<HTMLElement>('[aria-label="작업 내역 보관 개수"]')!
+    const hint=[...document.querySelectorAll<HTMLElement>('.sbe-history p')].find(el=>el.textContent?.startsWith('편집 초안과 작업 내역은 각각'))!
+    expect(count.textContent).toBe('편집 초안 1개 · 최근 20개 자동 보관')
+    expect(jobs.textContent).toBe('작업 내역 0개 · 최근 20개 자동 보관')
+    expect(hint.hidden).toBe(false)
+    const sessions=Array.from({length:20},(_,n)=>({...draft(),id:`draft-${n}`}))
+    api.list.mockResolvedValue(ok({sessions,jobs:[]}))
+    button('목록 새로고침').click();await flush()
+    expect(count.textContent).toBe('편집 초안 20개 · 최근 20개 자동 보관')
+    expect(hint.textContent).toContain('오래된 항목부터 자동 정리');expect(hint.textContent).toContain('원본 영상과 저장된 결과는 유지됩니다.')
+    expect(api.release).not.toHaveBeenCalled()
+    expect(document.querySelectorAll('.sbe-history .sbe-record')).toHaveLength(20)
+    api.list.mockResolvedValue(ok({sessions:sessions.slice(1),jobs:[]}))
+    button('편집 초안 삭제').click();await flush()
+    expect(api.release).toHaveBeenCalledExactlyOnceWith({id:'draft-0'})
+    expect(count.textContent).toBe('편집 초안 19개 · 최근 20개 자동 보관');expect(hint.hidden).toBe(false)
+})
+it('clears an automatically removed draft and its saved editing state and disables retry without a ready draft',async()=>{
+    const api=await setup()
+    const key='storagebucket-edit-v1:'+draft().id
+    localStorage.setItem(key,'{}')
+    localStorage.setItem('other-setting','keep')
+    api.list.mockResolvedValue(ok({sessions:[],jobs:[{id:'old-job',sessionId:draft().id,state:'failed',options:{kind:'gif',sessionId:draft().id},error:'failed',progress:0}]}))
+    button('목록 새로고침').click();await flush()
+    expect(localStorage.getItem(key)).toBeNull()
+    expect(localStorage.getItem('other-setting')).toBe('keep')
+    expect(document.body.textContent).toContain('오래된 편집 초안이 정리되었습니다.')
+    expect(button('GIF 저장').disabled).toBe(true)
+    expect(button('같은 설정으로 다시 실행').disabled).toBe(true)
+    expect(api.release).not.toHaveBeenCalled()
 })
 it('formats editing times as hours, minutes, seconds, and hundredths without wrapping at a day',()=>{
     for(const [seconds,text] of [[0,'00:00:00.00'],[134.37,'00:02:14.37'],[217,'00:03:37.00'],[59.999,'00:01:00.00'],[3599.999,'01:00:00.00'],[90061.25,'25:01:01.25']] as const)
@@ -612,7 +682,8 @@ it('preserves the original video while frames are preparing and in the trimming 
 
 async function setupQuickVideo() {
     const ready={...draft(),frameCount:0,options:{...draft().options,quickVideo:true,fullSource:true,fps:1000,end:120}}
-    const api={list:vi.fn(async()=>ok({sessions:[],jobs:[]})),prepare:vi.fn(async()=>ok(ready)),create:vi.fn(async()=>ok({id:'quick-job'})),frames:vi.fn(),frameStatus:vi.fn(),selection:vi.fn()}
+    let prepared=false
+    const api={list:vi.fn(async()=>ok({sessions:prepared?[ready]:[],jobs:[]})),prepare:vi.fn(async()=>{prepared=true;return ok(ready)}),create:vi.fn(async()=>ok({id:'quick-job'})),frames:vi.fn(),frameStatus:vi.fn(),selection:vi.fn()}
     const host=document.createElement('div');document.body.append(host)
     instance=mountMediaEditor(host,{api,file:{id:1,title:'긴 원본',kind:'video',duration:120,src:'/video.mp4'}})
     const video=document.querySelector<HTMLVideoElement>('.sbe-source')!
@@ -749,4 +820,73 @@ it('documents existing controls and keeps undo and redo working outside the guid
     expect(document.body.textContent).toContain('10장 중 9장 남음')
     key(stage,'z',{metaKey:true})
     expect(document.body.textContent).toContain('10장 중 10장 남음')
+})
+
+
+const selectedFrameNumbers = () => [...document.querySelectorAll<HTMLInputElement>('.sbe-frame input:checked')].map(input => Number(input.closest<HTMLElement>('.sbe-frame')!.dataset.frame) + 1)
+function clickFrame(number: number, modifiers: MouseEventInit = {}) {
+ const row = document.querySelector<HTMLButtonElement>(`button[aria-label="${number}번 프레임 보기"]`)!
+ row.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,detail:1,...modifiers}))
+}
+function framePointer(type: string, target: EventTarget, y: number, options: PointerEventInit = {}) {
+ target.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:1,pointerType:'mouse',button:0,clientX:30,clientY:y,...options}))
+}
+function frameGeometry() {
+ const grid=document.querySelector<HTMLElement>('.sbe-frames')!
+ vi.spyOn(grid,'getBoundingClientRect').mockReturnValue(new DOMRect(0,100,180,176))
+ Object.defineProperties(grid,{clientHeight:{value:176,configurable:true},scrollHeight:{value:440,configurable:true}})
+ return grid
+}
+it('selects frames from row clicks with Ctrl toggles and stable Shift ranges',async()=>{
+ await setup(); clickFrame(2); clickFrame(5,{ctrlKey:true});expect(selectedFrameNumbers()).toEqual([2,5])
+ clickFrame(8,{shiftKey:true});expect(selectedFrameNumbers()).toEqual([5,6,7,8])
+ clickFrame(6,{shiftKey:true});expect(selectedFrameNumbers()).toEqual([5,6])
+ clickFrame(3,{shiftKey:true,ctrlKey:true});expect(selectedFrameNumbers()).toEqual([2,3,4,5])
+ clickFrame(3,{ctrlKey:true});expect(selectedFrameNumbers()).toEqual([2,4,5])
+ expect(document.querySelector('.sbe-frame-selection')?.textContent).toContain('3개 선택')
+})
+it('deletes selected frames from a focused checkbox and supports keyboard undo and redo',async()=>{
+ const api=await setup(),checkbox=document.querySelector<HTMLInputElement>('[aria-label="3번 프레임 선택"]')!
+ checkbox.click();checkbox.focus();expect(key(checkbox,'Delete').defaultPrevented).toBe(true)
+ expect(document.body.textContent).toContain('10장 중 9장 남음')
+ const grid=document.querySelector<HTMLElement>('.sbe-frames')!;expect(document.activeElement).toBe(grid)
+ key(grid,'z',{ctrlKey:true});expect(document.body.textContent).toContain('10장 중 10장 남음')
+ key(grid,'Z',{ctrlKey:true,shiftKey:true});expect(document.body.textContent).toContain('10장 중 9장 남음')
+ const input=document.querySelector<HTMLInputElement>('.sbe-fields input[type="number"]')!;input.focus();expect(key(input,'Delete').defaultPrevented).toBe(false)
+ button('GIF 저장').click();await flush();expect(api.create.mock.calls[0][0]).toMatchObject({deleted:[2]})
+})
+it('selects a dragged frame range and adds ranges with Ctrl without letting the release click change it',async()=>{
+ editorLayoutHarness();await setup();const grid=frameGeometry()
+ const row=document.querySelector('[data-frame="1"] button')!
+ framePointer('pointerdown',row,166);framePointer('pointermove',window,298);framePointer('pointerup',window,298)
+ expect(selectedFrameNumbers()).toEqual([2,3,4,5])
+ clickFrame(2);expect(selectedFrameNumbers()).toEqual([2,3,4,5])
+ await new Promise(resolve=>setTimeout(resolve,0));clickFrame(9)
+ framePointer('pointerdown',row,166,{ctrlKey:true});framePointer('pointermove',window,210);framePointer('pointerup',window,210)
+ expect(selectedFrameNumbers()).toEqual([2,3,9]);expect(grid.scrollTop).toBe(0)
+})
+it('cancels frame dragging with Escape and restores the previous selection',async()=>{
+ editorLayoutHarness();await setup();frameGeometry();clickFrame(9)
+ const row=document.querySelector('[data-frame="1"] button')!
+ framePointer('pointerdown',row,166);framePointer('pointermove',window,254)
+ expect(selectedFrameNumbers()).toEqual([2,3,4])
+ expect(key(document.querySelector('.sbe-frames')!,'Escape').defaultPrevented).toBe(true)
+ expect(selectedFrameNumbers()).toEqual([9])
+ framePointer('pointerup',window,254);expect(selectedFrameNumbers()).toEqual([9])
+})
+it('auto-scrolls a dragged frame range and keeps virtual rows bounded',async()=>{
+ const layout=editorLayoutHarness();await setup({...draft(),frameCount:1000});const grid=frameGeometry()
+ Object.defineProperty(grid,'scrollHeight',{value:44000,configurable:true})
+ const row=document.querySelector('[data-frame="1"] button')!
+ framePointer('pointerdown',row,166);framePointer('pointermove',window,273)
+ await layout.flush();expect(grid.scrollTop).toBeGreaterThan(0)
+ expect(grid.querySelectorAll('.sbe-frame').length).toBeLessThanOrEqual(48)
+ framePointer('pointerup',window,273)
+})
+it('skips deleted frames in new ranges and preserves at least one retained frame',async()=>{
+ await setup();document.querySelector<HTMLInputElement>('[aria-label="3번 프레임 선택"]')!.click();button('선택 프레임 삭제').click()
+ clickFrame(2);clickFrame(5,{shiftKey:true});expect(selectedFrameNumbers()).toEqual([2,4,5])
+ clickFrame(1);clickFrame(10,{shiftKey:true});key(document.querySelector('.sbe-frames')!,'Delete')
+ expect(document.body.textContent).toContain('최소 한 프레임은 남겨야 합니다.')
+ expect(document.body.textContent).toContain('10장 중 9장 남음')
 })

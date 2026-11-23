@@ -1,3 +1,4 @@
+import { translate } from '@renderer/shared/i18n'
 import type { DownloadOptions } from './types'
 
 export type DownloadEngineKind = 'yt-dlp' | 'gallery-dl'
@@ -154,34 +155,34 @@ export interface DownloadServicePort {
 
 export function downloadFailure(code: string): DownloadResponse<never> {
     const messages: Record<string, string> = {
-        NOT_READY: '다운로드 기능을 사용할 준비가 되지 않았습니다.',
-        IMPORTED_HISTORY: '가져오거나 이관한 작업 이력입니다. 다시 다운로드하려면 URL을 새로 등록하세요.',
-        INVALID_ARGUMENT: '다운로드 요청 값이나 옵션을 확인하세요.',
-        UNSUPPORTED_INSTAGRAM_URL: 'Instagram 게시물 또는 릴스 링크를 입력하세요.',
-        UNSUPPORTED_INSTAGRAM_OPTIONS: 'Instagram은 종류: 영상, 화질: 최고 화질, 형식: 자동으로 설정하세요.',
-        AUTHENTICATION_REQUIRED: '로그인이 필요하거나 쿠키가 만료됐습니다. 설정에서 브라우저 또는 쿠키 파일을 지정하세요.',
-        ACCESS_DENIED: '게시물 접근이 제한됐습니다. 계정의 열람 권한이나 추가 인증을 확인하세요.',
-        MEDIA_UNAVAILABLE: '게시물이 삭제되었거나 현재 계정으로 찾을 수 없습니다.',
-        RATE_LIMITED: '요청이 일시적으로 제한됐습니다. 잠시 후 다시 시도하세요.',
-        NOT_FOUND: '다운로드 작업을 찾을 수 없습니다.',
-        ALREADY_PROCESSING: '이미 처리 중인 작업이 있습니다.',
-        REDOWNLOAD_CONFIRMATION_REQUIRED: '등록된 묶음의 교체 여부를 확인하세요.',
-        REVISION_CONFLICT: '묶음 정보가 변경되었습니다. 새로고침 후 다시 확인하세요.',
-        CLEANUP_REQUIRED: '이전 실행의 정리를 마친 후 다시 실행할 수 있습니다.',
-        CANNOT_DELETE_REQUEST: '정리가 끝난 실패·취소 요청 기록만 삭제할 수 있습니다.',
-        CANNOT_CANCEL_COMMITTING: '저장 중인 작업은 취소할 수 없습니다.',
-        DATABASE_ERROR: '다운로드 DB 작업을 처리하지 못했습니다.',
-        UNSUPPORTED_TARGET_DISCOVERY: '지원하지 않는 주소·옵션이거나 엔진 버전이 맞지 않습니다.',
-        UNSUPPORTED_MEDIA_FORMAT: '요청한 종류·화질에 맞는 MP4·M4A 포맷이 없습니다. 다른 화질이나 옵션을 선택하세요.',
-        DOWNLOAD_ENGINE_FAILED: '다운로드 엔진이 작업을 완료하지 못했습니다. 실제 오류와 실행 로그를 확인하세요.',
-        ENGINE_STOP_UNCONFIRMED: '엔진 종료 상태를 확인할 수 없어 실행을 보류했습니다.'
+        NOT_READY: translate("다운로드 기능을 사용할 준비가 되지 않았습니다."),
+        IMPORTED_HISTORY: translate("가져오거나 이관한 작업 이력입니다. 다시 다운로드하려면 URL을 새로 등록하세요."),
+        INVALID_ARGUMENT: translate("다운로드 요청 값이나 옵션을 확인하세요."),
+        UNSUPPORTED_INSTAGRAM_URL: translate("Instagram 게시물 또는 릴스 링크를 입력하세요."),
+        UNSUPPORTED_INSTAGRAM_OPTIONS: translate("Instagram은 종류: 영상, 화질: 최고 화질, 형식: 자동으로 설정하세요."),
+        AUTHENTICATION_REQUIRED: translate("로그인이 필요하거나 쿠키가 만료됐습니다. 설정에서 브라우저 또는 쿠키 파일을 지정하세요."),
+        ACCESS_DENIED: translate("게시물 접근이 제한됐습니다. 계정의 열람 권한이나 추가 인증을 확인하세요."),
+        MEDIA_UNAVAILABLE: translate("게시물이 삭제되었거나 현재 계정으로 찾을 수 없습니다."),
+        RATE_LIMITED: translate("요청이 일시적으로 제한됐습니다. 잠시 후 다시 시도하세요."),
+        NOT_FOUND: translate("다운로드 작업을 찾을 수 없습니다."),
+        ALREADY_PROCESSING: translate("이미 처리 중인 작업이 있습니다."),
+        REDOWNLOAD_CONFIRMATION_REQUIRED: translate("등록된 묶음의 교체 여부를 확인하세요."),
+        REVISION_CONFLICT: translate("묶음 정보가 변경되었습니다. 새로고침 후 다시 확인하세요."),
+        CLEANUP_REQUIRED: translate("이전 실행의 정리를 마친 후 다시 실행할 수 있습니다."),
+        CANNOT_DELETE_REQUEST: translate("정리가 끝난 실패·취소 요청 기록만 삭제할 수 있습니다."),
+        CANNOT_CANCEL_COMMITTING: translate("저장 중인 작업은 취소할 수 없습니다."),
+        DATABASE_ERROR: translate("다운로드 DB 작업을 처리하지 못했습니다."),
+        UNSUPPORTED_TARGET_DISCOVERY: translate("지원하지 않는 주소·옵션이거나 엔진 버전이 맞지 않습니다."),
+        UNSUPPORTED_MEDIA_FORMAT: translate("요청한 종류·화질에 맞는 MP4·M4A 포맷이 없습니다. 다른 화질이나 옵션을 선택하세요."),
+        DOWNLOAD_ENGINE_FAILED: translate("다운로드 엔진이 작업을 완료하지 못했습니다. 실제 오류와 실행 로그를 확인하세요."),
+        ENGINE_STOP_UNCONFIRMED: translate("엔진 종료 상태를 확인할 수 없어 실행을 보류했습니다.")
     }
 
     return {
         ok: false,
         error: {
             code,
-            message: messages[code] ?? '다운로드 요청을 처리하지 못했습니다.',
+            message: messages[code] ?? translate("다운로드 요청을 처리하지 못했습니다."),
             context: {}
         }
     }

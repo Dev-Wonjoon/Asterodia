@@ -20,6 +20,9 @@ func (g *GalleryDL) Download(ctx context.Context, originalURL string, expected G
 	if err != nil {
 		return nil, err
 	}
+	if expected.InstagramEmbed {
+		return g.downloadInstagramEmbed(ctx, originalURL, expected, stageDir)
+	}
 	if len(expected.PinterestVideoURLs()) > 0 {
 		return nil, fmt.Errorf("Pinterest 스트리밍 영상은 yt-dlp 엔진으로 저장해야 합니다")
 	}

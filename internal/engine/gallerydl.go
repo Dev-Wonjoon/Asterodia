@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -19,6 +20,7 @@ type GalleryDL struct {
 	Executable    string
 	CookieBrowser string
 	CookieFile    string
+	HTTPClient    *http.Client
 	runner        ProcessRunner
 }
 
@@ -30,6 +32,8 @@ type GalleryDLFile struct {
 type GalleryDLDiscovery struct {
 	Directories []json.RawMessage
 	Files       []GalleryDLFile
+	// Embed results must be transferred directly instead of re-extracted by CLI.
+	InstagramEmbed bool `json:"instagramEmbed,omitempty"`
 }
 
 var (
@@ -196,6 +200,29 @@ func (g *GalleryDL) Discover(
 	originalURL string,
 	workDir string,
 ) (GalleryDLDiscovery, error) {
+	if g.CookieBrowser == "" && g.CookieFile == "" {
+		if shortcode, err := instagramShortcode(originalURL); err == nil {
+			discovery, embedErr := g.discoverInstagramEmbed(ctx, shortcode)
+			if embedErr == nil {
+				return discovery, nil
+			}
+			if err := ctx.Err(); err != nil {
+				return GalleryDLDiscovery{}, err
+			}
+			if errors.Is(embedErr, ErrRateLimited) {
+				return GalleryDLDiscovery{}, embedErr
+			}
+			discovery, fallbackErr := g.discoverGalleryDL(ctx, originalURL, workDir)
+			if fallbackErr != nil {
+				return GalleryDLDiscovery{}, fmt.Errorf("Instagram 임베드 조회 실패: %w; gallery-dl 조회 실패: %w", embedErr, fallbackErr)
+			}
+			return discovery, nil
+		}
+	}
+	return g.discoverGalleryDL(ctx, originalURL, workDir)
+}
+
+func (g *GalleryDL) discoverGalleryDL(ctx context.Context, originalURL, workDir string) (GalleryDLDiscovery, error) {
 	auth, err := authArguments(g.CookieBrowser, g.CookieFile, workDir)
 	if err != nil {
 		return GalleryDLDiscovery{}, err
@@ -241,7 +268,7 @@ func (g *GalleryDL) Discover(
 }
 
 func (g *GalleryDL) arguments() []string {
-	return []string{
+	args := []string{
 		"--config-ignore", "--no-input", "--no-colors",
 		"-o", "extractor.module-sources=[null]", "-o", "cache.file=null",
 		"-o", "extractor.cookies=null", "-o", "extractor.cookies-update=false",
@@ -251,6 +278,10 @@ func (g *GalleryDL) arguments() []string {
 		"-o", "extractor.instagram.videos=merged", "-o", "extractor.instagram.audio=true",
 		"-o", "extractor.instagram.previews=false",
 	}
+	if g.CookieBrowser == "" && g.CookieFile == "" {
+		args = append(args, "-o", "extractor.instagram.api=graphql")
+	}
+	return args
 }
 
 func galleryDLFailure(class, message string) error {

@@ -1,3 +1,4 @@
+import { translateError, translate } from '@renderer/shared/i18n'
 import type { Confirm } from '@renderer/shared/hooks/confirmContext'
 import type { Unsubscribe } from '@contracts/api'
 import type {
@@ -210,7 +211,7 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000, confirm: Co
                     loading: false,
                     error: {
                         code: 'TRANSPORT_ERROR',
-                        message: '작업 상세를 불러오지 못했습니다. 새로고침하세요.',
+                        message: translate("작업 상세를 불러오지 못했습니다. 새로고침하세요."),
                         context: {}
                     }
                 }
@@ -304,7 +305,7 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000, confirm: Co
                 return
             }
 
-            const result = failure('TRANSPORT_ERROR', '작업 목록을 불러오지 못했습니다.')
+            const result = failure('TRANSPORT_ERROR', translate("작업 목록을 불러오지 못했습니다."))
 
             if (!result.ok) {
                 publish({
@@ -344,22 +345,22 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000, confirm: Co
                         'INTERNAL_ERROR'
                     ].includes(result.error.code)
                 ) {
-                    halt('실행 상태를 확인해야 하므로 추가 실행 요청을 보류했습니다.')
+                    halt(translate("실행 상태를 확인해야 하므로 추가 실행 요청을 보류했습니다."))
                 } else if (!quiet) {
-                    notice(result.error.message, 'error')
+                    notice(translateError(result.error), 'error')
                 }
             } else if (result.data.status === 'blocked') {
-                halt('작업 상태 확인이 필요합니다. 추가 실행 요청을 보류했습니다.')
+                halt(translate("작업 상태 확인이 필요합니다. 추가 실행 요청을 보류했습니다."))
             } else if (result.data.status === 'committed') {
                 commit(result.data.jobId, result.data.attemptId)
 
-                if (!quiet) notice('다운로드 등록이 완료되었습니다.', 'success')
+                if (!quiet) notice(translate("다운로드 등록이 완료되었습니다."), 'success')
             } else if (!quiet) {
-                notice('이번 실행은 정리가 필요합니다. 작업 목록을 확인하세요.', 'info')
+                notice(translate("이번 실행은 정리가 필요합니다. 작업 목록을 확인하세요."), 'info')
             }
             return result.ok && result.data.status === 'committed'
         } catch {
-            halt('실행 응답을 받지 못했습니다. 결과 확인 전까지 추가 실행 요청을 보류합니다.')
+            halt(translate("실행 응답을 받지 못했습니다. 결과 확인 전까지 추가 실행 요청을 보류합니다."))
             return false
         } finally {
             requested.delete(jobId)
@@ -384,7 +385,7 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000, confirm: Co
             for (let offset = 0; ; ) {
                 const result = await api.list({ limit: 200, offset })
                 if (!connected || generation !== ownGeneration) return
-                if (!result.ok) { notice(result.error.message, 'error'); return }
+                if (!result.ok) { notice(translateError(result.error), 'error'); return }
                 for (const job of result.data.data) {
                     if (seen.has(job.id)) continue
                     seen.add(job.id)
@@ -413,9 +414,9 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000, confirm: Co
                 if (success === undefined) counts.skipped++
                 publish({ batchRetry: { running: true, ...counts } })
             }
-            notice(`일괄 재시도 ${counts.processed}/${counts.total}건 처리 · 실패 ${counts.failed}건 · 제외 ${counts.skipped}건`, counts.failed || snapshot.halted ? 'error' : 'info')
+            notice(translate("일괄 재시도 {0}/{1}건 처리 · 실패 {2}건 · 제외 {3}건", { "0": counts.processed, "1": counts.total, "2": counts.failed, "3": counts.skipped }), counts.failed || snapshot.halted ? 'error' : 'info')
         } catch {
-            if (connected && generation === ownGeneration) notice('일괄 재시도 대상을 확인하지 못했습니다. 작업 목록을 새로고침해 주세요.', 'error')
+            if (connected && generation === ownGeneration) notice(translate("일괄 재시도 대상을 확인하지 못했습니다. 작업 목록을 새로고침해 주세요."), 'error')
         } finally {
             if (generation === ownGeneration) {
                 batchPending.clear()
@@ -432,14 +433,14 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000, confirm: Co
         publish({ deletingIds: [...deleting] })
         try {
             const result = await api.remove({ jobId })
-            if (!result.ok) { notice(result.error.message, 'error'); return }
+            if (!result.ok) { notice(translateError(result.error), 'error'); return }
             ++readSerial
             if (snapshot.detail.jobId === jobId) closeDetail()
             observed.delete(jobId)
             publish({ queue: snapshot.queue.filter(job => job.id !== jobId) })
-            notice('요청 기록을 삭제했습니다.', 'info')
+            notice(translate("요청 기록을 삭제했습니다."), 'info')
         } catch {
-            notice('삭제 응답을 받지 못했습니다. 작업 목록을 다시 확인하세요.', 'error')
+            notice(translate("삭제 응답을 받지 못했습니다. 작업 목록을 다시 확인하세요."), 'error')
         } finally {
             deleting.delete(jobId)
             publish({ deletingIds: [...deleting] })
@@ -449,7 +450,7 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000, confirm: Co
 
     async function startDownload(url: string, options?: DownloadJobOptions): Promise<DownloadResponse<DownloadJobDto>> {
         if (!connected || !snapshot.ready) {
-            return failure('NOT_READY', '다운로드 연결을 준비 중입니다.')
+            return failure('NOT_READY', translate("다운로드 연결을 준비 중입니다."))
         }
 
         if (snapshot.halted) {
@@ -468,7 +469,7 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000, confirm: Co
             if (!result.ok && result.error.code === 'REDOWNLOAD_CONFIRMATION_REQUIRED') {
                 const { mediaId, expectedRevision } = result.error.context
                 if (Number.isSafeInteger(mediaId) && mediaId > 0 && Number.isSafeInteger(expectedRevision) &&
-                    await confirm({ title: '파일 교체', message: '이미 등록된 묶음입니다. 다시 다운로드해 파일을 교체할까요? 사용자 제목·태그·즐겨찾기는 유지됩니다.', confirmLabel: '다시 다운로드', danger: true }) && connected && generation === ownGeneration) {
+                    await confirm({ title: translate("파일 교체"), message: translate("이미 등록된 묶음입니다. 다시 다운로드해 파일을 교체할까요? 사용자 제목·태그·즐겨찾기는 유지됩니다."), confirmLabel: translate("다시 다운로드"), danger: true }) && connected && generation === ownGeneration) {
                     result = await api.enqueue({ mode: 'replace', url: url.trim(), options, mediaId, expectedRevision })
                 }
             }
@@ -496,7 +497,7 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000, confirm: Co
         } catch {
             return failure(
                 'TRANSPORT_ERROR',
-                '등록 응답을 받지 못했습니다. 작업 목록을 확인하세요.'
+                translate("등록 응답을 받지 못했습니다. 작업 목록을 확인하세요.")
             )
         } finally {
             if (connected && generation === ownGeneration) {
@@ -518,12 +519,12 @@ export function createDownloadStore(api: DownloadApi, pollMs = 2000, confirm: Co
 
             notice(
                 result.ok
-                    ? '취소 요청을 전달했습니다. 최종 상태를 확인하세요.'
-                    : result.error.message,
+                    ? translate("취소 요청을 전달했습니다. 최종 상태를 확인하세요.")
+                    : translateError(result.error),
                 result.ok ? 'info' : 'error'
             )
         } catch {
-            notice('취소 응답을 받지 못했습니다. 작업 상태를 다시 확인하세요.', 'error')
+            notice(translate("취소 응답을 받지 못했습니다. 작업 상태를 다시 확인하세요."), 'error')
         } finally {
             cancelling.delete(jobId)
             publish({ cancellingIds: [...cancelling] })

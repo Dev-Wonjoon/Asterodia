@@ -1,3 +1,4 @@
+import { translate, useLanguage } from '@renderer/shared/i18n'
 import { useState } from 'react'
 import { toMediaUrl } from '@renderer/shared/utils/media'
 
@@ -14,6 +15,7 @@ export function MediaPreview({
     title: string
     className?: string
 }) {
+    useLanguage()
     const candidates = [resolveUrl(path), resolveUrl(fallbackPath)]
     const sourceKey = JSON.stringify(candidates)
     const [failure, setFailure] = useState<{ sourceKey: string; urls: string[] } | null>(null)
@@ -26,9 +28,7 @@ export function MediaPreview({
                 className={
                     className + ' flex items-center justify-center text-sm text-[var(--text-muted)]'
                 }
-            >
-                미리보기 없음
-            </div>
+            >{translate("미리보기 없음")}</div>
         )
     }
 

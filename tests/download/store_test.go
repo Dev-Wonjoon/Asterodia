@@ -125,6 +125,120 @@ func TestStoreCreateInitialAttempt(t *testing.T) {
 	})
 }
 
+func TestInstagramDownloadURLs(t *testing.T) {
+	root := filepath.Join(os.Getenv("STORAGEBUCKET_TEST_ROOT"), "instagram-urls")
+	if !filepath.IsAbs(root) {
+		t.Fatal("STORAGEBUCKET_TEST_ROOT에 실행별 절대 경로를 지정하세요")
+	}
+	const post = "https://www.instagram.com/p/DgCmlEARzrh"
+	for _, tc := range []struct {
+		name, original, want string
+	}{
+		{"shared-post", post + "/?utm_source=ig_web_copy_link&bqrl=NTc4MTIwNjQ2YQ==", post},
+		{"query-without-slash", post + "?igsh=shared", post},
+		{"trailing-slash", post + "/", post},
+		{"already-clean", post, post},
+		{"post-suffix", post + "/embed/captioned/?utm_source=shared#photo", post},
+		{"hash", post + "#photo", post},
+		{"reel", "https://www.instagram.com/reel/Fixture_123-/extra?igsh=shared#video", "https://www.instagram.com/reel/Fixture_123-"},
+		{"reels", "https://www.instagram.com/reels/Fixture_123/?utm_source=shared", "https://www.instagram.com/reels/Fixture_123"},
+		{"tv", "https://www.instagram.com/tv/Fixture_123/?igsh=shared", "https://www.instagram.com/tv/Fixture_123"},
+		{"bare-host", "https://instagram.com/p/DgCmlEARzrh/?igsh=shared", post},
+		{"uppercase-host", "https://WWW.INSTAGRAM.COM/p/DgCmlEARzrh/?igsh=shared", post},
+		{"default-port", "https://www.instagram.com:443/p/DgCmlEARzrh/?igsh=shared", post},
+		{"http", "http://instagram.com/p/DgCmlEARzrh/?igsh=shared", "http://www.instagram.com/p/DgCmlEARzrh"},
+		{"other-site", "https://example.test/p/DgCmlEARzrh/extra?token=keep#part", "https://example.test/p/DgCmlEARzrh/extra?token=keep#part"},
+		{"youtube", "https://www.youtube.com/watch?v=fixture&list=keep#part", "https://www.youtube.com/watch?v=fixture&list=keep#part"},
+		{"lookalike-host", "https://www.instagram.com.example.test/p/DgCmlEARzrh/?token=keep#part", "https://www.instagram.com.example.test/p/DgCmlEARzrh/?token=keep#part"},
+		{"profile", "https://www.instagram.com/author/?utm_source=keep", "https://www.instagram.com/author/?utm_source=keep"},
+		{"stories", "https://www.instagram.com/stories/author/123/?igsh=keep", "https://www.instagram.com/stories/author/123/?igsh=keep"},
+		{"share", "https://www.instagram.com/share/abc/?igsh=keep", "https://www.instagram.com/share/abc/?igsh=keep"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db := openStoreTestDB(t)
+			job, err := download.NewStore(db).CreateInitialAttempt(t.Context(), download.InitialAttemptInput{
+				OriginalURL: tc.original, StorageRoot: root,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var original, saved, normalized string
+			if err := db.QueryRow(`SELECT q.original_url,u.url,u.normalized_url FROM download_queue q
+				JOIN download_urls u ON u.id=q.request_url_id WHERE q.id=?`, job.JobID).Scan(&original, &saved, &normalized); err != nil {
+				t.Fatal(err)
+			}
+			if original != tc.want || saved != tc.want || normalized != tc.want {
+				t.Fatalf("original=%q saved=%q normalized=%q, want=%q", original, saved, normalized, tc.want)
+			}
+		})
+	}
+
+	t.Run("tracking-variants-share-one-active-job", func(t *testing.T) {
+		db := openStoreTestDB(t)
+		store := download.NewStore(db)
+		for i, raw := range []string{post + "/?utm_source=one", post + "?igsh=two", post + "/extra#three", post} {
+			_, err := store.CreateInitialAttempt(t.Context(), download.InitialAttemptInput{OriginalURL: raw, StorageRoot: root})
+			if i == 0 && err != nil {
+				t.Fatal(err)
+			}
+			if i > 0 && !errors.Is(err, download.ErrAlreadyProcessing) {
+				t.Fatalf("같은 게시물의 중복 작업을 막아야 합니다: %v", err)
+			}
+		}
+		assertStoreCounts(t, db, 1)
+	})
+
+	t.Run("invalid-input-stays-invalid", func(t *testing.T) {
+		db := openStoreTestDB(t)
+		service := download.NewService(db, func() string { return root }, nil, nil)
+		for _, raw := range []string{
+			"ftp://www.instagram.com/p/DgCmlEARzrh/?igsh=shared",
+			"https://user:pass@www.instagram.com/p/DgCmlEARzrh/?igsh=shared",
+			post + "/?invalid=has space",
+			post + "/#invalid\nfragment",
+		} {
+			_, err := download.NewStore(db).CreateInitialAttempt(t.Context(), download.InitialAttemptInput{OriginalURL: raw, StorageRoot: root})
+			if !errors.Is(err, engine.ErrInvalidURL) {
+				t.Fatalf("잘못된 URL을 거부해야 합니다: %q, %v", raw, err)
+			}
+			result := service.Enqueue(t.Context(), download.EnqueueRequest{URL: raw, Mode: "create"})
+			if result.OK || result.Error == nil || result.Error.Code != "INVALID_ARGUMENT" {
+				t.Fatalf("잘못된 요청을 거부해야 합니다: %q, %+v", raw, result)
+			}
+		}
+		assertStoreCounts(t, db, 0)
+	})
+}
+
+func TestInstagramDownloadServiceURLs(t *testing.T) {
+	root := filepath.Join(os.Getenv("STORAGEBUCKET_TEST_ROOT"), "instagram-service-urls")
+	if !filepath.IsAbs(root) {
+		t.Fatal("STORAGEBUCKET_TEST_ROOT에 실행별 절대 경로를 지정하세요")
+	}
+	db := openStoreTestDB(t)
+	service := download.NewService(db, func() string { return root }, nil, nil)
+	const original = "https://www.instagram.com/p/DgCmlEARzrh/extra/video.m3u8?utm_source=shared#photo"
+	const want = "https://www.instagram.com/p/DgCmlEARzrh"
+	options := engine.Options{Type: "video", Quality: "best"}
+	kind, err := service.PreviewEngine(original, options)
+	if err != nil || kind != engine.KindGalleryDL {
+		t.Fatalf("정리된 게시물 URL로 엔진을 선택해야 합니다: %s, %v", kind, err)
+	}
+	result := service.Enqueue(t.Context(), download.EnqueueRequest{URL: original, Mode: "create", Options: options})
+	if !result.OK {
+		t.Fatalf("게시물 등록 실패: %+v", result)
+	}
+	job, ok := result.Data.(download.Job)
+	if !ok || job.URL != want {
+		t.Fatalf("정리된 URL을 반환해야 합니다: %+v", result.Data)
+	}
+	duplicate := service.Enqueue(t.Context(), download.EnqueueRequest{URL: want + "/?igsh=another", Mode: "create", Options: options})
+	if duplicate.OK || duplicate.Error == nil || duplicate.Error.Code != "ALREADY_PROCESSING" {
+		t.Fatalf("다른 공유 파라미터도 동일한 작업으로 처리해야 합니다: %+v", duplicate)
+	}
+	assertStoreCounts(t, db, 1)
+}
+
 func TestStoreFreezeTargets(t *testing.T) {
 	root := os.Getenv("STORAGEBUCKET_TEST_ROOT")
 	if !filepath.IsAbs(root) {

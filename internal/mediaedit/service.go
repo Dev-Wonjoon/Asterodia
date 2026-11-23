@@ -19,6 +19,8 @@ import (
 
 var errGIFFrameTiming = errors.New("GIF로 유지할 수 없는 프레임 간격입니다. WebP로 저장하세요.")
 
+const maxEditSessions = 20
+
 type Service struct {
 	UpdateGate   *api.UpdateGate
 	store        Store
@@ -123,13 +125,6 @@ func (s *Service) Prepare(ctx context.Context, req PrepareRequest) api.Result {
 	if reused {
 		return invalid("이미 출력 작업에 사용한 요청 ID입니다")
 	}
-	var count int
-	if err := s.store.db.QueryRowContext(ctx, "SELECT count(*) FROM media_edit_session WHERE state<>'released'").Scan(&count); err != nil {
-		return fail(err)
-	}
-	if count >= 6 {
-		return api.Failure("LIMIT_EXCEEDED", "편집 자료는 최대 6개입니다. 사용하지 않는 자료를 정리하세요.")
-	}
 	tx, err := s.store.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fail(err)
@@ -204,6 +199,7 @@ func (s *Service) Prepare(ctx context.Context, req PrepareRequest) api.Result {
 	if err = tx.Commit(); err != nil {
 		return fail(err)
 	}
+	_ = s.pruneHistory(ctx, req.RequestID)
 	s.signal()
 	v, err := s.store.session(ctx, req.RequestID)
 	if err != nil {
@@ -247,9 +243,11 @@ func (s *Service) ResultPath(ctx context.Context, req Request) api.Result {
 	return api.Success(path)
 }
 func (s *Service) List(ctx context.Context) api.Result {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	sessions := []Session{}
 	jobs := []Job{}
-	ids, e := s.store.ids(ctx, "media_edit_session", "WHERE state<>'released' ORDER BY created_at DESC LIMIT 6")
+	ids, e := s.store.ids(ctx, "media_edit_session", "WHERE state<>'released' ORDER BY created_at DESC,rowid DESC")
 	if e != nil {
 		return fail(e)
 	}
@@ -260,7 +258,7 @@ func (s *Service) List(ctx context.Context) api.Result {
 		}
 		sessions = append(sessions, v)
 	}
-	ids, e = s.store.ids(ctx, "media_edit_job", "ORDER BY created_at DESC LIMIT 50")
+	ids, e = s.store.ids(ctx, "media_edit_job", "ORDER BY created_at DESC,rowid DESC")
 	if e != nil {
 		return fail(e)
 	}
@@ -423,6 +421,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) api.Result {
 	if e != nil {
 		return fail(e)
 	}
+	_ = s.pruneHistory(ctx, req.SessionID)
 	s.signal()
 	job, e := s.store.job(ctx, req.RequestID)
 	if e != nil {
@@ -480,6 +479,7 @@ func (s *Service) Cancel(ctx context.Context, req Request) api.Result {
 			return fail(e)
 		}
 	}
+	_ = s.pruneHistory(ctx, "")
 	return api.Success(nil)
 }
 func (s *Service) Release(ctx context.Context, req Request) api.Result {
@@ -537,6 +537,7 @@ func (s *Service) Start() error {
 	if e := s.recover(); e != nil {
 		return e
 	}
+	_ = s.pruneHistory(context.Background(), "")
 	ctx, cancel := context.WithCancel(context.Background())
 	s.stop = cancel
 	s.done = make(chan struct{})

@@ -1,3 +1,4 @@
+import { translateError, translate } from '@renderer/shared/i18n'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { WebServerResult, WebServerStatus } from '@contracts/webserver-api'
 import { getApi } from '@renderer/shared/api'
@@ -24,7 +25,7 @@ export function useWebServerSettings() {
         let cancel!: () => void
         const deadline = new Promise<WebServerResult<WebServerStatus>>((_, reject) => {
             timer = setTimeout(() => reject(STATUS_TIMEOUT), STATUS_TIMEOUT_MS)
-            cancel = () => { clearTimeout(timer); reject(new Error('상태 조회 해제')) }
+            cancel = () => { clearTimeout(timer); reject(new Error(translate("상태 조회 해제"))) }
         })
         const request: StatusRead = { cancel }
         reading.current = request
@@ -34,13 +35,13 @@ export function useWebServerSettings() {
             const result = await Promise.race([getApi().webServer.status(), deadline])
             if (!mounted.current || own !== revision.current) return
             if (result.ok) { setStatus(result.data); setError(result.data.error) }
-            else { setStatus(null); setError(result.error.message) }
+            else { setStatus(null); setError(translateError(result.error)) }
         } catch (problem) {
             if (mounted.current && own === revision.current) {
                 setStatus(null)
                 setError(problem === STATUS_TIMEOUT
-                    ? '웹 서버 상태 조회가 10초 안에 응답하지 않았습니다. 다시 확인해 주세요.'
-                    : '웹 서버 상태를 확인하지 못했습니다.')
+                    ? translate("웹 서버 상태 조회가 10초 안에 응답하지 않았습니다. 다시 확인해 주세요.")
+                    : translate("웹 서버 상태를 확인하지 못했습니다."))
             }
         } finally {
             clearTimeout(timer)
@@ -79,9 +80,9 @@ export function useWebServerSettings() {
             const result = await (status.running ? getApi().webServer.stop() : getApi().webServer.start())
             if (!mounted.current || own !== revision.current) return
             if (result.ok) { setStatus(result.data); setError(result.data.error) }
-            else setError(result.error.message)
+            else setError(translateError(result.error))
         } catch {
-            if (mounted.current && own === revision.current) setError('웹 서버 요청 결과를 받지 못했습니다. 상태를 다시 확인해 주세요.')
+            if (mounted.current && own === revision.current) setError(translate("웹 서버 요청 결과를 받지 못했습니다. 상태를 다시 확인해 주세요."))
         } finally {
             if (own === revision.current) {
                 locked.current = false
@@ -98,9 +99,9 @@ export function useWebServerSettings() {
             const result = await getApi().webServer.setEditing(!status.editing)
             if (!mounted.current || own !== revision.current) return
             if (result.ok) setStatus(result.data)
-            else setError(result.error.message)
+            else setError(translateError(result.error))
         } catch {
-            if (mounted.current && own === revision.current) setError('모바일 편집 허용 상태를 바꾸지 못했습니다.')
+            if (mounted.current && own === revision.current) setError(translate("모바일 편집 허용 상태를 바꾸지 못했습니다."))
         } finally {
             if (own === revision.current) { locked.current = false; if (mounted.current) setBusy(false) }
         }

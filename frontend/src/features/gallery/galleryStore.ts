@@ -1,3 +1,4 @@
+import { translateError, translate } from '@renderer/shared/i18n'
 import type { MediaApi } from '@contracts/media-api'
 import type { MoveSelection } from '@contracts/file-move-api'
 import { readExpandedAlbums, saveExpandedAlbums } from '../../../../internal/webserver/web/album-state.js'
@@ -11,7 +12,8 @@ import type {
     MediaUnregisterFilesRequest,
     MediaUnregisterRequest,
     MediaUnregisterResult,
-    MediaFilter
+    MediaFilter,
+    GalleryView
 } from '@contracts/media-v2'
 
 export interface MediaViewError {
@@ -61,7 +63,7 @@ export interface GalleryBulkResult {
 
 const transportError: MediaViewError = {
     code: 'TRANSPORT_ERROR',
-    message: '응답을 확인하지 못했습니다. 새로고침으로 현재 상태를 확인하세요.'
+    get message() { return translate("응답을 확인하지 못했습니다. 새로고침으로 현재 상태를 확인하세요.") }
 }
 
 function emptyList(): GallerySnapshot['list'] {
@@ -85,6 +87,8 @@ export function createGalleryStore(
     options: {
         favoritesOnly?: boolean
         expandAlbums?: boolean
+        galleryView?: GalleryView
+        showAlbumFiles?: boolean
     } = {}
 ) {
     const favoritesOnly = options.favoritesOnly ?? false
@@ -231,7 +235,9 @@ export function createGalleryStore(
                     offset,
                     favoritesOnly,
                     filter: requestedFilter,
-                    ...(expandAlbums ? { gallery: true, expandedMediaIds: requestedExpanded } : {})
+                    ...(expandAlbums ? { gallery: true, expandedMediaIds: requestedExpanded,
+                        ...(options.galleryView !== undefined ? { galleryView: options.galleryView } : {}),
+                        ...(options.showAlbumFiles !== undefined ? { showAlbumFiles: options.showAlbumFiles } : {}) } : {})
                 })
             )
 
@@ -250,7 +256,7 @@ export function createGalleryStore(
             if (page.hasNextPage && page.data.length === 0) {
                 return failList({
                     code: 'INVARIANT_VIOLATION',
-                    message: '다음 목록을 확인하지 못했습니다. 새로고침하세요.'
+                    message: translate("다음 목록을 확인하지 못했습니다. 새로고침하세요.")
                 })
             }
 
@@ -387,7 +393,7 @@ export function createGalleryStore(
     async function mutate<T>(
         action: () => Promise<MediaResult<T>>,
         apply: (data: T) => void,
-        successNotice: string | null = '변경을 반영했습니다.'
+        successNotice: string | null = translate("변경을 반영했습니다.")
     ): Promise<boolean> {
         if (snapshot.busy || snapshot.needsRefresh) {
             return false
@@ -439,7 +445,7 @@ export function createGalleryStore(
                 publish({
                     ...snapshot,
                     needsRefresh: true,
-                    notice: '변경은 반영됐지만 화면을 다시 불러오지 못했습니다. 새로고침하세요.'
+                    notice: translate("변경은 반영됐지만 화면을 다시 불러오지 못했습니다. 새로고침하세요.")
                 })
             }
 
@@ -540,18 +546,18 @@ export function createGalleryStore(
         try {
             for (const target of targets) {
                 if (own !== session || operationFilter !== filter || uncertain) {
-                    result.failed.push({ mediaId: target.mediaId, message: uncertain ? '이전 요청 결과를 확인한 뒤 다시 실행하세요.' : '화면이 변경되어 실행하지 않았습니다.' })
+                    result.failed.push({ mediaId: target.mediaId, message: uncertain ? translate("이전 요청 결과를 확인한 뒤 다시 실행하세요.") : translate("화면이 변경되어 실행하지 않았습니다.") })
                     continue
                 }
                 const outcome = await request(async (): Promise<MediaResult<true>> => {
                     // Read the current revision without silently replacing the user's selection revision.
                     const current = await api.get({ mediaId: target.mediaId, fileLimit: 1, fileOffset: 0 })
                     if (!current.ok) return current
-                    if (current.data.revision !== target.revision) return { ok: false, error: { code: 'REVISION_CONFLICT', message: '선택한 뒤 변경된 게시글입니다. 새로고침 후 다시 선택하세요.', context: {} } }
-                    if (own !== session || operationFilter !== filter) throw new Error('화면이 변경됐습니다')
+                    if (current.data.revision !== target.revision) return { ok: false, error: { code: 'REVISION_CONFLICT', message: translate("선택한 뒤 변경된 게시글입니다. 새로고침 후 다시 선택하세요."), context: {} } }
+                    if (own !== session || operationFilter !== filter) throw new Error(translate("화면이 변경됐습니다"))
                     if (action.kind === 'openFolders') {
                         const path = current.data.files.data[0]?.filepath
-                        if (!path) return { ok: false, error: { code: 'NOT_FOUND', message: '등록된 파일 경로가 없습니다.', context: {} } }
+                        if (!path) return { ok: false, error: { code: 'NOT_FOUND', message: translate("등록된 파일 경로가 없습니다."), context: {} } }
                         const normalized = path.replace(/\\/g, '/')
                         const folder = normalized.slice(0, normalized.lastIndexOf('/'))
                         const key = /^[a-z]:\//i.test(normalized) || normalized.startsWith('//') ? folder.toLowerCase() : folder
@@ -574,7 +580,7 @@ export function createGalleryStore(
                 })
                 if (outcome.ok) result.succeeded.push(target.mediaId)
                 else {
-                    result.failed.push({ mediaId: target.mediaId, message: outcome.error.message })
+                    result.failed.push({ mediaId: target.mediaId, message: translateError(outcome.error) })
                     uncertain = outcome.error.code === 'TRANSPORT_ERROR'
                 }
                 if (own === session) progress(result.succeeded.length + result.failed.length, targets.length)

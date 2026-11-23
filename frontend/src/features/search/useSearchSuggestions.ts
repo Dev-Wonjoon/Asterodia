@@ -1,3 +1,4 @@
+import { translateError, translate } from '@renderer/shared/i18n'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MediaFilter, SearchSuggestion, SearchSuggestionPage } from '@contracts/media-v2'
 import { getApi } from '@renderer/shared/api'
@@ -26,7 +27,7 @@ export function useSearchSuggestions(text: string, filter: MediaFilter, enabled:
         try {
             const result = await getApi().media.searchSuggest({ text, filter: JSON.parse(filterKey), limit: PAGE_SIZE, offset })
             if (serial.current !== own || current.current !== key) return
-            if (!result.ok) throw new Error(result.error.message)
+            if (!result.ok) throw new Error(translateError(result.error))
             const next = result.data
             if (offset > 0 && next.revision !== pageRef.current.revision) {
                 // Do not splice pages from different catalog revisions.
@@ -43,7 +44,7 @@ export function useSearchSuggestions(text: string, filter: MediaFilter, enabled:
                 if (cache.current.size > 32) cache.current.delete(cache.current.keys().next().value!)
             }
         } catch (failure) {
-            if (serial.current === own && current.current === key) setError(failure instanceof Error ? failure.message : '추천 목록을 불러오지 못했습니다.')
+            if (serial.current === own && current.current === key) setError(failure instanceof Error ? failure.message : translate("추천 목록을 불러오지 못했습니다."))
         } finally {
             if (serial.current === own) { busy.current = false; setLoading(false) }
         }

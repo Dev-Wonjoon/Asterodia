@@ -1,3 +1,4 @@
+import { translateError, translate } from '@renderer/shared/i18n'
 import { useCallback, useContext, useSyncExternalStore } from 'react'
 import { useToast } from '@renderer/shared/hooks/useToast'
 import type { ManualDownloadTrigger, DownloadJobOptions } from '@contracts/download-api'
@@ -26,11 +27,11 @@ export function useDownloadViewModel() {
             const result = await store.startDownload(url, options)
 
             if (!result.ok) {
-                showToast(result.error.message, 'error')
+                showToast(translateError(result.error), 'error')
                 return false
             }
 
-            showToast('다운로드 대기열에 등록했습니다.', 'info')
+            showToast(translate("다운로드 대기열에 등록했습니다."), 'info')
 
             return true
         },
@@ -53,9 +54,9 @@ export function useDownloadViewModel() {
     const cleanupDownload = useCallback(async (jobId: string) => {
         try {
             const result = await getApi().downloads.cleanup?.({ jobId })
-            if (result) showToast(result.ok ? '임시 파일 정리를 완료했습니다.' : result.error.message, result.ok ? 'success' : 'error')
+            if (result) showToast(result.ok ? translate("임시 파일 정리를 완료했습니다.") : translateError(result.error), result.ok ? 'success' : 'error')
             await store.refresh()
-        } catch { showToast('임시 파일 정리를 완료하지 못했습니다.', 'error') }
+        } catch { showToast(translate("임시 파일 정리를 완료하지 못했습니다."), 'error') }
     }, [store, showToast])
 
     return {

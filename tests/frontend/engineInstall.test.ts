@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EngineInstallProgress } from '@contracts/types'
-import { installProgressView, mergeInstallProgress } from '@renderer/features/settings/engineInstall'
+import { installProgressView, mergeInstallProgress, batchProgressView } from '@renderer/features/settings/engineInstall'
 import { formatBytes } from '@renderer/shared/utils/formatBytes'
 
 const event = (patch: Partial<EngineInstallProgress> = {}): EngineInstallProgress => ({ installId: 'request', engine: 'ffmpeg', phase: 'downloading', downloaded: 25, total: 100, ...patch })
@@ -49,5 +49,14 @@ describe('shared byte formatting', () => {
         expect(formatBytes(1024)).toBe('1.0 KB')
         expect(formatBytes(1024 ** 3)).toBe('1.0 GB')
         expect(formatBytes(1024 ** 5)).toBe('1024.0 TB')
+    })
+})
+
+describe('batch installation progress', () => {
+    it('counts completed attempts separately from successful installations', () => {
+        const view = batchProgressView({ names: ['a', 'b', 'c', 'd'], processed: 2, succeeded: 1, failed: ['a'] })
+        expect(view.percent).toBe(50)
+        expect(view.label).toBe('처리 2/4개 · 완료 1개 · 실패 1개')
+        expect(batchProgressView({ names: [], processed: 0, succeeded: 0, failed: [] }).percent).toBe(0)
     })
 })

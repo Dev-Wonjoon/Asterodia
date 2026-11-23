@@ -4,11 +4,69 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/Dev-Wonjoon/StorageBucket/internal/filemove"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
 )
+
+func TestMergeAndGatherCreatesOneRecoverableJob(t *testing.T) {
+	for _, operation := range []string{"copy", "move"} {
+		t.Run(operation, func(t *testing.T) {
+			f := createFixture(t)
+			var original string
+			must(t, f.db.QueryRow("SELECT filepath FROM media_file WHERE id=1").Scan(&original))
+			title := "합친 묶음"
+			request := filemove.CreateRequest{Selection: []filemove.Selection{{MediaID: 1, Revision: 5, FileIDs: []int64{1, 2}}, {MediaID: 1, Revision: 5, FileIDs: []int64{1}}}, DirectoryID: f.dir, Operation: operation, MergeTitle: &title}
+			created := ok(t, f.s.Create(t.Context(), request)).(map[string]string)
+			albumID, err := strconv.ParseInt(created["albumId"], 10, 64)
+			must(t, err)
+			catalog := media.NewService(f.db)
+			album := ok(t, catalog.Get(t.Context(), media.GetRequest{MediaID: albumID})).(map[string]any)
+			if album["fileCount"] != int64(2) {
+				t.Fatal("중복 파일이 병합됐습니다", album)
+			}
+			// A new service instance can recover the album/job association from disk.
+			reopened := filemove.NewService(f.db, nil)
+			status := ok(t, reopened.Get(t.Context(), filemove.Request{JobID: created["jobId"]})).(filemove.Status)
+			if status.AlbumID != albumID || status.Total != 2 {
+				t.Fatal(status)
+			}
+			ok(t, f.s.Run(t.Context(), filemove.Request{JobID: created["jobId"]}))
+			status = f.wait(t, created["jobId"])
+			if status.State != "completed" || status.AlbumID != albumID {
+				t.Fatal(status)
+			}
+			var path string
+			must(t, f.db.QueryRow("SELECT filepath FROM media_file WHERE id=1").Scan(&path))
+			if operation == "copy" && path != original || operation == "move" && filepath.Dir(path) != f.destination {
+				t.Fatal("병합 파일 위치가 잘못되었습니다", path)
+			}
+			var count int
+			must(t, f.db.QueryRow("SELECT count(*) FROM media_file WHERE media_id=1").Scan(&count))
+			if count != 2 {
+				t.Fatal("원본 묶음의 소유권이 변경됐습니다")
+			}
+		})
+	}
+}
+
+func TestMergeAndGatherRollsBackAnInvalidAlbum(t *testing.T) {
+	f := createFixture(t)
+	title := " "
+	result := f.s.Create(t.Context(), filemove.CreateRequest{Selection: []filemove.Selection{{MediaID: 1, Revision: 5}}, DirectoryID: f.dir, Operation: "move", MergeTitle: &title})
+	if result.OK {
+		t.Fatal(result)
+	}
+	for _, table := range []string{"user_album", "file_move_job"} {
+		var count int
+		must(t, f.db.QueryRow("SELECT count(*) FROM "+table).Scan(&count))
+		if count != 0 {
+			t.Fatal("부분 생성이 남았습니다", table)
+		}
+	}
+}
 
 func TestCopySelectedFilePreservesOriginalAndNames(t *testing.T) {
 	f := createFixture(t)

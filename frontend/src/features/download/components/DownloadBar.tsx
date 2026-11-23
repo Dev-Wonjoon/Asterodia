@@ -1,3 +1,4 @@
+import { translate, useLanguage } from '@renderer/shared/i18n'
 import {
     useEffect,
     useRef,
@@ -19,6 +20,7 @@ interface EnginePreview {
 }
 
 export function DownloadBar(): React.JSX.Element {
+    useLanguage()
     const [url, setUrl] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [preview, setPreview] = useState<EnginePreview | null>(null)
@@ -45,7 +47,7 @@ export function DownloadBar(): React.JSX.Element {
                     setPreview({
                         url: currentURL,
                         optionsKey,
-                        text: `엔진: ${kind}`,
+                        text: translate("엔진: {0}", { "0": kind }),
                         error: false
                     })
                 })
@@ -58,7 +60,7 @@ export function DownloadBar(): React.JSX.Element {
                         text:
                             error instanceof Error
                                 ? error.message
-                                : '엔진을 확인하지 못했습니다.',
+                                : translate("엔진을 확인하지 못했습니다."),
                         error: true
                     })
                 })
@@ -102,7 +104,7 @@ export function DownloadBar(): React.JSX.Element {
     }
 
     const previewText = currentURL
-        ? currentPreview?.text ?? '엔진 확인 중…'
+        ? currentPreview?.text ?? translate("엔진 확인 중…")
         : ''
 
     return (
@@ -111,30 +113,27 @@ export function DownloadBar(): React.JSX.Element {
             className="relative mx-auto flex w-full max-w-4xl gap-3"
         >
             <details className="shrink-0">
-                <summary className="cursor-pointer rounded-xl border border-[var(--border-line)] px-3 py-2.5 text-sm" aria-label="다운로드 옵션">옵션</summary>
+                <summary className="cursor-pointer rounded-xl border border-[var(--border-line)] px-3 py-2.5 text-sm" aria-label={translate("다운로드 옵션")}>{translate("옵션")}</summary>
                 <div className="absolute left-0 top-full z-30 mt-2 w-64 space-y-3 rounded-xl border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-4 shadow-xl">
-                    <p className="text-xs text-[var(--text-muted)]">Instagram은 영상 · 최고 화질 · 자동 형식에서 사진과 영상을 원래 순서대로 함께 저장합니다.</p>
-                    <label className="block text-sm">종류
-                        <select aria-label="다운로드 종류" value={options.type} onChange={(event) => {
+                    <p className="text-xs text-[var(--text-muted)]">{translate("Instagram은 영상 · 최고 화질 · 자동 형식에서 사진과 영상을 원래 순서대로 함께 저장합니다.")}</p>
+                    <label className="block text-sm">{translate("종류")}<select aria-label={translate("다운로드 종류")} value={options.type} onChange={(event) => {
                             const audio = event.target.value === 'audio'
                             setOptions({ ...options, type: audio ? 'audio' : 'video', quality: audio ? 'audio' : 'best', extension: audio ? 'mp3' : undefined })
                         }} className="mt-1 w-full rounded border border-[var(--border-line)] bg-[var(--bg-app)] p-2">
-                            <option value="video">영상</option><option value="audio">오디오 (MP3)</option>
+                            <option value="video">{translate("영상")}</option><option value="audio">{translate("오디오 (MP3)")}</option>
                         </select>
                     </label>
                     {options.type !== 'audio' && <>
-                        <label className="block text-sm">화질
-                            <select aria-label="다운로드 화질" value={options.quality} onChange={(event) => setOptions({ ...options, quality: event.target.value as DownloadJobOptions['quality'] })} className="mt-1 w-full rounded border border-[var(--border-line)] bg-[var(--bg-app)] p-2">
-                                {['best', '8k', '4k', '2k', '1080', '720', '480'].map(value => <option key={value} value={value}>{value === 'best' ? '최고 화질' : value}</option>)}
+                        <label className="block text-sm">{translate("화질")}<select aria-label={translate("다운로드 화질")} value={options.quality} onChange={(event) => setOptions({ ...options, quality: event.target.value as DownloadJobOptions['quality'] })} className="mt-1 w-full rounded border border-[var(--border-line)] bg-[var(--bg-app)] p-2">
+                                {['best', '8k', '4k', '2k', '1080', '720', '480'].map(value => <option key={value} value={value}>{value === 'best' ? translate("최고 화질") : value}</option>)}
                             </select>
                         </label>
-                        <label className="block text-sm">형식
-                            <select aria-label="다운로드 형식" value={options.extension ?? ''} onChange={(event) => setOptions({ ...options, extension: (event.target.value || undefined) as 'mp4' | 'mkv' | undefined })} className="mt-1 w-full rounded border border-[var(--border-line)] bg-[var(--bg-app)] p-2">
-                                <option value="">자동</option><option value="mp4">MP4</option><option value="mkv">MKV</option>
+                        <label className="block text-sm">{translate("형식")}<select aria-label={translate("다운로드 형식")} value={options.extension ?? ''} onChange={(event) => setOptions({ ...options, extension: (event.target.value || undefined) as 'mp4' | 'mkv' | undefined })} className="mt-1 w-full rounded border border-[var(--border-line)] bg-[var(--bg-app)] p-2">
+                                <option value="">{translate("자동")}</option><option value="mp4">MP4</option><option value="mkv">MKV</option>
                             </select>
                         </label>
                     </>}
-                    <label className="flex gap-2 text-sm"><input type="checkbox" checked={Boolean(options.playlist)} onChange={(event) => setOptions({ ...options, playlist: event.target.checked })} />재생목록 포함</label>
+                    <label className="flex gap-2 text-sm"><input type="checkbox" checked={Boolean(options.playlist)} onChange={(event) => setOptions({ ...options, playlist: event.target.checked })} />{translate("재생목록 포함")}</label>
                 </div>
             </details>
             <div className="group relative min-w-0 flex-1">
@@ -144,12 +143,12 @@ export function DownloadBar(): React.JSX.Element {
 
                 <input
                     type="text"
-                    aria-label="다운로드할 URL"
+                    aria-label={translate("다운로드할 URL")}
                     value={url}
                     onChange={(event) => setUrl(event.target.value)}
                     onPaste={handlePaste}
                     disabled={isSubmitting || Boolean(halted)}
-                    placeholder="다운로드할 링크를 붙여넣으세요..."
+                    placeholder={translate("다운로드할 링크를 붙여넣으세요...")}
                     className="w-full min-w-0 rounded-xl border bg-[var(--bg-sidebar)] py-2.5 pl-10 pr-40 text-[var(--text-main)] shadow-sm outline-none transition-all border-[var(--border-line)] placeholder:text-[var(--text-placeholder)] focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/20"
                 />
 
@@ -184,7 +183,7 @@ export function DownloadBar(): React.JSX.Element {
                     <Download className="size-4" />
                 )}
 
-                <span>{isSubmitting ? '처리 중' : '다운로드'}</span>
+                <span>{isSubmitting ? translate("처리 중") : translate("다운로드")}</span>
             </Button>
         </form>
     )

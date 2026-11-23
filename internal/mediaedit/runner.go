@@ -25,6 +25,9 @@ func (s *Service) work(ctx context.Context) {
 		case <-s.wake:
 		case <-time.After(2 * time.Second):
 		}
+		s.mu.Lock()
+		_ = s.pruneHistory(ctx, "")
+		s.mu.Unlock()
 		for ctx.Err() == nil {
 			// Serve one display page, then let an older output job run as well.
 			paged := s.runNextPage(ctx)
@@ -88,6 +91,7 @@ func (s *Service) work(ctx context.Context) {
 			}
 			s.activeID = ""
 			s.activeCancel = nil
+			_ = s.pruneHistory(ctx, "")
 			s.mu.Unlock()
 		}
 	}

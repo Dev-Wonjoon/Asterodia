@@ -63,3 +63,47 @@
     .sb-editor .sbe-heading h2{flex-basis:100%}
     .sbe-body.has-frames{grid-template-columns:115px minmax(0,1fr)}
 }
+
+.sbe-frame-aside .sbe-frames{user-select:none}.sbe-frame-selection{flex-shrink:0;min-height:38px;margin:0;padding:6px 9px;font-size:11px;line-height:1.3;color:#b5cbd6;border-bottom:1px solid #394c58}.sbe-frame.is-selected:not(.is-current){background:#254c58;opacity:1}.sbe-frame.is-selected{box-shadow:inset 3px 0 #a1ead5}.sbe-frame input{accent-color:#a1ead5}
+
+.sbe-resources{padding:16px;background:#0e1921}
+.sbe-resources-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.sbe-resources .sbe-resources-heading h3{margin:0;font-size:14px;font-weight:650;color:#dbe9ef}
+.sbe-resource-badge{padding:3px 9px;border:1px solid #3e615e;border-radius:6px;background:#19332f;color:#b3e5d9;font-size:11px;font-weight:600}
+.sbe-resource-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.sbe-resource-card{display:flex;flex-direction:column;min-width:0;padding:16px;border:1px solid #36515d;border-radius:9px;background:#162630}
+.sbe-resource-card h4{margin:0 0 14px;font-size:13px;font-weight:650;color:#c9dce5}
+.sbe-resource-card h4::before{content:"";display:inline-block;width:7px;height:7px;margin-right:8px;border-radius:2px;background:#a1ead5;vertical-align:1px}
+.sbe-resource-disk h4::before{background:#9ecbfa}
+.sbe-resources .sbe-resource-label{margin:0 0 3px;color:#b5cbd6;font-size:12px}
+.sbe-resources .sbe-resource-value{display:flex;align-items:baseline;flex-wrap:wrap;column-gap:7px;row-gap:0;margin:0;color:#b9f0de;line-height:1.2;font-variant-numeric:tabular-nums}
+.sbe-resource-value strong{font-size:30px;font-weight:700;letter-spacing:-.6px}
+.sbe-resource-unit{font-size:14px;font-weight:500;color:#bfd2db}
+.sbe-resource-disk .sbe-resource-value{color:#b9dafa}
+.sbe-resources .sbe-resource-detail{margin:6px 0 0;font-size:12px;color:#b5cbd6}
+.sbe-resource-estimate{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:4px 12px;margin:16px 0 0;padding-top:12px;border-top:1px solid #36515d}
+.sbe-resource-metric{flex:1}
+.sbe-resource-estimate dt{font-size:12px;color:#b5cbd6}
+.sbe-resource-estimate dd{margin:0;font-size:16px;font-weight:650;color:#edf5f7;font-variant-numeric:tabular-nums}
+.sbe-resources .is-unknown{color:#b5cbd6;font-size:14px;font-weight:400;line-height:1.5}
+.sbe-resource-live{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 12px;margin-top:12px;padding:10px 12px;border:1px solid #36515d;border-radius:7px;color:#b5cbd6;font-size:12px}
+.sbe-resource-live strong{font-size:14px;color:#edf5f7;font-variant-numeric:tabular-nums}
+.sbe-resources .sbe-resource-note{margin:12px 0 0;font-size:12px;line-height:1.6}
+.sbe-resource-card.is-warning{border-color:#b58a54;background:#30281f}
+.sbe-resource-card.is-warning .sbe-resource-value{color:#ffdaaa}
+.sbe-resource-card.is-warning h4::before{background:#ffce99}
+.sbe-resource-warning{margin-top:12px;padding:12px 14px;border:1px solid #b58a54;border-radius:8px;background:#30281f;color:#ffdaaa;font-size:12px}
+.sbe-resource-warning strong{font-size:13px}
+.sbe-resources .sbe-resource-warning p{margin:4px 0 0;line-height:1.6}
+@media(max-width:600px){.sbe-resources{padding:12px}.sbe-resource-grid{grid-template-columns:minmax(0,1fr);gap:10px}.sbe-resource-card{padding:14px}.sbe-resource-value strong{font-size:28px}}
+
+.sb-editor{--scrollbar-thumb:#526a79;--scrollbar-thumb-hover:#7894a3}
+.sb-editor,.sb-editor *{scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) transparent}
+@supports selector(::-webkit-scrollbar){
+    .sb-editor,.sb-editor *{scrollbar-width:auto;scrollbar-color:auto}
+    .sb-editor::-webkit-scrollbar,.sb-editor ::-webkit-scrollbar{width:10px;height:10px}
+    .sb-editor::-webkit-scrollbar-track,.sb-editor ::-webkit-scrollbar-track,.sb-editor::-webkit-scrollbar-corner,.sb-editor ::-webkit-scrollbar-corner{background:transparent}
+    .sb-editor::-webkit-scrollbar-thumb,.sb-editor ::-webkit-scrollbar-thumb{border:2px solid transparent;border-radius:999px;background:var(--scrollbar-thumb);background-clip:padding-box}
+    .sb-editor::-webkit-scrollbar-thumb:hover,.sb-editor ::-webkit-scrollbar-thumb:hover{background-color:var(--scrollbar-thumb-hover)}
+    .sb-editor::-webkit-scrollbar-button,.sb-editor ::-webkit-scrollbar-button{display:none;width:0;height:0}
+}

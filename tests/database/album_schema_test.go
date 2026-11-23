@@ -35,6 +35,193 @@ func albumObject(t *testing.T, result api.Result) media.Object {
 }
 func albumTitle(s string) *string { return &s }
 
+func TestGalleryViewsHideAlbumMembersAndRestoreLastRemovedMembership(t *testing.T) {
+	root := migrationRoot(t)
+	db := latestDB(t, filepath.Join(root, "gallery-visibility.db"))
+	catalog := media.NewService(db)
+	for id := int64(1); id <= 4; id++ {
+		addModernMedia(t, db, id, fmt.Sprintf("https://example.test/view/%d", id), fmt.Sprintf("original %d", id), filepath.Join(root, fmt.Sprintf("file-%d.mp4", id)), fmt.Sprint(id))
+	}
+	execDB(t, db, "UPDATE media_file SET media_id=1,position=9 WHERE id=2; DELETE FROM media WHERE id=2")
+	first := albumObject(t, catalog.SaveAlbum(t.Context(), media.AlbumRequest{Title: albumTitle("첫 앨범"), AddFileIDs: []int64{1, 3}}))
+	second := albumObject(t, catalog.SaveAlbum(t.Context(), media.AlbumRequest{Title: albumTitle("둘째 앨범"), AddFileIDs: []int64{1}}))
+	show := false
+	read := func(view string, expanded ...int64) media.Object {
+		t.Helper()
+		return albumObject(t, catalog.List(t.Context(), media.ListRequest{Gallery: true, GalleryView: view, ShowAlbumFiles: &show, ExpandedMediaIDs: expanded, Limit: 24}))
+	}
+	all := read("all")
+	if all["total"] != int64(4) {
+		t.Fatal("hidden files affected gallery totals", all)
+	}
+	for _, row := range all["data"].([]media.Object) {
+		if row["id"] == int64(3) {
+			t.Fatal("fully collected source remained visible", row)
+		}
+		if row["id"] == int64(1) && (row["galleryFile"].(media.Object)["id"] != int64(2) || row["galleryFileOffset"] != 1 || row["galleryCanCollapse"] != false) {
+			t.Fatal("partially collected source exposed hidden files or lost original offsets", row)
+		}
+	}
+	files := read("files")
+	if files["total"] != int64(2) {
+		t.Fatal(files)
+	}
+	for _, row := range files["data"].([]media.Object) {
+		file := row["galleryFile"].(media.Object)
+		if row["isUserAlbum"] == true || (file["id"] != int64(2) && file["id"] != int64(4)) || row["galleryCanCollapse"] != false {
+			t.Fatal("file-only view contains an album or hidden member", row)
+		}
+	}
+	albums := read("albums", first["id"].(int64))
+	if albums["total"] != int64(3) {
+		t.Fatal("album contents were hidden", albums)
+	}
+	for _, row := range albums["data"].([]media.Object) {
+		if row["isUserAlbum"] != true {
+			t.Fatal("album-only view includes a source card", row)
+		}
+	}
+	// Every visible slot must remain reachable exactly once across small pages.
+	seen := map[string]bool{}
+	for offset := 0; offset < 4; offset++ {
+		page := albumObject(t, catalog.List(t.Context(), media.ListRequest{Gallery: true, GalleryView: "all", ShowAlbumFiles: &show, Limit: 1, Offset: offset}))
+		rows := page["data"].([]media.Object)
+		if len(rows) != 1 || page["total"] != int64(4) || page["hasNextPage"] != (offset < 3) {
+			t.Fatal("visibility broke pagination", page)
+		}
+		key := fmt.Sprint(rows[0]["id"])
+		if seen[key] {
+			t.Fatal("duplicate page entry", key)
+		}
+		seen[key] = true
+	}
+	show = true
+	if read("all")["total"] != int64(5) || read("files")["total"] != int64(4) || read("albums")["total"] != int64(2) {
+		t.Fatal("show hidden files did not restore the original cards")
+	}
+	// Existing adapters that omit the options retain their original list shape.
+	legacy := albumObject(t, catalog.List(t.Context(), media.ListRequest{Gallery: true}))
+	if legacy["total"] != int64(5) {
+		t.Fatal(legacy)
+	}
+	show = false
+	albumObject(t, catalog.SaveAlbum(t.Context(), media.AlbumRequest{AlbumID: first["id"].(int64), ExpectedRevision: first["revision"].(int64), RemoveFileIDs: []int64{1}}))
+	if read("files")["total"] != int64(2) {
+		t.Fatal("file with another membership was revealed")
+	}
+	albumObject(t, catalog.UnregisterMedia(t.Context(), media.UnregisterRequest{MediaID: second["id"].(int64), ExpectedRevision: second["revision"].(int64)}))
+	if read("files")["total"] != int64(3) || countDB(t, db, "SELECT count(*) FROM media_file") != 4 {
+		t.Fatal("last album removal did not reveal the original file")
+	}
+	if result := catalog.List(t.Context(), media.ListRequest{Gallery: true, GalleryView: "invalid"}); result.OK {
+		t.Fatal("invalid gallery view accepted")
+	}
+}
+
+func TestGalleryHiddenFilePagingKeepsOriginalOffsetsAndSearchFilters(t *testing.T) {
+	root := migrationRoot(t)
+	db := latestDB(t, filepath.Join(root, "gallery-file-pages.db"))
+	catalog := media.NewService(db)
+	addModernMedia(t, db, 1, "https://example.test/large", "large-source", filepath.Join(root, "source.mp4"), "original")
+	addModernMedia(t, db, 2, "https://example.test/other", "other-source", filepath.Join(root, "other.mp4"), "other")
+	members := []int64{1}
+	for i := 0; i < 70; i++ {
+		id := int64(10 + i)
+		execDB(t, db, "INSERT INTO media_file(id,media_id,file_key,storage_kind,filepath,kind,position,created_at) VALUES(?,1,?,'app_managed',?,'video',?,1000)", id, fmt.Sprint(id), filepath.Join(root, fmt.Sprintf("file-%d.mp4", id)), (i+1)*3)
+		if i%2 == 0 {
+			members = append(members, id)
+		}
+	}
+	album := albumObject(t, catalog.SaveAlbum(t.Context(), media.AlbumRequest{Title: albumTitle("collection"), AddFileIDs: members}))
+	show := false
+	read := func(req media.ListRequest) media.Object {
+		t.Helper()
+		req.Gallery, req.GalleryView, req.ShowAlbumFiles, req.Limit = true, "files", &show, 24
+		return albumObject(t, catalog.List(t.Context(), req))
+	}
+	seen := map[int64]bool{}
+	for offset := 0; offset < 36; offset += 24 {
+		page := read(media.ListRequest{Offset: offset})
+		rows := page["data"].([]media.Object)
+		if page["total"] != int64(36) || len(rows) != min(24, 36-offset) || page["hasNextPage"] != (offset == 0) {
+			t.Fatal("filtered file pages have incorrect bounds", page)
+		}
+		for _, row := range rows {
+			file := row["galleryFile"].(media.Object)
+			id := file["id"].(int64)
+			if seen[id] || (id != 2 && (id < 11 || id%2 == 0)) {
+				t.Fatal("duplicate or hidden file in page", row)
+			}
+			seen[id] = true
+			if id != 2 && row["galleryFileOffset"] != int(id-9) {
+				t.Fatal("visible offset no longer locates the original detail row", row)
+			}
+		}
+	}
+	execDB(t, db, "INSERT INTO favorite(media_id,created_at) VALUES(1,0)")
+	for _, req := range []media.ListRequest{{Filter: media.Filter{Keyword: "large-source"}}, {FavoritesOnly: true}} {
+		if page := read(req); page["total"] != int64(35) {
+			t.Fatal("view options ignored search or favorites", page)
+		}
+	}
+	for {
+		more, err := catalog.RefreshSearchIndex(t.Context(), 128)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !more {
+			break
+		}
+	}
+	if page := read(media.ListRequest{Filter: media.Filter{Keyword: "large-source"}}); page["total"] != int64(35) {
+		t.Fatal("indexed search changed file visibility", page)
+	}
+	empty := albumObject(t, catalog.SaveAlbum(t.Context(), media.AlbumRequest{Title: albumTitle("empty")}))
+	page := albumObject(t, catalog.List(t.Context(), media.ListRequest{Gallery: true, GalleryView: "albums", ShowAlbumFiles: &show, ExpandedMediaIDs: []int64{album["id"].(int64), empty["id"].(int64)}}))
+	if page["total"] != int64(len(members)+1) {
+		t.Fatal("album view hid member files or the empty album", page)
+	}
+}
+
+func TestMergeAlbumsPreservesSourcesAndRejectsStaleSelection(t *testing.T) {
+	root := migrationRoot(t)
+	db := latestDB(t, filepath.Join(root, "merge-albums.db"))
+	catalog := media.NewService(db)
+	for id := int64(1); id <= 3; id++ {
+		addModernMedia(t, db, id, fmt.Sprintf("https://example.test/merge/%d", id), fmt.Sprint(id), filepath.Join(root, fmt.Sprintf("file-%d.mp4", id)), fmt.Sprint(id))
+	}
+	existing := albumObject(t, catalog.SaveAlbum(t.Context(), media.AlbumRequest{Title: albumTitle("기존"), AddFileIDs: []int64{2, 1}}))
+	revision := countDB(t, db, "SELECT revision FROM media WHERE id=2")
+	request := media.MergeAlbumRequest{Title: "모음", Selection: []media.AlbumSelection{{MediaID: existing["id"].(int64), Revision: existing["revision"].(int64)}, {MediaID: 2, Revision: revision, FileIDs: []int64{2}}}}
+	merged := albumObject(t, catalog.MergeAlbum(t.Context(), request))
+	sequence := albumObject(t, catalog.Sequence(t.Context(), media.SequenceRequest{MediaID: merged["id"].(int64)}))
+	if fmt.Sprint(sequence["ids"]) != "[2 1]" || merged["fileCount"] != int64(2) || countDB(t, db, "SELECT count(*) FROM media_file") != 3 || countDB(t, db, "SELECT count(*) FROM media WHERE id IN (1,2,3)") != 3 {
+		t.Fatal("병합이 순서·중복 제거·원본을 보존하지 못했습니다", merged, sequence)
+	}
+	before := countDB(t, db, "SELECT count(*) FROM user_album")
+	for _, change := range []string{"stale", "foreign-file", "empty-title", "empty-selection"} {
+		t.Run(change, func(t *testing.T) {
+			bad := media.MergeAlbumRequest{Title: "실패", Selection: []media.AlbumSelection{{MediaID: 2, Revision: revision}}}
+			switch change {
+			case "stale":
+				bad.Selection[0].Revision++
+			case "foreign-file":
+				bad.Selection[0].FileIDs = []int64{3}
+			case "empty-title":
+				bad.Title = " "
+			case "empty-selection":
+				bad.Selection = nil
+			}
+			if result := catalog.MergeAlbum(t.Context(), bad); result.OK {
+				t.Fatal("잘못된 병합을 허용했습니다", result)
+			}
+			if countDB(t, db, "SELECT count(*) FROM user_album") != before {
+				t.Fatal("실패한 병합의 일부가 남았습니다")
+			}
+		})
+	}
+}
+
 func TestUserAlbumSearchTracksMembershipAndFileChanges(t *testing.T) {
 	root := migrationRoot(t)
 	db := latestDB(t, filepath.Join(root, "search-albums.db"))

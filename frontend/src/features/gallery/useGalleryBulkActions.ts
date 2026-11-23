@@ -1,3 +1,4 @@
+import { translate } from '@renderer/shared/i18n'
 import { useEffect, useRef, useState } from 'react'
 import type { MoveSelection } from '@contracts/file-move-api'
 import { getApi } from '@renderer/shared/api'
@@ -29,8 +30,8 @@ export function useGalleryBulkActions(store: GalleryStore, selection: MoveSelect
         try {
             if (command === 'unregister' || command === 'openFolders') {
                 const accepted = await confirm(command === 'unregister'
-                    ? { title: '선택한 묶음 등록 해제', message: `선택한 게시글 ${targets.length}개의 등록을 해제할까요? 외부 원본과 보관 방식 미확인 원본은 삭제하지 않습니다. 앱 관리 파일의 정리는 별도로 처리합니다.`, confirmLabel: '등록 해제', danger: true }
-                    : { title: '선택한 파일 위치 열기', message: `선택한 게시글 ${targets.length}개의 파일 위치를 엽니다. 같은 폴더는 한 번만 열립니다.`, confirmLabel: '열기' })
+                    ? { title: translate("선택한 묶음 등록 해제"), message: translate("선택한 게시글 {0}개의 등록을 해제할까요? 외부 원본과 보관 방식 미확인 원본은 삭제하지 않습니다. 앱 관리 파일의 정리는 별도로 처리합니다.", { "0": targets.length }), confirmLabel: translate("등록 해제"), danger: true }
+                    : { title: translate("선택한 파일 위치 열기"), message: translate("선택한 게시글 {0}개의 파일 위치를 엽니다. 같은 폴더는 한 번만 열립니다.", { "0": targets.length }), confirmLabel: translate("열기") })
                 if (!accepted || own !== generation.current || JSON.stringify(latest.current.selection) !== JSON.stringify(targets)) return
             }
             const action: GalleryBulkAction = command === 'unregister' ? { kind: 'unregister' }
@@ -48,7 +49,7 @@ export function useGalleryBulkActions(store: GalleryStore, selection: MoveSelect
         } catch {
             if (own === generation.current) {
                 setProgress(null)
-                setResult({ succeeded: [], failed: targets.map(item => ({ mediaId: item.mediaId, message: '요청 결과를 확인하지 못했습니다. 새로고침 후 확인하세요.' })) })
+                setResult({ succeeded: [], failed: targets.map(item => ({ mediaId: item.mediaId, message: translate("요청 결과를 확인하지 못했습니다. 새로고침 후 확인하세요.") })) })
             }
         } finally { if (own === generation.current) { lock.current = false; setBusy(false) } }
     }

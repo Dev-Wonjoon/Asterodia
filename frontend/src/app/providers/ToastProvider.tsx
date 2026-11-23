@@ -1,3 +1,4 @@
+import { translateMessage, useLanguage } from '@renderer/shared/i18n'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ToastContext, type ToastType } from '@renderer/shared/context/toastContext'
 
@@ -8,6 +9,7 @@ interface Toast {
 }
 
 export function ToastProvider({ children }: { children: ReactNode }): React.JSX.Element {
+    useLanguage()
     const [toasts, setToasts] = useState<Toast[]>([])
     const counter = useRef(0)
     const timers = useRef(new Set<ReturnType<typeof setTimeout>>())
@@ -40,7 +42,7 @@ export function ToastProvider({ children }: { children: ReactNode }): React.JSX.
             ${toast.type === 'error' ? 'bg-red-600 text-white' : ''}
             ${toast.type === 'info' ? 'bg-[var(--bg-sidebar)] text-[var(--text-main)] border border-[var(--border-line)]' : ''}`}
                     >
-                        {toast.message}
+                        {translateMessage(toast.message)}
                     </div>
                 ))}
             </div>

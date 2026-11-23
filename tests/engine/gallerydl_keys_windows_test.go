@@ -26,6 +26,19 @@ func TestMain(m *testing.M) {
 				os.Exit(2)
 			}
 		}
+		if auth := os.Getenv("STORAGEBUCKET_GALLERYDL_EXPECT_AUTH"); auth != "" {
+			hasFile := strings.Contains(args, "--cookies\n")
+			hasBrowser := strings.Contains(args, "--cookies-from-browser\n")
+			hasGraphQL := strings.Contains(args, "-o\nextractor.instagram.api=graphql\n")
+			if hasFile != (auth == "file") || hasBrowser != (auth == "firefox") || hasGraphQL != (auth == "none") {
+				fmt.Fprintln(os.Stderr, "Instagram 인증 방식과 API 옵션 불일치")
+				os.Exit(2)
+			}
+			if hasBrowser && !strings.Contains(args, "--cookies-from-browser\nfirefox\n") {
+				fmt.Fprintln(os.Stderr, "설정된 쿠키 브라우저 불일치")
+				os.Exit(2)
+			}
+		}
 		for i, arg := range os.Args {
 			if arg == "--cookies" {
 				b, e := os.ReadFile(os.Args[i+1])
@@ -74,7 +87,66 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func testGalleryDLInstagramAPISelection(t *testing.T) {
+	root := engineTestRoot(t, "engine-parsers")
+	cookie := filepath.Join(root, "original-cookies.txt")
+	if err := os.WriteFile(cookie, []byte("synthetic cookie"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("STORAGEBUCKET_GALLERYDL_FIXTURE", "1")
+	const address = "https://www.instagram.com/p/Fixture_123/"
+	metadata := json.RawMessage(`{"category":"instagram","subcategory":"post","post_shortcode":"Fixture_123","typename":"GraphImage","post_id":"123","media_id":"123","count":1,"extension":"jpg"}`)
+	raw, err := json.Marshal([][]any{{2, metadata}, {3, "https://cdn.invalid/photo.jpg", metadata}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, err := json.Marshal([]map[string]any{{"Name": "photo.jpg", "Metadata": metadata, "Payload": "fixture photo"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, browser, file, auth string
+	}{
+		{"anonymous", "", "", "none"},
+		{"cookie-file", "", cookie, "file"},
+		{"browser", "firefox", "", "firefox"},
+		{"cookie-file-precedence", "firefox", cookie, "file"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("STORAGEBUCKET_GALLERYDL_EXPECT_AUTH", tc.auth)
+			t.Setenv("STORAGEBUCKET_GALLERYDL_FIXTURE_RESPONSE", string(raw))
+			g := engine.GalleryDL{Executable: os.Args[0], CookieBrowser: tc.browser, CookieFile: tc.file}
+			// Exercise CLI fallback without contacting Instagram from this fixture.
+			g.HTTPClient = instagramUnavailableClient()
+			if tc.auth != "none" {
+				g.HTTPClient = instagramNoEmbedClient(t)
+			}
+			work, err := os.MkdirTemp(root, "discovery-")
+			if err != nil {
+				t.Fatal(err)
+			}
+			discovery, err := g.Discover(t.Context(), address, work)
+			if err != nil || len(discovery.Files) != 1 || discovery.InstagramEmbed {
+				t.Fatalf("조회 실패: %+v %v", discovery, err)
+			}
+			stage, err := os.MkdirTemp(root, "download-")
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("STORAGEBUCKET_GALLERYDL_DOWNLOAD_RESULTS", string(payload))
+			paths, err := g.Download(t.Context(), address, discovery, stage)
+			if err != nil || len(paths) != 1 {
+				t.Fatalf("다운로드 실패: %v %v", paths, err)
+			}
+			if data, err := os.ReadFile(paths[0]); err != nil || string(data) != "fixture photo" {
+				t.Fatal("다운로드 내용 불일치", err)
+			}
+		})
+	}
+}
+
 func TestGalleryDLInstagramTargetKey(t *testing.T) {
+	t.Run("비로그인·쿠키 API 선택", testGalleryDLInstagramAPISelection)
 	const originalURL = "https://www.instagram.com/p/Fixture_123/?igsh=fixture"
 	const id = "3401234567890123456"
 	const wantKey = "instagram:" + id + ":" + id

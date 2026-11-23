@@ -124,6 +124,192 @@ func (f *fixture) start(t *testing.T, ffmpeg string) {
 	svc := f.service
 	t.Cleanup(svc.Close)
 }
+
+func TestEditDraftHistoryKeepsTwentyAndEvictsOldest(t *testing.T) {
+	f := newFixture(t)
+	var drafts []mediaedit.Session
+	for n := 0; n < 20; n++ {
+		drafts = append(drafts, prepareVideoMode(t, f, mediaedit.PrepareRequest{QuickVideo: true, FullSource: true}))
+		if _, err := f.db.Exec("UPDATE media_edit_session SET created_at=? WHERE id=?", n+1, drafts[n].ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	list := func(want int) []mediaedit.Session {
+		t.Helper()
+		data := success[map[string]any](t, f.service.List(t.Context()))
+		items := data["sessions"].([]mediaedit.Session)
+		if len(items) != want {
+			t.Fatalf("listed drafts = %d, want %d", len(items), want)
+		}
+		return items
+	}
+	list(20)
+	oldCache := filepath.Join(f.cache, drafts[0].ID)
+	if err := os.MkdirAll(oldCache, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(oldCache, "frame.jpg"), []byte("temporary frame"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.Exec("INSERT INTO media_edit_page(session_id,page_offset,state,accessed_at) VALUES(?,0,'ready',0)", drafts[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	req := mediaedit.PrepareRequest{RequestID: uuid.NewString(), FileID: f.fileID, QuickVideo: true, FullSource: true, FPS: 1000, Kind: "gif"}
+	invalid := req
+	invalid.FileID = -1
+	if result := f.service.Prepare(t.Context(), invalid); result.OK {
+		t.Fatal("잘못된 새 초안을 허용했습니다")
+	}
+	list(20)
+	if _, err := os.Stat(filepath.Join(oldCache, "frame.jpg")); err != nil {
+		t.Fatal("새 초안 검증 전에 기존 초안을 정리했습니다", err)
+	}
+	created := success[mediaedit.Session](t, f.service.Prepare(t.Context(), req))
+	if created.ID != req.RequestID {
+		t.Fatal("21번째 초안을 만들지 못했습니다")
+	}
+	for _, item := range list(20) {
+		if item.ID == drafts[0].ID {
+			t.Fatal("가장 오래된 초안이 목록에 남았습니다")
+		}
+	}
+	old := success[mediaedit.Session](t, f.service.GetSession(t.Context(), mediaedit.Request{ID: drafts[0].ID}))
+	if old.State != "released" {
+		t.Fatal("오래된 초안이 정리되지 않았습니다", old.State)
+	}
+	if _, err := os.Stat(oldCache); !os.IsNotExist(err) {
+		t.Fatal("오래된 초안의 임시 프레임이 남았습니다", err)
+	}
+	var count int
+	if err := f.db.QueryRow("SELECT count(*) FROM media_edit_page WHERE session_id=?", old.ID).Scan(&count); err != nil || count != 0 {
+		t.Fatal("프레임 페이지 내역이 남았습니다", count, err)
+	}
+	if again := success[mediaedit.Session](t, f.service.Prepare(t.Context(), req)); again.ID != created.ID {
+		t.Fatal("동일 요청의 새 초안이 중복 생성됐습니다")
+	}
+	list(20)
+	if _, err := os.Stat(f.source); err != nil {
+		t.Fatal("원본 파일이 변경되었습니다", err)
+	}
+}
+
+func insertHistoryJob(t *testing.T, f *fixture, sessionID, state string, created int, preview bool, proof any) string {
+	t.Helper()
+	id := uuid.NewString()
+	request := fmt.Sprintf(`{"requestId":%q,"sessionId":%q,"kind":"gif"}`, id, sessionID)
+	_, err := f.db.Exec(`INSERT INTO media_edit_job(id,session_id,request_json,state,output_root,result_uuid,created_at,updated_at,preview,proof_json) VALUES(?,?,?,?,?,?,?,?,?,?)`, id, sessionID, request, state, f.output, uuid.NewString(), created, created, preview, proof)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
+func TestEditJobHistoryProtectsActiveRecoveryAndPublishedFiles(t *testing.T) {
+	f := newFixture(t)
+	draft := prepareVideoMode(t, f, mediaedit.PrepareRequest{QuickVideo: true, FullSource: true})
+	protected := []string{
+		insertHistoryJob(t, f, draft.ID, "running", 0, false, nil),
+		insertHistoryJob(t, f, draft.ID, "interrupted", 1, false, "{}"),
+		insertHistoryJob(t, f, draft.ID, "stop_unconfirmed", 2, false, nil),
+	}
+	if err := os.MkdirAll(filepath.Join(f.cache, "previews"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(f.output, 0700); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(f.output, "kept.gif")
+	if err := os.WriteFile(output, []byte("published result"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var oldest []string
+	for n := 0; n < 20; n++ {
+		preview := n%2 == 0
+		id := insertHistoryJob(t, f, draft.ID, []string{"completed", "failed", "cancelled"}[n%3], n+3, preview, nil)
+		oldest = append(oldest, id)
+		if preview {
+			if err := os.WriteFile(filepath.Join(f.cache, "previews", id+".gif"), []byte("sample"), 0600); err != nil {
+				t.Fatal(err)
+			}
+		} else if _, err := f.db.Exec("UPDATE media_edit_job SET result_path=? WHERE id=?", output, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	request := mediaedit.CreateRequest{RequestID: uuid.NewString(), SessionID: draft.ID, Kind: "gif", Crop: engine.EditCrop{Width: 160, Height: 120}}
+	result := f.service.Create(t.Context(), request)
+	if !result.OK {
+		t.Fatal("새 작업 등록 실패", result.Error)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	var jobs []mediaedit.Job
+	for time.Now().Before(deadline) {
+		data := success[map[string]any](t, f.service.List(t.Context()))
+		jobs = data["jobs"].([]mediaedit.Job)
+		if len(jobs) <= 20 {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if len(jobs) != 20 {
+		t.Fatal("작업 내역이 20개로 정리되지 않았습니다", len(jobs))
+	}
+	for _, id := range protected {
+		if value := f.service.GetJob(t.Context(), mediaedit.Request{ID: id}); !value.OK {
+			t.Fatal("진행 중 또는 복구 작업이 삭제되었습니다", id)
+		}
+	}
+	if value := f.service.GetJob(t.Context(), mediaedit.Request{ID: oldest[0]}); value.OK {
+		t.Fatal("오래된 완료 내역이 남았습니다")
+	}
+	if _, err := os.Stat(filepath.Join(f.cache, "previews", oldest[0]+".gif")); !os.IsNotExist(err) {
+		t.Fatal("오래된 미리보기 파일이 남았습니다", err)
+	}
+	if contents, err := os.ReadFile(output); err != nil || string(contents) != "published result" {
+		t.Fatal("저장된 결과 파일이 변경되었습니다", err)
+	}
+	if _, err := os.Stat(f.source); err != nil {
+		t.Fatal("원본 파일이 사라졌습니다", err)
+	}
+}
+
+func TestEditHistoryPrunesOnRestartAndKeepsDraftsUsedByRecovery(t *testing.T) {
+	f := newFixture(t)
+	f.service.Close()
+	var ids []string
+	for n := 0; n < 23; n++ {
+		id := uuid.NewString()
+		ids = append(ids, id)
+		request := fmt.Sprintf(`{"requestId":%q,"fileId":%d,"kind":"gif"}`, id, f.fileID)
+		_, err := f.db.Exec(`INSERT INTO media_edit_session(id,source_file_id,source_uuid,source_path,source_title,request_json,state,created_at,updated_at) VALUES(?,?,?,?,?,?,'ready',1,1)`, id, f.fileID, uuid.NewString(), f.source, "history", request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(filepath.Join(f.cache, id), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	job := insertHistoryJob(t, f, ids[0], "interrupted", 0, false, "{}")
+	f.start(t, f.ffmpeg)
+	data := success[map[string]any](t, f.service.List(t.Context()))
+	sessions := data["sessions"].([]mediaedit.Session)
+	if len(sessions) != 20 {
+		t.Fatal("재시작 후 초안이 정리되지 않았습니다", len(sessions))
+	}
+	if oldest := success[mediaedit.Session](t, f.service.GetSession(t.Context(), mediaedit.Request{ID: ids[0]})); oldest.State != "ready" {
+		t.Fatal("복구 작업이 참조하는 초안이 정리되었습니다")
+	}
+	for _, id := range ids[1:4] {
+		if draft := success[mediaedit.Session](t, f.service.GetSession(t.Context(), mediaedit.Request{ID: id})); draft.State != "released" {
+			t.Fatal("오래된 비활성 초안이 정리되지 않았습니다", id)
+		}
+		if _, err := os.Stat(filepath.Join(f.cache, id)); !os.IsNotExist(err) {
+			t.Fatal("초안 캐시가 남았습니다", err)
+		}
+	}
+	if value := f.service.GetJob(t.Context(), mediaedit.Request{ID: job}); !value.OK {
+		t.Fatal("재시작 시 복구 내역이 삭제되었습니다")
+	}
+}
 func success[T any](t *testing.T, r api.Result) T {
 	t.Helper()
 	if !r.OK {

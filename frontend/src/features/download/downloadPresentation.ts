@@ -1,21 +1,22 @@
+import { translate } from '@renderer/shared/i18n'
 import type { DownloadJobDto, ManualDownloadTrigger } from '@contracts/download-api'
 import { formatBytes } from '@renderer/shared/utils/formatBytes'
 
 export const downloadStates = {
-    pending: '대기',
-    running: '처리 중',
-    completed: '완료',
-    failed: '실패',
-    cancelled: '취소됨',
-    interrupted: '중단됨'
+    get pending() { return translate("대기") },
+    get running() { return translate("처리 중") },
+    get completed() { return translate("완료") },
+    get failed() { return translate("실패") },
+    get cancelled() { return translate("취소됨") },
+    get interrupted() { return translate("중단됨") }
 }
 export const downloadPhases = {
-    discovering: '대상 확인 중',
-    downloading: '다운로드 중',
-    verifying: '파일 확인 중',
-    committing: '저장 중',
-    rolling_back: '정리 중',
-    finished: '종료'
+    get discovering() { return translate("대상 확인 중") },
+    get downloading() { return translate("다운로드 중") },
+    get verifying() { return translate("파일 확인 중") },
+    get committing() { return translate("저장 중") },
+    get rolling_back() { return translate("정리 중") },
+    get finished() { return translate("종료") }
 }
 export function downloadPlatform(url: string): string {
     try {
@@ -24,14 +25,14 @@ export function downloadPlatform(url: string): string {
             return 'YouTube'
         if (host === 'pin.it' || /(^|\.)pinterest\.(com|co\.kr|kr|co\.uk|jp|ca|fr|de|com\.au)$/.test(host)) return 'Pinterest'
         if (host === 'weverse.io' || host.endsWith('.weverse.io')) return 'Weverse'
-        return host || '플랫폼 미확인'
+        return host || translate("플랫폼 미확인")
     } catch {
-        return '플랫폼 미확인'
+        return translate("플랫폼 미확인")
     }
 }
 export function downloadStatus(job: DownloadJobDto): string {
     if (job.state === 'running' && job.phase === 'downloading' && job.transfer?.processing)
-        return '변환·병합 중'
+        return translate("변환·병합 중")
     if (job.state === 'running' && job.phase && job.phase !== 'finished')
         return downloadPhases[job.phase]
     return downloadStates[job.state]
@@ -56,26 +57,26 @@ export function downloadProgressView(job: DownloadJobDto) {
     const transfer = job.transfer
     const details: string[] = []
     if (transfer && job.state === 'running') {
-        if (transfer.fileCount > 1) details.push(`파일 ${transfer.fileIndex}/${transfer.fileCount}`)
+        if (transfer.fileCount > 1) details.push(translate("파일 {0}/{1}", { "0": transfer.fileIndex, "1": transfer.fileCount }))
         const total = transfer.total !== null && Number.isFinite(transfer.total) && transfer.total > 0 ? transfer.total : null
         details.push(total === null
-            ? `${transfer.batch ? '누적 ' : ''}${formatBytes(transfer.downloaded)} 다운로드`
-            : `${formatBytes(transfer.downloaded)} / ${transfer.estimated ? '약 ' : ''}${formatBytes(total)}`)
+            ? translate("{0}{1} 다운로드", { "0": transfer.batch ? translate("누적 ") : '', "1": formatBytes(transfer.downloaded) })
+            : `${formatBytes(transfer.downloaded)} / ${transfer.estimated ? translate("약 ") : ''}${formatBytes(total)}`)
         if (job.phase === 'downloading' && !transfer.processing) {
             if (transfer.speed !== null && Number.isFinite(transfer.speed) && transfer.speed > 0)
-                details.push(`${transfer.batch ? '약 ' : ''}${formatBytes(transfer.speed)}/s`)
+                details.push(`${transfer.batch ? translate("약 ") : ''}${formatBytes(transfer.speed)}/s`)
             if (transfer.eta !== null && Number.isFinite(transfer.eta) && transfer.eta > 0) {
                 const seconds = Math.ceil(transfer.eta)
                 const minutes = Math.floor(seconds / 60)
                 const hours = Math.floor(minutes / 60)
-                const duration = hours > 0 ? `${hours}시간 ${minutes % 60}분` : minutes > 0 ? `${minutes}분 ${seconds % 60}초` : `${seconds}초`
-                details.push(`약 ${duration} 남음`)
+                const duration = hours > 0 ? translate("{0}시간 {1}분", { "0": hours, "1": minutes % 60 }) : minutes > 0 ? translate("{0}분 {1}초", { "0": minutes, "1": seconds % 60 }) : translate("{0}초", { "0": seconds })
+                details.push(translate("약 {0} 남음", { "0": duration }))
             }
         }
     }
     return {
         percent: progress ?? undefined,
-        percentLabel: progress === null ? '' : `${transfer?.estimated ? '약 ' : ''}${progress.toFixed(1)}%`,
+        percentLabel: progress === null ? '' : `${transfer?.estimated ? translate("약 ") : ''}${progress.toFixed(1)}%`,
         detail: details.join(' · '),
     }
 }

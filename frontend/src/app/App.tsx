@@ -26,7 +26,7 @@ export default function App(): React.JSX.Element {
     const navigating = useRef(false)
     const alive = useRef(true)
     useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
-    const { showSetup, closeSetup } = useEngineSetup()
+    const { showSetup, checkingSetup, closeSetup } = useEngineSetup()
     useGlobalPaste(async url => !confirming && await startDownload(url))
 
     const pages: Record<AppMenu, React.JSX.Element> = {
@@ -42,7 +42,7 @@ export default function App(): React.JSX.Element {
     }
 
     return (
-        <AppUpdateProvider><div className="flex h-screen w-full bg-[var(--bg-app)] text-[var(--text-main)] overflow-hidden font-sans transition-colors duration-200">
+        <AppUpdateProvider blocked={checkingSetup || showSetup} leaveGuard={leaveGuard}><div className="flex h-screen w-full bg-[var(--bg-app)] text-[var(--text-main)] overflow-hidden font-sans transition-colors duration-200">
             <div
                 className={`motion-sidebar h-full shrink-0 ${
                     sidebarCollapsed ? 'w-20' : 'w-64'

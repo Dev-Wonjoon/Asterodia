@@ -1,3 +1,4 @@
+import { translateError, useLanguage } from '@renderer/shared/i18n'
 import { useEffect } from 'react'
 import { getApi } from '@renderer/shared/api'
 import { toMediaUrl } from '@renderer/shared/utils/media'
@@ -8,11 +9,12 @@ import '../../../../internal/webserver/web/player.css'
 
 async function unwrap<T>(pending: Promise<MediaResult<T>>): Promise<T> {
     const result = await pending
-    if (!result.ok) throw new Error(result.error.message)
+    if (!result.ok) throw new Error(translateError(result.error))
     return result.data
 }
 
 export function MediaViewer({ mediaId, fileId, onClose }: { mediaId: number; fileId?: number; onClose: () => void }) {
+    useLanguage()
     useEffect(() => {
         const api = getApi().media
         const viewer = mountMediaViewer({ mediaId, fileId,

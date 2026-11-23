@@ -1,14 +1,14 @@
 {
 	"fixed": {
-		"file_version": "2.1.1.0",
-		"product_version": "2.1.1.0"
+		"file_version": "2.1.2.0",
+		"product_version": "2.1.2.0"
 	},
 	"info": {
 		"0000": {
-			"FileVersion": "2.1.1",
-			"ProductVersion": "2.1.1",
+			"FileVersion": "2.1.2",
+			"ProductVersion": "2.1.2",
 			"CompanyName": "Dev-Wonjoon",
-			"FileDescription": "미디어 다운로드 및 로컬 라이브러리 관리",
+			"FileDescription": "StorageBucket",
 			"LegalCopyright": "(c) 2025, My Company",
 			"ProductName": "StorageBucket",
 			"Comments": "Some Product Comments"

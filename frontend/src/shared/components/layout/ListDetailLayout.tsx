@@ -1,3 +1,4 @@
+import { translate, useLanguage } from '@renderer/shared/i18n'
 import { useEffect, useId, useRef, useState, Ref, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 
@@ -18,6 +19,7 @@ export function ListDetailLayout({
     closeDisabled?: boolean
     listRef?: Ref<HTMLDivElement>
 }): React.JSX.Element {
+    useLanguage()
     const closing = useRef(false)
     const [replayTarget, setReplayTarget] = useState<HTMLElement | null>(null)
     const root = useRef<HTMLDivElement>(null)
@@ -131,11 +133,9 @@ export function ListDetailLayout({
                                 type="button"
                                 disabled={closeDisabled}
                                 onClick={onClose}
-                                aria-label={detailLabel + ' 닫기'}
+                                aria-label={detailLabel + translate(" 닫기")}
                                 className="rounded-lg border border-[var(--border-line)] px-3 py-2 text-sm disabled:opacity-40"
-                            >
-                                닫기
-                            </button>
+                            >{translate("닫기")}</button>
                         </header>
                         <div key={detailKey} className="motion-page min-h-0 flex-1 overflow-y-auto p-5">
                             {detail}

@@ -1,3 +1,4 @@
+import { translateError, translate } from '@renderer/shared/i18n'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { LocalImportFileFilter, LocalImportFilePage, LocalImportPage, LocalImportResult } from '@contracts/local-import-api'
 import { getApi } from '@renderer/shared/api'
@@ -36,8 +37,8 @@ export function useLocalImportViewModel(onComplete: () => void) {
         try {
             const result = await getApi().localImport.get({ jobId, offset: position, limit: 25 })
             if (!alive.current || revision !== requestRevision.current) return
-            if (result.ok) { accept(result.data); setError(null) } else setError(result.error.message)
-        } catch { if (alive.current && revision === requestRevision.current) setError('가져오기 상태를 읽지 못했습니다. 새로고침해 주세요.') }
+            if (result.ok) { accept(result.data); setError(null) } else setError(translateError(result.error))
+        } catch { if (alive.current && revision === requestRevision.current) setError(translate("가져오기 상태를 읽지 못했습니다. 새로고침해 주세요.")) }
     }, [accept])
     useEffect(() => { void load() }, [load])
     useEffect(() => {
@@ -54,8 +55,8 @@ export function useLocalImportViewModel(onComplete: () => void) {
         setFilePage(null); setFileError(null)
         void getApi().localImport.files({ jobId: job.id, fileState, offset: fileOffset, limit: 25 }).then(result => {
             if (stale) return
-            if (result.ok) setFilePage(result.data); else setFileError(result.error.message)
-        }).catch(() => { if (!stale) setFileError('파일 목록을 읽지 못했습니다.') })
+            if (result.ok) setFilePage(result.data); else setFileError(translateError(result.error))
+        }).catch(() => { if (!stale) setFileError(translate("파일 목록을 읽지 못했습니다.")) })
         return () => { stale = true }
     }, [showFiles, job?.id, job?.revision, fileState, fileOffset])
     const execute = useCallback(async (operation: () => Promise<LocalImportResult<LocalImportPage | boolean>>) => {
@@ -64,11 +65,11 @@ export function useLocalImportViewModel(onComplete: () => void) {
         try {
             const result = await operation()
             if (!alive.current) return
-            if (!result.ok) { setError(result.error.message); return }
+            if (!result.ok) { setError(translateError(result.error)); return }
             if (typeof result.data === 'object') {
                 if (result.data.job) { setOffset(0); setFileOffset(0); accept(result.data) }
             } else await load(job?.id, offset)
-        } catch { if (alive.current) setError('요청 결과를 확인하지 못했습니다. 상태를 새로고침해 주세요.') }
+        } catch { if (alive.current) setError(translate("요청 결과를 확인하지 못했습니다. 상태를 새로고침해 주세요.")) }
         finally { lock.current = false; if (alive.current) setRequesting(false) }
     }, [accept, job?.id, load, offset])
     const goTo = (position: number) => { setOffset(position); void load(job?.id, position) }

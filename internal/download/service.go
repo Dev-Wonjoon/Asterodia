@@ -105,7 +105,7 @@ type EnqueueRequest struct {
 }
 
 func (s *Service) PreviewEngine(url string, options engine.Options) (engine.Kind, error) {
-	return engine.Select(url, options)
+	return engine.Select(cleanInstagramURL(url), options)
 }
 func fail(err error) api.Result {
 	code := "DATABASE_ERROR"
@@ -164,6 +164,7 @@ func (s *Service) Enqueue(ctx context.Context, req EnqueueRequest) api.Result {
 	if req.Mode != "create" && req.Mode != "replace" {
 		return api.Failure("INVALID_ARGUMENT", "다운로드 방식이 올바르지 않습니다")
 	}
+	req.URL = cleanInstagramURL(req.URL)
 	if _, err := engine.Select(req.URL, req.Options); err != nil {
 		return api.Failure("INVALID_ARGUMENT", err.Error())
 	}

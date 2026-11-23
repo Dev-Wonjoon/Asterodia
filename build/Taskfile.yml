@@ -10,6 +10,12 @@ tasks:
     cmds:
       - node tools/generate-licenses.mjs --check
 
+  licenses:skip-dev:
+    summary: Skip the release-only notices check in development builds
+    internal: true
+    silent: true
+    cmds: []
+
   go:mod:tidy:
     summary: Runs `go mod tidy`
     internal: true
@@ -95,7 +101,9 @@ tasks:
       - dist/**/*
     deps:
       - task: install:frontend:deps
-      - task: licenses:check
+      # Development startup also calls build:frontend with DEV=true.
+      # Keep full validation for production builds and explicit licenses:check.
+      - task: '{{if eq .DEV "true"}}licenses:skip-dev{{else}}licenses:check{{end}}'
       - task: generate:bindings
         vars:
           BUILD_FLAGS:

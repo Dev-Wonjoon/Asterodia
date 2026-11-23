@@ -8,10 +8,10 @@ info:
   companyName: "Dev-Wonjoon" # The name of the company
   productName: "StorageBucket" # The name of the application
   productIdentifier: "com.storagebucket.app" # The unique product identifier
-  description: "미디어 다운로드 및 로컬 라이브러리 관리" # The application description
+  description: "StorageBucket" # The application description
   copyright: "(c) 2025, My Company" # Copyright text
   comments: "Some Product Comments" # Comments
-  version: "2.1.1" # Generated from VERSION by tools/release-version.mjs --sync
+  version: "2.1.2" # Generated from VERSION by tools/release-version.mjs --sync
   # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
   #                               # Should match the name of your .icon file without the extension
   #                               # If not set and Assets.car exists, defaults to "appicon"

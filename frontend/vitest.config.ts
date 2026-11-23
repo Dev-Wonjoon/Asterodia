@@ -27,6 +27,7 @@ export default defineConfig({
     } },
     test: {
         include: ['tests/frontend/**/*.test.ts'], environment: 'node', watch: false,
+        setupFiles: ['tests/frontend/i18nSetup.ts'],
         coverage: {
             provider: 'v8',
             include: ['frontend/src/**/*.{ts,tsx}'],

@@ -1,3 +1,4 @@
+import { translateError } from '@renderer/shared/i18n'
 import { useEffect, useMemo, useState } from 'react'
 import type { MediaFilter, MediaSuggestionRequest } from '@contracts/media-v2'
 import { getApi } from '@renderer/shared/api'
@@ -10,7 +11,7 @@ async function suggest(kind: MediaSuggestionRequest['kind'], text: string): Prom
     })
 
     if (!result.ok) {
-        throw new Error(result.error.message)
+        throw new Error(translateError(result.error))
     }
 
     return result.data

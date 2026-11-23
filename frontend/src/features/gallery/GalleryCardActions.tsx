@@ -1,3 +1,4 @@
+import { translate, useLanguage } from '@renderer/shared/i18n'
 import { useEffect, useId, useRef, useState, type MouseEvent } from 'react'
 import { Ellipsis, FolderOpen, Pencil, Star, Tags, Trash2, Info, Play, ListPlus, ChevronDown, ChevronUp, Film } from 'lucide-react'
 import { ActionContent } from '@renderer/shared/components/ui/ActionButton'
@@ -36,6 +37,7 @@ export function GalleryCardActions({
     onEdit,
     onUnregister, onView, onDetails, onAdd, onEditAlbum, fileOnly = false, onToggleFiles, filesLabel, filesExpanded, onCreateAnimation, editorDisabled, readOnly = false
 }: GalleryCardActionsProps): React.JSX.Element {
+    useLanguage()
     const [open, setOpen] = useState(false)
     const [opensUp, setOpensUp] = useState(true)
     const [menuHeight, setMenuHeight] = useState(420)
@@ -44,7 +46,7 @@ export function GalleryCardActions({
     const trigger = useRef<HTMLButtonElement>(null)
     const menu = useRef<HTMLDivElement>(null)
     const menuId = useId()
-    const starLabel = title + (isFavorite ? ' 즐겨찾기 해제' : ' 즐겨찾기 추가')
+    const starLabel = title + (isFavorite ? translate(" 즐겨찾기 해제") : translate(" 즐겨찾기 추가"))
     const iconButton =
         'flex min-h-9 min-w-9 px-2 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] focus-visible:outline-2 focus-visible:outline-[var(--color-primary)] disabled:opacity-40 disabled:pointer-events-none'
     const menuItem =
@@ -111,13 +113,13 @@ export function GalleryCardActions({
                 disabled={disabled || mutationDisabled || Boolean(favoriteDisabledReason)}
                 aria-label={starLabel}
                 aria-pressed={isFavorite}
-                title={favoriteDisabledReason || (isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가')}
+                title={favoriteDisabledReason || (isFavorite ? translate("즐겨찾기 해제") : translate("즐겨찾기 추가"))}
                 onClick={() => {
                     closeMenu()
                     onToggleFavorite()
                 }}
             >
-                <ActionContent label={isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가'} icon={<Star
+                <ActionContent label={isFavorite ? translate("즐겨찾기 해제") : translate("즐겨찾기 추가")} icon={<Star
                     className="size-[18px]"
                     fill={isFavorite ? 'currentColor' : 'none'}
                     aria-hidden="true"
@@ -127,22 +129,22 @@ export function GalleryCardActions({
                 type="button"
                 className={iconButton + ' text-[var(--text-muted)]'}
                 disabled={disabled}
-                aria-label={title + ' 파일 위치 열기'}
-                title="파일 위치 열기"
+                aria-label={title + translate(" 파일 위치 열기")}
+                title={translate("파일 위치 열기")}
                 onClick={() => {
                     closeMenu()
                     onOpenFolder()
                 }}
             >
-                <ActionContent icon={<FolderOpen className="size-[18px]" />} label="파일 위치 열기" />
+                <ActionContent icon={<FolderOpen className="size-[18px]" />} label={translate("파일 위치 열기")} />
             </button>}
             <button
                 ref={trigger}
                 type="button"
                 className="flex size-9 shrink-0 items-center justify-center rounded-lg hover:bg-[var(--bg-hover)] focus-visible:outline-2 focus-visible:outline-[var(--color-primary)] disabled:opacity-40"
                 disabled={disabled}
-                aria-label={title + ' 더보기'}
-                title="더보기"
+                aria-label={title + translate(" 더보기")}
+                title={translate("더보기")}
                 aria-haspopup="menu"
                 aria-expanded={open}
                 aria-controls={open ? menuId : undefined}
@@ -169,22 +171,22 @@ export function GalleryCardActions({
                     ref={menu}
                     id={menuId}
                     role="menu"
-                    aria-label={title + ' 카드 메뉴'}
+                    aria-label={title + translate(" 카드 메뉴")}
                     style={{ maxHeight: menuHeight, right: 8 - menuShift, maxWidth: 'calc(100vw - 16px)' }}
                     className={
                         'motion-menu absolute right-2 z-30 w-48 overflow-y-auto overscroll-contain rounded-lg border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-1 shadow-xl ' +
                         (opensUp ? 'motion-menu-up bottom-full mb-1' : 'top-full mt-1')
                     }
                 >
-                    {onView && <button type="button" role="menuitem" className={menuItem} disabled={disabled} onClick={() => { closeMenu(); onView() }}><Play className="size-4" aria-hidden="true" />감상하기</button>}
-                    {onDetails && <button type="button" role="menuitem" className={menuItem} onClick={() => { closeMenu(); onDetails() }}><Info className="size-4" aria-hidden="true" />상세 정보</button>}
-                    {onCreateAnimation && <button type="button" role="menuitem" className={menuItem} disabled={mutationDisabled || editorDisabled} onClick={() => { closeMenu(); onCreateAnimation() }}><Film className="size-4" aria-hidden="true" />GIF, WebP로 만들기</button>}
-                    {onAdd && <button type="button" role="menuitem" className={menuItem} disabled={mutationDisabled} onClick={() => { closeMenu(); onAdd() }}><ListPlus className="size-4" aria-hidden="true" />앨범에 추가</button>}
+                    {onView && <button type="button" role="menuitem" className={menuItem} disabled={disabled} onClick={() => { closeMenu(); onView() }}><Play className="size-4" aria-hidden="true" />{translate("감상하기")}</button>}
+                    {onDetails && <button type="button" role="menuitem" className={menuItem} onClick={() => { closeMenu(); onDetails() }}><Info className="size-4" aria-hidden="true" />{translate("상세 정보")}</button>}
+                    {onCreateAnimation && <button type="button" role="menuitem" className={menuItem} disabled={mutationDisabled || editorDisabled} onClick={() => { closeMenu(); onCreateAnimation() }}><Film className="size-4" aria-hidden="true" />{translate("GIF, WebP로 만들기")}</button>}
+                    {onAdd && <button type="button" role="menuitem" className={menuItem} disabled={mutationDisabled} onClick={() => { closeMenu(); onAdd() }}><ListPlus className="size-4" aria-hidden="true" />{translate("앨범에 추가")}</button>}
                     {onToggleFiles && <button type="button" role="menuitem" className={menuItem} disabled={mutationDisabled} aria-expanded={filesExpanded} onClick={event => { closeMenu(); onToggleFiles(event) }}>{filesExpanded ? <ChevronUp className="size-4" aria-hidden="true" /> : <ChevronDown className="size-4" aria-hidden="true" />}{filesLabel}</button>}
-                    {onEditAlbum && <button type="button" role="menuitem" className={menuItem} disabled={mutationDisabled} onClick={() => { closeMenu(); onEditAlbum() }}><Pencil className="size-4" aria-hidden="true" />앨범 편집</button>}
+                    {onEditAlbum && <button type="button" role="menuitem" className={menuItem} disabled={mutationDisabled} onClick={() => { closeMenu(); onEditAlbum() }}><Pencil className="size-4" aria-hidden="true" />{translate("앨범 편집")}</button>}
                     {!fileOnly && !readOnly && <>
-                    <button type="button" role="menuitem" className={menuItem} disabled={mutationDisabled || Boolean(favoriteDisabledReason)} title={favoriteDisabledReason} onClick={() => { closeMenu(); onToggleFavorite() }}><Star className="size-4" aria-hidden="true" />{isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가'}</button>
-                    <button type="button" role="menuitem" className={menuItem} onClick={() => { closeMenu(); onOpenFolder() }}><FolderOpen className="size-4" aria-hidden="true" />파일 위치 열기</button>
+                    <button type="button" role="menuitem" className={menuItem} disabled={mutationDisabled || Boolean(favoriteDisabledReason)} title={favoriteDisabledReason} onClick={() => { closeMenu(); onToggleFavorite() }}><Star className="size-4" aria-hidden="true" />{isFavorite ? translate("즐겨찾기 해제") : translate("즐겨찾기 추가")}</button>
+                    <button type="button" role="menuitem" className={menuItem} onClick={() => { closeMenu(); onOpenFolder() }}><FolderOpen className="size-4" aria-hidden="true" />{translate("파일 위치 열기")}</button>
                     <button
                         type="button"
                         role="menuitem"
@@ -194,9 +196,7 @@ export function GalleryCardActions({
                             onEdit('title')
                         }}
                     >
-                        <Pencil className="size-4" aria-hidden="true" />
-                        제목 편집
-                    </button>
+                        <Pencil className="size-4" aria-hidden="true" />{translate("제목 편집")}</button>
                     <button
                         type="button"
                         role="menuitem"
@@ -206,9 +206,7 @@ export function GalleryCardActions({
                             onEdit('tags')
                         }}
                     >
-                        <Tags className="size-4" aria-hidden="true" />
-                        태그 편집
-                    </button>
+                        <Tags className="size-4" aria-hidden="true" />{translate("태그 편집")}</button>
                     <button
                         type="button"
                         role="menuitem"
@@ -219,9 +217,7 @@ export function GalleryCardActions({
                             onUnregister()
                         }}
                     >
-                        <Trash2 className="size-4" aria-hidden="true" />
-                        등록 해제
-                    </button>
+                        <Trash2 className="size-4" aria-hidden="true" />{translate("등록 해제")}</button>
                     </>}
                 </div>
             )}

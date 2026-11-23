@@ -6,12 +6,19 @@ import { ToastContext } from '@renderer/shared/context/toastContext'
 import { useEngineSettingsViewModel } from '@renderer/features/settings/useEngineSettingsViewModel'
 import { EngineSetupModal } from '@renderer/features/settings/components/EngineSetupModal'
 import { EngineSettings } from '@renderer/features/settings/EngineSettings'
+import { DownloadPage } from '@renderer/features/download/DownloadPage'
+import { LeaveGuardProvider } from '@renderer/app/providers/LeaveGuardProvider'
 import { EngineInstallProgress as Progress } from '@renderer/features/settings/components/EngineInstallProgress'
 import { ProgressBar } from '@renderer/shared/components/ui/ProgressBar'
 import { cleanupReact, clickButton, deferred, mount } from './reactHarness'
 
 const api = vi.hoisted(() => ({ getEngineStatus: vi.fn(), installEngine: vi.fn(), onEngineInstallProgress: vi.fn() }))
 vi.mock('@renderer/shared/api', () => ({ getApi: () => api }))
+vi.mock('@renderer/features/download/useDownloadViewModel', () => ({ useDownloadViewModel: () => ({
+    detail: { jobId: null }, closeDetail: vi.fn(), ready: true, loading: false, refresh: vi.fn(), retryAll: vi.fn(),
+}) }))
+vi.mock('@renderer/features/download/components/DownloadQueue', () => ({ DownloadQueue: () => null }))
+vi.mock('@renderer/features/download/components/DownloadDetailPane', () => ({ DownloadDetailPane: () => null }))
 let listener: (event: EngineInstallProgress) => void
 let unsubscribe: ReturnType<typeof vi.fn>
 const toast = vi.fn()
@@ -94,6 +101,30 @@ describe('shared engine installation hook', () => {
     it('skips an empty install-all queue', async () => {
         api.getEngineStatus.mockResolvedValue(status(true)); await render(); await act(async () => { await model.installAll() }); expect(api.installEngine).not.toHaveBeenCalled()
     })
+    it('continues after a failure, skips installed tools, and retries only failed tools', async () => {
+        const statuses: Record<string, EngineStatus> = {
+            a: { installed: false, version: null }, b: { installed: false, version: null },
+            c: { installed: true, version: '1.0' }, d: { installed: false, version: null },
+        }
+        api.getEngineStatus.mockImplementation(async () => structuredClone(statuses))
+        api.installEngine.mockImplementation(async name => {
+            if (name === 'a') throw new Error('offline')
+            statuses[name] = { installed: true, version: '1.0' }; return true
+        })
+        await render(); await act(async () => { await model.installAll() })
+        expect(api.installEngine.mock.calls.map(call => call[0])).toEqual(['a', 'b', 'd'])
+        expect(model.batch).toEqual({ names: ['a', 'b', 'd'], processed: 3, succeeded: 2, failed: ['a'] })
+        api.installEngine.mockClear().mockImplementation(async name => { statuses[name] = { installed: true, version: '1.0' }; return true })
+        await act(async () => { await model.retryFailed() })
+        expect(api.installEngine.mock.calls.map(call => call[0])).toEqual(['a'])
+        expect(model.batch).toEqual({ names: ['a'], processed: 1, succeeded: 1, failed: [] })
+        expect(model.allInstalled).toBe(true)
+    })
+    it('does not treat an empty status response as all tools installed', async () => {
+        api.getEngineStatus.mockResolvedValue({}); await render()
+        expect(model.allInstalled).toBe(false); expect(model.statusError).not.toBeNull()
+        await act(async () => { await model.installAll() }); expect(api.installEngine).not.toHaveBeenCalled()
+    })
 })
 
 describe('engine progress UI', () => {
@@ -103,16 +134,23 @@ describe('engine progress UI', () => {
         await act(async () => { initial.reject(new Error('offline')) }); expect(document.querySelector('[role="alert"]')).not.toBeNull()
         api.getEngineStatus.mockResolvedValue({ custom: { installed: true, version: null } }); await clickButton('다시 확인')
         expect(document.body.textContent).toContain('custom'); expect(document.body.textContent).toContain('버전 확인 불가')
-        api.installEngine.mockResolvedValue(true); await clickButton('업데이트')
-        expect(document.querySelector('[aria-label="custom 다운로드 진행률"]')!.getAttribute('aria-valuenow')).toBe('100')
+        expect(document.querySelector<HTMLButtonElement>('button')!.disabled).toBe(true)
+        expect(document.body.textContent).toContain('설치 완료')
     })
-    it('connects install-all and the later button, including a missing version label', async () => {
+    it('provides one installation button and protects the queue until installation finishes', async () => {
         api.getEngineStatus.mockResolvedValue({ ffmpeg: { installed: false, version: null }, 'yt-dlp': { installed: true, version: null } })
         const pending = deferred<boolean>(); api.installEngine.mockReturnValue(pending.promise)
         const complete = vi.fn(); await render(h(EngineSetupModal, { onComplete: complete }))
-        expect(document.body.textContent).toContain('설치됨'); await clickButton('모두 설치')
-        expect(api.installEngine).toHaveBeenCalledTimes(1); await clickButton('나중에'); expect(complete).toHaveBeenCalledOnce()
-        await act(async () => { pending.resolve(true) })
+        expect(document.body.textContent).toContain('설치됨')
+        expect([...document.querySelectorAll('button')].filter(button => button.textContent === '설치')).toHaveLength(1)
+        await clickButton('설치')
+        expect(api.installEngine).toHaveBeenCalledTimes(1)
+        const later = [...document.querySelectorAll('button')].find(button => button.textContent === '나중에')!
+        expect(later.disabled).toBe(true)
+        await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
+        expect(complete).not.toHaveBeenCalled()
+        api.getEngineStatus.mockResolvedValue(status(true)); await act(async () => { pending.resolve(true) })
+        await clickButton('시작하기'); expect(complete).toHaveBeenCalledOnce()
     })
     it('shows a per-engine bar in setup and switches to start after completion', async () => {
         const pending = deferred<boolean>(); api.installEngine.mockReturnValue(pending.promise)
@@ -129,7 +167,7 @@ describe('engine progress UI', () => {
         const pending = deferred<boolean>(); api.installEngine.mockReturnValue(pending.promise)
         await render(h(EngineSettings)); await clickButton('설치')
         await emit(api.installEngine.mock.calls[0][1], { total: null })
-        expect(document.querySelector('[role="progressbar"]')!.hasAttribute('aria-valuenow')).toBe(false)
+        expect(document.querySelector('[aria-label="ffmpeg 다운로드 진행률"]')!.hasAttribute('aria-valuenow')).toBe(false)
         await act(async () => { pending.reject(new Error('네트워크 오류')) })
         expect(document.body.textContent).toContain('네트워크 오류'); expect(document.querySelector('[role="alert"]')).not.toBeNull()
     })
@@ -141,5 +179,33 @@ describe('engine progress UI', () => {
     it('renders no progress without an attempt, and clamps an accessible bar', async () => {
         await mount(h(Progress, { name: 'empty' })); expect(document.querySelector('[role="progressbar"]')).toBeNull()
         await mount(h(ProgressBar, { label: 'clamp', value: 200 })); expect(document.querySelector('[aria-label="clamp"]')!.getAttribute('aria-valuenow')).toBe('100')
+    })
+    it('installs every missing tool from a single settings button and displays the batch outcome', async () => {
+        const states = { a: { installed: false, version: null as string | null }, b: { installed: false, version: null as string | null } }
+        api.getEngineStatus.mockImplementation(async () => structuredClone(states))
+        api.installEngine.mockImplementation(async (name: keyof typeof states) => { states[name] = { installed: true, version: '1.0' }; return true })
+        await render(h(EngineSettings))
+        expect([...document.querySelectorAll('button')].filter(button => button.textContent === '설치')).toHaveLength(1)
+        await clickButton('설치')
+        expect(api.installEngine.mock.calls.map(call => call[0])).toEqual(['a', 'b'])
+        expect(document.body.textContent).toContain('처리 2/2개 · 완료 2개 · 실패 0개')
+        expect(document.querySelector('[aria-label="전체 설치 진행률"]')!.getAttribute('aria-valuenow')).toBe('100')
+    })
+    it('uses the same single installation button on the download page and keeps the final result visible', async () => {
+        const states = { a: { installed: false, version: null as string | null }, b: { installed: false, version: null as string | null } }
+        api.getEngineStatus.mockImplementation(async () => structuredClone(states))
+        api.installEngine.mockImplementation(async (name: keyof typeof states) => { states[name] = { installed: true, version: '1.0' }; return true })
+        await render(h(DownloadPage)); await clickButton('설치')
+        expect(api.installEngine.mock.calls.map(call => call[0])).toEqual(['a', 'b'])
+        expect(document.querySelector('[aria-label="필요한 엔진 설치"]')).not.toBeNull()
+        expect(document.body.textContent).toContain('처리 2/2개 · 완료 2개 · 실패 0개')
+    })
+    it('blocks navigation only while the installation queue is running', async () => {
+        const guard = { current: null as null | (() => boolean | Promise<boolean>) }
+        const pending = deferred<boolean>(); api.installEngine.mockReturnValue(pending.promise)
+        await render(h(LeaveGuardProvider, { guard }, h(EngineSettings)))
+        await clickButton('설치'); expect(guard.current?.()).toBe(false)
+        api.getEngineStatus.mockResolvedValue(status(true)); await act(async () => { pending.resolve(true) })
+        expect(guard.current?.()).toBe(true)
     })
 })

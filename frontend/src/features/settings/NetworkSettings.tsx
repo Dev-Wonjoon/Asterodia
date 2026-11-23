@@ -1,3 +1,4 @@
+import { translate, useLanguage } from '@renderer/shared/i18n'
 import { getApi } from '@renderer/shared/api'
 import { useState, useEffect } from 'react'
 import { SettingSection } from '@renderer/shared/components/ui/SettingSection'
@@ -7,13 +8,14 @@ import { useToast } from '@renderer/shared/hooks/useToast'
 import { WebServerSettings } from './WebServerSettings'
 
 const BROWSER_OPTIONS = [
-    { value: '', label: '사용 안 함' },
+    { value: '', get label() { return translate("사용 안 함") } },
     { value: 'chrome', label: 'Chrome' },
     { value: 'firefox', label: 'Firefox' },
     { value: 'edge', label: 'Edge' }
 ]
 
 export const NetworkSettings = (): React.JSX.Element => {
+    useLanguage()
     const [browser, setBrowser] = useState('')
     const [cookieFile, setCookieFile] = useState('')
     const { showToast } = useToast()
@@ -23,14 +25,14 @@ export const NetworkSettings = (): React.JSX.Element => {
         let active = true
         void Promise.all([getApi().getCookieBrowser(), getApi().getCookieFilePath()])
             .then(([browser, file]) => { if (active) { setBrowser(browser); setCookieFile(file) } })
-            .catch(() => { if (active) showToast('네트워크 설정을 읽지 못했습니다.', 'error') })
+            .catch(() => { if (active) showToast(translate("네트워크 설정을 읽지 못했습니다."), 'error') })
         return () => { active = false }
     }, [showToast])
 
     async function save(action: () => Promise<void>): Promise<void> {
         if (saving) return
         setSaving(true)
-        try { await action() } catch { showToast('네트워크 설정을 저장하지 못했습니다.', 'error') }
+        try { await action() } catch { showToast(translate("네트워크 설정을 저장하지 못했습니다."), 'error') }
         finally { setSaving(false) }
     }
 
@@ -50,13 +52,13 @@ export const NetworkSettings = (): React.JSX.Element => {
         <div className="space-y-6">
         <WebServerSettings />
         <SettingSection
-            title="네트워크 설정"
-            description="다운로드 시 사용되는 네트워크 관련 설정입니다."
+            title={translate("네트워크 설정")}
+            description={translate("다운로드 시 사용되는 네트워크 관련 설정입니다.")}
         >
             <SettingRow
-                label="쿠키 브라우저"
-                description="브라우저에서 쿠키를 자동으로 가져옵니다."
-                value={BROWSER_OPTIONS.find((o) => o.value === browser)?.label || '사용 안 함'}
+                label={translate("쿠키 브라우저")}
+                description={translate("브라우저에서 쿠키를 자동으로 가져옵니다.")}
+                value={BROWSER_OPTIONS.find((o) => o.value === browser)?.label || translate("사용 안 함")}
                 action={
                     <select
                         disabled={saving}
@@ -73,16 +75,14 @@ export const NetworkSettings = (): React.JSX.Element => {
                 }
             />
             <SettingRow
-                label="쿠키 파일"
-                description="Netscape 형식의 cookies.txt 파일을 직접 지정합니다."
-                value={cookieFile || '설정되지 않음'}
+                label={translate("쿠키 파일")}
+                description={translate("Netscape 형식의 cookies.txt 파일을 직접 지정합니다.")}
+                value={cookieFile || translate("설정되지 않음")}
                 action={
                     <div className="flex gap-2">
-                        <Button disabled={saving} onClick={handleSelectCookieFile}>선택</Button>
+                        <Button disabled={saving} onClick={handleSelectCookieFile}>{translate("선택")}</Button>
                         {cookieFile && (
-                            <Button disabled={saving} variant="ghost" onClick={handleClearCookieFile}>
-                                초기화
-                            </Button>
+                            <Button disabled={saving} variant="ghost" onClick={handleClearCookieFile}>{translate("초기화")}</Button>
                         )}
                     </div>
                 }

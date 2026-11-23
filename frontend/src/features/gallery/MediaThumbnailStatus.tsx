@@ -1,3 +1,4 @@
+import { translateError, translateMessage, translate, useLanguage } from '@renderer/shared/i18n'
 import { useEffect, useRef, useState } from 'react'
 import { getApi } from '@renderer/shared/api'
 import type { ThumbnailStatusDto } from '@contracts/thumbnail-api'
@@ -13,6 +14,7 @@ export function MediaThumbnailStatus({
     title: string
     disabled?: boolean
 }): React.JSX.Element | null {
+    useLanguage()
     const [status, setStatus] = useState<ThumbnailStatusDto | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [requesting, setRequesting] = useState(false)
@@ -38,7 +40,7 @@ export function MediaThumbnailStatus({
                 if (!active) return
 
                 if (!result.ok) {
-                    setError(result.error.message)
+                    setError(translateError(result.error))
                     return
                 }
 
@@ -51,7 +53,7 @@ export function MediaThumbnailStatus({
                 }
             } catch {
                 if (active) {
-                    setError('썸네일 상태를 확인하지 못했습니다.')
+                    setError(translate("썸네일 상태를 확인하지 못했습니다."))
                 }
             }
         }
@@ -68,14 +70,14 @@ export function MediaThumbnailStatus({
                     if (result.ok) {
                         setStatus(result.data)
                     } else {
-                        setError(result.error.message)
+                        setError(translateError(result.error))
                     }
                 }
 
                 await readStatus()
             } catch {
                 if (active) {
-                    setError('썸네일 재시도를 요청하지 못했습니다.')
+                    setError(translate("썸네일 재시도를 요청하지 못했습니다."))
                 }
             } finally {
                 if (active) {
@@ -109,29 +111,29 @@ export function MediaThumbnailStatus({
         return null
     }
 
-    let message = '썸네일 상태 확인 중...'
+    let message = translate("썸네일 상태 확인 중...")
 
     switch (status?.state) {
         case 'missing':
-            message = '썸네일 생성 작업이 등록되어 있지 않습니다.'
+            message = translate("썸네일 생성 작업이 등록되어 있지 않습니다.")
             break
 
         case 'pending':
-            message = '썸네일 생성 대기 중'
+            message = translate("썸네일 생성 대기 중")
             break
 
         case 'running':
-            message = '썸네일 생성 중'
+            message = translate("썸네일 생성 중")
             break
 
         case 'failed':
             message = status.canRetry
-                ? '썸네일을 가져오지 못했습니다.'
-                : '썸네일 생성을 완료하지 못했습니다.'
+                ? translate("썸네일을 가져오지 못했습니다.")
+                : translate("썸네일 생성을 완료하지 못했습니다.")
             break
 
         case 'blocked':
-            message = '썸네일 생성이 보류되었습니다.'
+            message = translate("썸네일 생성이 보류되었습니다.")
             break
 
         case 'registered':
@@ -153,7 +155,7 @@ export function MediaThumbnailStatus({
         <div
             data-thumbnail-file={fileId}
             data-thumbnail-state={status?.state ?? 'loading'}
-            aria-label={`${title} 썸네일 상태`}
+            aria-label={translate("{0} 썸네일 상태", { "0": title })}
             aria-busy={requesting}
             className="space-y-2 text-sm"
         >
@@ -163,20 +165,20 @@ export function MediaThumbnailStatus({
                 </p>
             )}
 
-            {error && <p role="alert">{error}</p>}
+            {error && <p role="alert">{translateMessage(error)}</p>}
 
             {status?.canRetry && (
                 <button
                     type="button"
                     className={button}
-                    aria-label={`${title} 썸네일 다시 시도`}
+                    aria-label={translate("{0} 썸네일 다시 시도", { "0": title })}
                     disabled={disabled || requesting}
                     onClick={(event) => {
                         event.stopPropagation()
                         request('retry')
                     }}
                 >
-                    {requesting ? '요청 중...' : '썸네일 다시 시도'}
+                    {requesting ? translate("요청 중...") : translate("썸네일 다시 시도")}
                 </button>
             )}
 
@@ -184,15 +186,13 @@ export function MediaThumbnailStatus({
                 <button
                     type="button"
                     className={button}
-                    aria-label={`${title} 썸네일 상태 새로고침`}
+                    aria-label={translate("{0} 썸네일 상태 새로고침", { "0": title })}
                     disabled={disabled || requesting}
                     onClick={(event) => {
                         event.stopPropagation()
                         request('read')
                     }}
-                >
-                    상태 새로고침
-                </button>
+                >{translate("상태 새로고침")}</button>
             )}
         </div>
     )

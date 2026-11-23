@@ -97,17 +97,18 @@ describe('download page engine requirements and original errors', () => {
     it('hides the engine section when all engines work', async () => {
         await renderPage(); expect(document.querySelector('[aria-label="필요한 엔진 설치"]')).toBeNull()
     })
-    it('shows only missing engines, installs them and hides the entire section after success', async () => {
+    it('shows only missing engines and keeps the batch result visible after installation', async () => {
         api.getEngineStatus.mockResolvedValue({ ready: { installed: true, version: 'already ready' }, ffprobe: { installed: false, version: null, error: '미설치' } })
         const pending = deferred<boolean>(); api.installEngine.mockReturnValue(pending.promise)
         await renderPage(); expect(document.body.textContent).not.toContain('already ready'); expect(document.body.textContent).toContain('ffprobe')
         await clickButton('설치'); expect(document.body.textContent).toContain('설치 중')
         api.getEngineStatus.mockResolvedValue({ ffprobe: { installed: true, version: 'ready' } }); await act(async () => { pending.resolve(true) })
-        expect(document.querySelector('[aria-label="필요한 엔진 설치"]')).toBeNull()
+        expect(document.querySelector('[aria-label="필요한 엔진 설치"]')).not.toBeNull()
+        expect(document.body.textContent).toContain('처리 1/1개 · 완료 1개 · 실패 0개')
     })
     it('does not hide a status-query failure and supports retry', async () => {
         api.getEngineStatus.mockRejectedValue(new Error('offline')); await renderPage(); expect(document.querySelector('[role="alert"]')).not.toBeNull()
-        api.getEngineStatus.mockResolvedValue({}); await clickButton('다시 확인'); expect(document.querySelector('[aria-label="필요한 엔진 설치"]')).toBeNull()
+        api.getEngineStatus.mockResolvedValue({ 'yt-dlp': { installed: true, version: '1' } }); await clickButton('다시 확인'); expect(document.querySelector('[aria-label="필요한 엔진 설치"]')).toBeNull()
     })
     it('displays the actual error and an indeterminate download without fabricated percent', async () => {
         const job: DownloadJobDto = { id: 'job', url: 'https://www.youtube.com/shorts/xhzS_pawX9Y', title: 'Shorts', state: 'failed', phase: 'finished', progress: 0, options: {}, cleanupRequired: false, currentAttemptId: 'a', errorCode: 'DOWNLOAD_ENGINE_FAILED', errorMessage: 'ERROR: ffmpeg executable is missing' }

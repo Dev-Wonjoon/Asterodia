@@ -1,16 +1,17 @@
+import { translateError, translate } from '@renderer/shared/i18n'
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
-import type { MediaFilter } from '@contracts/media-v2'
+import type { GalleryView, MediaFilter } from '@contracts/media-v2'
 import { getApi } from '@renderer/shared/api'
 import { useToast } from '@renderer/shared/hooks/useToast'
 import { useDownloadViewModel } from '@renderer/features/download/useDownloadViewModel'
 import { createGalleryStore } from './galleryStore'
 
-export function useGalleryViewModel(favoritesOnly = false, filter?: MediaFilter) {
+export function useGalleryViewModel(favoritesOnly = false, filter?: MediaFilter, galleryView: GalleryView = 'all', showAlbumFiles = false) {
     const { showToast } = useToast()
 
     const store = useMemo(
-        () => createGalleryStore(getApi().media, { favoritesOnly, expandAlbums: true }),
-        [favoritesOnly]
+        () => createGalleryStore(getApi().media, { favoritesOnly, expandAlbums: true, galleryView, showAlbumFiles }),
+        [favoritesOnly, galleryView, showAlbumFiles]
     )
 
     const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
@@ -36,20 +37,20 @@ export function useGalleryViewModel(favoritesOnly = false, filter?: MediaFilter)
                 })
 
                 if (!result.ok) {
-                    showToast(result.error.message, 'error')
+                    showToast(translateError(result.error), 'error')
                     return
                 }
 
                 const filepath = result.data.files.data[0]?.filepath
 
                 if (!filepath) {
-                    showToast('등록된 파일 경로를 찾지 못했습니다.', 'error')
+                    showToast(translate("등록된 파일 경로를 찾지 못했습니다."), 'error')
                     return
                 }
 
                 await getApi().showItemInFolder(filepath)
             } catch {
-                showToast('파일 위치를 열지 못했습니다.', 'error')
+                showToast(translate("파일 위치를 열지 못했습니다."), 'error')
             }
         },
         [showToast]

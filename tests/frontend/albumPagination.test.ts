@@ -5,6 +5,17 @@ import type { MediaApi } from '@contracts/media-api'
 import { readExpandedAlbums } from '../../internal/webserver/web/album-state.js'
 afterEach(() => { localStorage.clear() })
 const ok = (data: unknown) => ({ ok: true, data })
+it.each(['all','albums','files'] as const)('sends %s view and hidden-file visibility on every gallery page', async galleryView => {
+    const list=vi.fn(async(req:any)=>ok({data:Array.from({length:24},(_,i)=>({id:req.offset+i+1})),total:48,offset:req.offset,hasNextPage:req.offset===0}))
+    const store=createGalleryStore({list} as unknown as MediaApi,{expandAlbums:true,galleryView,showAlbumFiles:false})
+    await store.refresh();await store.loadMore()
+    expect(list).toHaveBeenCalledTimes(2)
+    for(const [request] of list.mock.calls)expect(request).toMatchObject({gallery:true,galleryView,showAlbumFiles:false})
+    expect(store.getSnapshot().list.page.data).toHaveLength(48)
+    const visible=createGalleryStore({list} as unknown as MediaApi,{expandAlbums:true,galleryView,showAlbumFiles:true})
+    await visible.refresh()
+    expect(list.mock.lastCall![0].showAlbumFiles).toBe(true)
+})
 it('keeps the same original file visible in two different expanded albums', async () => {
     const rows = [{ id: 1, galleryFile: { id: 7 } }, { id: 2, galleryFile: { id: 7 } }]
     const store = createGalleryStore({ list: vi.fn(async () => ok({ data: rows, total: 2, hasNextPage: false })) } as unknown as MediaApi, { expandAlbums: true })

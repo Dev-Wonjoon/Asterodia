@@ -1,3 +1,4 @@
+import { translate } from '@renderer/shared/i18n'
 import { Service as FileMoveService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/filemove";
 import { Service as UpdateService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/update";
 import { Service as MediaEditService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/mediaedit";
@@ -20,7 +21,7 @@ function wire<T>(request: unknown): T { return request as T; }
 async function response<T>(pending: Promise<Result>): Promise<T> {
     const value = await pending;
     if (typeof value.ok !== "boolean" || (!value.ok && !value.error)) {
-        throw new Error("앱 서비스 응답 형식이 올바르지 않습니다.");
+        throw new Error(translate("앱 서비스 응답 형식이 올바르지 않습니다."));
     }
     return value as T;
 }
@@ -75,6 +76,7 @@ const api: AppApi = {
     media: {
         albums: (request = {}) => response(MediaService.Albums(wire(request))),
         saveAlbum: request => response(MediaService.SaveAlbum(wire(request))),
+        mergeAlbum: request => response(MediaService.MergeAlbum(wire(request))),
         sequence: request => response(MediaService.Sequence(wire(request))),
         readFile: request => response(MediaService.ReadFile(wire(request))),
         directories: (request = {}) => response(MediaService.Directories(wire(request))),
@@ -98,7 +100,7 @@ const api: AppApi = {
             });
 
             if (kind !== "yt-dlp" && kind !== "gallery-dl") {
-                throw new Error("엔진을 선택하지 못했습니다.");
+                throw new Error(translate("엔진을 선택하지 못했습니다."));
             }
 
             return kind;
@@ -124,14 +126,14 @@ const api: AppApi = {
         const statuses = await EngineManager.Status();
 
         if (statuses === null) {
-            throw new Error("엔진 상태 응답이 비어 있습니다.");
+            throw new Error(translate("엔진 상태 응답이 비어 있습니다."));
         }
 
         const result: Record<string, EngineStatus> = {};
 
         for (const [name, status] of Object.entries(statuses)) {
             if (status === undefined) {
-                throw new Error(`${name}의 상태 응답이 없습니다.`);
+                throw new Error(translate("{0}의 상태 응답이 없습니다.", { "0": name }));
             }
 
             result[name] = status;

@@ -71,3 +71,49 @@ it('expands the entire player with its jump buttons when native fullscreen is un
     expect(document.querySelector('.sbp-fullscreen-dialog')).toBeNull()
     expect(player!.root.parentElement).toBe(document.body)
 })
+
+
+const audioKey = 'storagebucket:player-audio:v1'
+function changeVolume(value: string) {
+ const volume=document.querySelector<HTMLInputElement>('.sbp-volume')!
+ volume.value=value;volume.dispatchEvent(new Event('input'))
+}
+it('persists volume immediately and restores it for a newly created player',()=>{
+ setup();changeVolume('0.35')
+ expect(JSON.parse(localStorage.getItem(audioKey)!)).toEqual({volume:.35,muted:false})
+ player!.destroy();player=undefined
+ const video=setup();expect(video.volume).toBe(.35);expect(video.muted).toBe(false)
+ expect(document.querySelector<HTMLInputElement>('.sbp-volume')!.value).toBe('0.35')
+})
+it('remembers mute separately from volume and restores the level when unmuted',()=>{
+ setup();changeVolume('0.4');button('음소거').click()
+ expect(JSON.parse(localStorage.getItem(audioKey)!)).toEqual({volume:.4,muted:true})
+ player!.destroy();player=undefined
+ const video=setup();expect(video.volume).toBe(.4);expect(video.muted).toBe(true)
+ expect(document.querySelector<HTMLInputElement>('.sbp-volume')!.value).toBe('0')
+ button('음소거 해제').click();expect(video.volume).toBe(.4);expect(video.muted).toBe(false)
+ expect(JSON.parse(localStorage.getItem(audioKey)!)).toEqual({volume:.4,muted:false})
+ player!.root.dispatchEvent(new KeyboardEvent('keydown',{key:'m',bubbles:true}))
+ expect(JSON.parse(localStorage.getItem(audioKey)!)).toEqual({volume:.4,muted:true})
+})
+it('restores zero volume and records native volume changes without saving on destroy',()=>{
+ localStorage.setItem(audioKey,JSON.stringify({volume:0,muted:true}))
+ const video=setup();expect(video.volume).toBe(0);expect(video.muted).toBe(true)
+ video.volume=.6;video.muted=false;video.dispatchEvent(new Event('volumechange'))
+ expect(JSON.parse(localStorage.getItem(audioKey)!)).toEqual({volume:.6,muted:false})
+ player!.destroy();player=undefined
+ localStorage.setItem(audioKey,JSON.stringify({volume:.2,muted:false}))
+ video.volume=.9;video.dispatchEvent(new Event('volumechange'))
+ expect(JSON.parse(localStorage.getItem(audioKey)!)).toEqual({volume:.2,muted:false})
+})
+it.each(['broken','null','[]','{"volume":2,"muted":false}','{"volume":-1,"muted":false}','{"volume":"0.3","muted":false}','{"volume":0.3,"muted":"false"}'])('ignores an invalid saved audio preference: %s',raw=>{
+ localStorage.setItem(audioKey,raw)
+ const video=setup();expect(video.volume).toBe(1);expect(video.muted).toBe(false)
+})
+it('keeps volume controls usable when preference storage is unavailable',()=>{
+ vi.spyOn(Storage.prototype,'getItem').mockImplementation(()=>{throw new Error('blocked')})
+ vi.spyOn(Storage.prototype,'setItem').mockImplementation(()=>{throw new Error('full')})
+ const video=setup();expect(video.volume).toBe(1)
+ expect(()=>changeVolume('0.25')).not.toThrow();expect(video.volume).toBe(.25)
+ expect(()=>button('음소거').click()).not.toThrow();expect(video.muted).toBe(true)
+})

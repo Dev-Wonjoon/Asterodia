@@ -1,3 +1,4 @@
+import { translateMessage, translate, useLanguage } from '@renderer/shared/i18n'
 import type { AppMenu } from '../navigation'
 import { useEffect, useState, type ReactNode } from 'react'
 import { SidebarItem } from '@renderer/app/layouts/SidebarItem'
@@ -10,7 +11,7 @@ import { useDownloadViewModel } from '@renderer/features/download/useDownloadVie
 const SIDEBAR_MENUS: Array<{ id: AppMenu; label: string; icon: ReactNode }> = [
     {
         id: 'gallery',
-        label: '갤러리',
+        get label() { return translate("갤러리") },
         icon: (
             <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -30,12 +31,12 @@ const SIDEBAR_MENUS: Array<{ id: AppMenu; label: string; icon: ReactNode }> = [
     },
     {
         id: 'downloads',
-        label: '다운로드',
+        get label() { return translate("다운로드") },
         icon: <Download className="size-6" />
     },
     {
         id: 'search',
-        label: '검색',
+        get label() { return translate("검색") },
         icon: (
             <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -55,7 +56,7 @@ const SIDEBAR_MENUS: Array<{ id: AppMenu; label: string; icon: ReactNode }> = [
     },
     {
         id: 'favorites',
-        label: '즐겨찾기',
+        get label() { return translate("즐겨찾기") },
         icon: (
             <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -88,6 +89,7 @@ export const Sidebar = ({
     collapsed,
     onToggle
 }: SidebarProps): React.JSX.Element => {
+    useLanguage()
     const { theme, toggleTheme } = useTheme()
     const { mode, toggle: toggleActionDisplay } = useActionDisplay()
     const [modeNotice, setModeNotice] = useState('')
@@ -97,8 +99,8 @@ export const Sidebar = ({
         return () => clearTimeout(timer)
     }, [modeNotice])
     const { requestedIds } = useDownloadViewModel()
-    const themeLabel = theme === 'dark' ? '라이트모드 전환' : '다크모드 전환'
-    const toggleLabel = collapsed ? '사이드바 펼치기' : '사이드바 접기'
+    const themeLabel = theme === 'dark' ? translate("라이트모드 전환") : translate("다크모드 전환")
+    const toggleLabel = collapsed ? translate("사이드바 펼치기") : translate("사이드바 접기")
 
     return (
         <aside
@@ -144,7 +146,7 @@ export const Sidebar = ({
             </div>
 
             <nav
-                aria-label="주 메뉴"
+                aria-label={translate("주 메뉴")}
                 className="flex-1 min-h-0 px-3 py-4 flex flex-col gap-1 overflow-y-auto"
             >
                 {SIDEBAR_MENUS.map((menu) => (
@@ -152,7 +154,7 @@ export const Sidebar = ({
                         key={menu.id}
                         label={
                             menu.id === 'downloads' && requestedIds.length > 0
-                                ? `다운로드 · 요청 ${requestedIds.length}`
+                                ? translate("다운로드 · 요청 {0}", { "0": requestedIds.length })
                                 : menu.label
                         }
                         icon={menu.icon}
@@ -170,7 +172,7 @@ export const Sidebar = ({
             >
                 <div className={collapsed ? 'w-full' : 'flex-1 min-w-0'}>
                     <SidebarItem
-                        label="설정"
+                        label={translate("설정")}
                         icon={<Settings className="size-6" />}
                         isActive={activeMenu === 'settings'}
                         collapsed={collapsed}
@@ -179,7 +181,7 @@ export const Sidebar = ({
                 </div>
 
                 <div className={'relative flex shrink-0 items-center ' + (collapsed ? 'gap-0' : 'gap-1')}>
-                    {modeNotice && <p role="status" className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 w-64 max-w-[80vw] rounded-lg border border-[var(--border-line)] bg-[var(--bg-sidebar)] px-3 py-2 text-xs shadow-lg">{modeNotice}</p>}
+                    {modeNotice && <p role="status" className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 w-64 max-w-[80vw] rounded-lg border border-[var(--border-line)] bg-[var(--bg-sidebar)] px-3 py-2 text-xs shadow-lg">{translateMessage(modeNotice)}</p>}
                     <button
                         type="button"
                         onClick={toggleTheme}
@@ -195,10 +197,10 @@ export const Sidebar = ({
                     </button>
                     <button
                         type="button"
-                        onClick={() => { setModeNotice(mode === 'icons' ? '설명 모드 · 버튼에 마우스를 올리거나 포커스하면 기능명이 표시됩니다.' : '아이콘 모드'); toggleActionDisplay() }}
-                        aria-label="기능 버튼 설명 모드"
+                        onClick={() => { setModeNotice(mode === 'icons' ? translate("설명 모드 · 버튼에 마우스를 올리거나 포커스하면 기능명이 표시됩니다.") : translate("아이콘 모드")); toggleActionDisplay() }}
+                        aria-label={translate("기능 버튼 설명 모드")}
                         aria-pressed={mode === 'details'}
-                        title={mode === 'icons' ? '아이콘 모드 · 설명 모드로 전환' : '설명 모드 · 아이콘 모드로 전환'}
+                        title={mode === 'icons' ? translate("아이콘 모드 · 설명 모드로 전환") : translate("설명 모드 · 아이콘 모드로 전환")}
                         className={(collapsed ? 'size-7' : 'size-9') + ' shrink-0 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)]'}
                     >
                         {mode === 'icons' ? <TextCursorInput className="size-5" aria-hidden="true" /> : <Grid2X2 className="size-5" aria-hidden="true" />}

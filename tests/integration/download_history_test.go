@@ -42,7 +42,7 @@ func TestDownloadJobsIncludeLocalPreviewWithoutRemoteLookup(t *testing.T) {
 	if _, err = f.db.Exec("UPDATE media_file SET thumbnail_path=?,thumbnail_origin='app_generated' WHERE media_id=?", cover, mediaID); err != nil {
 		t.Fatal(err)
 	}
-	cachedJob := success(t, f.service.Enqueue(t.Context(), download.EnqueueRequest{Mode: "create", URL: postURL + "?preview=cache"})).(download.Job)
+	cachedJob := success(t, f.service.Enqueue(t.Context(), download.EnqueueRequest{Mode: "create", URL: "https://www.instagram.com/p/PreviewFixture/?preview=cache"})).(download.Job)
 	cache := filepath.Join(f.root, "cache", "previews", fmt.Sprintf("%x.jpg", sha256.Sum256([]byte(cachedJob.URL))))
 	if err = os.MkdirAll(filepath.Dir(cache), 0700); err != nil {
 		t.Fatal(err)

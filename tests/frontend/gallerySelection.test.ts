@@ -4,14 +4,15 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { cleanupReact, clickButton, deferred, mount } from './reactHarness'
 import { GalleryPage } from '@renderer/features/gallery/GalleryPage'
 import { useInfiniteScroll } from '@renderer/shared/hooks/useInfiniteScroll'
+import { useGalleryViewModel } from '@renderer/features/gallery/useGalleryViewModel'
 const mocks = vi.hoisted(() => ({ bulk: vi.fn(), unregister: vi.fn(), confirm: vi.fn(async () => true), refresh: vi.fn(), getSnapshot: vi.fn(), get: vi.fn(), create: vi.fn(), run: vi.fn(), directories: vi.fn(), on: vi.fn(), mediaGet: vi.fn(), mountEditor: vi.fn(), destroyEditor: vi.fn(), state: null as any }))
-const api = {fileMove:{get:mocks.get,create:mocks.create,run:mocks.run},media:{directories:mocks.directories,albums:vi.fn(),saveAlbum:vi.fn(),get:mocks.mediaGet},onMediaThumbnailUpdated:mocks.on}
+const api = {fileMove:{get:mocks.get,create:mocks.create,run:mocks.run},media:{directories:mocks.directories,albums:vi.fn(),saveAlbum:vi.fn(),mergeAlbum:vi.fn(),get:mocks.mediaGet},onMediaThumbnailUpdated:mocks.on}
 vi.mock('../../internal/webserver/web/editor.js',()=>({mountMediaEditor:mocks.mountEditor}))
 vi.mock('@renderer/shared/hooks/useConfirm',()=>({useConfirm:()=>({confirm:mocks.confirm,isOpen:false})}))
 vi.mock('@renderer/shared/api',()=>({getApi:()=>api}))
 const store = {refresh:mocks.refresh,getSnapshot:mocks.getSnapshot,unregisterMedia:mocks.unregister,bulk:mocks.bulk,closeDetail:vi.fn(),toggleAlbum:vi.fn(),loadMore:vi.fn(),openDetail:vi.fn()}
 const downloads = { activeJobs: [] as any[], cancellingIds: [], openDetail: vi.fn(), closeDetail: vi.fn(), cancelDownload: vi.fn() }
-vi.mock('@renderer/features/gallery/useGalleryViewModel',()=>({useGalleryViewModel:()=>({store,snapshot:mocks.state,openInFolder:vi.fn(),downloads})}))
+vi.mock('@renderer/features/gallery/useGalleryViewModel',()=>({useGalleryViewModel:vi.fn(()=>({store,snapshot:mocks.state,openInFolder:vi.fn(),downloads}))}))
 vi.mock('@renderer/shared/hooks/useLeaveGuard',()=>({useLeaveGuard:vi.fn()}))
 vi.mock('@renderer/shared/hooks/useInfiniteScroll',()=>({useInfiniteScroll:vi.fn()}))
 vi.mock('@renderer/features/download/components/DownloadThumbnail',()=>({DownloadThumbnail:()=>h('div',null,'작업 썸네일')}))
@@ -20,6 +21,7 @@ vi.mock('@renderer/features/localimport/LocalImportPanel',()=>({LocalImportPanel
 vi.mock('@renderer/features/gallery/MediaViewer',()=>({MediaViewer:({mediaId,fileId,onClose}:any)=>h('div',{role:'dialog','aria-label':`감상 ${mediaId} ${fileId ?? ''}`},h('button',{onClick:onClose},'감상 닫기'))}))
 afterEach(cleanupReact)
 function setup(){
+ vi.mocked(useGalleryViewModel).mockClear()
  mocks.mediaGet.mockReset();mocks.destroyEditor.mockReset()
  mocks.mountEditor.mockReset().mockImplementation((host:HTMLElement,options:any)=>{
   const dialog=document.createElement('dialog');dialog.open=true;dialog.setAttribute('aria-label','편집 테스트 창')
@@ -42,6 +44,38 @@ function singleVideo(){
  mocks.mediaGet.mockResolvedValue(result)
  return {file,result}
 }
+it('switches gallery views, clears selection and exposes hidden files through the view menu',async()=>{
+ setup();await mount(h(GalleryPage))
+ expect(vi.mocked(useGalleryViewModel).mock.lastCall).toEqual([false,undefined,'all',false])
+ await clickButton('메뉴');await clickButton('현재 목록 전체 선택')
+ expect(document.querySelector('[aria-label="선택 항목 작업"]')).not.toBeNull()
+ await clickButton('전체 보기');expect(document.querySelector('[role=menuitemradio][aria-checked=true]')?.textContent).toBe('전체')
+ await clickButton('앨범만')
+ expect(vi.mocked(useGalleryViewModel).mock.lastCall).toEqual([false,undefined,'albums',false])
+ expect(document.querySelector('[aria-label="선택 항목 작업"]')).toBeNull()
+ await clickButton('앨범만 보기')
+ expect(document.querySelector<HTMLButtonElement>('[role=menuitemcheckbox]')!.disabled).toBe(true)
+ await clickButton('파일만');await clickButton('파일만 보기');await clickButton('숨긴 파일 표시')
+ expect(vi.mocked(useGalleryViewModel).mock.lastCall).toEqual([false,undefined,'files',true])
+ await clickButton('파일만 보기');expect(document.querySelector('[role=menuitemcheckbox]')?.getAttribute('aria-checked')).toBe('true')
+ await clickButton('전체')
+ expect(vi.mocked(useGalleryViewModel).mock.lastCall).toEqual([false,undefined,'all',true])
+})
+it('keeps favorites and search constraints while changing the gallery view',async()=>{
+ setup();await mount(h(GalleryPage,{favoritesOnly:true,filter:{keyword:'여행'}}))
+ await clickButton('전체 보기');await clickButton('파일만')
+ expect(vi.mocked(useGalleryViewModel).mock.lastCall).toEqual([true,{keyword:'여행'},'files',false])
+})
+it('disables view changes while a library mutation is running',async()=>{
+ setup();mocks.state.busy=true;await mount(h(GalleryPage))
+ expect(document.querySelector<HTMLButtonElement>('button[aria-label="전체 보기"]')!.disabled).toBe(true)
+})
+it('does not offer collapse for file cards forced by visibility or file-only mode',async()=>{
+ setup();Object.assign(mocks.state.list.page.data[0],{galleryFile:{id:18,title:'남은 파일',kind:'image'},galleryCanCollapse:false})
+ await mount(h(GalleryPage));expect(document.querySelector('[aria-label="게시글 1 파일 접기"]')).toBeNull()
+ await clickButton('남은 파일 더보기')
+ expect([...document.querySelectorAll('[role=menuitem]')].map(item=>item.textContent)).not.toContain('파일 접기')
+})
 it('opens the renamed editor from the main menu and keeps it mounted after the menu closes',async()=>{
  setup();await mount(h(GalleryPage))
  expect(document.body.textContent).not.toContain('GIF, WebP로 만들기')
@@ -194,23 +228,29 @@ it('keeps refresh available after a list error while blocking selection',async()
  await clickButton('메뉴');expect([...document.querySelectorAll('button')].find(item=>item.textContent==='현재 목록 전체 선택')?.disabled).toBe(true)
 })
 
-it('shows a unified selection bar while keeping the main toolbar stable',async()=>{
+it('places selection actions beside the gallery title while keeping the main controls stable',async()=>{
  setup();await mount(h(GalleryPage))
  const header=document.querySelector('header')!
- const initialControls=[...header.querySelectorAll('button')].map(item=>item.textContent)
- expect(initialControls).toEqual(['새로고침','메뉴'])
+ const toolbar=header.querySelector('[data-gallery-toolbar]')!
+ const initialControls=[...toolbar.querySelectorAll('button')].map(item=>item.textContent)
+ expect(initialControls).toEqual(['전체 보기','새로고침','메뉴'])
  expect(header.querySelector('[role=status]')).toBeNull();expect(header.querySelector('.invisible')).toBeNull()
  expect(header.textContent).not.toContain('묶음');expect(header.textContent).not.toContain('게시글')
  await act(async()=>document.querySelector<HTMLInputElement>('input[type=checkbox]')!.click())
  const bar=document.querySelector('[aria-label="선택 항목 작업"]')!
+ expect(bar.closest('header')).toBe(header)
+ expect(header.querySelector('h1')?.textContent).toBe('갤러리')
+ expect(document.querySelectorAll('[aria-label="선택 항목 작업"]')).toHaveLength(1)
  expect(bar.querySelector('[role=status]')?.textContent).toBe('1개 선택')
  expect([...document.querySelectorAll('button')].some(item=>item.getAttribute('aria-label')==='게시글 1 더보기')).toBe(true)
- expect([...header.querySelectorAll('button')].map(item=>item.textContent)).toEqual(initialControls)
- expect([...bar.querySelectorAll('button')].map(item=>item.textContent)).toEqual(['앨범에 추가','한 폴더에 모으기','선택 작업','선택 해제'])
- await clickButton('메뉴');await clickButton('선택 해제')
+ expect([...toolbar.querySelectorAll('button')].map(item=>item.textContent)).toEqual(initialControls)
+ expect([...bar.querySelectorAll('button')].map(item=>item.textContent)).toEqual(['앨범에 추가','한 폴더에 모으기','병합','선택 작업','선택 해제'])
+ await clickButton('메뉴')
+ const clear=[...toolbar.querySelectorAll<HTMLButtonElement>('[role=menuitem]')].find(item=>item.textContent==='선택 해제')!
+ await act(async()=>clear.click())
  expect(header.querySelector('[role=status]')).toBeNull()
  expect(document.querySelector('[aria-label="선택 항목 작업"]')).toBeNull()
- expect([...header.querySelectorAll('button')].map(item=>item.textContent)).toEqual(initialControls)
+ expect([...toolbar.querySelectorAll('button')].map(item=>item.textContent)).toEqual(initialControls)
 })
 
 it('offers direct selection without selection-mode menu entries or checkbox text',async()=>{
@@ -251,7 +291,7 @@ it('opens an expanded file at its own offset and retains infinite scrolling with
 
 it('opens playback from the thumbnail and details from the title or named menu',async()=>{
  setup();store.openDetail.mockClear();await mount(h(GalleryPage))
- await clickButton('게시글 1 감상하기')
+ await clickButton('게시글 1 선택 · 두 번 클릭하여 감상')
  expect(document.querySelector('[aria-label="감상 1 "]')).not.toBeNull()
  expect(store.openDetail).not.toHaveBeenCalled()
  await clickButton('감상 닫기');await clickButton('게시글 1 상세보기')
@@ -292,4 +332,39 @@ it('moves a mixed selection with per-file scope and clears every kind of selecti
  await act(async()=>{select.value='7';select.dispatchEvent(new Event('change',{bubbles:true}))});await clickButton('복사 시작')
  expect(mocks.create).toHaveBeenCalledWith({selection:[{mediaId:1,revision:4},{mediaId:2,revision:4,fileIds:[22]}],directoryId:7,operation:'copy'})
  expect(document.querySelector('[aria-label="선택 항목 작업"]')).toBeNull()
+})
+
+
+it('connects Explorer mouse selection and double-click playback to gallery cards', async () => {
+ setup(); await mount(h(GalleryPage))
+ const first = document.querySelector<HTMLButtonElement>('article[data-album-id="1"] [data-card-select]')!
+ const second = document.querySelector<HTMLButtonElement>('article[data-album-id="2"] [data-card-select]')!
+ await act(async () => first.dispatchEvent(new MouseEvent('click', { bubbles:true, detail:1 })))
+ expect(document.querySelector('[aria-label="감상 1 "]')).toBeNull()
+ expect(document.querySelector('[aria-label="전체 2 / 선택 1"]')).not.toBeNull()
+ await act(async () => second.dispatchEvent(new MouseEvent('click', { bubbles:true, detail:1, shiftKey:true })))
+ expect(document.querySelector('[aria-label="전체 2 / 선택 2"]')).not.toBeNull()
+ const checkbox = document.querySelector<HTMLInputElement>('input[type="checkbox"]')!
+ checkbox.focus(); await act(async () => checkbox.dispatchEvent(new KeyboardEvent('keydown', { key:'Escape', bubbles:true, cancelable:true })))
+ expect(document.querySelector('[aria-label="선택 항목 작업"]')).toBeNull()
+ await act(async () => second.dispatchEvent(new MouseEvent('click', { bubbles:true, detail:1 })))
+ await act(async () => second.dispatchEvent(new MouseEvent('dblclick', { bubbles:true, detail:2 })))
+ expect(document.querySelector('[aria-label="감상 2 "]')).not.toBeNull()
+})
+
+it('freezes selected groups in the merge dialog and creates one combined job', async () => {
+ setup(); mocks.create.mockClear(); mocks.run.mockClear(); await mount(h(GalleryPage)); await clickButton('메뉴'); await clickButton('현재 목록 전체 선택'); await clickButton('병합')
+ expect(document.querySelector('dialog[aria-labelledby="folder-merge-title"]')).not.toBeNull()
+ await act(async () => document.querySelector<HTMLInputElement>('input[value="combined"]')!.click())
+ await act(async () => {
+  const input = document.querySelector<HTMLInputElement>('input[aria-label="새 앨범 이름"]')!
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,'합친 묶음');input.dispatchEvent(new Event('input',{bubbles:true}))
+  const select = document.querySelector<HTMLSelectElement>('select[aria-label="병합 대상 폴더"]')!
+  select.value='7';select.dispatchEvent(new Event('change',{bubbles:true}))
+ })
+ await clickButton('병합 시작')
+ expect(mocks.create).toHaveBeenCalledExactlyOnceWith({selection:[{mediaId:1,revision:4},{mediaId:2,revision:4}],directoryId:7,operation:'copy',mergeTitle:'합친 묶음'})
+ expect(mocks.run).toHaveBeenCalledExactlyOnceWith({jobId:'job'})
+ expect(document.querySelector('[aria-label="선택 항목 작업"]')).toBeNull()
+ expect(document.querySelector('dialog')).toBeNull()
 })

@@ -1,10 +1,11 @@
+import { translate } from '@renderer/shared/i18n'
 import type { MediaApi } from '@contracts/media-api'
 import type { MediaEditApi } from '@contracts/media-edit-api'
 import type { MediaFileDto, MediaFilter, MediaSummaryDto, MediaDetailDto, MediaResult, MediaPage } from '@contracts/media-v2'
 
 export async function request<T>(path: string, options?: RequestInit): Promise<T> {
     const response = await fetch(path, { credentials: 'same-origin', ...options })
-    if (!response.ok) throw new Error(response.status === 403 ? 'PC 앱에서 모바일 편집 허용 상태를 확인해 주세요.' : '서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+    if (!response.ok) throw new Error(response.status === 403 ? translate("PC 앱에서 모바일 편집 허용 상태를 확인해 주세요.") : translate("서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요."))
     return response.json()
 }
 export function filterParameters(filter: MediaFilter = {}) {
@@ -15,9 +16,9 @@ export function filterParameters(filter: MediaFilter = {}) {
 }
 async function result<T>(read: () => Promise<T>): Promise<MediaResult<T>> {
     try { return { ok: true, data: await read() } }
-    catch (error) { return { ok: false, error: { code: 'INTERNAL_ERROR', message: error instanceof Error ? error.message : '서버 응답을 확인하지 못했습니다.', context: {} } } }
+    catch (error) { return { ok: false, error: { code: 'INTERNAL_ERROR', message: error instanceof Error ? error.message : translate("서버 응답을 확인하지 못했습니다."), context: {} } } }
 }
-const unavailable = async (): Promise<MediaResult<never>> => ({ ok: false, error: { code: 'NOT_READY', message: 'PC 앱에서 사용할 수 있는 기능입니다.', context: {} } })
+const unavailable = async (): Promise<MediaResult<never>> => ({ ok: false, error: { code: 'NOT_READY', message: translate("PC 앱에서 사용할 수 있는 기능입니다."), context: {} } })
 export function fileDTO(file: Partial<MediaFileDto> & Pick<MediaFileDto, 'id'>): MediaFileDto {
     return { mediaId: 0, fileKey: String(file.id), fileUuid: '', filenameToken: '', directoryId: null, storageKind: 'external_reference', sourceUrl: null, title: null, relativePath: null, kind: 'unknown', position: 0, filesize: null, duration: null, detectedFormat: null, width: null, height: null, orientation: null, frameCount: null, pageCount: null, primaryImageIndex: null, thumbnailOrigin: 'none', createdAt: 0,
         ...file, filepath: `/api/files/${file.id}/content`, thumbnailPath: `/api/files/${file.id}/thumbnail`, previewPath: `/api/files/${file.id}/preview` }
@@ -47,7 +48,7 @@ const media: MediaApi = {
     suggest: value => result(() => request('/api/suggestions?' + new URLSearchParams({ kind: value.kind, q: value.text, limit: String(value.limit ?? 10) }))),
     sequence: value => result(() => request(`/api/library/${value.mediaId}/sequence`)),
     readFile: value => result(async () => fileDTO(await request(`/api/files/${value.fileId}/info`))),
-    albums: unavailable, saveAlbum: unavailable, directories: unavailable, edit: unavailable, unregisterFiles: unavailable, unregisterMedia: unavailable,
+    albums: unavailable, saveAlbum: unavailable, mergeAlbum: unavailable, directories: unavailable, edit: unavailable, unregisterFiles: unavailable, unregisterMedia: unavailable,
 }
 export interface EditAccess { enabled: boolean; csrf: string }
 let access: EditAccess = { enabled: false, csrf: '' }
@@ -63,7 +64,7 @@ const mediaEdit: MediaEditApi = {
     frames: value => editRequest('frames', value), frameStatus: value => editRequest('frames', value, true), selection: value => editRequest('selection', value), resources: value => editRequest('resources', value),
     prepare: value => editRequest('prepare', value), getSession: value => editRequest('session', value, true), create: value => editRequest('create', value), getJob: value => editRequest('job', value, true),
     list: () => editRequest('list', undefined, true), cancel: value => editRequest('cancel', value), release: value => editRequest('release', value),
-    resultPath: async () => ({ ok: false, error: { code: 'NOT_READY', message: '결과는 갤러리에서 확인할 수 있습니다.' } }),
+    resultPath: async () => ({ ok: false, error: { code: 'NOT_READY', message: translate("결과는 갤러리에서 확인할 수 있습니다.") } }),
 }
 const api = { media, mediaEdit, showItemInFolder: async () => {} }
 export function getApi() { return api }

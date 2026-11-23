@@ -3,6 +3,7 @@
     --motion-menu: 160ms;
     --motion-page: 180ms;
     --motion-panel: 220ms;
+    --motion-gallery: 220ms;
     --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
@@ -59,6 +60,11 @@
 .animate-slide-up { animation: slide-up var(--motion-page) var(--motion-ease); }
 .motion-sidebar { transition: width var(--motion-panel) var(--motion-ease); }
 .motion-progress { transition: width var(--motion-panel) linear; }
+
+/* Album layout effects are started explicitly by the gallery expansion hook. */
+.motion-gallery-scroll { scrollbar-gutter: stable; }
+.motion-gallery-moving { will-change: transform; }
+.motion-gallery-entering { will-change: transform, opacity; }
 
 @media (prefers-reduced-motion: reduce) {
     .motion-page, .motion-backdrop, .motion-menu, .motion-modal,

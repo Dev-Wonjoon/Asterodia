@@ -1,0 +1,168 @@
+import { useEffect, useRef, useState, type MouseEvent, type RefObject } from 'react'
+import type { MoveSelection } from '@contracts/file-move-api'
+import type { MediaSummaryDto } from '@contracts/media-v2'
+
+export const gallerySelectionKey = (item: MediaSummaryDto) => item.galleryFile ? `file:${item.galleryFile.id}` : `media:${item.id}`
+const displayKey = (item: MediaSummaryDto) => `${item.id}:${gallerySelectionKey(item)}`
+const target = (item: MediaSummaryDto): MoveSelection => ({ mediaId: item.id, revision: item.revision, ...(item.galleryFile ? { fileIds: [item.galleryFile.id] } : {}) })
+type Modifiers = Pick<MouseEvent, 'ctrlKey' | 'metaKey' | 'shiftKey'>
+type Rectangle = { left: number; top: number; width: number; height: number }
+type Gesture = { id: number; x: number; y: number; clientX: number; clientY: number; base: Map<string, MoveSelection>; additive: boolean; active: boolean; fromCard: boolean }
+
+export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject<boolean>, scrollRef: RefObject<HTMLDivElement | null>, resetKey: unknown) {
+    const [entries, setEntries] = useState(new Map<string, MoveSelection>())
+    const selected = useRef(entries)
+    const gridRef = useRef<HTMLDivElement>(null)
+    const anchor = useRef<string | null>(null)
+    const rangeBase = useRef(new Map<string, MoveSelection>())
+    const gesture = useRef<Gesture | null>(null)
+    const suppressClick = useRef(false), suppressRepeatedClick = useRef(false)
+    const frame = useRef(0)
+    const [rectangle, setRectangle] = useState<Rectangle | null>(null)
+    const [dragging, setDragging] = useState(false)
+    const [dragBase, setDragBase] = useState<Map<string, MoveSelection> | null>(null)
+    const latest = useRef({ items }); latest.current = { items }
+    function replace(next: Map<string, MoveSelection>) { selected.current = next; setEntries(next) }
+    function clear() { anchor.current = null; rangeBase.current = new Map(); replace(new Map()) }
+    function select(item: MediaSummaryDto, event: Modifiers, toggle = false) {
+        if (blocked.current) return
+        const rows = latest.current.items, additive = event.ctrlKey || event.metaKey
+        if (event.shiftKey && anchor.current) {
+            const from = rows.findIndex(row => displayKey(row) === anchor.current), to = rows.findIndex(row => displayKey(row) === displayKey(item))
+            if (from >= 0 && to >= 0) {
+                const next = additive ? new Map(rangeBase.current) : new Map<string, MoveSelection>()
+                for (const row of rows.slice(Math.min(from, to), Math.max(from, to) + 1)) next.set(gallerySelectionKey(row), target(row))
+                replace(next); return
+            }
+        }
+        const next = additive || toggle ? new Map(selected.current) : new Map<string, MoveSelection>()
+        const key = gallerySelectionKey(item)
+        if ((additive || toggle) && next.has(key)) next.delete(key)
+        else next.set(key, target(item))
+        anchor.current = displayKey(item); rangeBase.current = new Map(next); replace(next)
+    }
+    function all() {
+        if (blocked.current) return
+        anchor.current = null
+        replace(new Map(latest.current.items.map(item => [gallerySelectionKey(item), target(item)])))
+    }
+    function removeMedia(ids: number[]) {
+        replace(new Map([...selected.current].filter(([, value]) => value.fileIds || !ids.includes(value.mediaId))))
+        anchor.current = null
+    }
+    function stop(cancel = false) {
+        const own = gesture.current
+        if (cancel && own) replace(own.base)
+        gesture.current = null
+        if (own) { try { scrollRef.current?.releasePointerCapture(own.id) } catch { /* capture may already be released */ } }
+        cancelAnimationFrame(frame.current); setDragging(false); setDragBase(null); setRectangle(null)
+    }
+    function updateRectangle() {
+        const own = gesture.current, root = scrollRef.current, grid = gridRef.current
+        if (!own || !root || !grid) return
+        const startX = own.x - root.scrollLeft, startY = own.y - root.scrollTop
+        const box = { left: Math.min(startX, own.clientX), top: Math.min(startY, own.clientY), width: Math.abs(startX - own.clientX), height: Math.abs(startY - own.clientY) }
+        setRectangle(box)
+        const rows = new Map(latest.current.items.map(item => [gallerySelectionKey(item), item]))
+        const next = own.additive ? new Map(own.base) : new Map<string, MoveSelection>()
+        for (const card of grid.querySelectorAll<HTMLElement>('[data-selection-key]')) {
+            const bounds = card.getBoundingClientRect(), item = rows.get(card.dataset.selectionKey!)
+            if (item && bounds.width > 0 && bounds.height > 0 && bounds.left < box.left + box.width && bounds.right > box.left && bounds.top < box.top + box.height && bounds.bottom > box.top) next.set(gallerySelectionKey(item), target(item))
+        }
+        anchor.current = null; replace(next)
+    }
+    function autoScroll() {
+        const own = gesture.current, root = scrollRef.current
+        if (!own?.active || !root) return
+        if (blocked.current) { stop(true); return }
+        const bounds = root.getBoundingClientRect(), previous = root.scrollTop
+        if (own.clientY < bounds.top + 36) root.scrollTop = Math.max(0, previous - 14)
+        else if (own.clientY > bounds.bottom - 36) root.scrollTop = Math.min(root.scrollHeight - root.clientHeight, previous + 14)
+        if (root.scrollTop !== previous) updateRectangle()
+        frame.current = requestAnimationFrame(autoScroll)
+    }
+    function onPointerDown(event: globalThis.PointerEvent) {
+        if (event.button !== 0 || (event.pointerType && event.pointerType !== 'mouse')) return
+        suppressClick.current = false
+        if (blocked.current || event.defaultPrevented || !(event.target instanceof Element) || event.target.closest('input,select,textarea,a,label,[contenteditable="true"],[data-action-boundary]')) return
+        const button = event.target.closest('button'), card = event.target.closest('[data-selection-key]')
+        if (button && !button.hasAttribute('data-card-select') || event.target.closest('article') && !card) return
+        if (card && !gridRef.current?.contains(card)) return
+        const root = scrollRef.current
+        if (!root) return
+        const bounds = root.getBoundingClientRect()
+        if (root.clientWidth > 0 && (event.clientX < bounds.left + root.clientLeft || event.clientX >= bounds.left + root.clientLeft + root.clientWidth)) return
+        if (root.clientHeight > 0 && (event.clientY < bounds.top + root.clientTop || event.clientY >= bounds.top + root.clientTop + root.clientHeight)) return
+        gesture.current = { id: event.pointerId, x: event.clientX + root.scrollLeft, y: event.clientY + root.scrollTop, clientX: event.clientX, clientY: event.clientY, base: new Map(selected.current), additive: event.ctrlKey || event.metaKey, active: false, fromCard: Boolean(card) }
+    }
+    useEffect(() => {
+        clear(); stop()
+    }, [resetKey])
+    // Keep revision snapshots for unchanged selections, and reject stale visible rows.
+    useEffect(() => {
+        const revisions = new Map(items.map(item => [item.id, item.revision]))
+        const next = new Map([...selected.current].filter(([, value]) => !revisions.has(value.mediaId) || revisions.get(value.mediaId) === value.revision))
+        if (next.size !== selected.current.size) { stop(); replace(next); anchor.current = null }
+    }, [items])
+    useEffect(() => {
+        if (blocked.current && gesture.current) stop(true)
+    })
+    useEffect(() => {
+        const root = scrollRef.current
+        function move(event: globalThis.PointerEvent) {
+            const own = gesture.current
+            if (!own || event.pointerId !== own.id || blocked.current) return
+            own.clientX = event.clientX; own.clientY = event.clientY
+            const root = scrollRef.current!
+            if (!own.active && Math.hypot(own.x - root.scrollLeft - event.clientX, own.y - root.scrollTop - event.clientY) < 6) return
+            if (!own.active) {
+                own.active = true; suppressClick.current = true; suppressRepeatedClick.current = true
+                try { root.setPointerCapture?.(own.id) } catch { /* native capture can be unavailable in synthetic events */ }
+                setDragBase(own.base); setDragging(true); frame.current = requestAnimationFrame(autoScroll)
+            }
+            event.preventDefault(); updateRectangle()
+        }
+        function up(event: globalThis.PointerEvent) {
+            const own = gesture.current
+            if (!own || event.pointerId !== own.id) return
+            if (own.active) { own.clientX = event.clientX; own.clientY = event.clientY; updateRectangle() }
+            else if (!own.fromCard && !own.additive) clear()
+            stop()
+        }
+        function click(event: globalThis.MouseEvent) {
+            if (!event.detail || !(event.target instanceof Node) || !root?.contains(event.target)) return
+            if (suppressClick.current || suppressRepeatedClick.current && event.detail > 1) {
+                event.preventDefault(); event.stopImmediatePropagation(); return
+            }
+            if (event.type === 'click' && event.detail === 1) suppressRepeatedClick.current = false
+        }
+        function cancel() { if (gesture.current) stop(true) }
+        function lost(event: globalThis.PointerEvent) { if (gesture.current?.active && gesture.current.id === event.pointerId && event.target === root) stop(true) }
+        function escape(event: KeyboardEvent) {
+            if (event.key !== 'Escape' || blocked.current || document.querySelector('dialog[open],[data-confirm-dialog]') || (event.target instanceof Element && event.target.closest('input:not([type="checkbox"]),textarea,select,[contenteditable="true"]'))) return
+            if (gesture.current || selected.current.size) {
+                event.preventDefault(); event.stopPropagation()
+                if (gesture.current) stop(true); else clear()
+            }
+        }
+        window.addEventListener('pointermove', move, { passive: false }); window.addEventListener('pointerup', up)
+        window.addEventListener('pointercancel', cancel); window.addEventListener('blur', cancel); window.addEventListener('keydown', escape, true)
+        window.addEventListener('lostpointercapture', lost)
+        // Listen on the scroll pane, including empty space below the card grid.
+        root?.addEventListener('pointerdown', onPointerDown)
+        window.addEventListener('click', click, true); window.addEventListener('dblclick', click, true)
+        return () => {
+            cancelAnimationFrame(frame.current); gesture.current = null
+            window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up)
+            window.removeEventListener('pointercancel', cancel); window.removeEventListener('blur', cancel); window.removeEventListener('keydown', escape, true)
+            window.removeEventListener('lostpointercapture', lost)
+            root?.removeEventListener('pointerdown', onPointerDown)
+            window.removeEventListener('click', click, true); window.removeEventListener('dblclick', click, true)
+        }
+    }, [])
+    // Keep the action bar's layout fixed while previews change under a marquee.
+    const committed = dragging && dragBase ? dragBase : entries
+    const groups = [...committed.values()].filter(value => !value.fileIds)
+    const fileSelections = [...committed.values()].filter(value => value.fileIds)
+    return { entries, groups, fileSelections, fileIds: fileSelections.flatMap(value => value.fileIds!), gridRef, rectangle, dragging, select, clear, all, removeMedia }
+}

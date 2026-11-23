@@ -51,6 +51,7 @@ func (s *Store) CreateInitialAttempt(
 	ctx context.Context,
 	input InitialAttemptInput,
 ) (InitialAttempt, error) {
+	input.OriginalURL = cleanInstagramURL(input.OriginalURL)
 	normalizedURL, err := normalizeRequestURL(input.OriginalURL)
 	if err != nil {
 		return InitialAttempt{}, err
@@ -173,7 +174,7 @@ func normalizeRequestURL(original string) (string, error) {
 	}) {
 		return "", engine.ErrInvalidURL
 	}
-	parsed, err := whatwgurl.Parse(original)
+	parsed, err := whatwgurl.Parse(cleanInstagramURL(original))
 	if err != nil || (parsed.Scheme() != "http" && parsed.Scheme() != "https") ||
 		parsed.Host() == "" || parsed.Username() != "" || parsed.Password() != "" {
 		return "", engine.ErrInvalidURL

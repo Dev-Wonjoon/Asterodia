@@ -29,7 +29,7 @@ func TestQueueSerializesEnginesAndCancelsWaitingJob(t *testing.T) {
 		return engine.GalleryDLDiscovery{}, ctx.Err()
 	}
 	first := f.enqueue(t)
-	second := success(t, f.service.Enqueue(t.Context(), download.EnqueueRequest{Mode: "create", URL: postURL + "?second=1"})).(download.Job)
+	second := success(t, f.service.Enqueue(t.Context(), download.EnqueueRequest{Mode: "create", URL: "https://www.instagram.com/p/SecondFixture/?second=1"})).(download.Job)
 	result1, result2 := make(chan struct{}, 1), make(chan struct{}, 1)
 	go func() {
 		f.service.Run(context.Background(), download.RunRequest{JobID: first.ID, Trigger: "manual_initial"})

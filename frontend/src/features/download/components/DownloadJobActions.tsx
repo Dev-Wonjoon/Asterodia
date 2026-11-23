@@ -1,9 +1,11 @@
+import { translate, useLanguage } from '@renderer/shared/i18n'
 import type { DownloadJobDto } from '@contracts/download-api'
 import { useDownloadViewModel } from '../useDownloadViewModel'
 import { canCancelDownload, downloadTrigger } from '../downloadPresentation'
 import { useState } from 'react'
 
 export function DownloadJobActions({ job }: { job: DownloadJobDto }): React.JSX.Element | null {
+    useLanguage()
     const vm = useDownloadViewModel()
     const [cleaning, setCleaning] = useState(false)
     const action = downloadTrigger(job)
@@ -16,7 +18,7 @@ export function DownloadJobActions({ job }: { job: DownloadJobDto }): React.JSX.
             {job.cleanupRequired && <button type="button" className={button} disabled={cleaning || executing || vm.deletingIds?.includes(job.id) || vm.batchRetry?.running} onClick={() => {
                 setCleaning(true)
                 void vm.cleanupDownload(job.id).finally(() => setCleaning(false))
-            }}>{cleaning ? '정리 중…' : '임시 파일 정리'}</button>}
+            }}>{cleaning ? translate("정리 중…") : translate("임시 파일 정리")}</button>}
             {action && !(job.state === 'pending' && executing) && (
                 <button
                     type="button"
@@ -34,12 +36,12 @@ export function DownloadJobActions({ job }: { job: DownloadJobDto }): React.JSX.
                     onClick={() => vm.runJob(job.id, action)}
                 >
                     {executing
-                        ? '실행 요청 중'
+                        ? translate("실행 요청 중")
                         : action === 'manual_initial'
-                          ? '실행'
+                          ? translate("실행")
                           : action === 'manual_retry'
-                            ? '재시도'
-                            : '다시 시작'}
+                            ? translate("재시도")
+                            : translate("다시 시작")}
                 </button>
             )}
             {canCancelDownload(job) && (
@@ -49,7 +51,7 @@ export function DownloadJobActions({ job }: { job: DownloadJobDto }): React.JSX.
                     disabled={!vm.ready || cancelling}
                     onClick={() => vm.cancelDownload(job.id)}
                 >
-                    {cancelling ? '취소 요청 중' : '취소 요청'}
+                    {cancelling ? translate("취소 요청 중") : translate("취소 요청")}
                 </button>
             )}
         </>

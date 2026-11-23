@@ -1,3 +1,4 @@
+import { translateError, translate, useLanguage } from '@renderer/shared/i18n'
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
 import { getApi } from '@renderer/shared/api'
 import { toMediaUrl } from '@renderer/shared/utils/media'
@@ -8,6 +9,7 @@ export interface MediaEditFile { id: number; filepath: string; title: string | n
 export interface MediaEditControls { open(file?: MediaEditFile): void }
 
 export function MediaEditLauncher({ file, disabled = false, compact = false, controlRef, allowReveal = true }: { file?: MediaEditFile; disabled?: boolean; compact?: boolean; controlRef?: Ref<MediaEditControls>; allowReveal?: boolean }) {
+    useLanguage()
     const [request, setRequest] = useState<{ file?: MediaEditFile } | null>(null)
     const open = request !== null, activeFile = request?.file
     const openEditor = (value = file) => { if (!disabled) setRequest({ file: value }) }
@@ -22,11 +24,11 @@ export function MediaEditLauncher({ file, disabled = false, compact = false, con
             onClose: () => setRequest(null),
             reveal: allowReveal ? async (id: string) => {
                 const result = await api.mediaEdit.resultPath({ id })
-                if (!result.ok) throw new Error(result.error.message)
+                if (!result.ok) throw new Error(translateError(result.error))
                 await api.showItemInFolder(result.data)
             } : undefined,
         })
         return () => editor.destroy()
     }, [open, activeFile?.id])
-    return <>{!compact && <button type="button" disabled={disabled} onClick={() => openEditor()} className="rounded-lg border border-[var(--border-line)] px-3 py-2 text-sm disabled:opacity-40">{file ? (file.kind==='image'?'GIF 편집':'GIF 만들기·영상 자르기') : 'GIF, WebP로 만들기'}</button>}<div ref={host} style={{ display: 'contents' }} /></>
+    return <>{!compact && <button type="button" disabled={disabled} onClick={() => openEditor()} className="rounded-lg border border-[var(--border-line)] px-3 py-2 text-sm disabled:opacity-40">{file ? (file.kind==='image'?translate("GIF 편집"):translate("GIF 만들기·영상 자르기")) : translate("GIF, WebP로 만들기")}</button>}<div ref={host} style={{ display: 'contents' }} /></>
 }

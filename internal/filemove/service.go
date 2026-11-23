@@ -47,6 +47,7 @@ type CreateRequest struct {
 	Selection   []Selection `json:"selection"`
 	Operation   string      `json:"operation"`
 	DirectoryID int64       `json:"directoryId"`
+	MergeTitle  *string     `json:"mergeTitle"`
 }
 type Request struct {
 	JobID  string `json:"jobId"`
@@ -63,6 +64,7 @@ type Item struct {
 }
 type Status struct {
 	JobID          string `json:"jobId"`
+	AlbumID        int64  `json:"albumId"`
 	Operation      string `json:"operation"`
 	Directory      string `json:"directory"`
 	State          string `json:"state"`
@@ -79,6 +81,7 @@ type Status struct {
 }
 type expected struct {
 	Version           int    `json:"version"`
+	AlbumID           int64  `json:"albumId,omitempty"`
 	KeepName          bool   `json:"keepName,omitempty"`
 	Identity          string `json:"identity"`
 	Size              int64  `json:"size"`
@@ -140,6 +143,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) api.Result {
 	}
 	seen := map[int64][]int64{}
 	selected := map[int64]bool{}
+	ordered := []int64{}
 	for _, selection := range req.Selection {
 		if e = media.CheckWrite(ctx, tx, selection.MediaID, selection.Revision); e != nil {
 			return api.Failure("REVISION_CONFLICT", "선택한 앨범이 변경됐거나 다른 작업에서 사용 중입니다. 새로고침 후 확인하세요.")
@@ -148,7 +152,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) api.Result {
 			return api.Failure("INVALID_ARGUMENT", "한 번에 최대 20,000개 파일을 모을 수 있습니다")
 		}
 		raw, _ := json.Marshal(selection.FileIDs)
-		rows, err := tx.QueryContext(ctx, `SELECT id,media_id FROM media_file WHERE (media_id=? OR id IN (SELECT file_id FROM user_album_file WHERE album_id=?)) AND (?=0 OR id IN (SELECT value FROM json_each(?))) ORDER BY position,id LIMIT 20001`, selection.MediaID, selection.MediaID, len(selection.FileIDs), string(raw))
+		rows, err := tx.QueryContext(ctx, `SELECT id,media_id FROM media_file WHERE (media_id=? OR id IN (SELECT file_id FROM user_album_file WHERE album_id=?)) AND (?=0 OR id IN (SELECT value FROM json_each(?))) ORDER BY coalesce((SELECT position FROM user_album_file WHERE album_id=? AND file_id=media_file.id),position),id LIMIT 20001`, selection.MediaID, selection.MediaID, len(selection.FileIDs), string(raw), selection.MediaID)
 		if err != nil {
 			return failure(err)
 		}
@@ -161,6 +165,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) api.Result {
 			found[file] = true
 			if !selected[file] {
 				selected[file] = true
+				ordered = append(ordered, file)
 				seen[owner] = append(seen[owner], file)
 			}
 		}
@@ -191,6 +196,13 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) api.Result {
 		}
 	}
 	operation := req.Operation
+	var albumID int64
+	if req.MergeTitle != nil {
+		albumID, e = media.CreateMergedAlbum(ctx, tx, *req.MergeTitle, ordered)
+		if e != nil {
+			return failure(e)
+		}
+	}
 	if operation == "" {
 		operation = "move"
 	}
@@ -231,7 +243,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) api.Result {
 				return api.Failure("INVALID_ARGUMENT", "한 번에 최대 20,000개 파일을 이동할 수 있습니다")
 			}
 			state, message := "pending", ""
-			stat := expected{Version: 1, KeepName: req.Operation != "", Token: f.token, DirectoryIdentity: dirID, Hash: f.hash}
+			stat := expected{Version: 1, AlbumID: albumID, KeepName: req.Operation != "", Token: f.token, DirectoryIdentity: dirID, Hash: f.hash}
 			path, sourceKey, err := media.CanonicalPath(f.path)
 			if err == nil {
 				// Do not follow a last-component link, or accept a directory as a file.
@@ -272,7 +284,11 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) api.Result {
 	if e = tx.Commit(); e != nil {
 		return failure(e)
 	}
-	return api.Success(map[string]string{"jobId": job})
+	response := map[string]string{"jobId": job}
+	if albumID != 0 {
+		response["albumId"] = fmt.Sprint(albumID)
+	}
+	return api.Success(response)
 }
 func (s *Service) Get(ctx context.Context, req Request) api.Result {
 	if req.Offset < 0 {
@@ -295,6 +311,9 @@ func (s *Service) Get(ctx context.Context, req Request) api.Result {
 	}
 	e := s.db.QueryRowContext(ctx, `SELECT count(*),coalesce(sum(state IN ('completed','excluded')),0),coalesce(sum(state='failed'),0),coalesce(sum(state IN ('committed','cleanup_pending')),0),coalesce(sum(json_extract(expected_stat_json,'$.size')),0),coalesce(sum(CASE WHEN state IN ('completed','excluded','committed','cleanup_pending') THEN json_extract(expected_stat_json,'$.size') ELSE 0 END),0) FROM file_move_item WHERE job_id=?`, v.JobID).Scan(&v.Total, &v.Completed, &v.Failed, &v.CleanupPending, &v.TotalBytes, &v.ProcessedBytes)
 	if e != nil {
+		return failure(e)
+	}
+	if e = s.db.QueryRowContext(ctx, "SELECT coalesce(max(json_extract(expected_stat_json,'$.albumId')),0) FROM file_move_item WHERE job_id=?", v.JobID).Scan(&v.AlbumID); e != nil {
 		return failure(e)
 	}
 	rows, e := s.db.QueryContext(ctx, "SELECT id,media_id_snapshot,coalesce(file_id,0),source_path,coalesce(target_path,''),state,coalesce(error_message,'') FROM file_move_item WHERE job_id=? ORDER BY rowid LIMIT 100 OFFSET ?", v.JobID, req.Offset)

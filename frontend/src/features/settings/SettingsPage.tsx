@@ -1,3 +1,4 @@
+import { translate, useLanguage } from '@renderer/shared/i18n'
 import { useState, useContext, useEffect } from 'react'
 import { LeaveGuardContext } from '@renderer/shared/hooks/leaveGuardContext'
 import { GeneralSettings } from '@renderer/features/settings/GeneralSettings'
@@ -8,7 +9,7 @@ import { NetworkSettings } from '@renderer/features/settings/NetworkSettings'
 const SETTINGS_TABS = [
     {
         id: 'general',
-        label: '일반',
+        get label() { return translate("일반") },
         icon: (
             <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -33,7 +34,7 @@ const SETTINGS_TABS = [
     },
     {
         id: 'engine',
-        label: '엔진',
+        get label() { return translate("엔진") },
         icon: (
             <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -53,7 +54,7 @@ const SETTINGS_TABS = [
     },
     {
         id: 'license',
-        label: '라이선스',
+        get label() { return translate("라이선스") },
         icon: (
             <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -73,7 +74,7 @@ const SETTINGS_TABS = [
     },
     {
         id: 'network',
-        label: '네트워크',
+        get label() { return translate("네트워크") },
         icon: (
             <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -94,6 +95,7 @@ const SETTINGS_TABS = [
 ]
 
 export const SettingsPage = ({ updateRequest = 0 }: { updateRequest?: number }): React.JSX.Element => {
+    useLanguage()
     const leaveGuard = useContext(LeaveGuardContext)
     const [activeTab, setActiveTab] = useState('general')
     useEffect(() => { setActiveTab('general') }, [updateRequest])

@@ -3,6 +3,7 @@ package media
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -15,6 +16,117 @@ const albumFileOrder = ` ORDER BY coalesce((SELECT position FROM user_album_file
 
 func albumFiles(ctx context.Context, q queryer, id int64, limit, offset int) ([]Object, error) {
 	return objects(ctx, q, fileSQL+" WHERE "+albumFileWhere+albumFileOrder+" LIMIT ? OFFSET ?", id, id, id, limit, offset)
+}
+
+type AlbumSelection struct {
+	MediaID  int64   `json:"mediaId"`
+	Revision int64   `json:"revision"`
+	FileIDs  []int64 `json:"fileIds"`
+}
+
+type MergeAlbumRequest struct {
+	Title     string           `json:"title"`
+	Selection []AlbumSelection `json:"selection"`
+}
+
+// CreateMergedAlbum links an already validated, frozen list in the caller's transaction.
+func CreateMergedAlbum(ctx context.Context, tx *sql.Tx, title string, files []int64) (int64, error) {
+	title = strings.TrimSpace(title)
+	if title == "" || utf8.RuneCountInString(title) > 1000 || len(files) == 0 || len(files) > 20000 {
+		return 0, domainError("INVALID_ARGUMENT")
+	}
+	now := time.Now().UnixMilli()
+	result, err := tx.ExecContext(ctx, "INSERT INTO media(source_kind,custom_title,created_at) VALUES('local',?,?)", title, now)
+	if err != nil {
+		return 0, err
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	if _, err = tx.ExecContext(ctx, "INSERT INTO user_album(media_id) VALUES(?)", id); err != nil {
+		return 0, err
+	}
+	for i, file := range files {
+		if _, err = tx.ExecContext(ctx, "INSERT INTO user_album_file(album_id,file_id,position) VALUES(?,?,?) ON CONFLICT DO NOTHING", id, file, i); err != nil {
+			return 0, err
+		}
+	}
+	return id, nil
+}
+
+func (s *Service) MergeAlbum(ctx context.Context, req MergeAlbumRequest) api.Result {
+	leave, allowed := s.UpdateGate.Enter()
+	if !allowed {
+		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
+	}
+	defer leave()
+	if len(req.Selection) == 0 || len(req.Selection) > 500 {
+		return failure(domainError("INVALID_ARGUMENT"))
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return failure(err)
+	}
+	defer tx.Rollback()
+	seen, owners := map[int64]bool{}, map[int64]bool{}
+	files := []int64{}
+	for _, selected := range req.Selection {
+		if err = checkWrite(ctx, tx, selected.MediaID, selected.Revision); err != nil {
+			return failure(err)
+		}
+		if len(selected.FileIDs) > 20000 {
+			return failure(domainError("INVALID_ARGUMENT"))
+		}
+		raw, _ := json.Marshal(selected.FileIDs)
+		rows, e := objects(ctx, tx, "SELECT id,media_id FROM media_file WHERE "+albumFileWhere+" AND (?=0 OR id IN (SELECT value FROM json_each(?)))"+albumFileOrder+" LIMIT 20001", selected.MediaID, selected.MediaID, len(selected.FileIDs), string(raw), selected.MediaID)
+		if e != nil {
+			return failure(e)
+		}
+		wanted := map[int64]bool{}
+		for _, file := range selected.FileIDs {
+			wanted[file] = true
+		}
+		for _, row := range rows {
+			file := row["id"].(int64)
+			if len(selected.FileIDs) > 0 && !wanted[file] {
+				continue
+			}
+			delete(wanted, file)
+			owners[row["media_id"].(int64)] = true
+			if !seen[file] {
+				seen[file] = true
+				files = append(files, file)
+			}
+			if len(files) > 20000 {
+				return failure(domainError("INVALID_ARGUMENT"))
+			}
+		}
+		if len(wanted) > 0 {
+			return failure(domainError("INVALID_ARGUMENT"))
+		}
+	}
+	for owner := range owners {
+		var revision int64
+		if err = tx.QueryRowContext(ctx, "SELECT revision FROM media WHERE id=?", owner).Scan(&revision); err != nil {
+			return failure(err)
+		}
+		if err = checkWrite(ctx, tx, owner, revision); err != nil {
+			return failure(err)
+		}
+	}
+	id, err := CreateMergedAlbum(ctx, tx, req.Title, files)
+	if err != nil {
+		return failure(err)
+	}
+	obj, err := summary(ctx, tx, id)
+	if err != nil {
+		return failure(err)
+	}
+	if err = tx.Commit(); err != nil {
+		return failure(err)
+	}
+	return api.Success(obj)
 }
 
 type AlbumRequest struct {

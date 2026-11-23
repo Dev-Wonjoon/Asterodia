@@ -18,8 +18,10 @@ import type {
     SearchSuggestionRequest,
     SearchSuggestionPage
 } from './media-v2'
+import type { MoveSelection } from './file-move-api'
 
 export interface MediaApi {
+    mergeAlbum(request: { title: string; selection: MoveSelection[] }): Promise<MediaResult<MediaSummaryDto>>
     albums(request?: MediaDirectoryListRequest): Promise<MediaResult<MediaPage<MediaSummaryDto>>>
     saveAlbum(request: AlbumRequest): Promise<MediaResult<MediaSummaryDto>>
     sequence(request: { mediaId: number }): Promise<MediaResult<MediaSequence>>

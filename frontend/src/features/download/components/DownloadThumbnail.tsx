@@ -1,3 +1,4 @@
+import { translate, useLanguage } from '@renderer/shared/i18n'
 import { Download } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { getApi } from '@renderer/shared/api'
@@ -7,7 +8,7 @@ export function DownloadThumbnail({
     url,
     localPath,
     completed = false,
-    title = '다운로드 썸네일',
+    title = translate("다운로드 썸네일"),
     fullWidth = false
 }: {
     url: string
@@ -16,6 +17,7 @@ export function DownloadThumbnail({
     title?: string
     fullWidth?: boolean
 }): React.JSX.Element {
+    useLanguage()
     const [result, setResult] = useState<{
         url: string
         hint: string | null | undefined
@@ -90,21 +92,19 @@ export function DownloadThumbnail({
                 <div className="flex flex-col items-center gap-0.5">
                     <Download className="size-6" aria-hidden="true" />
 
-                    <span className="text-xs">{loading ? '미리보기 준비 중' : '썸네일 없음'}</span>
+                    <span className="text-xs">{loading ? translate("미리보기 준비 중") : translate("썸네일 없음")}</span>
 
                     {!loading && (
                         <button
                             type="button"
                             data-detail-trigger
-                            aria-label="썸네일 다시 불러오기"
+                            aria-label={translate("썸네일 다시 불러오기")}
                             className="text-[11px] leading-4 underline"
                             onClick={(event) => {
                                 event.stopPropagation()
                                 setReload((value) => value + 1)
                             }}
-                        >
-                            다시 시도
-                        </button>
+                        >{translate("다시 시도")}</button>
                     )}
                 </div>
             )}

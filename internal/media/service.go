@@ -39,6 +39,8 @@ type ListRequest struct {
 	FavoritesOnly    bool    `json:"favoritesOnly"`
 	Filter           Filter  `json:"filter"`
 	Gallery          bool    `json:"gallery"`
+	GalleryView      string  `json:"galleryView"`
+	ShowAlbumFiles   *bool   `json:"showAlbumFiles"`
 	ExpandedMediaIDs []int64 `json:"expandedMediaIds"`
 	AnchorMediaID    int64   `json:"anchorMediaId"`
 }

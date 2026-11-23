@@ -1,8 +1,7 @@
+import { translate, useLanguage } from '@renderer/shared/i18n'
 import { GalleryPage } from '../gallery/GalleryPage'
 
-export const FavoritesPage = (): React.JSX.Element => (
-    <GalleryPage
-        favoritesOnly
-        title="즐겨찾기"
-    />
-)
+export const FavoritesPage = (): React.JSX.Element => {
+    useLanguage()
+    return <GalleryPage favoritesOnly title={translate('즐겨찾기')} />
+}

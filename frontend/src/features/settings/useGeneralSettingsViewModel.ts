@@ -1,3 +1,4 @@
+import { translateError, translate } from '@renderer/shared/i18n'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getApi } from '@renderer/shared/api'
 import { useToast } from '@renderer/shared/hooks/useToast'
@@ -30,7 +31,7 @@ export function useGeneralSettingsViewModel(): GeneralSettingsViewModel {
             .catch((error: unknown) => {
                 if (cancelled) return
                 console.error('[Settings] Failed to load download path:', error)
-                showToast('다운로드 경로를 읽지 못했습니다.', 'error')
+                showToast(translate("다운로드 경로를 읽지 못했습니다."), 'error')
             })
         return () => {
             cancelled = true
@@ -42,7 +43,7 @@ export function useGeneralSettingsViewModel(): GeneralSettingsViewModel {
             if (value) setDownloadPath(value)
         } catch (error) {
             console.error('[Settings] Failed to change download path:', error)
-            showToast('다운로드 경로를 변경하지 못했습니다.', 'error')
+            showToast(translate("다운로드 경로를 변경하지 못했습니다."), 'error')
         }
     }, [showToast])
     const importDatabase = useCallback(async (): Promise<void> => {
@@ -54,14 +55,14 @@ export function useGeneralSettingsViewModel(): GeneralSettingsViewModel {
         try {
             const result = await getApi().database.import()
             if (!result.ok) {
-                setImportError(result.error.message)
+                setImportError(translateError(result.error))
                 return
             }
             if (result.data.cancelled) return
             setImportResult(result.data)
-            showToast('데이터베이스 병합을 완료했습니다.', 'success')
+            showToast(translate("데이터베이스 병합을 완료했습니다."), 'success')
         } catch {
-            setImportError('병합 응답을 확인하지 못했습니다. 갤러리에서 결과를 확인한 뒤 다시 시도하세요.')
+            setImportError(translate("병합 응답을 확인하지 못했습니다. 갤러리에서 결과를 확인한 뒤 다시 시도하세요."))
         } finally {
             importLock.current = false
             setImporting(false)

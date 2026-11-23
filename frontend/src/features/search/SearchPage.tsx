@@ -1,9 +1,11 @@
+import { translateMessage, translate, useLanguage } from '@renderer/shared/i18n'
 import { useState, type ComponentType } from 'react'
 import type { MediaFilter } from '@contracts/media-v2'
 import { useSearchViewModel } from '@renderer/features/search/useSearchViewModel'
 import { SearchSuggestions } from './SearchSuggestions'
 
 export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string; filter: MediaFilter; emptyMessage: string }> }): React.JSX.Element => {
+    useLanguage()
     const vm = useSearchViewModel()
     const [tagInput, setTagInput] = useState('')
     const [platformInput, setPlatformInput] = useState('')
@@ -65,12 +67,12 @@ export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string
                         <div className="flex items-center gap-2">
                             <input
                                 type="text"
-                                aria-label="태그 추가"
+                                aria-label={translate("태그 추가")}
                                 value={tagInput}
                                 maxLength={200}
                                 onChange={(e) => handleTagInput(e.target.value)}
                                 onKeyDown={handleTagKeyDown}
-                                placeholder="태그 추가..."
+                                placeholder={translate("태그 추가...")}
                                 className="min-w-0 flex-1 px-3 py-1.5 text-sm rounded-lg
                                     bg-[var(--bg-hover)] text-[var(--text-main)]
                                     placeholder-[var(--text-placeholder)]
@@ -117,12 +119,12 @@ export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string
                     <div className="min-w-0 relative">
                         <input
                             type="text"
-                            aria-label="플랫폼 추가"
+                            aria-label={translate("플랫폼 추가")}
                             maxLength={200}
                             value={platformInput}
                             onChange={(e) => handlePlatformInput(e.target.value)}
                             onKeyDown={handlePlatformKeyDown}
-                            placeholder="플랫폼 추가..."
+                            placeholder={translate("플랫폼 추가...")}
                             className="w-full px-3 py-1.5 text-sm rounded-lg
                                 bg-[var(--bg-hover)] text-[var(--text-main)]
                                 placeholder-[var(--text-placeholder)]
@@ -151,12 +153,12 @@ export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string
                     <div className="min-w-0 relative">
                         <input
                             type="text"
-                            aria-label="작성자 추가"
+                            aria-label={translate("작성자 추가")}
                             maxLength={200}
                             value={authorInput}
                             onChange={(e) => handleAuthorInput(e.target.value)}
                             onKeyDown={handleAuthorKeyDown}
-                            placeholder="작성자 추가..."
+                            placeholder={translate("작성자 추가...")}
                             className="w-full px-3 py-1.5 text-sm rounded-lg
                                 bg-[var(--bg-hover)] text-[var(--text-main)]
                                 placeholder-[var(--text-placeholder)]
@@ -194,7 +196,7 @@ export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string
                             >
                                 {tag}
                                 <button
-                                    aria-label={`태그 ${tag} 제거`}
+                                    aria-label={translate("태그 {0} 제거", { "0": tag })}
                                     onClick={() => vm.removeTag(tag)}
                                     className="hover:opacity-70"
                                 >
@@ -209,7 +211,7 @@ export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string
                             >
                                 {p}
                                 <button
-                                    aria-label={`플랫폼 ${p} 제거`}
+                                    aria-label={translate("플랫폼 {0} 제거", { "0": p })}
                                     onClick={() => vm.removePlatform(p)}
                                     className="hover:opacity-70"
                                 >
@@ -224,7 +226,7 @@ export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string
                             >
                                 {a}
                                 <button
-                                    aria-label={`작성자 ${a} 제거`}
+                                    aria-label={translate("작성자 {0} 제거", { "0": a })}
                                     onClick={() => vm.removeAuthor(a)}
                                     className="hover:opacity-70"
                                 >
@@ -235,9 +237,7 @@ export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string
                         <button
                             onClick={() => { vm.clearAll(); setTagInput(''); setPlatformInput(''); setAuthorInput('') }}
                             className="text-xs text-[var(--text-muted)] hover:text-[var(--text-main)]"
-                        >
-                            초기화
-                        </button>
+                        >{translate("초기화")}</button>
                     </div>
                 )}
             </div>
@@ -245,15 +245,15 @@ export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string
             {/* 결과 헤더 */}
             {vm.suggestionError && (
                 <p role="status" className="px-4 py-2 text-sm text-[var(--text-muted)]">
-                    {vm.suggestionError}
+                    {translateMessage(vm.suggestionError)}
                 </p>
             )}
 
             <div className="flex-1 min-h-0 overflow-hidden">
                 <Gallery
-                    title="검색 결과"
+                    title={translate("검색 결과")}
                     filter={vm.filter}
-                    emptyMessage="검색 결과가 없습니다."
+                    emptyMessage={translate("검색 결과가 없습니다.")}
                 />
             </div>
         </div>

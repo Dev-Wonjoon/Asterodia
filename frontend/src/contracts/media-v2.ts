@@ -69,9 +69,13 @@ export interface MediaListRequest {
     favoritesOnly?: boolean
     filter?: MediaFilter
     gallery?: boolean
+    galleryView?: GalleryView
+    showAlbumFiles?: boolean
     expandedMediaIds?: number[]
     anchorMediaId?: number
 }
+
+export type GalleryView = 'all' | 'albums' | 'files'
 
 export interface MediaGetRequest {
     mediaId: number
@@ -105,6 +109,7 @@ export interface MediaSummaryDto {
     isUserAlbum?: boolean
     galleryFile?: MediaFileDto
     galleryFileOffset?: number
+    galleryCanCollapse?: boolean
     id: number
     sourceKind: MediaSourceKind
     requestUrl: string | null
