@@ -347,7 +347,7 @@ export const GalleryPage = ({
             }
         >
             <div className="space-y-5 pb-6">
-                <header data-action-boundary className="sticky top-0 z-30 flex flex-wrap items-center gap-3 bg-[var(--bg-app)]">
+                <header data-action-boundary className="flex flex-wrap items-center gap-3 bg-[var(--bg-app)]">
                     <h1 className="shrink-0 text-lg font-semibold">{title}</h1>
                     <GallerySelectionBar count={selection.length + albumFileIds.length} groupCount={selection.length} fileCount={albumFileIds.length} total={list.status === 'ready' ? list.page.total : null} disabled={pageDisabled || pointerSelection.dragging}
                         onAdd={() => albumControls.current?.addSelection()} onMove={gatherSelection} onMerge={() => { if (!pageDisabled) setMergeSelection(selectedTargets()) }} onClear={clearSelection} onBulk={onBulk} />
