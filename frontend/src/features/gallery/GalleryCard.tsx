@@ -1,12 +1,12 @@
 import { getLocale, translate, useLanguage } from '@renderer/shared/i18n'
-import type { MouseEvent, ReactNode } from 'react'
+import type { DragEvent, MouseEvent, ReactNode } from 'react'
 import type { MediaSummaryDto } from '@contracts/media-v2'
 import { MediaPreview } from '@renderer/shared/components/media/MediaPreview'
 
 export const galleryGridClass = 'grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(min(100%,200px),1fr))] items-start gap-4'
 
 /** The desktop and HTTP clients render this same card. Actions depend on the client. */
-export function GalleryCard({ media, previewPath, resolveUrl, selected, active, selection, disabled, viewDisabled, onView, onDetails, onSelect, selectionKey, children }: {
+export function GalleryCard({ media, previewPath, resolveUrl, selected, active, selection, disabled, viewDisabled, onView, onDetails, onSelect, selectionKey, onAlbumDragStart, onAlbumDragEnd, children }: {
     media: MediaSummaryDto
     previewPath: string | null
     resolveUrl?: (path: string | null | undefined) => string | null
@@ -19,12 +19,20 @@ export function GalleryCard({ media, previewPath, resolveUrl, selected, active, 
     onDetails(): void
     onSelect?: (event: MouseEvent) => void
     selectionKey?: string
+    onAlbumDragStart?: (event: DragEvent<HTMLElement>) => void
+    onAlbumDragEnd?: () => void
     children: ReactNode
 }) {
     useLanguage()
     const title = media.galleryFile?.title || media.title
+    const draggable = Boolean(onAlbumDragStart) && !viewDisabled && media.fileCount > 0
     return <article data-album-id={media.id} data-selection-key={selectionKey} data-selected={selected || undefined} data-detail-trigger
-        onDragStart={event => { if (onSelect) event.preventDefault() }}
+        draggable={onAlbumDragStart ? draggable : undefined} data-album-draggable={draggable || undefined}
+        onDragStart={event => {
+            if (draggable && !(event.target as Element).closest('input,label,a,[data-action-boundary],button:not([data-card-select])')) onAlbumDragStart?.(event)
+            else if (onSelect || onAlbumDragStart) event.preventDefault()
+        }}
+        onDragEnd={onAlbumDragEnd}
         onClick={event => { if (onSelect && event.detail < 2 && !viewDisabled && !(event.target as Element).closest('button,input,label,a,[data-action-boundary]')) onSelect(event) }}
         onDoubleClick={event => { if (onSelect && !viewDisabled && media.fileCount > 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey && !(event.target as Element).closest('input,label,[data-action-boundary],button:not([data-card-select])')) onView() }}
         className={'motion-card relative min-w-0 rounded-xl border bg-[var(--bg-sidebar)] text-left ' + (onSelect ? 'select-none ' : '') + (selected ? 'border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]' : active ? 'border-[var(--color-primary)]' : 'border-[var(--border-line)]')}>

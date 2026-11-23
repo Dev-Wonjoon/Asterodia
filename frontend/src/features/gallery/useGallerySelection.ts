@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState, type MouseEvent, type RefObject } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type MouseEvent, type RefObject } from 'react'
+import { translate } from '@renderer/shared/i18n'
 import type { MoveSelection } from '@contracts/file-move-api'
 import type { MediaSummaryDto } from '@contracts/media-v2'
 
 export const gallerySelectionKey = (item: MediaSummaryDto) => item.galleryFile ? `file:${item.galleryFile.id}` : `media:${item.id}`
 const displayKey = (item: MediaSummaryDto) => `${item.id}:${gallerySelectionKey(item)}`
 const target = (item: MediaSummaryDto): MoveSelection => ({ mediaId: item.id, revision: item.revision, ...(item.galleryFile ? { fileIds: [item.galleryFile.id] } : {}) })
+export const albumDragType = 'application/x-storagebucket-album-selection'
+export type AlbumDragSelection = { fileIds: number[]; mediaIds: number[] }
 type Modifiers = Pick<MouseEvent, 'ctrlKey' | 'metaKey' | 'shiftKey'>
 type Rectangle = { left: number; top: number; width: number; height: number }
 type Gesture = { id: number; x: number; y: number; clientX: number; clientY: number; base: Map<string, MoveSelection>; additive: boolean; active: boolean; fromCard: boolean }
@@ -21,9 +24,37 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
     const [rectangle, setRectangle] = useState<Rectangle | null>(null)
     const [dragging, setDragging] = useState(false)
     const [dragBase, setDragBase] = useState<Map<string, MoveSelection> | null>(null)
+    const [albumDrag, setAlbumDrag] = useState<AlbumDragSelection | null>(null)
+    const albumDragRef = useRef<AlbumDragSelection | null>(null)
     const latest = useRef({ items }); latest.current = { items }
     function replace(next: Map<string, MoveSelection>) { selected.current = next; setEntries(next) }
     function clear() { anchor.current = null; rangeBase.current = new Map(); replace(new Map()) }
+    function endAlbumDrag() { albumDragRef.current = null; setAlbumDrag(null) }
+    function startAlbumDrag(item: MediaSummaryDto, event: DragEvent<HTMLElement>) {
+        if (blocked.current || item.fileCount === 0) { event.preventDefault(); return }
+        stop()
+        const key = gallerySelectionKey(item)
+        if (!selected.current.has(key)) {
+            const next = new Map([[key, target(item)]])
+            anchor.current = displayKey(item); rangeBase.current = new Map(next); replace(next)
+        }
+        const values = [...selected.current.values()]
+        const drag = {
+            fileIds: [...new Set(values.flatMap(value => value.fileIds ?? []))],
+            mediaIds: [...new Set(values.filter(value => !value.fileIds).map(value => value.mediaId))],
+        }
+        event.dataTransfer.effectAllowed = 'copy'
+        event.dataTransfer.setData(albumDragType, JSON.stringify(drag))
+        // Use a compact count badge instead of a large card as the native drag image.
+        const badge = document.createElement('div')
+        badge.textContent = translate("묶음 {0}개 · 개별 파일 {1}개", { "0": drag.mediaIds.length, "1": drag.fileIds.length })
+        badge.style.cssText = 'position:fixed;top:-1000px;left:0;padding:10px 14px;border-radius:8px;background:#252532;color:white;font:14px sans-serif;white-space:nowrap'
+        document.body.append(badge)
+        event.dataTransfer.setDragImage(badge, 12, 12)
+        setTimeout(() => badge.remove(), 0)
+        suppressClick.current = true; suppressRepeatedClick.current = true
+        albumDragRef.current = drag; setAlbumDrag(drag)
+    }
     function select(item: MediaSummaryDto, event: Modifiers, toggle = false) {
         if (blocked.current) return
         const rows = latest.current.items, additive = event.ctrlKey || event.metaKey
@@ -86,6 +117,7 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
         suppressClick.current = false
         if (blocked.current || event.defaultPrevented || !(event.target instanceof Element) || event.target.closest('input,select,textarea,a,label,[contenteditable="true"],[data-action-boundary]')) return
         const button = event.target.closest('button'), card = event.target.closest('[data-selection-key]')
+        if (card?.hasAttribute('data-album-draggable')) return
         if (button && !button.hasAttribute('data-card-select') || event.target.closest('article') && !card) return
         if (card && !gridRef.current?.contains(card)) return
         const root = scrollRef.current
@@ -96,16 +128,17 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
         gesture.current = { id: event.pointerId, x: event.clientX + root.scrollLeft, y: event.clientY + root.scrollTop, clientX: event.clientX, clientY: event.clientY, base: new Map(selected.current), additive: event.ctrlKey || event.metaKey, active: false, fromCard: Boolean(card) }
     }
     useEffect(() => {
-        clear(); stop()
+        clear(); stop(); endAlbumDrag()
     }, [resetKey])
     // Keep revision snapshots for unchanged selections, and reject stale visible rows.
     useEffect(() => {
         const revisions = new Map(items.map(item => [item.id, item.revision]))
         const next = new Map([...selected.current].filter(([, value]) => !revisions.has(value.mediaId) || revisions.get(value.mediaId) === value.revision))
-        if (next.size !== selected.current.size) { stop(); replace(next); anchor.current = null }
+        if (next.size !== selected.current.size) { stop(); endAlbumDrag(); replace(next); anchor.current = null }
     }, [items])
     useEffect(() => {
         if (blocked.current && gesture.current) stop(true)
+        if (blocked.current && albumDragRef.current) endAlbumDrag()
     })
     useEffect(() => {
         const root = scrollRef.current
@@ -136,9 +169,10 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
             }
             if (event.type === 'click' && event.detail === 1) suppressRepeatedClick.current = false
         }
-        function cancel() { if (gesture.current) stop(true) }
+        function cancel() { if (gesture.current) stop(true); if (albumDragRef.current) endAlbumDrag() }
         function lost(event: globalThis.PointerEvent) { if (gesture.current?.active && gesture.current.id === event.pointerId && event.target === root) stop(true) }
         function escape(event: KeyboardEvent) {
+            if (event.key === 'Escape' && albumDragRef.current) { event.preventDefault(); event.stopPropagation(); endAlbumDrag(); return }
             if (event.key !== 'Escape' || blocked.current || document.querySelector('dialog[open],[data-confirm-dialog]') || (event.target instanceof Element && event.target.closest('input:not([type="checkbox"]),textarea,select,[contenteditable="true"]'))) return
             if (gesture.current || selected.current.size) {
                 event.preventDefault(); event.stopPropagation()
@@ -164,5 +198,5 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
     const committed = dragging && dragBase ? dragBase : entries
     const groups = [...committed.values()].filter(value => !value.fileIds)
     const fileSelections = [...committed.values()].filter(value => value.fileIds)
-    return { entries, groups, fileSelections, fileIds: fileSelections.flatMap(value => value.fileIds!), gridRef, rectangle, dragging, select, clear, all, removeMedia }
+    return { entries, groups, fileSelections, fileIds: fileSelections.flatMap(value => value.fileIds!), gridRef, rectangle, dragging, select, clear, all, removeMedia, albumDrag, startAlbumDrag, endAlbumDrag }
 }

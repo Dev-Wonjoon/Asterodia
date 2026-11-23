@@ -3,6 +3,7 @@ import { useGallerySelection, gallerySelectionKey } from './useGallerySelection'
 import { useGalleryExpansionMotion } from './useGalleryExpansionMotion'
 import { FolderMergeDialog } from './FolderMergeDialog'
 import { AlbumManager, type AlbumControls } from './AlbumManager'
+import { AlbumDropPanel } from './AlbumDropPanel'
 import { MediaViewer } from './MediaViewer'
 import { useConfirm } from '@renderer/shared/hooks/useConfirm'
 import { MediaEditLauncher, type MediaEditControls } from '../mediaedit/MediaEditLauncher'
@@ -75,6 +76,8 @@ export const GalleryPage = ({
     const [importBusy, setImportBusy] = useState(false)
     const [hasImportResult, setHasImportResult] = useState(false)
     const [moveBusy, setMoveBusy] = useState(false)
+    const [albumDropBusy, setAlbumDropBusy] = useState(false)
+    const [albumRefresh, setAlbumRefresh] = useState(0)
     const [mergeSelection, setMergeSelection] = useState<MoveSelection[] | null>(null)
     const bulk = useGalleryBulkActions(store, selection, pointerSelection.removeMedia)
     const [draftDirty, setDraftDirty] = useState(false)
@@ -83,7 +86,7 @@ export const GalleryPage = ({
         dirtyRef.current = dirty
         setDraftDirty(dirty)
     }, [])
-    useLeaveGuard(draftDirty, state.busy || bulk.busy || moveBusy || mergeSelection !== null)
+    useLeaveGuard(draftDirty, state.busy || bulk.busy || moveBusy || albumDropBusy || mergeSelection !== null)
 
     const thumbnailRefreshPending = useRef(false)
 
@@ -92,13 +95,13 @@ export const GalleryPage = ({
 
         const current = store.getSnapshot()
 
-        if (dirtyRef.current || current.busy || current.needsRefresh || current.list.refreshing || current.list.loadingMore) {
+        if (dirtyRef.current || albumDropBusy || pointerSelection.albumDrag || pointerSelection.dragging || current.busy || current.needsRefresh || current.list.refreshing || current.list.loadingMore) {
             return
         }
 
         thumbnailRefreshPending.current = false
         void store.refresh()
-    }, [store])
+    }, [store, albumDropBusy, pointerSelection.albumDrag, pointerSelection.dragging])
 
     useEffect(() => {
         let timer: ReturnType<typeof setTimeout> | undefined
@@ -121,10 +124,10 @@ export const GalleryPage = ({
     }, [refreshThumbnails])
 
     useEffect(() => {
-        if (!draftDirty && !state.busy && !state.needsRefresh) {
+        if (!draftDirty && !albumDropBusy && !state.busy && !state.needsRefresh) {
             refreshThumbnails()
         }
-    }, [draftDirty, state.busy, state.needsRefresh, state.list.refreshing, state.list.loadingMore, refreshThumbnails])
+    }, [draftDirty, albumDropBusy, state.busy, state.needsRefresh, state.list.refreshing, state.list.loadingMore, refreshThumbnails])
 
     const [editFocus, setEditFocus] = useState<MediaDetailFocusRequest | null>(null)
     const editSequence = useRef(0)
@@ -148,7 +151,7 @@ export const GalleryPage = ({
     useInfiniteScroll({
         rootRef: listScrollRef,
         targetRef: sentinelRef,
-        enabled: !pointerSelection.dragging && list.status === 'ready' && list.page.hasNextPage && !list.refreshing && !list.loadingMore && !list.error && !list.moreError && !state.busy && !bulk.busy && !moveBusy && !state.needsRefresh,
+        enabled: !pointerSelection.dragging && !pointerSelection.albumDrag && !albumDropBusy && list.status === 'ready' && list.page.hasNextPage && !list.refreshing && !list.loadingMore && !list.error && !list.moreError && !state.busy && !bulk.busy && !moveBusy && !state.needsRefresh,
         onLoadMore: store.loadMore
     })
 
@@ -219,10 +222,10 @@ export const GalleryPage = ({
         return typeof answer === 'boolean' ? apply(answer) : answer.then(apply)
     }
 
-    const disabled = state.busy || bulk.busy || list.status !== 'ready'
+    const disabled = state.busy || bulk.busy || albumDropBusy || list.status !== 'ready'
     const toolbarDisabled = disabled || moveBusy || draftDirty || state.needsRefresh || mergeSelection !== null
     const pageDisabled = toolbarDisabled || list.refreshing
-    selectionLocked.current = pageDisabled
+    selectionLocked.current = pageDisabled || tagCommand !== null || viewer !== null
     async function openAnimationEditor(media: MediaSummaryDto) {
         if (pageDisabled || mediaEditPending.current) return
         setMediaEditError('')
@@ -293,12 +296,12 @@ export const GalleryPage = ({
             detailKey={downloadDetailId ? 'download:' + downloadDetailId : state.detail.mediaId}
             onClose={closeDetail}
             listRef={listScrollRef}
-            closeDisabled={state.busy || bulk.busy || moveBusy || tagCommand !== null}
+            closeDisabled={state.busy || bulk.busy || moveBusy || albumDropBusy || tagCommand !== null}
             detail={
                 downloadDetailId !== null ? <DownloadDetailPane /> : state.detail.mediaId !== null ? (
                     <MediaDetailPane
                         key={state.detail.mediaId}
-                        state={state}
+                        state={albumDropBusy ? { ...state, busy: true } : state}
                         store={store}
                         onDirtyChange={onDirtyChange}
                         onViewFile={fileId => setViewer({ mediaId: state.detail.mediaId!, fileId })}
@@ -317,9 +320,9 @@ export const GalleryPage = ({
                     <h1 className="shrink-0 text-lg font-semibold">{title}</h1>
                     <GallerySelectionBar count={selection.length + albumFileIds.length} groupCount={selection.length} fileCount={albumFileIds.length} total={list.status === 'ready' ? list.page.total : null} disabled={pageDisabled || pointerSelection.dragging}
                         onAdd={() => albumControls.current?.addSelection()} onMove={gatherSelection} onMerge={() => { if (!pageDisabled) setMergeSelection(selectedTargets()) }} onClear={clearSelection} onBulk={onBulk} />
-                    <MediaEditLauncher compact controlRef={mediaEditControls} disabled={state.busy || bulk.busy || moveBusy || draftDirty} />
+                    <MediaEditLauncher compact controlRef={mediaEditControls} disabled={state.busy || bulk.busy || moveBusy || albumDropBusy || draftDirty} />
 
-                    <div data-gallery-toolbar className="ml-auto shrink-0"><GalleryToolbar count={selection.length + albumFileIds.length} disabled={state.busy || bulk.busy || moveBusy || draftDirty} actionDisabled={state.needsRefresh || list.status !== 'ready'} importDisabled={importBusy || state.needsRefresh} canImport={!favoritesOnly} hasImportResult={hasImportResult}
+                    <div data-gallery-toolbar className="ml-auto shrink-0"><GalleryToolbar count={selection.length + albumFileIds.length} disabled={state.busy || bulk.busy || moveBusy || albumDropBusy || draftDirty} actionDisabled={state.needsRefresh || list.status !== 'ready'} importDisabled={importBusy || state.needsRefresh} canImport={!favoritesOnly} hasImportResult={hasImportResult}
                         galleryView={galleryView} showAlbumFiles={showAlbumFiles} viewDisabled={pageDisabled || tagCommand !== null}
                         onViewChange={setGalleryView} onShowAlbumFilesChange={setShowAlbumFiles}
                         editorDisabled={mediaEditLoading} onOpenEditor={() => { setMediaEditError(''); mediaEditControls.current?.open() }}
@@ -331,10 +334,10 @@ export const GalleryPage = ({
                 {mediaEditError && <p role="alert" className="text-sm text-red-500">{translateMessage(mediaEditError)}</p>}
 
                 <AlbumManager selection={selection} fileIds={albumFileIds} disabled={toolbarDisabled} controlRef={albumControls} showSelectionActions={false}
-                    onChanged={(id, deleted) => { if (deleted && store.getSnapshot().detail.mediaId === id) store.closeDetail(); void store.refresh() }} onClear={clearSelection} />
+                    onChanged={(id, deleted) => { if (deleted && store.getSnapshot().detail.mediaId === id) store.closeDetail(); setAlbumRefresh(value => value + 1); void store.refresh() }} onClear={clearSelection} />
 
-                {!favoritesOnly && <LocalImportPanel compact controlRef={importControls} onBusyChange={setImportBusy} onHasResultChange={setHasImportResult} disabled={draftDirty || state.busy || bulk.busy || moveBusy} onComplete={() => { thumbnailRefreshPending.current = true; refreshThumbnails() }} />}
-                <FileMovePanel compact controlRef={moveControls} onBusyChange={setMoveBusy} selection={selection} disabled={draftDirty || state.busy || bulk.busy || state.needsRefresh} onCreated={clearSelection} onChanged={() => { thumbnailRefreshPending.current = true; refreshThumbnails() }} />
+                {!favoritesOnly && <LocalImportPanel compact controlRef={importControls} onBusyChange={setImportBusy} onHasResultChange={setHasImportResult} disabled={draftDirty || state.busy || bulk.busy || moveBusy || albumDropBusy} onComplete={() => { thumbnailRefreshPending.current = true; refreshThumbnails() }} />}
+                <FileMovePanel compact controlRef={moveControls} onBusyChange={setMoveBusy} selection={selection} disabled={draftDirty || state.busy || bulk.busy || albumDropBusy || state.needsRefresh} onCreated={clearSelection} onChanged={() => { thumbnailRefreshPending.current = true; setAlbumRefresh(value => value + 1); refreshThumbnails() }} />
                 {bulk.progress && <p role="status" className="text-sm">{translate("일괄 처리 중 · {0} / {1}개", { "0": bulk.progress.done, "1": bulk.progress.total })}</p>}
                 {bulk.result && <section aria-label={translate("일괄 처리 결과")} className="rounded-lg border border-[var(--border-line)] p-3 text-sm">
                     <p role="status">{translate("성공 {0}개 · 실패 {1}개", { "0": bulk.result.succeeded.length, "1": bulk.result.failed.length })}</p>
@@ -375,6 +378,8 @@ export const GalleryPage = ({
                 )}
 
                 {pointerSelection.rectangle && <div aria-hidden="true" className="pointer-events-none fixed z-50 border border-[var(--color-primary)] bg-[var(--color-primary)]/15" style={pointerSelection.rectangle} />}
+                <div className="flex flex-col-reverse items-start gap-4 lg:flex-row">
+                <div className="w-full min-w-0 flex-1">
                 <div ref={pointerSelection.gridRef} className={galleryGridClass + ' motion-gallery-grid min-h-32'}>
                     {activeJobs.map(job => <GalleryDownloadCard key={'download:' + job.id} job={job} selected={downloadDetailId === job.id} disabled={disabled || moveBusy || tagCommand !== null} cancelling={downloads.cancellingIds.includes(job.id)} onOpen={() => { void openDownload(job.id) }} onCancel={() => downloads.cancelDownload(job.id)} />)}
                     {list.page.data.map((media) => (
@@ -384,6 +389,8 @@ export const GalleryPage = ({
                             selected={pointerSelection.entries.has(gallerySelectionKey(media))}
                             selectionKey={gallerySelectionKey(media)}
                             onSelect={event => pointerSelection.select(media, event)}
+                            onAlbumDragStart={event => pointerSelection.startAlbumDrag(media, event)}
+                            onAlbumDragEnd={pointerSelection.endAlbumDrag}
                             active={state.detail.mediaId === media.id}
                             disabled={disabled} viewDisabled={pageDisabled}
                             previewPath={media.galleryFile ? media.galleryFile.thumbnailPath ?? media.galleryFile.previewPath ?? (media.galleryFile.kind === 'image' ? media.galleryFile.filepath : null) : media.cover?.path ?? null}
@@ -438,6 +445,11 @@ export const GalleryPage = ({
                         {list.page.hasNextPage && !list.error && <button type="button" data-detail-trigger className={button} disabled={pageDisabled || list.loadingMore} onClick={() => { void store.loadMore() }}>{list.moreError ? translate("다시 시도") : translate("더 불러오기")}</button>}
                     </div>
                 )}
+                </div>
+                <AlbumDropPanel drag={pointerSelection.albumDrag} disabled={pageDisabled || tagCommand !== null || viewer !== null || pointerSelection.dragging}
+                    refreshKey={albumRefresh} onDragEnd={pointerSelection.endAlbumDrag} onBusyChange={setAlbumDropBusy}
+                    onChanged={() => { clearSelection(); void store.refresh() }} />
+                </div>
             </div>
         </ListDetailLayout>
         </>
