@@ -20,7 +20,8 @@ export function MediaEditLauncher({ file, disabled = false, compact = false, con
         const api = getApi()
         const editor = mountMediaEditor(host.current, {
             api: api.mediaEdit,
-            file: activeFile ? { id: activeFile.id, title: activeFile.title || activeFile.fileKey, duration: activeFile.duration,kind:activeFile.kind,detectedFormat:activeFile.detectedFormat,nativeGIF:activeFile.kind==='image', src: toMediaUrl(activeFile.filepath) } : undefined,
+            chooseOutputDirectory: allowReveal ? () => api.chooseEditOutputDirectory() : undefined,
+            file: activeFile ? { id: activeFile.id, title: activeFile.title || activeFile.fileKey, duration: activeFile.duration,kind:activeFile.kind,detectedFormat:activeFile.detectedFormat,nativeGIF:activeFile.detectedFormat==='gif',nativeWebP:activeFile.detectedFormat==='webp', src: toMediaUrl(activeFile.filepath) } : undefined,
             onClose: () => setRequest(null),
             reveal: allowReveal ? async (id: string) => {
                 const result = await api.mediaEdit.resultPath({ id })
@@ -30,5 +31,5 @@ export function MediaEditLauncher({ file, disabled = false, compact = false, con
         })
         return () => editor.destroy()
     }, [open, activeFile?.id])
-    return <>{!compact && <button type="button" disabled={disabled} onClick={() => openEditor()} className="rounded-lg border border-[var(--border-line)] px-3 py-2 text-sm disabled:opacity-40">{file ? (file.kind==='image'?translate("editor.editGif"):translate("editor.createGifOrTrimVideo")) : translate("gallery.editor.createAnimation")}</button>}<div ref={host} style={{ display: 'contents' }} /></>
+    return <>{!compact && <button type="button" disabled={disabled} onClick={() => openEditor()} className="rounded-lg border border-[var(--border-line)] px-3 py-2 text-sm disabled:opacity-40">{file ? (file.kind==='image'?translate("editor.editAnimation"):translate("editor.createGifOrTrimVideo")) : translate("gallery.editor.createAnimation")}</button>}<div ref={host} style={{ display: 'contents' }} /></>
 }

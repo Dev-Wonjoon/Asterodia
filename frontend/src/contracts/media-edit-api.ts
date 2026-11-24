@@ -5,6 +5,7 @@ export interface EditPrepare {
     fullSource?: boolean;
     nativeVideo?: boolean;
     nativeGIF?: boolean;
+    nativeWebP?: boolean;
     requestId: string;
     fileId: number;
     start: number;
@@ -58,6 +59,9 @@ export interface EditPage {
     error: string;
 }
 export interface EditCreate {
+    outputDirectory?: string;
+    albumIds?: number[];
+    tagNames?: string[];
     rangeStart?: number;
     rangeEnd?: number;
     trimStart?: number;
@@ -94,6 +98,7 @@ export interface EditSession {
     createdAt: number;
 }
 export interface EditJob {
+    outputNotice?: string;
     id: string;
     sessionId: string;
     options: EditCreate;
@@ -107,6 +112,13 @@ export interface EditJob {
     createdAt: number;
 }
 export interface MediaEditApi {
+    outputOptions(request: { keyword?: string; offset?: number }): Promise<WebServerResult<{
+        directory: string;
+        albums: { id: number; title: string }[];
+        tags: string[];
+        hasNextPage: boolean;
+        offset: number;
+    }>>;
     overview(request: { fileId: number; index: number }): Promise<WebServerResult<{
         index: number; count: number; time: number; duration: number; frameCount: number; image: string;
     }>>;

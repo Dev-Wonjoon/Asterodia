@@ -8,6 +8,10 @@ const ok = (data: unknown) => ({ok:true,data})
 const flush = async () => { for(let i=0;i<12;i++)await Promise.resolve() }
 function pendingResult<T>() { let resolve!: (value:T)=>void; const promise=new Promise<T>(done=>{resolve=done}); return {promise,resolve}; }
 const button = (label: string) => [...document.querySelectorAll('button')].find(el=>el.textContent===label)!
+function chooseFormat(value: 'gif' | 'webp' | 'trim') {
+    if (document.querySelector<HTMLElement>('.sbe-format-chooser')!.hidden) button('형식 변경').click()
+    button(value === 'webp' ? 'WebP로 만들기' : value === 'trim' ? '동영상 자르기' : 'GIF로 만들기').click()
+}
 const context = {clearRect:vi.fn(),drawImage:vi.fn(),beginPath:vi.fn(),rect:vi.fn(),fill:vi.fn(),strokeRect:vi.fn(),fillRect:vi.fn()}
 function editorLayoutHarness() {
     const frames = new Map<number, FrameRequestCallback>()
@@ -33,10 +37,120 @@ beforeEach(()=>{
     vi.stubGlobal('confirm',vi.fn(()=>true))
 })
 afterEach(()=>{instance?.destroy();instance=undefined;document.body.replaceChildren();vi.useRealTimers();vi.restoreAllMocks();vi.unstubAllGlobals()})
-async function setup(session = draft(), file?: unknown) {
+async function setup(session = draft(), file?: unknown, output?: any) {
     const api = {list:vi.fn(async()=>ok({sessions:[session],jobs:[]})),prepare:vi.fn(),create:vi.fn(async()=>ok({id:'job'})),cancel:vi.fn(async()=>ok(null)),release:vi.fn(async()=>ok(null)),frameStatus:vi.fn(async()=>ok({offset:0,count:6,state:'ready',times:[0,.03,.14,.21,.46,.55],durations:[.03,.11,.07,.25,.09,.12]}))}
-    const host=document.createElement('div');document.body.append(host);instance=mountMediaEditor(host,{api,file});await flush();button('열기').click();await flush();return api
+    if (output) Object.assign(api, { outputOptions: vi.fn(async () => ok(output)) })
+    const host=document.createElement('div');document.body.append(host);instance=mountMediaEditor(host,{api,file,chooseOutputDirectory: output ? async () => 'E:/One-off' : undefined});
+    if (file) chooseFormat('gif')
+    await flush();button('열기').click();
+    if (!document.querySelector<HTMLElement>('.sbe-format-chooser')!.hidden) chooseFormat('gif')
+    await flush();return api
 }
+
+it('keeps edits and output settings mounted while navigating accessible editor tabs', async () => {
+    const api = await setup(draft(), undefined, { directory: 'D:/Working', albums: [{ id: 9, title: '앨범' }], tags: [], hasNextPage: false, offset: 0 })
+    const tabs = [...document.querySelectorAll<HTMLButtonElement>('[role="tab"]')]
+    const panel = document.querySelector<HTMLElement>('[role="tabpanel"]:not([hidden])')!
+    const stage = document.querySelector('.sbe-stage')
+    const tags = document.querySelector<HTMLInputElement>('[aria-label="결과물 태그 입력"]')!
+    const album = document.querySelector<HTMLInputElement>('[data-album-id="9"]')!
+    const pane = document.querySelector<HTMLElement>('.sbe-main-pane')!
+    expect(tabs.map(tab => tab.textContent)).toEqual(['편집', '편집 초안', '출력 작업'])
+    expect(tabs.map(tab => tab.tabIndex)).toEqual([0, -1, -1])
+    expect(panel.getAttribute('aria-labelledby')).toBe(tabs[0].id)
+    document.querySelectorAll<HTMLInputElement>('.sbe-frame input')[2].click(); button('선택 프레임 삭제').click()
+    tags.value = '보존할 태그'; album.click(); pane.scrollTop = 400
+    tabs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    expect(document.activeElement).toBe(tabs[1]); expect(panel.hidden).toBe(true)
+    expect(document.querySelector<HTMLElement>('.sbe-frame-aside')!.hidden).toBe(true)
+    expect(document.querySelector('.sbe-body')!.classList.contains('has-frames')).toBe(false)
+    tabs[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }))
+    expect(document.activeElement).toBe(tabs[2]); expect(tabs[2].getAttribute('aria-selected')).toBe('true')
+    tabs[2].dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
+    expect(document.activeElement).toBe(tabs[0]); expect(panel.hidden).toBe(false)
+    expect(document.querySelector('.sbe-stage')).toBe(stage); expect(tags.isConnected).toBe(true)
+    expect(tags.value).toBe('보존할 태그'); expect(album.checked).toBe(true); expect(pane.scrollTop).toBe(400)
+    button('GIF 저장').click(); await flush()
+    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ deleted: [2], tagNames: ['보존할 태그'], albumIds: [9] }))
+    expect(tabs[0].getAttribute('aria-selected')).toBe('true')
+})
+
+it('disables preview creation from submission through queueing and shows real progress and the result in Edit', async () => {
+    vi.useFakeTimers()
+    const api = await setup(), request = pendingResult<any>()
+    const job = { id: 'sample-job', sessionId: draft().id, options: { kind: 'gif', sessionId: draft().id }, preview: true, state: 'pending', progress: 0, createdAt: 1, error: '' }
+    api.create.mockImplementationOnce(() => request.promise)
+    const sample = button('미리보기 만들기'), progress = document.querySelector<HTMLProgressElement>('.sbe-sample-status progress')!
+    expect(progress.parentElement!.hidden).toBe(true)
+    sample.click()
+    expect(sample.disabled).toBe(true); expect(sample.textContent).toBe('미리보기 대기 중…')
+    expect(progress.hasAttribute('value')).toBe(false)
+    sample.click(); expect(api.create).toHaveBeenCalledOnce()
+    api.list.mockResolvedValue(ok({ sessions: [draft()], jobs: [job] })); request.resolve(ok(job)); await flush()
+    expect(sample.disabled).toBe(true); expect(progress.hasAttribute('value')).toBe(false)
+    expect(button('출력 작업 · 진행 1').getAttribute('aria-selected')).toBe('false')
+    button('출력 작업 · 진행 1').click(); button('편집').click()
+    expect(sample.disabled).toBe(true)
+    api.list.mockResolvedValue(ok({ sessions: [draft()], jobs: [{ ...job, state: 'running', progress: 42 }] }))
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(sample.textContent).toBe('미리보기 만드는 중…'); expect(progress.value).toBe(42)
+    expect(progress.parentElement!.textContent).toContain('42%'); expect(sample.disabled).toBe(true)
+    api.list.mockResolvedValue(ok({ sessions: [draft()], jobs: [{ ...job, state: 'completed', progress: 100 }] }))
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(sample.textContent).toBe('미리보기 다시 만들기'); expect(sample.disabled).toBe(false); expect(progress.value).toBe(100)
+    const image = document.querySelector<HTMLImageElement>('.sbe-sample-result img')!
+    expect(image.getAttribute('src')).toBe('/edit-assets/jobs/sample-job')
+    expect(image.closest<HTMLElement>('[role="tabpanel"]')!.hidden).toBe(false)
+    expect(button('편집').getAttribute('aria-selected')).toBe('true')
+})
+
+it('allows preview retry after request errors and failed or cancelled jobs', async () => {
+    vi.useFakeTimers()
+    const api = await setup(), sample = button('미리보기 만들기')
+    api.create.mockRejectedValueOnce(new Error('연결 끊김'))
+    sample.click(); await flush()
+    expect(sample.disabled).toBe(false); expect(sample.textContent).toBe('미리보기 다시 시도')
+    expect(document.querySelector('.sbe-sample-status')!.textContent).toContain('연결 끊김')
+    const job = { id: 'retry-job', sessionId: draft().id, options: { kind: 'gif', sessionId: draft().id }, preview: true, state: 'pending', progress: 0, error: '', createdAt: 1 }
+    api.create.mockResolvedValueOnce(ok(job)); api.list.mockResolvedValue(ok({ sessions: [draft()], jobs: [job] }))
+    sample.click(); await flush(); expect(sample.disabled).toBe(true)
+    api.list.mockResolvedValue(ok({ sessions: [draft()], jobs: [{ ...job, state: 'failed', error: '인코더 오류' }] }))
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(sample.disabled).toBe(false); expect(sample.textContent).toBe('미리보기 다시 시도')
+    expect(document.querySelector('.sbe-sample-status')!.textContent).toContain('인코더 오류')
+    expect(document.querySelector<HTMLProgressElement>('.sbe-sample-status progress')!.hidden).toBe(true)
+    api.list.mockResolvedValue(ok({ sessions: [draft()], jobs: [{ ...job, state: 'cancelled' }] }))
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(sample.disabled).toBe(false); expect(sample.textContent).toBe('미리보기 다시 시도')
+})
+
+it('shows active export counts without moving away from edits and opens drafts in Edit', async () => {
+    const api = await setup()
+    const job = { id: 'export-job', sessionId: draft().id, options: { kind: 'gif' }, state: 'running', progress: 31, createdAt: 1 }
+    api.list.mockResolvedValue(ok({ sessions: [draft()], jobs: [job] }))
+    button('GIF 저장').click(); await flush()
+    expect(button('편집').getAttribute('aria-selected')).toBe('true')
+    button('출력 작업 · 진행 1').click()
+    expect(document.querySelector('[role="tabpanel"]:not([hidden])')!.textContent).toContain('31%')
+    button('편집 초안').click(); button('열기').click()
+    // Reopening a draft asks for a format, then returns to its mounted editor.
+    chooseFormat('webp'); await flush()
+    expect(button('편집').getAttribute('aria-selected')).toBe('true')
+    expect(button('WebP 저장').disabled).toBe(false)
+})
+
+it('passes the physical output folder and logical album/tag choices only to final exports', async () => {
+    const api = await setup(draft(), undefined, { directory: 'D:/Working', albums: [{ id: 9, title: '결과 앨범' }], tags: [], hasNextPage: false, offset: 0 })
+    document.querySelector<HTMLInputElement>('input[data-album-id="9"]')!.click()
+    document.querySelector<HTMLInputElement>('[aria-label="결과물 태그 입력"]')!.value = '새 태그'
+    button('GIF 저장').click(); await flush()
+    expect(api.create).toHaveBeenLastCalledWith(expect.objectContaining({ outputDirectory: 'D:/Working', albumIds: [9], tagNames: ['새 태그'], preview: false }))
+    api.create.mockClear(); button('미리보기 만들기').click(); await flush()
+    expect(api.create).toHaveBeenLastCalledWith(expect.objectContaining({ preview: true }))
+    expect(api.create.mock.calls[0][0]).not.toHaveProperty('outputDirectory')
+    expect(api.create.mock.calls[0][0]).not.toHaveProperty('albumIds')
+    expect(api.create.mock.calls[0][0]).not.toHaveProperty('tagNames')
+})
 
 it('shows an overview for a 1000-frame video without preparing all precise frames',async()=>{
     const first=pendingResult<any>(),last=pendingResult<any>()
@@ -44,6 +158,7 @@ it('shows an overview for a 1000-frame video without preparing all precise frame
         overview:vi.fn(({index}:any)=>index===0?first.promise:last.promise)}
     const host=document.createElement('div');document.body.append(host)
     instance=mountMediaEditor(host,{api,file:{id:1,title:'1000 프레임',kind:'video',duration:40,src:'/video'}})
+    chooseFormat('gif')
     await flush()
     expect(document.querySelectorAll('.sbe-overview-frame')).toHaveLength(12)
     expect(document.querySelector('.sbe-overview')?.hasAttribute('hidden')).toBe(false)
@@ -67,6 +182,7 @@ it('selects a small overview interval and prepares only that interval on demand'
         prepare:vi.fn(async(req:any)=>{prepared={...draft(),options:{...req,quickVideo:false},frameCount:1000};return ok(prepared)})}
     const host=document.createElement('div');document.body.append(host)
     instance=mountMediaEditor(host,{api,file:{id:1,title:'긴 영상',kind:'video',duration:1200,src:'/video'}})
+    chooseFormat('gif')
     const source=document.querySelector<HTMLVideoElement>('.sbe-source')!
     Object.defineProperties(source,{duration:{value:1200},videoWidth:{value:160},videoHeight:{value:120}})
     source.dispatchEvent(new Event('loadedmetadata'));await flush()
@@ -123,9 +239,11 @@ it('keeps immutable output-frame IDs and bounds arbitrary crop coordinates',()=>
 })
 it('shows automatic retention for both drafts and jobs and still allows manual deletion',async()=>{
     const api=await setup()
+    button('편집 초안').click()
     const count=document.querySelector<HTMLElement>('[aria-label="편집 초안 보관 개수"]')!
     const jobs=document.querySelector<HTMLElement>('[aria-label="작업 내역 보관 개수"]')!
-    const hint=[...document.querySelectorAll<HTMLElement>('.sbe-history p')].find(el=>el.textContent?.startsWith('편집 초안과 작업 내역은 각각'))!
+    const panel=count.closest('[role="tabpanel"]')!
+    const hint=[...panel.querySelectorAll<HTMLElement>('p')].find(el=>el.textContent?.startsWith('편집 초안과 작업 내역은 각각'))!
     expect(count.textContent).toBe('편집 초안 1개 · 최근 20개 자동 보관')
     expect(jobs.textContent).toBe('작업 내역 0개 · 최근 20개 자동 보관')
     expect(hint.hidden).toBe(false)
@@ -135,7 +253,7 @@ it('shows automatic retention for both drafts and jobs and still allows manual d
     expect(count.textContent).toBe('편집 초안 20개 · 최근 20개 자동 보관')
     expect(hint.textContent).toContain('오래된 항목부터 자동 정리');expect(hint.textContent).toContain('원본 영상과 저장된 결과는 유지됩니다.')
     expect(api.release).not.toHaveBeenCalled()
-    expect(document.querySelectorAll('.sbe-history .sbe-record')).toHaveLength(20)
+    expect(panel.querySelectorAll('.sbe-record')).toHaveLength(20)
     api.list.mockResolvedValue(ok({sessions:sessions.slice(1),jobs:[]}))
     button('편집 초안 삭제').click();await flush()
     expect(api.release).toHaveBeenCalledExactlyOnceWith({id:'draft-0'})
@@ -163,7 +281,7 @@ it('shows the original video immediately and prepares only a selected interval f
     const session={...draft(),state:'pending',frameCount:0,options:{...draft().options,fullSource:true,nativeVideo:true,start:0,end:0,fps:1000}}
     const api={list:vi.fn(async()=>ok({sessions:[],jobs:[]})),prepare:vi.fn(async()=>ok(session))}
     const host=document.createElement('div');document.body.append(host)
-    instance=mountMediaEditor(host,{api,file:{id:1,title:'긴 영상',duration:120,kind:'video',src:'/media?path=video.mp4'}});await flush()
+    instance=mountMediaEditor(host,{api,file:{id:1,title:'긴 영상',duration:120,kind:'video',src:'/media?path=video.mp4'}});chooseFormat('gif');await flush()
     const video=document.querySelector<HTMLVideoElement>('.sbe-source')!
     expect(video.hidden).toBe(false);expect(video.controls).toBe(true)
     expect(document.querySelector<HTMLElement>('.sbe-source-surface')!.hidden).toBe(false)
@@ -180,7 +298,7 @@ it('gives a source-selection instruction when the editor is opened without a fil
     instance=mountMediaEditor(host,{api:{list:async()=>ok({sessions:[],jobs:[]})}});await flush()
     const placeholder=document.querySelector<HTMLElement>('.sbe-crop-placeholder')!
     expect(placeholder.hidden).toBe(false)
-    expect(placeholder.textContent).toContain('영상 카드의 ⋯ 메뉴')
+    expect(placeholder.textContent).toContain('영상 또는 GIF·WebP 파일의 ⋯ 메뉴')
     expect(document.querySelector<HTMLElement>('.sbe-source-surface')!.hidden).toBe(false)
 })
 it('does not show a different original video when a historical session is preparing',async()=>{
@@ -541,15 +659,14 @@ it('represents long deletions as ranges and jumps across them',()=>{
 it('switches format and quality without changing the crop or frame deletion',async()=>{
     const api=await setup();document.querySelector<HTMLInputElement>('input[aria-label="3번 프레임 선택"]')!.click();button('선택 프레임 삭제').click()
     const selects=[...document.querySelectorAll('select')]
-    const format=selects.find(el=>el.querySelector('option[value="webp"]'))!
-    format.value='webp';format.dispatchEvent(new Event('change'))
+    chooseFormat('webp')
     const preset=selects.find(el=>el.querySelector('option[value="custom"]'))!
     preset.value='custom';preset.dispatchEvent(new Event('change'))
     const quality=[...document.querySelectorAll('label')].find(el=>el.firstChild?.textContent==='화질(1–100)')!.querySelector('input')!
     quality.value='91';quality.dispatchEvent(new Event('change'))
     const compression=[...document.querySelectorAll('label')].find(el=>el.firstChild?.textContent==='WebP 압축 방식')!.querySelector('select')!
     compression.value='lossless';compression.dispatchEvent(new Event('change'))
-    button('화질 확인').click();await flush()
+    button('미리보기 만들기').click();await flush()
     expect(api.create.mock.calls[0][0]).toMatchObject({kind:'webp',deleted:[2],crop:{width:160,height:120},preview:true,quality:{preset:'custom',quality:91,lossless:true}})
     expect(document.body.textContent).toContain('10장 중 9장 남음')
 })
@@ -568,14 +685,13 @@ it('sends maximum quality for both save and preview, preserving edits and separa
     expect(quality.value).toBe('100');expect(quality.disabled).toBe(true)
     button('GIF 저장').click();await flush()
     expect(api.create.mock.calls[0][0]).toMatchObject({kind:'gif',deleted:[2],crop:{width:160,height:120},quality:{preset:'max',quality:100,effort:'normal',lossless:false}})
-    const format=labelled('작업 종류').querySelector('select')!
-    format.value='webp';format.dispatchEvent(new Event('change'))
+    chooseFormat('webp')
     expect(preset.value).toBe('balanced')
     preset.value='max';preset.dispatchEvent(new Event('change'))
-    button('화질 확인').click();await flush()
+    button('미리보기 만들기').click();await flush()
     expect(api.create.mock.calls[1][0]).toMatchObject({kind:'webp',preview:true,deleted:[2],quality:{preset:'max',quality:100,lossless:false}})
     expect(JSON.parse(localStorage.getItem('storagebucket-quality:webp')!)).toMatchObject({preset:'max',quality:100})
-    format.value='gif';format.dispatchEvent(new Event('change'))
+    chooseFormat('gif')
     expect(preset.value).toBe('max');expect(quality.value).toBe('100')
     instance!.destroy();document.body.replaceChildren();await setup()
     expect(labelled('화질 프리셋').querySelector('select')!.value).toBe('max')
@@ -593,7 +709,7 @@ it('keeps algorithm controls in collapsed advanced settings and remembers GIF di
     advanced.open=true;dither.value='floyd_steinberg';dither.dispatchEvent(new Event('change'))
     const preset=labelled('화질 프리셋').querySelector('select')!;preset.value='max';preset.dispatchEvent(new Event('change'))
     expect(dither.value).toBe('floyd_steinberg');expect(dither.disabled).toBe(false)
-    button('화질 확인').click();await flush();button('GIF 저장').click();await flush()
+    button('미리보기 만들기').click();await flush();button('GIF 저장').click();await flush()
     expect(api.create).toHaveBeenCalledTimes(2)
     for(const [request] of api.create.mock.calls)expect(request.quality).toMatchObject({preset:'max',quality:100,dither:'floyd_steinberg'})
     instance!.destroy();document.body.replaceChildren();await setup()
@@ -605,14 +721,13 @@ it('shows simple WebP compression outside advanced settings and preserves lossle
     const api=await setup()
     const labelled=(label:string)=>[...document.querySelectorAll('label')].find(el=>el.firstChild?.textContent===label)!
     const change=(select:HTMLSelectElement,value:string)=>{select.value=value;select.dispatchEvent(new Event('change'))}
-    const format=labelled('작업 종류').querySelector('select')!
-    change(format,'webp')
+    chooseFormat('webp')
     const advanced=document.querySelector<HTMLDetailsElement>('.sbe-quality-advanced')!
     const compression=labelled('WebP 압축 방식').querySelector('select')!,optimization=labelled('WebP 최적화 유형').querySelector('select')!
     expect(compression.closest('details')).toBeNull();expect(optimization.closest('details')).toBe(advanced)
     expect(advanced.open).toBe(false);expect(labelled('GIF 디더링').hidden).toBe(true)
     advanced.open=true;change(optimization,'text')
-    button('화질 확인').click();await flush()
+    button('미리보기 만들기').click();await flush()
     expect(api.create.mock.calls[0][0].quality).toMatchObject({lossless:false,webpPreset:'text'})
     expect(labelled('압축률').querySelector('select')!.disabled).toBe(true)
     change(compression,'lossless')
@@ -620,9 +735,9 @@ it('shows simple WebP compression outside advanced settings and preserves lossle
     button('WebP 저장').click();await flush()
     expect(api.create.mock.calls[1][0].quality).toMatchObject({lossless:true})
     expect(api.create.mock.calls[1][0].quality.webpPreset).toBeUndefined()
-    change(format,'gif');expect(labelled('WebP 압축 방식').hidden).toBe(true)
+    chooseFormat('gif');expect(labelled('WebP 압축 방식').hidden).toBe(true)
     expect(labelled('GIF 디더링').querySelector('select')!.value).toBe('auto')
-    change(format,'webp');expect(compression.value).toBe('lossless');expect(optimization.value).toBe('text')
+    chooseFormat('webp');expect(compression.value).toBe('lossless');expect(optimization.value).toBe('text')
     change(compression,'lossy');expect(optimization.disabled).toBe(false)
     button('WebP 저장').click();await flush()
     expect(api.create.mock.calls[2][0].quality).toMatchObject({lossless:false,webpPreset:'text'})
@@ -634,7 +749,7 @@ it('migrates saved lossless preferences and ignores unknown saved algorithms',as
     await setup()
     const labelled=(label:string)=>[...document.querySelectorAll('label')].find(el=>el.firstChild?.textContent===label)!
     expect(labelled('GIF 디더링').querySelector('select')!.value).toBe('auto')
-    const format=labelled('작업 종류').querySelector('select')!;format.value='webp';format.dispatchEvent(new Event('change'))
+    chooseFormat('webp')
     expect(labelled('WebP 압축 방식').querySelector('select')!.value).toBe('lossless')
     expect(labelled('WebP 최적화 유형').querySelector('select')!.value).toBe('none')
 })
@@ -672,8 +787,8 @@ it('applies a crop to every frame explicitly and blocks saving a pending crop',a
     expect(api.create.mock.calls[0][0].crop).toMatchObject({width:120,height:120})
 })
 
-it('uses original GIF frame timestamps instead of a resampled FPS timeline',async()=>{
-    const session={...draft(),options:{...draft().options,nativeGIF:true,fps:100,end:.67},frameCount:6}
+it.each(['nativeGIF','nativeWebP'])('uses original animation timestamps instead of a resampled FPS timeline (%s)',async(native)=>{
+    const session={...draft(),options:{...draft().options,[native]:true,fps:native==='nativeWebP'?1000:100,end:.67},frameCount:6}
     await setup(session)
     document.querySelector<HTMLButtonElement>('button[aria-label="3번 프레임 보기"]')!.click();await flush()
     expect(document.body.textContent).toContain('3 / 6장 · 00:00:00.14')
@@ -703,8 +818,7 @@ it.each([true,false])('edits crops in the top surface with or without the origin
     expect(aside.hidden).toBe(false);expect(body.firstElementChild).toBe(aside)
     const width=[...document.querySelectorAll('label')].find(el=>el.firstChild?.textContent==='너비')!.querySelector('input')!
     width.value='120';width.dispatchEvent(new Event('change'))
-    const format=[...document.querySelectorAll('select')].find(el=>el.querySelector('option[value="webp"]'))!
-    format.value='webp';format.dispatchEvent(new Event('change'))
+    chooseFormat('webp')
     expect(crop.hidden).toBe(false)
     button('모든 프레임에 크롭 적용').click();button('WebP 저장').click();await flush()
     expect(api.create.mock.calls[0][0]).toMatchObject({kind:'webp',crop:{width:120,height:120}})
@@ -725,12 +839,13 @@ it('preserves the original video while frames are preparing and in the trimming 
     expect(document.querySelector('.sbe-body')!.classList.contains('has-frames')).toBe(false)
 })
 
-async function setupQuickVideo() {
+async function setupQuickVideo(format: 'gif' | 'webp' | 'trim' = 'gif') {
     const ready={...draft(),frameCount:0,options:{...draft().options,quickVideo:true,fullSource:true,fps:1000,end:120}}
     let prepared=false
     const api={list:vi.fn(async()=>ok({sessions:prepared?[ready]:[],jobs:[]})),prepare:vi.fn(async()=>{prepared=true;return ok(ready)}),create:vi.fn(async()=>ok({id:'quick-job'})),frames:vi.fn(),frameStatus:vi.fn(),selection:vi.fn()}
     const host=document.createElement('div');document.body.append(host)
     instance=mountMediaEditor(host,{api,file:{id:1,title:'긴 원본',kind:'video',duration:120,src:'/video.mp4'}})
+    chooseFormat(format)
     const video=document.querySelector<HTMLVideoElement>('.sbe-source')!
     Object.defineProperties(video,{duration:{value:120},videoWidth:{value:160},videoHeight:{value:120},readyState:{value:2}})
     video.dispatchEvent(new Event('loadedmetadata'));await flush()
@@ -751,13 +866,52 @@ it('starts a video interval edit without preparing, indexing, or requesting thum
     expect(api.selection).not.toHaveBeenCalled()
 })
 function readySessionID(){return draft().id}
+
+it('shows two visible format choices before loading the video or entering the editor', async () => {
+    const api = { list: vi.fn(async () => ok({ sessions: [], jobs: [] })), overview: vi.fn(), prepare: vi.fn(), create: vi.fn() }
+    const host = document.createElement('div'); document.body.append(host)
+    instance = mountMediaEditor(host, { api, file: { id: 1, title: '선택한 영상', kind: 'video', duration: 10, src: '/source.mp4' } })
+    const choices = [...document.querySelectorAll<HTMLButtonElement>('.sbe-format-choice')]
+    expect(choices.map(node => node.textContent)).toEqual(['GIF로 만들기', 'WebP로 만들기'])
+    expect(choices.every(node => !node.closest('[hidden]'))).toBe(true)
+    expect(document.activeElement).toBe(choices[0])
+    expect(document.querySelector<HTMLElement>('.sbe-body')!.hidden).toBe(true)
+    expect(document.querySelector('video')!.getAttribute('src')).toBeNull()
+    expect(api.list).not.toHaveBeenCalled(); expect(api.overview).not.toHaveBeenCalled(); expect(api.prepare).not.toHaveBeenCalled()
+    choices[1].click(); await flush()
+    expect(document.querySelector<HTMLElement>('.sbe-body')!.hidden).toBe(false)
+    expect(document.querySelector<HTMLElement>('.sbe-format-chooser')!.hidden).toBe(true)
+    expect(document.querySelector('.sbe-format-badge')?.textContent).toBe('WebP')
+    expect([...document.querySelectorAll('select')].some(node => node.querySelector('option[value="webp"]'))).toBe(false)
+    expect(api.list).toHaveBeenCalledOnce()
+})
+
+it.each(['webp', 'trim'] as const)('keeps the initial %s choice through metadata and server preparation', async format => {
+    const { api } = await setupQuickVideo(format)
+    expect(document.querySelector('.sbe-format-badge')?.textContent).toBe(format === 'webp' ? 'WebP' : '동영상 자르기')
+    button(format === 'webp' ? 'WebP 저장' : '잘라낸 영상 저장').click(); await flush()
+    expect(api.create).toHaveBeenLastCalledWith(expect.objectContaining({ kind: format }))
+})
+
+it('chooses a format after opening a saved draft and can cancel a format change without losing edits', async () => {
+    const api = await setup()
+    const checkbox = document.querySelector<HTMLInputElement>('input[aria-label="3번 프레임 선택"]')!
+    checkbox.click(); button('선택 프레임 삭제').click()
+    button('형식 변경').click()
+    expect(document.querySelector<HTMLElement>('.sbe-format-chooser')!.hidden).toBe(false)
+    expect(document.querySelector<HTMLElement>('.sbe-body')!.hidden).toBe(true)
+    const chooser = document.querySelector<HTMLElement>('.sbe-format-chooser')!
+    chooser.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    expect(chooser.hidden).toBe(true); expect(document.body.textContent).toContain('10장 중 9장 남음')
+    chooseFormat('webp'); button('WebP 저장').click(); await flush()
+    expect(api.create).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'webp', deleted: [2] }))
+})
 it('switches quick editing between WebP and video trimming with no frame setup',async()=>{
     const {api}=await setupQuickVideo()
-    const format=[...document.querySelectorAll('select')].find(el=>el.querySelector('option[value="trim"]'))!
-    format.value='webp';format.dispatchEvent(new Event('change'))
+    chooseFormat('webp')
     button('WebP 저장').click();await flush()
     expect(api.create.mock.calls[0][0]).toMatchObject({kind:'webp',trimStart:0,trimEnd:120})
-    format.value='trim';format.dispatchEvent(new Event('change'))
+    chooseFormat('trim')
     button('잘라낸 영상 저장').click();await flush()
     expect(api.create.mock.calls[1][0]).toMatchObject({kind:'trim',trimStart:0,trimEnd:120})
     expect(api.prepare).toHaveBeenCalledOnce();expect(api.frames).not.toHaveBeenCalled()

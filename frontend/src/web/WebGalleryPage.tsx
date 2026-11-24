@@ -1,3 +1,4 @@
+import { canEditMedia } from '../features/mediaedit/canEditMedia'
 import { translateError, translateMessage, translate, useLanguage } from '@renderer/shared/i18n'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { ChevronDown, ChevronUp, Play, RefreshCw } from 'lucide-react'
@@ -62,7 +63,7 @@ export function WebGalleryPage({ title, filter, emptyMessage }: { title: string;
                 if (result.data.revision !== media.revision || result.data.fileCount !== 1 || result.data.files.data[0]?.id !== media.cover?.fileId) throw new Error(translate("common.theMediaHasChangedRefreshAndReopenIt"))
                 file = result.data.files.data[0]
             }
-            if (own === serial.current && (!file || file.kind === 'video' || file.detectedFormat === 'gif')) editor.current?.open(file)
+            if (own === serial.current && (!file || canEditMedia(file))) editor.current?.open(file)
         } catch (failure) { if (own === serial.current) setError(failure instanceof Error ? failure.message : translate("gallery.couldNotLoadTheVideo")) }
         finally { if (own === serial.current) setEditBusy(false) }
     }
@@ -86,7 +87,7 @@ export function WebGalleryPage({ title, filter, emptyMessage }: { title: string;
                     {detail.data.files.data.map(file => <section key={file.id} className="space-y-2 rounded-xl border border-[var(--border-line)] p-3">
                         <p className="break-words text-sm">{file.title || translate("gallery.file", { fileId: file.id })}</p>
                         <button type="button" className={button} onClick={() => openViewer(detail.data!, file.id)}>{translate("viewer.open")}</button>
-                        {editEnabled && (file.kind === 'video' || file.kind === 'image' && file.detectedFormat === 'gif') && <button type="button" className={button} disabled={editBusy} onClick={() => void openEditor(undefined, file)}>{translate("gallery.editor.createAnimation")}</button>}
+                        {editEnabled && (canEditMedia(file)) && <button type="button" className={button} disabled={editBusy} onClick={() => void openEditor(undefined, file)}>{translate("gallery.editor.createAnimation")}</button>}
                     </section>)}
                     <nav aria-label={translate("common.filePage")} className="flex gap-2"><button type="button" className={button} disabled={detail.offset === 0 || detail.status === 'loading'} onClick={() => void store.loadDetail(Math.max(0, detail.offset - 24))}>{translate("gallery.previousFiles")}</button><button type="button" className={button} disabled={!detail.data.files.hasNextPage || detail.status === 'loading'} onClick={() => void store.loadDetail(detail.offset + 24)}>{translate("gallery.nextFiles")}</button></nav>
                 </>}
@@ -118,7 +119,7 @@ export function WebGalleryPage({ title, filter, emptyMessage }: { title: string;
                             onView={media.fileCount ? () => openViewer(media) : undefined} onDetails={() => void store.openDetail(media.id, media.galleryFileOffset)}
                             onToggleFiles={media.fileCount > 1 || media.galleryFile ? event => toggle(media, event.currentTarget) : undefined}
                             filesLabel={`${media.isUserAlbum ? translate("gallery.album") : translate("media.file")} ${media.galleryFile ? translate("gallery.collapse") : translate("gallery.expand")}`} filesExpanded={!!media.galleryFile}
-                            editorDisabled={editBusy} onCreateAnimation={editEnabled && (media.galleryFile ? media.galleryFile.kind === 'video' : media.fileCount === 1 && media.cover?.kind === 'video') ? () => void openEditor(media) : undefined} />
+                            editorDisabled={editBusy} onCreateAnimation={editEnabled && (media.galleryFile ? canEditMedia(media.galleryFile) : media.fileCount === 1 && media.cover?.kind === 'video') ? () => void openEditor(media) : undefined} />
                     </GalleryCard>)}
                 </div>
                 <div ref={sentinel} className="h-px" aria-hidden="true" />

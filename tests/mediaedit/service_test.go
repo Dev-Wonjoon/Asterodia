@@ -117,7 +117,7 @@ func newFixture(t *testing.T) *fixture {
 }
 func (f *fixture) start(t *testing.T, ffmpeg string) {
 	t.Helper()
-	f.service = mediaedit.NewService(f.db, f.cache, engine.VideoEditor{FFmpeg: ffmpeg, FFprobe: f.probe}, func() string { return f.output }, nil)
+	f.service = mediaedit.NewService(f.db, f.cache, engine.VideoEditor{FFmpeg: ffmpeg, FFprobe: f.probe}, func() string { return filepath.Join(f.output, "edits") }, nil)
 	if e := f.service.Start(); e != nil {
 		t.Fatal(e)
 	}

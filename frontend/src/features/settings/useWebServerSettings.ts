@@ -90,21 +90,21 @@ export function useWebServerSettings() {
             }
         }
     }
-    const toggleEditing = async () => {
+    const togglePermission = async (kind: 'editing' | 'downloading') => {
         if (!mounted.current || locked.current || !status) return
         const own = ++revision.current
         locked.current = true; reading.current?.cancel(); reading.current = null
         setLoading(false); setBusy(true); setError(null)
         try {
-            const result = await getApi().webServer.setEditing(!status.editing)
+            const result = await (kind === 'editing' ? getApi().webServer.setEditing(!status.editing) : getApi().webServer.setDownloading(!status.downloading))
             if (!mounted.current || own !== revision.current) return
             if (result.ok) setStatus(result.data)
             else setError(translateError(result.error))
         } catch {
-            if (mounted.current && own === revision.current) setError(translate("settings.couldNotChangeMobileEditingPermission"))
+            if (mounted.current && own === revision.current) setError(translate(kind === 'editing' ? 'settings.couldNotChangeMobileEditingPermission' : 'settings.mobileDownloads.permissionError'))
         } finally {
             if (own === revision.current) { locked.current = false; if (mounted.current) setBusy(false) }
         }
     }
-    return { status, loading, busy, error, refresh, toggle, toggleEditing }
+    return { status, loading, busy, error, refresh, toggle, toggleEditing: () => togglePermission('editing'), toggleDownloading: () => togglePermission('downloading') }
 }

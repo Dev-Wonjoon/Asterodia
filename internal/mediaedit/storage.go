@@ -46,15 +46,20 @@ func (s *Service) render(ctx context.Context, id string) (err error) {
 		return err
 	}
 	defer root.Close()
-	if err = root.MkdirAll("edits", 0700); err != nil {
+	direct := j.Options.OutputDirectory != "" && !j.Preview
+	stageDirectory := "edits"
+	if direct {
+		stageDirectory = ".storagebucket-tmp"
+	}
+	if err = root.MkdirAll(stageDirectory, 0700); err != nil {
 		return err
 	}
-	editsLock, err := media.LockDirectory(filepath.Join(actual, "edits"))
+	editsLock, err := media.LockDirectory(filepath.Join(actual, stageDirectory))
 	if err != nil {
 		return err
 	}
 	defer editsLock.Close()
-	workRel := filepath.Join("edits", "."+id)
+	workRel := filepath.Join(stageDirectory, "."+id)
 	if err = root.Mkdir(workRel, 0700); err != nil {
 		return err
 	}
@@ -74,6 +79,10 @@ func (s *Service) render(ctx context.Context, id string) (err error) {
 		workLock.Close()
 		if !errors.Is(err, engine.ErrStopUnconfirmed) {
 			_ = root.RemoveAll(workRel)
+			if direct {
+				editsLock.Close()
+				_ = root.Remove(stageDirectory)
+			}
 		}
 	}()
 	ext := ".gif"
@@ -131,15 +140,16 @@ func (s *Service) render(ctx context.Context, id string) (err error) {
 		}
 		request := engine.AnimationRequest{Source: sourcePath, Start: v.Options.Start, End: v.Options.End, FPS: v.Options.FPS, FrameCount: end, FirstFrame: first, ExpectedFrames: expected, Crop: j.Options.Crop, Format: j.Options.Kind, Quality: j.Options.Quality, NewSkip: factory, PictureSequence: v.RenderVersion == 1}
 		expectedDuration = float64(expected) / float64(v.Options.FPS)
-		if v.Options.NativeGIF || v.Options.NativeVideo {
+		if v.Options.NativeGIF || v.Options.NativeVideo || v.Options.NativeWebP {
 			timeline, e := s.timing(v)
 			if e != nil {
 				return e
 			}
 			request.NativeGIF = v.Options.NativeGIF
+			request.NativeWebP = v.Options.NativeWebP
 			request.NativeVideo = v.Options.NativeVideo
 			request.DelayRate = timeline.Rate()
-			request.Delays = timeline.Delays
+			request.Delays = append([]int(nil), timeline.Delays...)
 			skip := factory()
 			ticks := 0
 			for n := first; n < end; n++ {
@@ -266,12 +276,18 @@ func (s *Service) render(ctx context.Context, id string) (err error) {
 	}
 	name := media.PathComponent(v.Title, "영상", 70) + "_" + id + ext
 	proof := media.FileProof{Path: filepath.Join("edits", name), Size: info.Size(), Hash: fmt.Sprintf("%x", hash.Sum(nil))}
-	finalPath := filepath.Join(actual, proof.Path)
-	targetRoot, err := root.OpenRoot("edits")
-	if err != nil {
-		return err
+	if direct {
+		proof.Path = name
 	}
-	defer targetRoot.Close()
+	finalPath := filepath.Join(actual, proof.Path)
+	targetRoot := root
+	if !direct {
+		targetRoot, err = root.OpenRoot("edits")
+		if err != nil {
+			return err
+		}
+		defer targetRoot.Close()
+	}
 	// Cancellation ends here. Exclusive creation denies writes/deletes until
 	// commit. Persist expected contents and actual ownership before copying.
 	var published *os.File
@@ -364,7 +380,15 @@ func (s *Service) commit(ctx context.Context, j Job, v Session, resultUUID, path
 	if err != nil {
 		return err
 	}
-	if _, err = tx.ExecContext(ctx, "UPDATE media_edit_job SET state='completed',progress=100,result_file_id=?,error_message='',updated_at=? WHERE id=?", fileID, now(), j.ID); err != nil {
+	skippedAlbums, err := classifyOutput(ctx, tx, j.Options, mediaID, fileID)
+	if err != nil {
+		return err
+	}
+	notice := ""
+	if skippedAlbums > 0 {
+		notice = "일부 출력 앨범이 삭제되었습니다. 결과 파일과 태그는 저장했습니다."
+	}
+	if _, err = tx.ExecContext(ctx, "UPDATE media_edit_job SET state='completed',progress=100,result_file_id=?,error_message=?,updated_at=? WHERE id=?", fileID, notice, now(), j.ID); err != nil {
 		return err
 	}
 	if err = tx.Commit(); err != nil {
@@ -403,7 +427,14 @@ func (s *Service) recover() error {
 			return err
 		}
 		var proof media.FileProof
-		if json.Unmarshal([]byte(proofJSON), &proof) != nil || !filepath.IsLocal(proof.Path) || !strings.HasPrefix(proof.Path, "edits"+string(filepath.Separator)) {
+		if json.Unmarshal([]byte(proofJSON), &proof) != nil || !filepath.IsLocal(proof.Path) {
+			continue
+		}
+		if j.Options.OutputDirectory != "" {
+			if proof.Path != filepath.Base(proof.Path) {
+				continue
+			}
+		} else if !strings.HasPrefix(proof.Path, "edits"+string(filepath.Separator)) {
 			continue
 		}
 		// Preserve a conflicting/missing file; never delete or overwrite it.

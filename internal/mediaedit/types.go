@@ -8,6 +8,7 @@ type PrepareRequest struct {
 	FullSource     bool    `json:"fullSource,omitempty"`
 	NativeVideo    bool    `json:"nativeVideo,omitempty"`
 	NativeGIF      bool    `json:"nativeGIF,omitempty"`
+	NativeWebP     bool    `json:"nativeWebP,omitempty"`
 	RequestID      string  `json:"requestId"`
 	FileID         int64   `json:"fileId"`
 	Start          float64 `json:"start"`
@@ -17,20 +18,23 @@ type PrepareRequest struct {
 	Kind           string  `json:"kind"`
 }
 type CreateRequest struct {
-	TrimStart    *float64                `json:"trimStart,omitempty"`
-	TrimEnd      *float64                `json:"trimEnd,omitempty"`
-	RangeStart   int                     `json:"rangeStart"`
-	RangeEnd     int                     `json:"rangeEnd"`
-	RequestID    string                  `json:"requestId"`
-	SessionID    string                  `json:"sessionId"`
-	Kind         string                  `json:"kind"`
-	Crop         engine.EditCrop         `json:"crop"`
-	Deleted      []int                   `json:"deleted"`
-	Mute         bool                    `json:"mute"`
-	Quality      engine.AnimationQuality `json:"quality"`
-	SelectionID  string                  `json:"selectionId"`
-	Preview      bool                    `json:"preview"`
-	PreviewStart int                     `json:"previewStart"`
+	OutputDirectory string                  `json:"outputDirectory,omitempty"`
+	AlbumIDs        []int64                 `json:"albumIds,omitempty"`
+	TagNames        []string                `json:"tagNames,omitempty"`
+	TrimStart       *float64                `json:"trimStart,omitempty"`
+	TrimEnd         *float64                `json:"trimEnd,omitempty"`
+	RangeStart      int                     `json:"rangeStart"`
+	RangeEnd        int                     `json:"rangeEnd"`
+	RequestID       string                  `json:"requestId"`
+	SessionID       string                  `json:"sessionId"`
+	Kind            string                  `json:"kind"`
+	Crop            engine.EditCrop         `json:"crop"`
+	Deleted         []int                   `json:"deleted"`
+	Mute            bool                    `json:"mute"`
+	Quality         engine.AnimationQuality `json:"quality"`
+	SelectionID     string                  `json:"selectionId"`
+	Preview         bool                    `json:"preview"`
+	PreviewStart    int                     `json:"previewStart"`
 }
 type Request struct {
 	ID string `json:"id"`
@@ -51,6 +55,7 @@ type Session struct {
 	RenderVersion int            `json:"renderVersion"`
 }
 type Job struct {
+	OutputNotice string        `json:"outputNotice,omitempty"`
 	ID           string        `json:"id"`
 	SessionID    string        `json:"sessionId"`
 	Options      CreateRequest `json:"options"`

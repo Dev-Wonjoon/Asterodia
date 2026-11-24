@@ -125,7 +125,7 @@ it('has complete catalogs, matching interpolation parameters, and no missing UI 
     }
     const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
     collect(path.join(root, 'frontend/src'))
-    files.push(...['editor', 'player', 'viewer', 'app', 'search', 'shortcuts', 'i18n'].map(name => path.join(root, `internal/webserver/web/${name}.js`)))
+    files.push(...['editor', 'player', 'viewer', 'app', 'search', 'shortcuts', 'i18n', 'output-controls'].map(name => path.join(root, `internal/webserver/web/${name}.js`)))
     for (const language of ['ko', 'en']) {
         const filename = path.join(root, `internal/webserver/web/langs/${language}.json`)
         const source = ts.parseJsonText(filename, readFileSync(filename, 'utf8'))
@@ -219,6 +219,7 @@ it('updates an open editor while keeping controls, user titles, and edited value
         file: { id: 1, title: '갤러리', duration: 10, src: '/fixture.mp4' },
         api: { list: async () => ({ ok: true, data: { sessions: [], jobs: [] } }) },
     }); widget = editor
+    document.querySelector<HTMLButtonElement>('.sbe-format-choice')!.click()
     for (let i = 0; i < 6; i++) await Promise.resolve()
     const input = document.querySelector<HTMLInputElement>('input[type="number"]')!
     input.value = '2.5'
@@ -229,7 +230,20 @@ it('updates an open editor while keeping controls, user titles, and edited value
     expect(input.value).toBe('2.5')
     expect(document.body.textContent).not.toContain('() =>')
     expect(document.querySelector('.sbe-trim-range')!.getAttribute('aria-label')).toBe('Original range selection')
+    expect([...document.querySelectorAll('[role="tab"]')].map(tab => tab.textContent)).toEqual(['Edit', 'Drafts', 'Export jobs'])
+    expect(document.querySelector('.sbe-sample-controls button')!.textContent).toBe('Create preview')
     setLanguage('ko')
     expect(input.isConnected).toBe(true)
     expect(document.body.textContent).toContain('시작 시간(초)')
+})
+
+it('translates the format chooser while preserving its buttons, focus, and user video title', () => {
+    const host = document.createElement('div'); document.body.append(host)
+    widget = mountMediaEditor(host, { file: { id: 1, title: '갤러리', kind: 'video', src: '/source.mp4' }, api: { list: async () => ({ ok: true, data: { sessions: [], jobs: [] } }) } })
+    const choice = document.querySelector<HTMLButtonElement>('.sbe-format-choice')!
+    expect(choice.textContent).toBe('GIF로 만들기'); expect(document.activeElement).toBe(choice)
+    setLanguage('en')
+    expect(document.querySelector('.sbe-format-choice')).toBe(choice); expect(choice.textContent).toBe('Create GIF')
+    expect(document.querySelector('.sbe-format-source')?.textContent).toBe('갤러리')
+    expect(document.activeElement).toBe(choice)
 })

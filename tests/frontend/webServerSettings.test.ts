@@ -5,7 +5,7 @@ import type { WebServerStatus, WebServerResult } from '@contracts/webserver-api'
 import { WebServerSettings } from '@renderer/features/settings/WebServerSettings'
 import { cleanupReact, clickButton, deferred, mount } from './reactHarness'
 
-const api = vi.hoisted(() => ({ status: vi.fn(), start: vi.fn(), stop: vi.fn(), setEditing: vi.fn() }))
+const api = vi.hoisted(() => ({ status: vi.fn(), start: vi.fn(), stop: vi.fn(), setEditing: vi.fn(), setDownloading: vi.fn() }))
 vi.mock('@renderer/shared/api', () => ({ getApi: () => ({ webServer: api }) }))
 const state = (running = false, error: string | null = null): WebServerStatus => ({ running, url: 'http://127.0.0.1:9246', error })
 const ok = (data: WebServerStatus): WebServerResult<WebServerStatus> => ({ ok: true, data })
@@ -15,6 +15,15 @@ beforeEach(() => { vi.resetAllMocks(); api.status.mockResolvedValue(ok(state()))
 afterEach(async () => { await cleanupReact(); vi.useRealTimers() })
 
 describe('localhost web server controls', () => {
+    it('toggles download permission independently of editing', async () => {
+        api.status.mockResolvedValue(ok({ ...state(true), editing: false, downloading: false }))
+        api.setDownloading.mockResolvedValue(ok({ ...state(true), editing: false, downloading: true }))
+        await mount(h(WebServerSettings))
+        const input = [...document.querySelectorAll('label')].find(label => label.textContent === '모바일 다운로드 허용')!.querySelector('input')!
+        await act(async () => input.click())
+        expect(api.setDownloading).toHaveBeenCalledExactlyOnceWith(true)
+        expect(input.checked).toBe(true); expect(api.setEditing).not.toHaveBeenCalled()
+    })
     it('starts disabled, displays the local address, starts/stops and polls only while running', async () => {
         vi.useFakeTimers()
         const first = deferred<WebServerResult<WebServerStatus>>(); api.status.mockReturnValueOnce(first.promise)

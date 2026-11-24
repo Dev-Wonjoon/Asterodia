@@ -1,5 +1,6 @@
 import { translate, bindText, bindAttribute, localizeWidget, getLocale, translateError, translateMessage } from "./i18n.js"
 import { matchShortcut, isComposing, isTextInput, shortcutKeys, shortcuts, formatShortcut, shortcutAria } from './shortcuts.js';
+import { mountOutputControls } from './output-controls.js';
 // Shared by the React desktop launcher and the mobile web page. The server owns
 // immutable frame IDs; this UI sends crop coordinates and deleted IDs only.
 const labels = { get pending() { return translate("editor.pending") }, get preparing() { return translate("editor.preparingFrames") }, get ready() { return translate("editor.readyToEdit") }, get running() { return translate("editor.converting") }, get verifying() { return translate("editor.checkingOutput") }, get publishing() { return translate("download.saving") }, get completed() { return translate("download.completed") }, get failed() { return translate("download.failed") }, get cancelled() { return translate("download.cancelled") }, get interrupted() { return translate("download.interrupted") }, get released() { return translate("editor.released") }, get stop_unconfirmed() { return translate("editor.appRestartRequired") } };
@@ -177,9 +178,11 @@ export function mountRangeControl(host, { label, count, values, change, format }
 }
 export function mountMediaEditor(host, options) {
     const { api, file, onClose } = options;
-    const sourceGIF = file?.nativeGIF || file?.kind === 'image' || file?.detectedFormat === 'gif';
+    const sourceAnimation = file?.nativeGIF || file?.nativeWebP || file?.kind === 'image' || ['gif', 'webp'].includes(file?.detectedFormat);
     const doc = host.ownerDocument;
     const view = doc.defaultView;
+    const previousFocus = doc.activeElement;
+    let formatSelected = false, openedEditor = false, contentStarted = false;
     function node(tag, text, className) {
         const el = doc.createElement(tag);
         if (typeof text === 'function') bindText(el, text);
@@ -198,6 +201,15 @@ export function mountMediaEditor(host, options) {
     heading.append(title);
     const headingActions = node('div', undefined, 'sbe-heading-actions');
     heading.append(headingActions);
+    const formatBadge = node('span', '', 'sbe-format-badge');
+    bindAttribute(formatBadge, 'aria-label', () => translate('editor.format.current'));
+    headingActions.append(formatBadge);
+    const changeFormat = button(() => translate('editor.format.change'), () => {
+        formatSelected = false;
+        source?.pause();
+        for (const media of dialog.querySelectorAll('audio,video')) media.pause();
+        sync(); gifChoice.focus();
+    }, headingActions);
     const shortcutToggle = button(() => (translate("editor.keyboardShortcuts")), () => showShortcuts(shortcutsPanel.hidden), headingActions, 'sbe-shortcut-toggle');
     const keyboardIcon = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
     keyboardIcon.setAttribute('viewBox', '0 0 24 24'); keyboardIcon.setAttribute('width', '18'); keyboardIcon.setAttribute('height', '18');
@@ -208,6 +220,18 @@ export function mountMediaEditor(host, options) {
     const closeEditor = button(() => (translate("common.close")), () => dialog.close(), headingActions);
     bindAttribute(closeEditor, 'title', () => translate("editor.closeEditorEsc"));
     dialog.append(heading);
+    const formatChooser = node('section', undefined, 'sbe-format-chooser');
+    bindAttribute(formatChooser, 'aria-label', () => translate('editor.format.choose'));
+    const formatSource = node('p', () => file?.title || '', 'sbe-format-source');
+    formatChooser.append(node('h3', () => translate('editor.format.choose')),
+        formatSource,
+        node('p', () => translate('editor.format.help'), 'sbe-hint'));
+    const choices = node('div', undefined, 'sbe-format-choices'); formatChooser.append(choices);
+    const gifChoice = button(() => translate('editor.format.gif'), () => selectFormat('gif'), choices, 'sbe-format-choice');
+    const webpChoice = button(() => translate('editor.format.webp'), () => selectFormat('webp'), choices, 'sbe-format-choice');
+    const trimChoice = button(() => translate('editor.trimVideo'), () => selectFormat('trim'), formatChooser, 'sbe-format-trim');
+    const returnToEditor = button(() => translate('editor.format.back'), () => { formatSelected = true; sync(); changeFormat.focus(); }, formatChooser);
+    dialog.append(formatChooser);
     const shortcutsPanel = node('section', undefined, 'sbe-shortcuts');
     shortcutsPanel.id = 'sbe-shortcuts-' + crypto.randomUUID(); shortcutsPanel.hidden = true; shortcutsPanel.tabIndex = -1;
     shortcutsPanel.setAttribute('role', 'region'); bindAttribute(shortcutsPanel, 'aria-label', () => translate("editor.editingKeyboardShortcuts"));
@@ -264,14 +288,53 @@ export function mountMediaEditor(host, options) {
     message.setAttribute('role', 'status');
     dialog.append(message);
     const content = node('div', undefined, 'sbe-content');
+    const tabs = node('div', undefined, 'sbe-tabs');
+    tabs.setAttribute('role', 'tablist');
+    bindAttribute(tabs, 'aria-label', () => translate('editor.tabs.label'));
+    dialog.append(tabs);
+    let currentTab = file ? 'edit' : 'drafts';
+    const tabButtons = {}, panels = {}, tabScroll = {};
+    const tabID = 'sbe-tabs-' + crypto.randomUUID();
+    for (const name of ['edit', 'drafts', 'jobs']) {
+        const tab = button(() => translate('editor.tabs.' + name), () => selectTab(name), tabs);
+        tab.id = `${tabID}-${name}`;
+        tab.setAttribute('role', 'tab');
+        tab.setAttribute('aria-controls', `${tab.id}-panel`);
+        const panel = node('section', undefined, 'sbe-tab-panel');
+        panel.id = `${tab.id}-panel`;
+        panel.setAttribute('role', 'tabpanel');
+        panel.setAttribute('aria-labelledby', tab.id);
+        panel.tabIndex = 0;
+        tabButtons[name] = tab; panels[name] = panel; content.append(panel);
+        tab.addEventListener('keydown', event => {
+            const names = ['edit', 'drafts', 'jobs'], index = names.indexOf(name);
+            const next = event.key === 'Home' ? 0 : event.key === 'End' ? 2 : event.key === 'ArrowRight' ? (index + 1) % 3 : event.key === 'ArrowLeft' ? (index + 2) % 3 : -1;
+            if (next < 0) return;
+            event.preventDefault(); event.stopPropagation();
+            selectTab(names[next]); tabButtons[names[next]].focus({ preventScroll: true });
+        });
+    }
     const editorBody = node('div', undefined, 'sbe-body');
     const mainPane = node('div', undefined, 'sbe-main-pane');
     mainPane.append(shortcutsPanel, message, content);
     editorBody.append(mainPane); dialog.append(editorBody);
+    function selectTab(name) {
+        if (name !== currentTab) {
+            tabScroll[currentTab] = mainPane.scrollTop;
+            stopPlayback(); source?.pause(); stopFrameDrag();
+            for (const media of dialog.querySelectorAll('audio,video')) media.pause();
+            currentTab = name;
+            sync(); mainPane.scrollTop = tabScroll[name] || 0;
+        } else sync();
+    }
     let dead = false, busy = false, session = null, selection = new FrameRanges(), current = 0, page = 0, anchor = null;
     let frameSelectionBase = new FrameRanges(), framePointer = null, frameScroll = null, suppressFrameClick = false, frameClickTimer;
     let crop = null, appliedCrop = null, clipStart = 0, clipEnd = 0, deleted = new FrameRanges(), undo = [], redo = [], playing = false, playbackVersion = 0, playTimer, pollTimer, reading = false;
     let prepareRetry = null, createRetry = null, sessions = [], jobs = [], selectedJob = null, pointer = null, paintSerial = 0;
+    const previewJobs = new Map();
+    let previewSubmitting = false, previewError = '';
+    function currentPreview() { return previewJobs.get(session?.id); }
+    function previewActive() { const job = currentPreview(); return previewSubmitting || Boolean(job && active(job.state)); }
     const imageCache = new Map(), frameTimes = new Map(), frameDelays = new Map();
     let navTarget = null, navTimer;
     const frameURL = options.frameURL || ((id, n, thumbnail = false) => `/edit-assets/sessions/${id}/${n}${thumbnail ? '?thumbnail=1' : ''}`);
@@ -357,13 +420,12 @@ export function mountMediaEditor(host, options) {
     const sourceSurface = node('section', undefined, 'sbe-source-surface');
     const sourceTitle = node('h3', () => (file?.title || translate("editor.editingPreview")));
     sourceSurface.append(sourceTitle);
-    content.append(sourceSurface, setup);
+    panels.edit.append(sourceSurface, setup);
     let source = null, paintedSession = null, quickCrop = false, preciseCrop = null, quickPrepareRetry = null;
     const timeMode = value => value?.options.quickVideo || value?.options.kind === 'trim';
-    if (file?.src && !sourceGIF) {
+    if (file?.src && !sourceAnimation) {
         source = node('video');
         source.preload = 'metadata';
-        source.src = file.src;
         source.controls = true;
         source.playsInline = true;
         source.className = 'sbe-source';
@@ -438,12 +500,13 @@ export function mountMediaEditor(host, options) {
         o.value = value;
         kind.append(o);
     }
-    field(() => (translate("editor.jobType")), kind);
+    // This detached select only holds internal mode state. Format is chosen
+    // before entering the editor, never through a dropdown in the workspace.
     const start = numeric(() => (translate("editor.startTimeSeconds")), 0, 0, file?.duration || 86400, .01);
     const end = numeric(() => (translate("editor.endTimeSeconds")), file?.duration || 3, .01, file?.duration || 86400, .01);
     const fps = numeric(() => (translate("editor.animationFps")), 10, 1, Number.MAX_SAFE_INTEGER);
     start.parentElement.hidden = end.parentElement.hidden = fps.parentElement.hidden = true;
-    if (sourceGIF) {
+    if (sourceAnimation) {
         fps.parentElement.hidden = true;
         kind.querySelector('option[value=trim]').disabled = true;
     }
@@ -479,7 +542,7 @@ export function mountMediaEditor(host, options) {
     });
     source?.addEventListener('seeked', () => { if (session?.options.quickVideo && quickCrop) void paint(); });
     source?.addEventListener('loadeddata', () => { if (session?.options.quickVideo && quickCrop) void paint(); });
-    if (sourceGIF) {
+    if (sourceAnimation) {
         start.parentElement.hidden = end.parentElement.hidden = true;
         setup.append(node('p', () => (translate("editor.gifPreservesOriginalFramesAndTimingAfterPreparationChoose")), 'sbe-hint'));
     }
@@ -518,7 +581,7 @@ export function mountMediaEditor(host, options) {
     const prepare = button(() => (translate("editor.preciseFrameEditing")), () => action(async () => {
         if (!file)
             return;
-        const bounded = !sourceGIF && (Number.isFinite(source?.duration) && source.duration > 0 || file.duration > 0);
+        const bounded = !sourceAnimation && (Number.isFinite(source?.duration) && source.duration > 0 || file.duration > 0);
         const req = { fileId: file.id, fullSource: !bounded, ...(bounded ? { originalFrames: true } : {}), start: bounded ? session?.state === 'ready' ? frameTime(clipStart) ?? +start.value : +start.value : 0, end: bounded ? session?.state === 'ready' ? frameTime(clipEnd) ?? +end.value : +end.value : 0, fps: 1000, width: 0, kind: 'gif' };
         if (session && !session.options.quickVideo && (deleted.length || undo.length) && !confirm(translate("editor.prepareNewFramesYouCanReopenTheCurrentDraft")))
             return;
@@ -539,7 +602,7 @@ export function mountMediaEditor(host, options) {
         setup.hidden = true;
     const workspace = node('section', undefined, 'sbe-workspace');
     workspace.hidden = true;
-    content.append(workspace);
+    panels.edit.append(workspace);
     const muteLabel = mute.parentElement;
     workspace.append(muteLabel);
     const summary = node('p');
@@ -915,7 +978,46 @@ export function mountMediaEditor(host, options) {
     qualityBox.append(qualityHint);
     qualityBox.append(node('p', () => (translate("editor.qualityChangesDoNotAffectSizeFpsOrEdits")), 'sbe-hint'));
     qualityBox.append(node('p', () => (translate("editor.theLatest8QualityPreviewsAreKeptTemporarily")), 'sbe-hint'));
-    const sample = button(() => (translate("editor.checkQuality")), () => action(() => submit(true)), qualityBox);
+    const sampleControls = node('div', undefined, 'sbe-sample-controls');
+    qualityBox.append(sampleControls);
+    const sample = button(() => translate('editor.preview.create'), async () => {
+        if (previewActive()) return;
+        previewSubmitting = true; previewError = ''; sync();
+        try { await action(async () => {
+            try { await submit(true); }
+            catch (error) { previewError = error.message; throw error; }
+        }); }
+        finally { previewSubmitting = false; sync(); }
+    }, sampleControls);
+    const sampleStatus = node('div', undefined, 'sbe-sample-status');
+    sampleStatus.setAttribute('role', 'status'); sampleStatus.setAttribute('aria-live', 'polite');
+    const sampleProgress = node('progress'); sampleProgress.max = 100;
+    bindAttribute(sampleProgress, 'aria-label', () => translate('editor.preview.progress'));
+    const sampleMessage = node('p', '', 'sbe-hint');
+    sampleStatus.append(sampleProgress, sampleMessage); sampleControls.append(sampleStatus);
+    const sampleResult = node('div', undefined, 'sbe-result sbe-sample-result');
+    sampleControls.append(sampleResult);
+    let shownPreview = '';
+    function syncPreview() {
+        const job = currentPreview(), waiting = previewSubmitting || job?.state === 'pending';
+        const failed = previewError || job && ['failed', 'cancelled', 'interrupted', 'released'].includes(job.state);
+        bindText(sample, () => translate(previewActive() ? waiting ? 'editor.preview.waiting' : 'editor.preview.running' : failed ? 'editor.preview.retry' : job?.state === 'completed' ? 'editor.preview.again' : 'editor.preview.create'));
+        sampleStatus.hidden = !job && !previewSubmitting && !previewError;
+        sampleProgress.hidden = Boolean(failed);
+        const percent = Math.round(clamp(Number(job?.progress) || 0, 0, 100));
+        if (waiting || !job) sampleProgress.removeAttribute('value');
+        else sampleProgress.value = job.state === 'completed' ? 100 : percent;
+        bindText(sampleMessage, () => previewError ? translateMessage(previewError) : failed ? translate('editor.preview.failed', { reason: translateMessage(job.error || labels[job.state] || job.state) }) : waiting ? translate('editor.preview.waiting') : job?.state === 'completed' ? translate('editor.preview.completed') : translate('editor.preview.percent', { percent }));
+        const id = job?.state === 'completed' && job.preview ? job.id : '';
+        if (shownPreview !== id) {
+            shownPreview = id; sampleResult.replaceChildren();
+            if (id) {
+                const image = node('img'); image.src = resultURL(id);
+                bindAttribute(image, 'alt', () => translate('editor.actualQualityPreview'));
+                sampleResult.append(image);
+            }
+        }
+    }
     const resourceBox = node('section', undefined, 'sbe-resources');
     workspace.append(resourceBox);
     bindAttribute(resourceBox, 'aria-label', () => translate("editor.processingPcResources"));
@@ -933,7 +1035,7 @@ export function mountMediaEditor(host, options) {
         resourceReading = true;
         const serial = ++resourceSerial;
         try {
-            const r = await unwrap(api.resources(payload()));
+            const r = await unwrap(api.resources({ ...payload(), ...outputControls.request() }));
             if (dead || serial !== resourceSerial)
                 return;
             const heading = node('div', undefined, 'sbe-resources-heading');
@@ -1004,7 +1106,7 @@ export function mountMediaEditor(host, options) {
         if ((session.options.quickVideo ? kind.value : session.options.kind) !== 'trim' && JSON.stringify(crop) !== JSON.stringify(appliedCrop))
             throw new Error(translate("editor.applyTheUpdatedCropToAllFramesBeforeSaving"));
         const quick = session.options.quickVideo;
-        const value = { ...payload(), preview, previewStart: preview && !quick ? nextRetained(current) : 0 };
+        const value = { ...payload(), ...outputControls.request(preview), preview, previewStart: preview && !quick ? nextRetained(current) : 0 };
         if (preview && quick) {
             value.trimStart = clamp(source?.currentTime ?? value.trimStart, value.trimStart, Math.max(value.trimStart, value.trimEnd-2));
             value.trimEnd = Math.min(value.trimEnd, value.trimStart+2);
@@ -1050,24 +1152,30 @@ export function mountMediaEditor(host, options) {
         if (createRetry === pending)
             createRetry = null;
         selectedJob = job.id;
+        if (preview) previewJobs.set(value.sessionId, { ...job, preview: true, state: job.state || 'pending' });
         report(preview ? translate("editor.qualityCheckQueuedConvertsUpTo2SecondsWithout") : translate("editor.saveJobQueuedProcessingContinuesOnThePcIf"));
         await refresh();
     }
+    const outputControls = mountOutputControls(workspace, { api, chooseDirectory: options.chooseOutputDirectory, onChange: changed => { if (changed) createRetry = null; sync(); } });
     const save = button(() => (translate("editor.saveGif")), () => action(() => submit(false)), workspace, 'sbe-primary');
-    const history = node('section', undefined, 'sbe-history');
-    history.append(node('h3', () => (translate("editor.editingDataAndJobs"))));
+    const history = panels.drafts;
+    history.append(node('h3', () => translate('editor.tabs.drafts')));
+    panels.jobs.append(node('h3', () => translate('editor.tabs.jobs')));
     const sessionLimit = 20;
     const sessionCount = node('p', '', 'sbe-hint');
     bindAttribute(sessionCount, 'aria-label', () => translate("editor.editingDraftRetentionCount"));
     const jobCount = node('p', '', 'sbe-hint');
     bindAttribute(jobCount, 'aria-label', () => translate("editor.jobHistoryRetentionCount"));
     const sessionLimitHint = node('p', () => (translate("editor.theLatest20DraftsAnd20JobHistoryEntries")), 'sbe-hint');
-    history.append(sessionCount, jobCount, sessionLimitHint);
-    content.append(history);
+    history.append(sessionCount, sessionLimitHint);
+    panels.jobs.append(jobCount);
     button(() => (translate("editor.refreshList")), () => refresh(), history);
+    button(() => (translate("editor.refreshList")), () => refresh(), panels.jobs);
     const sessionList = node('div'), jobList = node('div'), resultBox = node('div', undefined, 'sbe-result');
-    history.append(sessionList, jobList, resultBox);
+    history.append(sessionList); panels.jobs.append(jobList, resultBox);
     function useSession(value) {
+        if (value.id !== session?.id) previewError = '';
+        if (!file && value.id !== session?.id) formatSelected = value.options.kind === 'trim';
         stopFrameDrag(); anchor = null; frameSelectionBase.clear();
         const sourceStart = +start.value, sourceEnd = +end.value;
         paintedSession = null;
@@ -1124,10 +1232,10 @@ export function mountMediaEditor(host, options) {
         bindText(sourceTitle, () => value.title);
         if (value.options.kind === 'trim')
             kind.value = 'trim';
-        else if (kind.value === 'trim')
+        else if (kind.value === 'trim' && !value.options.quickVideo)
             kind.value = 'gif';
         loadQuality();
-        if (value.state === 'ready' && (value.options.nativeGIF || value.options.nativeVideo)) {
+        if (value.state === 'ready' && (value.options.nativeGIF || value.options.nativeVideo || value.options.nativeWebP)) {
             void requestTiming(0);
             void requestTiming(value.frameCount - 1);
         }
@@ -1154,7 +1262,7 @@ export function mountMediaEditor(host, options) {
                 await new Promise(resolve => setTimeout(resolve, 600));
                 p = await unwrap(api.frameStatus({ id, offset }));
             }
-            if ((session?.options.nativeGIF || session?.options.nativeVideo) && !p.times?.length)
+            if ((session?.options.nativeGIF || session?.options.nativeVideo || session?.options.nativeWebP) && !p.times?.length)
                 throw new Error(translate("editor.couldNotReadOriginalFrameTimingPrepareTheEditing"));
             cacheTiming(p);
             if (session?.id === id) {
@@ -1250,7 +1358,7 @@ export function mountMediaEditor(host, options) {
         }
     }
     async function requestTiming(n) {
-        if (!(session?.options.nativeGIF || session?.options.nativeVideo) || !api.frameStatus || n >= session.frameCount || frameTimes.has(n))
+        if (!(session?.options.nativeGIF || session?.options.nativeVideo || session?.options.nativeWebP) || !api.frameStatus || n >= session.frameCount || frameTimes.has(n))
             return;
         const id = session.id;
         try {
@@ -1271,7 +1379,7 @@ export function mountMediaEditor(host, options) {
             return Math.min(session.options.end, session.options.start + n / 1000);
         if (n === session.frameCount)
             return session.options.end;
-        if (session.options.nativeGIF || session.options.nativeVideo)
+        if (session.options.nativeGIF || session.options.nativeVideo || session.options.nativeWebP)
             return frameTimes.get(n) ?? null;
         return session.options.start + n / session.options.fps;
     }
@@ -1452,18 +1560,43 @@ export function mountMediaEditor(host, options) {
     function retainedDuration() {
         if (!session)
             return '';
-        if (session.options.nativeGIF || session.options.nativeVideo)
+        if (session.options.nativeGIF || session.options.nativeVideo || session.options.nativeWebP)
             return translate("editor.preserveOriginalFrameTiming");
         return translate("download.about") + (retainedCount() / session.options.fps).toFixed(2) + translate("editor.s");
     }
     function sync() {
         if (dead)
             return;
-        fps.disabled = kind.value === 'trim' || sourceGIF || !!session?.options.nativeGIF;
+        const picking = !formatSelected && (Boolean(file) || Boolean(session));
+        dialog.classList.toggle('is-picking-format', picking);
+        formatChooser.hidden = !picking;
+        tabs.hidden = picking;
+        for (const name of ['edit', 'drafts', 'jobs']) {
+            const selected = name === currentTab;
+            tabButtons[name].setAttribute('aria-selected', String(selected));
+            tabButtons[name].tabIndex = selected ? 0 : -1;
+            panels[name].hidden = !selected;
+        }
+        bindText(tabButtons.jobs, () => {
+            const count = jobs.filter(job => active(job.state)).length;
+            return count ? translate('editor.tabs.jobsActive', { count }) : translate('editor.tabs.jobs');
+        });
+        syncPreview();
+        bindText(formatSource, () => file?.title || session?.title || '');
+        editorBody.hidden = picking;
+        shortcutsPanel.hidden = picking || shortcutsPanel.hidden;
+        shortcutToggle.hidden = picking;
+        formatBadge.hidden = !formatSelected;
+        changeFormat.hidden = !formatSelected || Boolean(session?.options.kind === 'trim' && !session?.options.quickVideo);
+        trimChoice.hidden = sourceAnimation || Boolean(session && !session.options.quickVideo);
+        returnToEditor.hidden = !openedEditor;
+        bindText(formatBadge, () => kind.value === 'webp' ? 'WebP' : kind.value === 'trim' ? translate('editor.trimVideo') : 'GIF');
+        bindAttribute(dialog, 'aria-label', () => picking ? translate('editor.format.choose') : translate('editor.launch'));
+        fps.disabled = kind.value === 'trim' || sourceAnimation || !!(session?.options.nativeGIF || session?.options.nativeWebP);
         mute.disabled = kind.value !== 'trim';
-        prepare.disabled = busy || !file;
-        bindText(prepare, () => sourceGIF ? translate("editor.loadFrames") : translate("editor.preciseFrameEditing"));
-        prepare.hidden = !sourceGIF && kind.value === 'trim';
+        prepare.disabled = busy || !file || !formatSelected;
+        bindText(prepare, () => sourceAnimation ? translate("editor.loadFrames") : translate("editor.preciseFrameEditing"));
+        prepare.hidden = !sourceAnimation && kind.value === 'trim';
         workspace.hidden = !session;
         clipControl.root.hidden = session?.state !== 'ready';
         const quick = !!session?.options.quickVideo;
@@ -1483,12 +1616,12 @@ export function mountMediaEditor(host, options) {
         quickCropToggle.setAttribute('aria-pressed', String(quickCrop));
         cropSurface.hidden = !cropEditing;
         cropPlaceholder.hidden = frameEditing || Boolean(source) && sourceMatches || trimMode;
-        frameAside.hidden = !frameEditing;
-        editorBody.classList.toggle('has-frames', Boolean(frameEditing));
+        frameAside.hidden = !frameEditing || currentTab !== 'edit';
+        editorBody.classList.toggle('has-frames', Boolean(frameEditing) && currentTab === 'edit');
         frameShortcutGroup.hidden = !frameEditing;
-        rangeShortcutGroup.hidden = !(session?.state === 'ready' || !setup.hidden && !sourceGIF);
+        rangeShortcutGroup.hidden = !(session?.state === 'ready' || !setup.hidden && !sourceAnimation);
         bindText(shortcutMode, () => !session || session.state !== 'ready' ? translate("editor.shortcutsForTheCurrentModeAppearAfterEditingData") : frameEditing ? translate("editor.keyboardShortcutsForGifAndWebpFrameEditing") : translate("editor.videoTrimmingSupportsRangeHandleAndGeneralShortcuts"));
-        sourceRange.root.hidden = !file || sourceGIF || !!session;
+        sourceRange.root.hidden = !file || sourceAnimation || !!session;
         sourceRange.update();
         if (!session) {
             save.disabled = true;
@@ -1507,8 +1640,9 @@ export function mountMediaEditor(host, options) {
         sample.disabled = busy || !ready;
         if (ready && !resourceBox.childNodes.length)
             scheduleResources();
-        save.disabled = busy || !ready || !quick && (kind.value === 'trim') !== (session.options.kind === 'trim');
-        sample.disabled = save.disabled;
+        save.disabled = busy || !ready || !formatSelected || !outputControls.ready() || !quick && (kind.value === 'trim') !== (session.options.kind === 'trim');
+        outputControls.setDisabled(busy);
+        sample.disabled = save.disabled || previewActive();
         resourceBox.hidden = !!session.localQuick;
         clipControl.update(current);
         if (ready && quick) {
@@ -1639,13 +1773,17 @@ export function mountMediaEditor(host, options) {
     view.addEventListener('blur', cancelCropPointer);
     dialog.addEventListener('keydown', event => {
         if (event.defaultPrevented || isComposing(event)) return;
+        if (!formatChooser.hidden) {
+            if (event.key === 'Escape' && openedEditor) { event.preventDefault(); event.stopPropagation(); formatSelected = true; sync(); changeFormat.focus(); }
+            return;
+        }
         if (event.key === 'Escape' && framePointer?.active) { event.preventDefault(); event.stopPropagation(); stopFrameDrag(true); return; }
         if (event.key === 'Escape' && !shortcutsPanel.hidden) {
             event.preventDefault(); event.stopPropagation(); showShortcuts(false); return;
         }
         if (matchShortcut(event, 'app')?.id === 'app.help') { event.preventDefault(); showShortcuts(shortcutsPanel.hidden); return; }
         const frameCheckbox = grid.contains(event.target) && event.target.tagName === 'INPUT' && event.target.type === 'checkbox';
-        if (shortcutsPanel.contains(event.target) || busy || !session || session.state !== 'ready' || !frameCheckbox && isTextInput(event.target))
+        if (currentTab !== 'edit' || tabs.contains(event.target) || shortcutsPanel.contains(event.target) || busy || !session || session.state !== 'ready' || !frameCheckbox && isTextInput(event.target))
             return;
         const item = matchShortcut(event, 'editor');
         if (!item) return;
@@ -1682,8 +1820,9 @@ export function mountMediaEditor(host, options) {
             row.append(node('span', () => (`${item.title} · ${item.options.kind === 'gif' ? 'GIF' : translate("media.video")} · ${labels[item.state] || item.state} ${item.progress}%${item.cancelling ? translate("editor.cancelling") : ''}`)));
             button(() => (translate("common.open")), () => {
                 useSession(item);
+                selectTab('edit');
                 mainPane.scrollTop = 0;
-                const target = item.state === 'ready' && item.options.kind !== 'trim' ? stage : closeEditor;
+                const target = !formatChooser.hidden ? gifChoice : item.state === 'ready' && item.options.kind !== 'trim' ? stage : closeEditor;
                 target.focus({ preventScroll: true });
             }, row);
             if (active(item.state))
@@ -1716,14 +1855,22 @@ export function mountMediaEditor(host, options) {
             if (job.state === 'completed' && (job.resultFileId || job.preview))
                 button(() => (translate("editor.viewResult")), () => { selectedJob = job.id; renderResult(); }, row);
             if (['failed', 'cancelled', 'interrupted'].includes(job.state)) {
-                const retry = button(() => (translate("editor.runAgainWithTheSameSettings")), () => action(async () => { const next = await unwrap(api.create({ ...job.options, requestId: crypto.randomUUID() })); selectedJob = next.id; await refresh(); }), row);
-                retry.disabled = !sessions.some(item => item.id === (job.sessionId || job.options.sessionId) && item.state === 'ready');
+                const retry = button(() => (translate("editor.runAgainWithTheSameSettings")), () => action(async () => {
+                    const next = await unwrap(api.create({ ...job.options, requestId: crypto.randomUUID() }));
+                    selectedJob = next.id;
+                    if (job.preview) { previewError = ''; previewJobs.set(job.sessionId || job.options.sessionId, { ...next, preview: true, state: next.state || 'pending' }); }
+                    await refresh();
+                }), row);
+                if (job.preview && jobs.some(other => other.preview && (other.sessionId || other.options.sessionId) === (job.sessionId || job.options.sessionId) && active(other.state))) retry.disabled = true;
+                retry.disabled ||= !sessions.some(item => item.id === (job.sessionId || job.options.sessionId) && item.state === 'ready');
                 if (retry.disabled) bindAttribute(retry, 'title', () => translate("editor.prepareTheEditingDraftAgainBeforeSaving"));
             }
             jobList.append(row);
+            if (job.outputNotice) row.append(node('p', () => translateMessage(job.outputNotice), 'sbe-hint'));
         }
-        if (!sessions.length && !jobs.length)
-            sessionList.append(node('p', () => (translate("editor.noEditingDataOrJobs"))));
+        if (!sessions.length)
+            sessionList.append(node('p', () => translate('editor.tabs.noDrafts'), 'sbe-hint'));
+        if (!jobs.length) jobList.append(node('p', () => translate('editor.tabs.noJobs'), 'sbe-hint'));
         renderResult();
     }
     let shownResult = '';
@@ -1741,6 +1888,7 @@ export function mountMediaEditor(host, options) {
         resultBox.replaceChildren();
         if (!job)
             return;
+        if (job.outputNotice) resultBox.append(node('p', () => translateMessage(job.outputNotice), 'sbe-hint'));
         const media = node(job.options.kind !== 'trim' ? 'img' : 'video');
         if (job.options.kind !== 'trim')
             bindAttribute(media, 'alt', () => job.preview ? translate("editor.actualQualityPreview") : translate("editor.generatedAnimation"));
@@ -1767,6 +1915,15 @@ export function mountMediaEditor(host, options) {
                 return;
             sessions = value.sessions;
             jobs = value.jobs;
+            for (const [id, previous] of previewJobs) {
+                const latest = jobs.find(job => job.id === previous.id);
+                if (latest) previewJobs.set(id, latest);
+                else if (!active(previous.state)) previewJobs.delete(id);
+            }
+            for (const job of [...jobs].sort((a, b) => b.createdAt - a.createdAt)) {
+                const id = job.sessionId || job.options?.sessionId;
+                if (job.preview && id && !previewJobs.has(id)) previewJobs.set(id, job);
+            }
             try {
                 const retained = new Set(sessions.map(item => `storagebucket-edit-v1:${item.id}`));
                 if (session?.localQuick) retained.add(storageKey());
@@ -1810,11 +1967,25 @@ export function mountMediaEditor(host, options) {
         }
     }
     kind.addEventListener('change', () => { loadQuality(); sync(); });
+    function selectFormat(value) {
+        kind.value = value; formatSelected = true; openedEditor = true;
+        selectTab('edit');
+        loadQuality(); sync(); startContent();
+        const target = session?.state === 'ready' && !timeMode(session) ? stage : source && !source.hidden ? source : closeEditor;
+        target.focus({ preventScroll: true });
+    }
+    function startContent() {
+        if (contentStarted) return;
+        contentStarted = true;
+        if (source && file?.src) source.src = file.src;
+        void refresh(); void loadOverview();
+    }
     dialog.addEventListener('close', () => { persist(); destroy(); onClose?.(); });
     function destroy() {
         if (dead)
             return;
         dead = true;
+        outputControls.destroy();
         stopLanguage();
         stopFrameDrag(); clearTimeout(frameClickTimer);
         view.removeEventListener('pointermove', moveFramePointer); view.removeEventListener('pointerup', finishFramePointer);
@@ -1847,6 +2018,7 @@ export function mountMediaEditor(host, options) {
             video.load();
         }
         dialog.remove();
+        if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
     }
     if (typeof dialog.showModal === 'function')
         dialog.showModal();
@@ -1854,8 +2026,8 @@ export function mountMediaEditor(host, options) {
         dialog.setAttribute('open', '');
     loadQuality();
     sync();
-    void refresh();
     const stopLanguage = localizeWidget(dialog);
-    void loadOverview();
+    if (file) gifChoice.focus();
+    else startContent();
     return { destroy };
 }

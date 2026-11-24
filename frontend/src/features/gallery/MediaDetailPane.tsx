@@ -1,3 +1,4 @@
+import { canEditMedia } from '../mediaedit/canEditMedia'
 import { translateError, translate, useLanguage } from '@renderer/shared/i18n'
 import { useConfirm } from '@renderer/shared/hooks/useConfirm'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -430,7 +431,7 @@ export function MediaDetailPane({
                                 </div>
 
                                 <div className="flex flex-wrap items-start gap-2">
-                                    {(file.kind === 'video'||file.kind==='image'&&(file.detectedFormat==='gif'||/\.gif$/i.test(file.filepath))) && <MediaEditLauncher file={file} disabled={disabled} />}
+                                    {canEditMedia(file) && <MediaEditLauncher file={file} disabled={disabled} />}
                                     <button
                                         type="button"
                                         className={button}

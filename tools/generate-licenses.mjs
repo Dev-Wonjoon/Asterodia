@@ -26,6 +26,7 @@ const moduleLicenses = {
     'github.com/bits-and-blooms/bitset': 'BSD-3-Clause', 'github.com/google/uuid': 'BSD-3-Clause',
     'github.com/remyoudompheng/bigfft': 'BSD-3-Clause', 'golang.org/x/net': 'BSD-3-Clause',
     'golang.org/x/sys': 'BSD-3-Clause', 'golang.org/x/mod': 'BSD-3-Clause', 'golang.org/x/text': 'BSD-3-Clause; additional source notices',
+    'golang.org/x/image': 'BSD-3-Clause; additional source notices',
     'modernc.org/libc': 'BSD-3-Clause; see third-party notices', 'modernc.org/mathutil': 'BSD-3-Clause; see additional notices',
     'modernc.org/memory': 'BSD-3-Clause; see additional notices', 'modernc.org/sqlite': 'BSD-3-Clause; see third-party notices',
 }

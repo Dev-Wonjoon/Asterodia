@@ -106,8 +106,12 @@ func (s *Service) prepareTimeline(ctx context.Context, id string) error {
 	var metadata engine.LocalMetadata
 	var timeline *engine.GIFTimeline
 	count := 0
-	if v.Options.NativeGIF {
-		native, err := engine.ReadGIFTimeline(ctx, path)
+	if v.Options.NativeGIF || v.Options.NativeWebP {
+		read := engine.ReadGIFTimeline
+		if v.Options.NativeWebP {
+			read = engine.ReadWebPTimeline
+		}
+		native, err := read(ctx, path)
 		if err != nil {
 			return err
 		}
@@ -232,7 +236,9 @@ func (s *Service) buildPage(ctx context.Context, id string, offset int) error {
 	if e != nil {
 		return e
 	}
-	if v.Options.NativeGIF {
+	if v.Options.NativeWebP {
+		e = s.editor.WebPFramePage(ctx, path, filepath.Join(s.cache, rel), v.FrameCount, offset, framePageSize)
+	} else if v.Options.NativeGIF {
 		e = s.editor.GIFFramePage(ctx, path, filepath.Join(s.cache, rel), v.FrameCount, offset, framePageSize)
 	} else if v.Options.NativeVideo {
 		var exactTime []float64
@@ -354,6 +360,9 @@ func (s *Service) gifTimeline(id string) (engine.GIFTimeline, error) {
 	return s.readTimeline(id, "gif-timeline.json")
 }
 func timelineName(v Session) string {
+	if v.Options.NativeWebP {
+		return "webp-timeline.json"
+	}
 	if v.Options.NativeVideo {
 		return "video-timeline.json"
 	}
@@ -394,7 +403,7 @@ func (s *Service) readTimeline(id, name string) (engine.GIFTimeline, error) {
 	return value, err
 }
 func (s *Service) pageTiming(v Session, p *FramePage) {
-	if !v.Options.NativeGIF && !v.Options.NativeVideo {
+	if !v.Options.NativeGIF && !v.Options.NativeVideo && !v.Options.NativeWebP {
 		return
 	}
 	g, err := s.timing(v)

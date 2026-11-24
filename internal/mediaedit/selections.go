@@ -198,7 +198,7 @@ func (s *Service) framePlan(v Session, req CreateRequest) (int, int, int, func()
 	if req.Preview {
 		reader := &rangeReader{store: s.store, id: req.SelectionID, legacy: req.Deleted}
 		n, taken := start, 0
-		if v.Options.NativeGIF || v.Options.NativeVideo {
+		if v.Options.NativeGIF || v.Options.NativeVideo || v.Options.NativeWebP {
 			g, err := s.timing(v)
 			if err != nil {
 				return 0, 0, 0, nil, err

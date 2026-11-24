@@ -58,6 +58,13 @@ func (s *Service) editAPI(w http.ResponseWriter, r *http.Request) {
 	var result api.Result
 	if r.Method == "GET" || r.Method == "HEAD" {
 		switch r.URL.Path {
+		case "/api/edit/output-options":
+			offset, err := integer(r, "offset", 0)
+			if err != nil {
+				http.Error(w, "출력 옵션 검색 값을 확인하세요", 400)
+				return
+			}
+			result = editor.OutputOptions(r.Context(), mediaedit.OutputOptionsRequest{Keyword: r.URL.Query().Get("keyword"), Offset: offset})
 		case "/api/edit/list":
 			result = editor.List(r.Context())
 		case "/api/edit/session":
@@ -124,6 +131,10 @@ func (s *Service) editAPI(w http.ResponseWriter, r *http.Request) {
 			if !decode(&req) {
 				return
 			}
+			if req.OutputDirectory != "" {
+				http.Error(w, "출력 폴더는 PC에서 선택하세요", 400)
+				return
+			}
 			result = editor.Resources(r.Context(), req)
 		case "/api/edit/prepare":
 			var req mediaedit.PrepareRequest
@@ -134,6 +145,10 @@ func (s *Service) editAPI(w http.ResponseWriter, r *http.Request) {
 		case "/api/edit/create":
 			var req mediaedit.CreateRequest
 			if !decode(&req) {
+				return
+			}
+			if req.OutputDirectory != "" {
+				http.Error(w, "출력 폴더는 PC에서 선택하세요", 400)
 				return
 			}
 			result = editor.Create(r.Context(), req)
@@ -169,5 +184,31 @@ func (s *Service) editAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(code)
 	}
-	respond(w, r, result)
+	respond(w, r, publicEditResult(result))
+}
+
+// Physical PC paths stay local even though desktop and mobile share job types.
+func publicEditResult(result api.Result) api.Result {
+	switch data := result.Data.(type) {
+	case mediaedit.Job:
+		data.Options.OutputDirectory = ""
+		result.Data = data
+	case mediaedit.OutputOptions:
+		data.Directory = ""
+		result.Data = data
+	case map[string]any:
+		if jobs, ok := data["jobs"].([]mediaedit.Job); ok {
+			copyData := map[string]any{}
+			for key, value := range data {
+				copyData[key] = value
+			}
+			copyJobs := append([]mediaedit.Job{}, jobs...)
+			for i := range copyJobs {
+				copyJobs[i].Options.OutputDirectory = ""
+			}
+			copyData["jobs"] = copyJobs
+			result.Data = copyData
+		}
+	}
+	return result
 }

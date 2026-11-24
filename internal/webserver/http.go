@@ -63,7 +63,7 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	editPost := r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/api/edit/")
+	editPost := r.Method == http.MethodPost && (strings.HasPrefix(r.URL.Path, "/api/edit/") || strings.HasPrefix(r.URL.Path, "/api/download/"))
 	if r.Method != http.MethodGet && r.Method != http.MethodHead && !editPost {
 		w.Header().Set("Allow", "GET, HEAD")
 		http.Error(w, "읽기 전용 서버입니다", 405)
@@ -88,6 +88,7 @@ func (s *Service) routes() http.Handler {
 	mux.HandleFunc("GET /licenses", s.licenseNotices)
 	mux.HandleFunc("GET /licenses.txt", s.licenseText)
 	s.editRoutes(mux)
+	s.downloadRoutes(mux)
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		data, err := assets.ReadFile("web/dist/web.html")
 		if err != nil {
@@ -105,7 +106,7 @@ func (s *Service) routes() http.Handler {
 	for _, path := range []string{"/i18n.js", "/translations.js", "/app.js", "/style.css", "/favicon.ico", "/editor.js", "/editor.css", "/search.js", "/search.css", "/licenses.css", "/player.js", "/player.css", "/album-state.js", "/viewer.js", "/viewer-queue.js", "/viewer.css"} {
 		mux.Handle("GET "+path, http.FileServerFS(web))
 	}
-	for _, path := range []string{"/langs/ko.json", "/langs/en.json", "/shortcuts.js"} {
+	for _, path := range []string{"/langs/ko.json", "/langs/en.json", "/shortcuts.js", "/output-controls.js"} {
 		mux.Handle("GET "+path, http.FileServerFS(web))
 	}
 	return mux

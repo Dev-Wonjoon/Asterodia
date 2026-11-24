@@ -97,6 +97,7 @@ func applicationServices(
 		return download.Runner{Storage: download.Storage{Root: root}, Ytdlp: &engine.Ytdlp{Executable: filepath.Join(paths.Bin, "yt-dlp.exe"), JSRuntime: jsRuntime, FFmpegLocation: filepath.Join(paths.Bin, "ffmpeg.exe"), CookieBrowser: snapshot.CookieBrowser, CookieFile: snapshot.CookieFilePath, NoPlaylist: options.Playlist == nil || !*options.Playlist}, GalleryDL: &engine.GalleryDL{Executable: filepath.Join(paths.Bin, "gallery-dl.exe"), CookieBrowser: snapshot.CookieBrowser, CookieFile: snapshot.CookieFilePath}}
 	}, thumb.ScheduleMedia)
 	downloader.ConfigureImages(inspector)
+	web.ConfigureDownloader(downloader)
 	downloader.UpdateGate = updateGate
 	downloader.ConfigurePreviewLookup(thumb.CachedDownloadPreview)
 	downloader.ConfigurePreviewCleanup(func(ctx context.Context, url string) {
@@ -113,7 +114,7 @@ func applicationServices(
 	})
 	mover.ConfigureInspector(inspector)
 	mover.UpdateGate = updateGate
-	editor := mediaedit.NewService(db, filepath.Join(paths.Cache, "mediaedit"), engine.VideoEditor{FFmpeg: filepath.Join(paths.Bin, "ffmpeg.exe"), FFprobe: filepath.Join(paths.Bin, "ffprobe.exe")}, config.GetDownloadPath, func(id int64) {
+	editor := mediaedit.NewService(db, filepath.Join(paths.Cache, "mediaedit"), engine.VideoEditor{FFmpeg: filepath.Join(paths.Bin, "ffmpeg.exe"), FFprobe: filepath.Join(paths.Bin, "ffprobe.exe")}, config.GetEditOutputDirectory, func(id int64) {
 		thumb.ScheduleMedia(id)
 		if app := application.Get(); app != nil {
 			app.Event.Emit("media:thumbnail-updated", id)

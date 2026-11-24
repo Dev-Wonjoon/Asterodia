@@ -203,12 +203,12 @@ async function loadFiles() {
             figure.append(text('figcaption', file.title || translate("web.file", { number: file.id })));
             const watch = text('button', translate("viewer.open")); watch.type = 'button'; watch.addEventListener('click', () => openViewer(state.media, file.id)); figure.append(watch);
 
-            if (file.kind === 'video'||file.kind==='image'&&file.detectedFormat==='gif') {
-                const edit = text('button',file.kind==='image'?translate("editor.editGif"):translate("editor.createGifOrTrimVideo"));
+            if (file.kind === 'video'||file.kind==='image'&&['gif','webp'].includes(file.detectedFormat)) {
+                const edit = text('button',file.kind==='image'?translate("editor.editAnimation"):translate("editor.createGifOrTrimVideo"));
                 edit.type = 'button';
                 edit.dataset.edit = 'true';
                 edit.hidden = !editAccess.enabled;
-                edit.addEventListener('click', () => openEditor({ id: file.id, title: file.title || detail.title, duration: file.duration,kind:file.kind,detectedFormat:file.detectedFormat,nativeGIF:file.kind==='image', src: fileURL(file.id, 'content') }));
+                edit.addEventListener('click', () => openEditor({ id: file.id, title: file.title || detail.title, duration: file.duration,kind:file.kind,detectedFormat:file.detectedFormat,nativeGIF:file.detectedFormat==='gif',nativeWebP:file.detectedFormat==='webp', src: fileURL(file.id, 'content') }));
                 figure.append(edit);
             }
             el('files').append(figure);

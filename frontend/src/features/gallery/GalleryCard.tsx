@@ -31,8 +31,27 @@ export function GalleryCard({ media, previewPath, resolveUrl, selected, active, 
     useLanguage()
     const title = media.galleryFile?.title || media.title
     const draggable = Boolean(onAlbumDragStart) && !viewDisabled && media.fileCount > 0
+    function openCardMenu(card: HTMLElement): boolean {
+        const trigger = card.querySelector<HTMLButtonElement>('[data-card-menu]')
+        if (disabled || !trigger || trigger.disabled) return false
+        const event = new window.MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2 })
+        trigger.dispatchEvent(event)
+        return event.defaultPrevented
+    }
     return <article data-album-id={media.id} data-selection-key={selectionKey} data-selected={selected || undefined} data-detail-trigger
         draggable={onAlbumDragStart ? draggable : undefined} data-album-draggable={draggable || undefined}
+        onContextMenu={event => {
+            if (!event.defaultPrevented && !(event.target as Element).closest('[data-card-menu]') && openCardMenu(event.currentTarget)) {
+                event.preventDefault()
+                event.stopPropagation()
+            }
+        }}
+        onKeyDown={event => {
+            if (event.defaultPrevented || event.nativeEvent.isComposing) return
+            if (event.key === 'ContextMenu' || event.key === 'F10' && event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) {
+                if (openCardMenu(event.currentTarget)) { event.preventDefault(); event.stopPropagation() }
+            }
+        }}
         onDragStart={event => {
             if (draggable && !(event.target as Element).closest('input,label,a,[data-action-boundary],button:not([data-card-select])')) onAlbumDragStart?.(event)
             else if (onSelect || onAlbumDragStart) event.preventDefault()

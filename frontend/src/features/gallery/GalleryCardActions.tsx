@@ -69,6 +69,22 @@ export function GalleryCardActions({
         setOpen(false)
         if (restore) trigger.current?.focus({ preventScroll: true })
     }
+    function openMenu(toggle: boolean): void {
+        const bounds = trigger.current?.getBoundingClientRect()
+        const main = root.current?.closest('main')?.getBoundingClientRect()
+        if (bounds) {
+            const rootBounds = root.current!.getBoundingClientRect()
+            const menuWidth = Math.min(keyboardShortcuts ? 288 : 192, window.innerWidth - 16)
+            setMenuShift(Math.max(0, Math.max(8, (main?.left ?? 0) + 8) - (rootBounds.right - 8 - menuWidth)))
+            const above = bounds.top - Math.max(main?.top ?? 0, 0)
+            const below = Math.min(main?.bottom ?? window.innerHeight, window.innerHeight) - bounds.bottom
+            const up = above > below
+            setOpensUp(up)
+            setMenuHeight(Math.max(100, Math.min(420, (up ? above : below) - 8)))
+        }
+        setOpen(previous => toggle ? !previous : true)
+        if (!toggle) menu.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true })
+    }
     useEffect(() => {
         if (!open) return
         menu.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true })
@@ -78,9 +94,11 @@ export function GalleryCardActions({
         }
         document.addEventListener('pointerdown', outside)
         document.addEventListener('click', outside, true)
+        document.addEventListener('contextmenu', outside, true)
         return () => {
             document.removeEventListener('pointerdown', outside)
             document.removeEventListener('click', outside, true)
+            document.removeEventListener('contextmenu', outside, true)
         }
     }, [open])
 
@@ -185,20 +203,12 @@ export function GalleryCardActions({
                 aria-haspopup="menu"
                 aria-expanded={open}
                 aria-controls={open ? menuId : undefined}
-                onClick={() => {
-                    const bounds = trigger.current?.getBoundingClientRect()
-                    const main = root.current?.closest('main')?.getBoundingClientRect()
-                    if (bounds) {
-                        const rootBounds = root.current!.getBoundingClientRect()
-                        const menuWidth = Math.min(keyboardShortcuts ? 288 : 192, window.innerWidth - 16)
-                        setMenuShift(Math.max(0, Math.max(8, (main?.left ?? 0) + 8) - (rootBounds.right - 8 - menuWidth)))
-                        const above = bounds.top - Math.max(main?.top ?? 0, 0)
-                        const below = Math.min(main?.bottom ?? window.innerHeight, window.innerHeight) - bounds.bottom
-                        const up = above > below
-                        setOpensUp(up)
-                        setMenuHeight(Math.max(100, Math.min(420, (up ? above : below) - 8)))
-                    }
-                    setOpen((previous) => !previous)
+                onClick={() => openMenu(true)}
+                onContextMenu={event => {
+                    if (disabled) return
+                    event.preventDefault()
+                    event.stopPropagation()
+                    openMenu(false)
                 }}
             >
                 <Ellipsis className="size-[18px]" aria-hidden="true" />

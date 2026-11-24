@@ -22,7 +22,7 @@ type Service struct {
 	values   map[string]json.RawMessage
 	dialogs  Dialogs
 }
-type Snapshot struct{ DownloadPath, CookieBrowser, CookieFilePath string }
+type Snapshot struct{ DownloadPath, WorkingDirectory, CookieBrowser, CookieFilePath string }
 
 func New(filename, defaultDownloads string, dialogs Dialogs) (*Service, error) {
 	s := &Service{filename: filename, values: map[string]json.RawMessage{}, dialogs: dialogs}
@@ -49,7 +49,7 @@ func (s *Service) read(key string) string {
 func (s *Service) Snapshot() Snapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return Snapshot{s.read("downloadPath"), strings.ToLower(s.read("cookieBrowser")), s.read("cookieFilePath")}
+	return Snapshot{DownloadPath: s.read("downloadPath"), WorkingDirectory: s.read("workingDirectory"), CookieBrowser: strings.ToLower(s.read("cookieBrowser")), CookieFilePath: s.read("cookieFilePath")}
 }
 func (s *Service) save(key, value string) error {
 	s.mu.Lock()
@@ -95,7 +95,50 @@ func (s *Service) persist() error {
 	}
 	return os.Rename(name, s.filename)
 }
-func (s *Service) GetDownloadPath() string { return s.Snapshot().DownloadPath }
+func (s *Service) GetDownloadPath() string     { return s.Snapshot().DownloadPath }
+func (s *Service) GetWorkingDirectory() string { return s.Snapshot().WorkingDirectory }
+
+// GetEditOutputDirectory resolves only the physical destination. Albums and tags
+// are references/metadata and never create additional output files.
+func (s *Service) GetEditOutputDirectory() string {
+	v := s.Snapshot()
+	if v.WorkingDirectory != "" {
+		return v.WorkingDirectory
+	}
+	return filepath.Join(v.DownloadPath, "edits")
+}
+
+func (s *Service) ChooseEditOutputDirectory() (*string, error) {
+	if s.dialogs.Directory == nil {
+		return nil, fmt.Errorf("폴더 선택 창을 사용할 수 없습니다")
+	}
+	v, err := s.dialogs.Directory(s.GetEditOutputDirectory())
+	if err != nil || v == "" {
+		return nil, err
+	}
+	if !filepath.IsAbs(v) || strings.ContainsRune(v, 0) {
+		return nil, fmt.Errorf("절대 경로가 필요합니다")
+	}
+	v = filepath.Clean(v)
+	if err = os.MkdirAll(v, 0700); err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+func (s *Service) SetWorkingDirectory() (*string, error) {
+	v, err := s.ChooseEditOutputDirectory()
+	if err != nil || v == nil {
+		return nil, err
+	}
+	if err = s.save("workingDirectory", *v); err != nil {
+		return nil, err
+	}
+	return v, nil
+}
+func (s *Service) ClearWorkingDirectory() (bool, error) {
+	err := s.save("workingDirectory", "")
+	return err == nil, err
+}
 func (s *Service) SetDownloadPath() (*string, error) {
 	if s.dialogs.Directory == nil {
 		return nil, fmt.Errorf("폴더 선택 창을 사용할 수 없습니다")

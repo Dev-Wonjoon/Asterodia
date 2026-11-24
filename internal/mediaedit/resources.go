@@ -3,6 +3,8 @@ package mediaedit
 import (
 	"context"
 	"math"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -157,10 +159,20 @@ func (s *Service) Resources(ctx context.Context, req CreateRequest) api.Result {
 	if req.Crop.X < 0 || req.Crop.Y < 0 || req.Crop.Width < 1 || req.Crop.Height < 1 || req.Crop.Width > v.Width || req.Crop.Height > v.Height || req.Crop.X > v.Width-req.Crop.Width || req.Crop.Y > v.Height-req.Crop.Height {
 		return invalid("크롭 영역을 확인하세요")
 	}
-	available, total, disk, memoryKnown, diskKnown := systemResources(s.output())
+	outputDirectory := req.OutputDirectory
+	if outputDirectory == "" {
+		outputDirectory = s.output()
+	}
+	if !filepath.IsAbs(outputDirectory) || strings.ContainsRune(outputDirectory, 0) {
+		return invalid("PC의 저장 폴더를 확인하세요")
+	}
+	if req.Preview {
+		outputDirectory = s.cache
+	}
+	available, total, disk, memoryKnown, diskKnown := systemResources(outputDirectory)
 	r := ResourceEstimate{MemoryKnown: memoryKnown, AvailableRAM: available, TotalRAM: total, DiskKnown: diskKnown, DiskAvailable: disk, Basis: "calculated", Note: "버퍼 계산에 따른 참고 범위입니다. 전체 작업의 최대 사용량을 보장하지 않습니다."}
 	r.LowRAM, r.HighRAM, r.EstimateKnown = estimateBase(v.Width, v.Height, req.Crop.Width, req.Crop.Height, req.Kind, v.FrameCount)
-	if (v.Options.NativeGIF || v.Options.NativeVideo) && r.EstimateKnown {
+	if (v.Options.NativeGIF || v.Options.NativeVideo || v.Options.NativeWebP) && r.EstimateKnown {
 		factor := 128.0
 		low := float64(r.LowRAM) + float64(v.FrameCount)*24
 		high := float64(r.HighRAM) + float64(v.FrameCount)*factor

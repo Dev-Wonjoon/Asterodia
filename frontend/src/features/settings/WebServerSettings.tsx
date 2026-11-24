@@ -18,6 +18,8 @@ export function WebServerSettings() {
                 <p className="text-xs text-[var(--text-muted)]">{translate("settings.offWhenTheAppStartsTheServerAlsoStops")}</p>
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(vm.status.editing)} disabled={vm.loading || vm.busy || !vm.status.running} onChange={() => void vm.toggleEditing()} />{translate("settings.allowMobileEditing")}</label>
                 <p className="text-xs text-[var(--text-muted)]">{translate("settings.devicesPermittedByYourTailscaleAccessPolicyCanCreate")}</p>
+                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(vm.status.downloading)} disabled={vm.loading || vm.busy || !vm.status.running} onChange={() => void vm.toggleDownloading()} />{translate('settings.mobileDownloads.allow')}</label>
+                <p className="text-xs text-[var(--text-muted)]">{translate('settings.mobileDownloads.help')}</p>
             </>}
         </div>
     </SettingSection>

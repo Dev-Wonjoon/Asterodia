@@ -40,6 +40,7 @@ type AnimationRequest struct {
 	Output          io.Writer
 	NativeGIF       bool
 	NativeVideo     bool
+	NativeWebP      bool
 	DelayRate       int
 	Delays          []int
 	Duration        float64
@@ -138,7 +139,7 @@ func (e VideoEditor) animationPass(ctx context.Context, req AnimationRequest, di
 	}
 	pixelFormat := "rgb24"
 	channels := int64(3)
-	if req.NativeGIF || req.NativeVideo {
+	if req.NativeGIF || req.NativeVideo || req.NativeWebP {
 		pixelFormat = "rgba"
 		channels = 4
 	}
@@ -160,7 +161,7 @@ func (e VideoEditor) animationPass(ctx context.Context, req AnimationRequest, di
 		decode = []string{"-ss", number(req.Start), "-t", number(req.End - req.Start), "-protocol_whitelist", "file,pipe", "-i", req.Source, "-map", "0:V:0", "-an", "-sn", "-dn", "-vf", filter, "-fps_mode", "passthrough", "-frames:v", strconv.Itoa(req.FrameCount - req.FirstFrame), "-f", "rawvideo", "-pix_fmt", "rgba", "pipe:1"}
 	}
 	inputFPS := req.FPS
-	if req.NativeVideo {
+	if req.NativeVideo || req.NativeWebP {
 		inputFPS = 100
 	} // Exact delays are applied by the GIF/WebP container writer.
 	input := []string{"-f", "rawvideo", "-pixel_format", pixelFormat, "-video_size", fmt.Sprintf("%dx%d", req.Crop.Width, req.Crop.Height), "-framerate", strconv.Itoa(inputFPS), "-i", "pipe:0"}
@@ -169,14 +170,18 @@ func (e VideoEditor) animationPass(ctx context.Context, req AnimationRequest, di
 	wait.Add(1)
 	go func() {
 		defer wait.Done()
-		decodeErr = e.streamRun(ctx, dir, decode, nil, stream, 0, nil)
+		if req.NativeWebP {
+			decodeErr = decodeWebPRaw(ctx, req, stream)
+		} else {
+			decodeErr = e.streamRun(ctx, dir, decode, nil, stream, 0, nil)
+		}
 		if decodeErr == nil && stream.remaining != 0 {
 			decodeErr = io.ErrUnexpectedEOF
 		}
 		writer.CloseWithError(decodeErr)
 	}()
 	duration := float64(req.ExpectedFrames) / float64(req.FPS)
-	if req.NativeGIF || req.NativeVideo {
+	if req.NativeGIF || req.NativeVideo || req.NativeWebP {
 		duration = req.Duration
 	}
 	err := e.streamRun(ctx, dir, append(input, encoderArgs...), reader, req.Output, duration, progress)
@@ -261,7 +266,7 @@ func (e VideoEditor) Animation(ctx context.Context, req AnimationRequest, destin
 		return err
 	}
 	dir := filepath.Dir(destination)
-	if req.NativeVideo && req.Format == "gif" {
+	if (req.NativeVideo || req.NativeWebP) && req.Format == "gif" {
 		var err error
 		req, err = videoGIFTiming(ctx, req)
 		if err != nil {
@@ -269,14 +274,14 @@ func (e VideoEditor) Animation(ctx context.Context, req AnimationRequest, destin
 		}
 	}
 	lastDelay := 0
-	if req.NativeGIF || req.NativeVideo {
+	if req.NativeGIF || req.NativeVideo || req.NativeWebP {
 		req.Duration, lastDelay, err = gifTiming(ctx, req)
 		if err != nil {
 			return err
 		}
 	}
 	if req.Format == "webp" {
-		if req.NativeGIF || req.NativeVideo {
+		if req.NativeGIF || req.NativeVideo || req.NativeWebP {
 			return e.gifWebP(ctx, req, destination, q, progress)
 		}
 		level := 4
@@ -315,7 +320,7 @@ func (e VideoEditor) Animation(ctx context.Context, req AnimationRequest, destin
 	}
 	palette := filepath.Join(dir, "palette.png")
 	transparent := 0
-	if req.NativeGIF {
+	if req.NativeGIF || req.NativeWebP {
 		transparent = 1
 	}
 	first := []string{"-vf", fmt.Sprintf("palettegen=max_colors=%d:reserve_transparent=%d", colors, transparent), "-frames:v", "1", "-update", "1", "-threads", "2", palette}
@@ -342,7 +347,7 @@ func (e VideoEditor) Animation(ctx context.Context, req AnimationRequest, destin
 		dither = "bayer:bayer_scale=3"
 	}
 	second := []string{"-i", palette, "-filter_complex", "[0:v][1:v]paletteuse=dither=" + dither, "-loop", "0", "-gifflags", "-offsetting", "-threads", "2", destination}
-	if req.NativeGIF || req.NativeVideo {
+	if req.NativeGIF || req.NativeVideo || req.NativeWebP {
 		second = []string{"-i", palette, "-filter_complex", "[0:v][1:v]paletteuse=dither=" + dither, "-fps_mode", "passthrough", "-enc_time_base", "1:100", "-frames:v", strconv.Itoa(req.ExpectedFrames), "-final_delay", strconv.Itoa(lastDelay), "-loop", "0", "-gifflags", "-offsetting", "-threads", "2", destination}
 	}
 	err = e.animationPass(ctx, req, dir, second, func(p int) {
@@ -353,7 +358,7 @@ func (e VideoEditor) Animation(ctx context.Context, req AnimationRequest, destin
 	if err != nil {
 		return err
 	}
-	if req.NativeGIF || req.NativeVideo {
+	if req.NativeGIF || req.NativeVideo || req.NativeWebP {
 		return fixGIFDelays(ctx, destination, req)
 	}
 	return nil

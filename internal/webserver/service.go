@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
+	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/mediaedit"
 	"github.com/google/uuid"
@@ -18,30 +19,34 @@ import (
 const DefaultAddress = "127.0.0.1:9246"
 
 type Status struct {
-	Running bool    `json:"running"`
-	URL     string  `json:"url"`
-	Error   *string `json:"error"`
-	Editing bool    `json:"editing"`
+	Running     bool    `json:"running"`
+	URL         string  `json:"url"`
+	Error       *string `json:"error"`
+	Editing     bool    `json:"editing"`
+	Downloading bool    `json:"downloading"`
 }
 
 type Service struct {
-	mu         sync.Mutex
-	library    *media.Service
-	address    string
-	server     *http.Server
-	handler    http.Handler
-	url        string
-	lastError  *string
-	closed     bool
-	generation uint64
-	requests   sync.WaitGroup
-	capacity   chan struct{}
-	cancel     context.CancelFunc
-	editor     *mediaedit.Service
-	editing    bool
-	csrf       string
-	editLast   time.Time
-	editTokens float64
+	mu           sync.Mutex
+	library      *media.Service
+	address      string
+	server       *http.Server
+	handler      http.Handler
+	url          string
+	lastError    *string
+	closed       bool
+	generation   uint64
+	requests     sync.WaitGroup
+	capacity     chan struct{}
+	cancel       context.CancelFunc
+	editor       *mediaedit.Service
+	editing      bool
+	csrf         string
+	editLast     time.Time
+	editTokens   float64
+	downloader   *download.Service
+	downloading  bool
+	downloadRuns sync.Map
 }
 
 func NewService(library *media.Service, address string) *Service {
@@ -54,11 +59,28 @@ func NewService(library *media.Service, address string) *Service {
 }
 
 func (s *Service) snapshot() Status {
-	return Status{Running: s.server != nil, URL: s.url, Error: s.lastError, Editing: s.editing}
+	return Status{Running: s.server != nil, URL: s.url, Error: s.lastError, Editing: s.editing, Downloading: s.downloading}
 }
 
 //wails:ignore
 func (s *Service) ConfigureEditor(editor *mediaedit.Service) { s.editor = editor }
+
+//wails:ignore
+func (s *Service) ConfigureDownloader(downloader *download.Service) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.downloader = downloader
+}
+
+func (s *Service) SetDownloading(enabled bool) api.Result {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed || s.downloader == nil {
+		return api.Failure("NOT_READY", "다운로드 서비스를 사용할 수 없습니다")
+	}
+	s.downloading = enabled
+	return api.Success(s.snapshot())
+}
 
 func (s *Service) SetEditing(enabled bool) api.Result {
 	s.mu.Lock()
@@ -130,6 +152,7 @@ func (s *Service) Stop() api.Result {
 	server := s.server
 	s.server = nil
 	s.editing = false
+	s.downloading = false
 	s.generation++
 	if s.cancel != nil {
 		s.cancel()

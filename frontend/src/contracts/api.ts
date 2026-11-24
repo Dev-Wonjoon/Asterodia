@@ -29,6 +29,10 @@ export interface AppApi {
 
     getDownloadPath(): Promise<string>;
     setDownloadPath(): Promise<string | null>;
+    getWorkingDirectory(): Promise<string>;
+    setWorkingDirectory(): Promise<string | null>;
+    clearWorkingDirectory(): Promise<boolean>;
+    chooseEditOutputDirectory(): Promise<string | null>;
 
     getEngineStatus(): Promise<Record<string, EngineStatus>>;
     installEngine(engine: string, installId?: string): Promise<boolean>;

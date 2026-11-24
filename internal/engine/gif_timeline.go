@@ -187,7 +187,7 @@ func gifTiming(ctx context.Context, req AnimationRequest) (float64, int, error) 
 			continue
 		}
 		maximum := 65535
-		if req.NativeVideo && req.Format == "webp" {
+		if (req.NativeVideo || req.NativeWebP) && req.Format == "webp" {
 			maximum = 0xffffff
 		}
 		if index >= len(req.Delays) || req.Delays[index] < 1 || req.Delays[index] > maximum {

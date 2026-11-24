@@ -1,0 +1,84 @@
+Source: bmp/reader.go, tiff/buffer.go, tiff/buffer_test.go, tiff/compress.go, tiff/consts.go, tiff/lzw/reader.go, tiff/reader.go, tiff/reader_test.go, vp8/decode.go, vp8/idct.go, vp8/partition.go, vp8/pred.go, vp8/predfunc.go, vp8/quant.go, vp8/reconstruct.go, vp8/token.go, webp/decode.go
+// Copyright 2011 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: bmp/reader_test.go, tiff/writer.go, tiff/writer_test.go
+// Copyright 2012 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: bmp/writer.go, bmp/writer_test.go
+// Copyright 2013 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: ccitt/gen.go, ccitt/reader.go, ccitt/reader_test.go, ccitt/writer.go, ccitt/writer_test.go, font/sfnt/gpos.go, font/sfnt/kern_test.go, tiff/fuzz.go
+// Copyright 2019 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: colornames/colornames.go, colornames/colornames_test.go, colornames/gen.go, draw/draw.go, draw/example_test.go, draw/gen.go, draw/scale.go, draw/scale_test.go, draw/stdlib_test.go, example/font/main.go, font/basicfont/basicfont.go, font/basicfont/gen.go, font/font.go, font/plan9font/example_test.go, font/plan9font/plan9font.go, math/f32/f32.go, math/f64/f64.go, math/fixed/fixed.go, math/fixed/fixed_test.go
+// Copyright 2015 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: font/basicfont/basicfont.go
+// Face7x13 is a Face derived from the public domain X11 misc-fixed font files.
+//
+// At the moment, it holds the printable characters in ASCII starting with
+// space, and the Unicode replacement character U+FFFD.
+//
+// Its data is entirely self-contained and does not require loading from
+// separate files.
+
+Source: font/basicfont/basicfont_test.go
+// Copyright 2018 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: font/basicfont/data.go, font/basicfont/gen.go
+// This data is derived from files in the font/fixed directory of the Plan 9
+// Port source code (https://github.com/9fans/plan9port) which were originally
+// based on the public domain X11 misc-fixed font files.
+
+Source: font/font_test.go, font/gofont/gen.go, font/inconsolata/inconsolata.go, font/plan9font/plan9font_test.go, font/sfnt/postscript.go, font/sfnt/sfnt.go, font/sfnt/sfnt_test.go, riff/riff_test.go, vector/acc_amd64.go, vector/acc_other.go, vector/acc_test.go, vector/gen.go, vector/raster_fixed.go, vector/raster_floating.go, vector/vector.go, vector/vector_test.go, webp/doc.go
+// Copyright 2016 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: font/inconsolata/inconsolata.go
+// Package inconsolata provides pre-rendered bitmap versions of the Inconsolata
+// font family.
+//
+// Inconsolata is copyright Raph Levien and Cyreal. This package is licensed
+// under Go's BSD-style license (https://golang.org/LICENSE) with their
+// permission.
+//
+// Inconsolata's home page is at
+// http://www.levien.com/type/myfonts/inconsolata.html
+
+Source: font/opentype/example_test.go
+// Copyright 2020 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: font/opentype/opentype.go, font/opentype/opentype_test.go, font/sfnt/cmap.go, font/sfnt/example_test.go, font/sfnt/gen.go, font/sfnt/proprietary_test.go, font/sfnt/truetype.go
+// Copyright 2017 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: font/sfnt/gpos_test.go, internal/safemath/safemath.go
+// Copyright 2026 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: riff/example_test.go, riff/riff.go, vp8/filter.go, vp8l/decode.go, vp8l/huffman.go, vp8l/transform.go, webp/decode_test.go
+// Copyright 2014 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: vector/example_test.go
+// Copyright 2021 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.

@@ -75,6 +75,7 @@ func (s *Service) Prepare(ctx context.Context, req PrepareRequest) api.Result {
 	}
 	defer leaveUpdate()
 	req.NativeGIF = false
+	req.NativeWebP = false
 	req.NativeVideo = false
 	if req.QuickVideo && (!req.FullSource || req.OriginalFrames) || req.OriginalFrames && req.Kind == "trim" {
 		return invalid("영상 편집 방식을 확인하세요")
@@ -114,6 +115,10 @@ func (s *Service) Prepare(ctx context.Context, req PrepareRequest) api.Result {
 				compared.Start = 0
 				compared.End = existing.Options.End
 			}
+			if existing.Options.NativeWebP {
+				compared.NativeWebP = true
+				compared.FPS, compared.Start, compared.End = 1000, 0, existing.Options.End
+			}
 		}
 		if raw(existing.Options) != raw(compared) {
 			return invalid("같은 요청 식별자로 다른 편집을 만들 수 없습니다")
@@ -143,7 +148,7 @@ func (s *Service) Prepare(ctx context.Context, req PrepareRequest) api.Result {
 		return fail(err)
 	}
 	if kind != "video" && (kind != "image" || req.Kind == "trim") {
-		return invalid("등록된 영상 또는 GIF 파일을 선택하세요")
+		return invalid("등록된 영상 또는 GIF·WebP 파일을 선택하세요")
 	}
 	if err = media.CheckWrite(ctx, tx, mediaID, revision); err != nil {
 		return api.Failure("JOB_ACTIVE", "원본을 사용하는 다른 작업이 있습니다")
@@ -165,16 +170,19 @@ func (s *Service) Prepare(ctx context.Context, req PrepareRequest) api.Result {
 		if req.QuickVideo || req.OriginalFrames {
 			return invalid("영상 파일에서 사용할 수 있는 편집 방식입니다")
 		}
-		var signature [6]byte
+		var signature [12]byte
 		if _, err = f.ReadAt(signature[:], 0); err != nil {
 			return fail(err)
 		}
-		if string(signature[:]) != "GIF87a" && string(signature[:]) != "GIF89a" {
-			return invalid("GIF 파일을 선택하세요")
+		switch {
+		case string(signature[:6]) == "GIF87a" || string(signature[:6]) == "GIF89a":
+			req.NativeGIF, req.FPS = true, 100
+		case string(signature[:4]) == "RIFF" && string(signature[8:]) == "WEBP":
+			req.NativeWebP, req.FPS = true, 1000
+		default:
+			return invalid("GIF 또는 WebP 파일을 선택하세요")
 		}
-		req.NativeGIF = true
 		req.Start = 0
-		req.FPS = 100
 	}
 	identity, err := media.FileIdentity(f)
 	if err != nil {
@@ -292,6 +300,9 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) api.Result {
 	if !validID(req.RequestID) || !validID(req.SessionID) || (req.Kind != "gif" && req.Kind != "webp" && req.Kind != "trim") {
 		return invalid("편집 요청을 확인하세요")
 	}
+	if err := normalizeOutput(&req); err != nil {
+		return invalid(err.Error())
+	}
 	// Canonical ordering makes retries independent of selection order.
 	req.Deleted = append([]int{}, req.Deleted...)
 	sort.Ints(req.Deleted)
@@ -304,6 +315,10 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) api.Result {
 	}
 	if old, e := s.store.job(ctx, req.RequestID); e == nil {
 		compared := old.Options
+		// An unspecified destination on retry keeps the original frozen folder.
+		if req.OutputDirectory == "" {
+			compared.OutputDirectory = ""
+		}
 		if compared.Kind != "trim" {
 			compared.Quality, e = engine.NormalizeAnimationQuality(compared.Kind, compared.Quality)
 			if e != nil {
@@ -344,7 +359,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) api.Result {
 	} else if req.TrimStart != nil || req.TrimEnd != nil {
 		return invalid("영상 자르기 시간은 영상 출력에서만 지정하세요")
 	}
-	if req.Kind == "gif" && !v.Options.NativeVideo && !v.Options.QuickVideo && v.Options.FPS > 100 {
+	if req.Kind == "gif" && !v.Options.NativeVideo && !v.Options.NativeWebP && !v.Options.QuickVideo && v.Options.FPS > 100 {
 		return invalid("GIF의 시간 단위로는 100FPS 초과를 표현할 수 없습니다. WebP를 선택하거나 새 자료의 FPS를 조정하세요.")
 	}
 	if req.Kind == "webp" && v.Options.FPS > 1000 {
@@ -386,7 +401,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) api.Result {
 		if planErr != nil {
 			return invalid(planErr.Error())
 		}
-		if req.Kind == "gif" && v.Options.NativeVideo {
+		if req.Kind == "gif" && (v.Options.NativeVideo || v.Options.NativeWebP) {
 			timeline, err := s.timing(v)
 			if err != nil {
 				return fail(err)
@@ -416,12 +431,20 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) api.Result {
 	if count >= 10 {
 		return api.Failure("LIMIT_EXCEEDED", "동시에 대기할 수 있는 작업은 최대 10개입니다")
 	}
-	root := s.output()
+	if e = s.validateOutputAlbums(ctx, req.AlbumIDs); e != nil {
+		return invalid(e.Error())
+	}
+	root := req.OutputDirectory
+	if root == "" {
+		root = s.output()
+	}
 	if !filepath.IsAbs(root) {
 		return invalid("PC의 저장 폴더를 확인하세요")
 	}
 	if req.Preview {
 		root = s.cache
+	} else {
+		req.OutputDirectory = filepath.Clean(root)
 	}
 	_, e = s.store.db.ExecContext(ctx, `INSERT INTO media_edit_job(id,session_id,request_json,state,output_root,result_uuid,created_at,updated_at,preview) VALUES(?,?,?,'pending',?,?,?,?,?)`, req.RequestID, req.SessionID, raw(req), root, uuid.NewString(), now(), now(), req.Preview)
 	if e != nil {

@@ -32,6 +32,9 @@ func (s Store) job(ctx context.Context, id string) (Job, error) {
 		err = json.Unmarshal([]byte(usage), &v.Resources)
 	}
 	v.Cancelling = v.Cancelling && (v.State == "pending" || v.State == "running" || v.State == "verifying")
+	if v.State == "completed" && v.Error != "" {
+		v.OutputNotice, v.Error = v.Error, ""
+	}
 	return v, err
 }
 func (s Store) ids(ctx context.Context, table, where string, args ...any) ([]string, error) {

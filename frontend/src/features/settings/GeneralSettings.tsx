@@ -5,6 +5,7 @@ import { SettingSection } from '@renderer/shared/components/ui/SettingSection'
 import { SettingRow } from '@renderer/shared/components/ui/SettingRow'
 import { UpdateSettings } from './UpdateSettings'
 import { LanguageSelect } from '@renderer/shared/i18n/LanguageSelect'
+import { WorkingDirectorySettings } from './WorkingDirectorySettings'
 
 export const GeneralSettings = (): React.JSX.Element => {
     useLanguage()
@@ -20,6 +21,7 @@ export const GeneralSettings = (): React.JSX.Element => {
                     <Button disabled={importing} onClick={changePath}>{translate("settings.change")}</Button>
                 }
             />
+            <WorkingDirectorySettings disabled={importing} />
             <SettingRow
                 label={translate("settings.importWailsDatabase")}
                 value={importing ? translate("settings.checkingAndMergingTheDatabase") : translate("settings.selectAStoragebucketWailsDatabaseElectronDatabasesAreNot")}

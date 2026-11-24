@@ -1,3 +1,4 @@
+import { canEditMedia } from '../mediaedit/canEditMedia'
 import { translateError, translateMessage, translate, useLanguage } from '@renderer/shared/i18n'
 import { useGallerySelection, gallerySelectionKey, albumDragType } from './useGallerySelection'
 import { useGalleryExpansionMotion } from './useGalleryExpansionMotion'
@@ -330,7 +331,7 @@ export const GalleryPage = ({
         if (pageDisabled || mediaEditPending.current) return
         setMediaEditError('')
         if (media.galleryFile) {
-            if (media.galleryFile.kind === 'video') mediaEditControls.current?.open(media.galleryFile)
+            if (canEditMedia(media.galleryFile)) mediaEditControls.current?.open(media.galleryFile)
             return
         }
         if (media.fileCount !== 1 || media.cover?.kind !== 'video') return
@@ -595,7 +596,7 @@ export const GalleryPage = ({
                                 onOpenFolder={() => void openCardFolder(media)}
                                 onView={media.fileCount > 0 ? () => setViewer({ mediaId: media.id, fileId: media.galleryFile?.id }) : undefined}
                                 onDetails={() => { void selectDetail(media.id, media.galleryFileOffset) }}
-                                onCreateAnimation={media.galleryFile ? media.galleryFile.kind === 'video' ? () => { void openAnimationEditor(media) } : undefined : media.fileCount === 1 && media.cover?.kind === 'video' ? () => { void openAnimationEditor(media) } : undefined}
+                                onCreateAnimation={media.galleryFile ? canEditMedia(media.galleryFile) ? () => { void openAnimationEditor(media) } : undefined : media.fileCount === 1 && media.cover?.kind === 'video' ? () => { void openAnimationEditor(media) } : undefined}
                                 editorDisabled={mediaEditLoading}
                                 onAdd={media.fileCount > 0 ? () => media.galleryFile ? albumControls.current?.addFiles([media.galleryFile.id]) : albumControls.current?.addMedia(media.id) : undefined}
                                 addLabel={!media.galleryFile && media.fileCount > 1 ? translate("gallery.addAll") : translate("gallery.album.add")}

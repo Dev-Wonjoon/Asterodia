@@ -34,6 +34,7 @@ const api: AppApi = {
         restart: () => response(UpdateService.Restart()),
     },
     mediaEdit: {
+        outputOptions: request => response(MediaEditService.OutputOptions(wire(request))),
         overview: request => response(MediaEditService.Overview(wire(request))),
         frames: request => response(MediaEditService.Frames(wire(request))),
         frameStatus: request => response(MediaEditService.FrameStatus(wire(request))),
@@ -57,6 +58,7 @@ const api: AppApi = {
  },
     webServer: {
         setEditing: enabled => response(WebServerService.SetEditing(enabled)),
+        setDownloading: enabled => response(WebServerService.SetDownloading(enabled)),
         status: () => response(WebServerService.Status()),
         start: () => response(WebServerService.Start()),
         stop: () => response(WebServerService.Stop()),
@@ -122,6 +124,10 @@ const api: AppApi = {
     showItemInFolder: SettingsService.ShowItemInFolder,
     getDoubleClickInterval: SystemService.GetDoubleClickInterval,
     getDownloadPath: SettingsService.GetDownloadPath,
+    getWorkingDirectory: SettingsService.GetWorkingDirectory,
+    setWorkingDirectory: SettingsService.SetWorkingDirectory,
+    clearWorkingDirectory: SettingsService.ClearWorkingDirectory,
+    chooseEditOutputDirectory: SettingsService.ChooseEditOutputDirectory,
     setDownloadPath: SettingsService.SetDownloadPath,
     async getEngineStatus(): Promise<Record<string, EngineStatus>> {
         const statuses = await EngineManager.Status();
