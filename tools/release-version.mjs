@@ -6,10 +6,18 @@ const repository = fileURLToPath(new URL('../', import.meta.url))
 
 export function parseVersion(value) {
     const version = value.trim()
-    if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version) || version.split('.').some(part => Number(part) > 65535)) {
-        throw new Error('VERSION must contain one stable major.minor.patch version (each component 0–65535).')
+    const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\.([1-9]\d*)|([a-z]))?$/.exec(version)
+    if (!match || match.slice(1, 4).some(part => Number(part) > 65535) || Number(match[4] || 0) > Math.floor(65535 / 27)) {
+        throw new Error('VERSION must be major.minor.patch, major.minor.patch[a-z], or major.minor.patch.revision (components 0–65535; revision 1–2427).')
     }
     return version
+}
+
+export function windowsVersion(value) {
+    const version = parseVersion(value)
+    const match = /^(\d+)\.(\d+)\.(\d+)(?:\.(\d+)|([a-z]))?$/.exec(version)
+    const revision = match[4] ? Number(match[4]) * 27 : match[5] ? match[5].charCodeAt(0) - 96 : 0
+    return `${match[1]}.${match[2]}.${match[3]}.${revision}`
 }
 
 export function readVersion(root = repository) {
@@ -26,24 +34,26 @@ function replaceOne(text, pattern, replacement, filename) {
 }
 
 export function versionResources(root = repository) {
-    const version = readVersion(root), files = new Map()
+    const version = readVersion(root), numeric = windowsVersion(version), files = new Map()
     const read = name => readFileSync(path.join(root, name), 'utf8')
     const config = 'build/config.yml'
     files.set(config, replaceOne(read(config), /^(  version: ")[^"]+(".*)$/m, (_, before, after) => `${before}${version}${after}`, config))
     const infoName = 'build/windows/info.json', info = JSON.parse(read(infoName))
-    info.fixed = { ...info.fixed, file_version: `${version}.0`, product_version: `${version}.0` }
+    info.fixed = { ...info.fixed, file_version: numeric, product_version: numeric }
     for (const locale of Object.values(info.info)) {
         locale.FileVersion = version
         locale.ProductVersion = version
     }
     files.set(infoName, JSON.stringify(info, null, '\t') + '\n')
     const manifest = 'build/windows/wails.exe.manifest'
-    files.set(manifest, replaceOne(read(manifest), /(<assemblyIdentity type="win32" name="com\.storagebucket\.app" version=")[^"]+/, (_, before) => `${before}${version}.0`, manifest))
+    files.set(manifest, replaceOne(read(manifest), /(<assemblyIdentity type="win32" name="com\.storagebucket\.app" version=")[^"]+/, (_, before) => `${before}${numeric}`, manifest))
     for (const msix of ['build/windows/msix/app_manifest.xml', 'build/windows/msix/template.xml']) {
-        files.set(msix, replaceOne(read(msix), /(\bVersion=")[^"]+/, (_, before) => `${before}${version}.0`, msix))
+        files.set(msix, replaceOne(read(msix), /(\bVersion=")[^"]+/, (_, before) => `${before}${numeric}`, msix))
     }
     const nsis = 'build/windows/nsis/wails_tools.nsh'
-    files.set(nsis, replaceOne(read(nsis), /(!define INFO_PRODUCTVERSION ")[^"]+/, (_, before) => `${before}${version}`, nsis))
+    let nsisText = replaceOne(read(nsis), /(!define INFO_PRODUCTVERSION ")[^"]+/, (_, before) => `${before}${version}`, nsis)
+    nsisText = replaceOne(nsisText, /(!define INFO_NUMERICVERSION ")[^"]+/, (_, before) => `${before}${numeric}`, nsis)
+    files.set(nsis, nsisText)
     for (const name of ['build/darwin/Info.plist', 'build/darwin/Info.dev.plist', 'build/ios/Info.plist', 'build/ios/Info.dev.plist']) {
         let text = read(name)
         for (const key of ['CFBundleShortVersionString', 'CFBundleVersion']) {
@@ -71,6 +81,10 @@ export function syncVersionResources(root = repository, check = false) {
 }
 
 function main(args) {
+    if (args.length === 2 && args[0] === '--windows-version') {
+        process.stdout.write(windowsVersion(args[1]))
+        return
+    }
     let sync = false, check = false, tag
     for (let i = 0; i < args.length; i++) {
         if (args[i] === '--sync' || args[i] === '--sync-windows') sync = true

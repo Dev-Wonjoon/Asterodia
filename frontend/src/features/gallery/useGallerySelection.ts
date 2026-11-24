@@ -80,8 +80,8 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
         anchor.current = null
         replace(new Map(latest.current.items.map(item => [gallerySelectionKey(item), target(item)])))
     }
-    function removeMedia(ids: number[]) {
-        replace(new Map([...selected.current].filter(([, value]) => value.fileIds || !ids.includes(value.mediaId))))
+    function removeMedia(ids: number[], includeFiles = false) {
+        replace(new Map([...selected.current].filter(([, value]) => (!includeFiles && value.fileIds) || !ids.includes(value.mediaId))))
         anchor.current = null
     }
     function stop(cancel = false) {

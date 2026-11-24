@@ -1,18 +1,20 @@
 import { translate } from '@renderer/shared/i18n'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { MoveSelection } from '@contracts/file-move-api'
 import { getApi } from '@renderer/shared/api'
 import { useConfirm } from '@renderer/shared/hooks/useConfirm'
 import type { GalleryBulkAction, GalleryBulkResult, GalleryStore } from './galleryStore'
+import { prepareRemoval, removalConfirmation } from './galleryRemoval'
 
 export type BulkCommand = 'favorite' | 'unfavorite' | 'addTags' | 'removeTags' | 'openFolders' | 'unregister'
 
-export function useGalleryBulkActions(store: GalleryStore, selection: MoveSelection[], onSuccess: (ids: number[]) => void) {
+export function useGalleryBulkActions(store: GalleryStore, selection: MoveSelection[], onSuccess: (ids: number[], command: BulkCommand) => void) {
     const { confirm } = useConfirm()
     const [busy, setBusy] = useState(false)
     const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
     const [result, setResult] = useState<GalleryBulkResult | null>(null)
     const lock = useRef(false)
+    const returnFocus = useRef<HTMLElement | null>(null)
     const generation = useRef(0)
     const latest = useRef({ selection, onSuccess }); latest.current = { selection, onSuccess }
     useEffect(() => {
@@ -20,19 +22,40 @@ export function useGalleryBulkActions(store: GalleryStore, selection: MoveSelect
         setBusy(false); setProgress(null); setResult(null)
         return () => { ++generation.current }
     }, [store])
+    useLayoutEffect(() => {
+        if (busy) return
+        const origin = returnFocus.current
+        returnFocus.current = null
+        // The confirmation closes before busy cards are enabled again.
+        if (origin?.isConnected && document.activeElement === document.body && !document.querySelector('dialog[open],[aria-modal="true"]')) origin.focus({ preventScroll: true })
+    }, [busy])
 
-    async function run(command: BulkCommand, names: string[] = []) {
-        if (lock.current || !selection.length || store.getSnapshot().busy || store.getSnapshot().needsRefresh) return
+    function commandSelection(command: BulkCommand, values: MoveSelection[]) {
+        return command === 'unregister' ? values : values.filter(item => !item.fileIds)
+    }
+    async function run(command: BulkCommand, names: string[] = [], fallback: MoveSelection[] = []) {
+        const selected = commandSelection(command, selection)
+        const values = selected.length ? selected : command === 'unregister' ? fallback : []
+        const initial = store.getSnapshot()
+        const initialPage = initial.list?.page
+        if (lock.current || !values.length || initial.busy || initial.needsRefresh) return
         lock.current = true
         const own = generation.current
-        const targets = selection.map(item => ({ ...item }))
+        const selectionSnapshot = JSON.stringify(selected)
+        const targets = values.map(item => ({ ...item, ...(item.fileIds ? { fileIds: [...item.fileIds] } : {}) }))
         setBusy(true)
         try {
             if (command === 'unregister' || command === 'openFolders') {
+                returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+                const counts = command === 'unregister' ? await prepareRemoval(targets, initial.list?.page.data ?? [], getApi().media) : null
+                if (own !== generation.current || store.getSnapshot().list?.page !== initialPage
+                    || JSON.stringify(commandSelection(command, latest.current.selection)) !== selectionSnapshot) return
                 const accepted = await confirm(command === 'unregister'
-                    ? { title: translate("gallery.unregisterSelectedCollections"), message: translate("gallery.unregisterSelectedPostsExternalOriginalsAndFilesWithUnknown", { count: targets.length }), confirmLabel: translate("gallery.unregister"), danger: true }
+                    ? removalConfirmation(counts!, targets.reduce((count, item) => count + (item.fileIds?.length ?? 1), 0))
                     : { title: translate("gallery.openSelectedFileLocations"), message: translate("gallery.openFileLocationsForSelectedPostsEachFolderOpens", { count: targets.length }), confirmLabel: translate("common.open") })
-                if (!accepted || own !== generation.current || JSON.stringify(latest.current.selection) !== JSON.stringify(targets)) return
+                const current = store.getSnapshot()
+                if (!accepted || own !== generation.current || current.busy || current.needsRefresh || current.list?.page !== initialPage
+                    || JSON.stringify(commandSelection(command, latest.current.selection)) !== selectionSnapshot) return
             }
             const action: GalleryBulkAction = command === 'unregister' ? { kind: 'unregister' }
                 : command === 'openFolders' ? { kind: 'openFolders', open: path => getApi().showItemInFolder(path) }
@@ -44,7 +67,7 @@ export function useGalleryBulkActions(store: GalleryStore, selection: MoveSelect
                 if (own === generation.current) setProgress({ done, total })
             })
             if (own !== generation.current) return
-            if (outcome) { setResult(outcome); setProgress(null); latest.current.onSuccess(outcome.succeeded) }
+            if (outcome) { setResult(outcome); setProgress(null); latest.current.onSuccess(outcome.succeeded, command) }
             else setProgress(null)
         } catch {
             if (own === generation.current) {

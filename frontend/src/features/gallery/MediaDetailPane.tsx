@@ -11,6 +11,7 @@ import { MediaThumbnailStatus } from './MediaThumbnailStatus'
 import { MediaEditLauncher } from '../mediaedit/MediaEditLauncher'
 import { ActionButton } from '@renderer/shared/components/ui/ActionButton'
 import { Play, ListPlus, FolderInput } from 'lucide-react'
+import { prepareRemoval, removalConfirmation, removalCounts, removalLabel } from './galleryRemoval'
 
 export interface MediaDetailFocusRequest {
     mediaId: number
@@ -461,7 +462,10 @@ export function MediaDetailPane({
                                         disabled={disabled}
                                         onClick={async () => {
                                             const warning = hasDraft ? translate("gallery.ifUnregisteringTheFileRemovesItsCollectionUnsavedTitle") : ''
-                                            if (!await confirm({ title: data.isUserAlbum ? translate("gallery.album.removeFile") : translate("gallery.unregisterFile"), message: (data.isUserAlbum ? translate("gallery.removeThisFileFromTheAlbumOriginalFilesAnd") : translate("gallery.unregisterThisFileExternalOriginalsAndFilesWithUnknown")) + warning, confirmLabel: data.isUserAlbum ? translate("gallery.album.removeFile") : translate("gallery.unregister"), danger: true }) || !canContinue()) return
+                                            const counts = removalCounts(data, [file.id])
+                                            if (!counts) { showToast(translate('gallery.cannotDetermineRemoval'), 'error'); return }
+                                            const options = removalConfirmation(counts, 1)
+                                            if (!await confirm({ ...options, message: options.message + warning }) || !canContinue()) return
                                             void store.unregisterFiles({
                                                 mediaId: data.id,
                                                 expectedRevision: data.revision,
@@ -469,7 +473,7 @@ export function MediaDetailPane({
                                             })
                                         }}
                                     >
-                                        {data.isUserAlbum ? translate("gallery.album.removeFile") : translate("gallery.unregister")}
+                                        {removalLabel(removalCounts(data, [file.id]))}
                                     </button>
                                 </div>
                             </article>
@@ -509,14 +513,19 @@ export function MediaDetailPane({
                         disabled={disabled}
                         onClick={async () => {
                             const warning = hasDraft ? translate("gallery.unsavedTitleAndTagEditsWillAlsoClose") : ''
-                            if (!await confirm({ title: data.isUserAlbum ? translate("gallery.deleteAlbum") : translate("gallery.unregisterCollection"), message: (data.isUserAlbum ? translate("gallery.deleteThisAlbumOriginalFilesAndOtherAlbumsWill") : translate("gallery.unregisterThisCollectionExternalOriginalsAndFilesWithUnknown")) + warning, confirmLabel: data.isUserAlbum ? translate("gallery.deleteAlbum") : translate("gallery.unregister"), danger: true }) || !canContinue()) return
+                            let counts
+                            try { counts = await prepareRemoval([{ mediaId: data.id, revision: data.revision }], [data], getApi().media) }
+                            catch { showToast(translate('gallery.cannotDetermineRemoval'), 'error'); return }
+                            if (!canContinue()) return
+                            const options = removalConfirmation(counts, 1, true)
+                            if (!await confirm({ ...options, message: options.message + warning }) || !canContinue()) return
                             void store.unregisterMedia({
                                 mediaId: data.id,
                                 expectedRevision: data.revision
                             })
                         }}
                     >
-                        {data.isUserAlbum ? translate("gallery.deleteAlbum") : translate("gallery.unregisterCollection")}
+                        {removalLabel(removalCounts(data), true)}
                     </button>
                 </>
             )}

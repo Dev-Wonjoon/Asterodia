@@ -48,7 +48,7 @@ func NewService(version string, gate *api.UpdateGate) *Service {
 	if gate == nil {
 		gate = &api.UpdateGate{}
 	}
-	return &Service{gate: gate, status: Status{CurrentVersion: version, State: "idle", Supported: runtime.GOOS == "windows" && (runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64") && stableVersion.MatchString(version)}}
+	return &Service{gate: gate, status: Status{CurrentVersion: version, State: "idle", Supported: runtime.GOOS == "windows" && (runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64") && validVersion(version)}}
 }
 
 //wails:ignore

@@ -108,6 +108,7 @@ export interface MediaUnregisterFilesRequest extends MediaUnregisterRequest {
 }
 
 export interface MediaSummaryDto {
+    managedFileCount?: number
     isPinned?: boolean
     isUserAlbum?: boolean
     galleryFile?: MediaFileDto

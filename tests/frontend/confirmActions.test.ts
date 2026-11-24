@@ -22,6 +22,15 @@ function fixture(){
  return{state,store,remove,removeFiles,edit,view:h(MediaDetailPane,{state,store,onDirtyChange:vi.fn()})}
 }
 describe('confirmed media actions',()=>{
+ it('labels managed files as deletion and warns about bypassing the Recycle Bin',async()=>{
+  const f=fixture();f.state.detail.data!.files.data[0].storageKind='app_managed'
+  await mount(h(ConfirmProvider,null,f.view))
+  const fileDelete=[...document.querySelectorAll<HTMLButtonElement>('button')].find(button=>button.textContent==='파일 삭제')!
+  await act(async()=>fileDelete.click())
+  expect(document.querySelector('[role=alertdialog]')?.textContent).toContain('실제 파일 삭제: 1개')
+  expect(document.querySelector('[role=alertdialog]')?.textContent).toContain('휴지통을 거치지 않습니다')
+  await answer(true);expect(f.removeFiles).toHaveBeenCalledExactlyOnceWith({mediaId:1,expectedRevision:2,fileIds:[7]})
+ })
  it('cancels deletion and applies the confirmed media ID and revision exactly once',async()=>{
   const f=fixture();await mount(h(ConfirmProvider,null,f.view));await clickButton('묶음 등록 해제');expect(f.remove).not.toHaveBeenCalled();await answer(false);expect(f.remove).not.toHaveBeenCalled();await clickButton('묶음 등록 해제');await answer(true);expect(f.remove).toHaveBeenCalledExactlyOnceWith({mediaId:1,expectedRevision:2});expect(window.confirm).not.toHaveBeenCalled()
  })

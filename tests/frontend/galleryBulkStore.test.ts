@@ -8,7 +8,7 @@ const fail = (code = 'JOB_ACTIVE') => ({ ok: false as const, error: { code, mess
 const selection = [{ mediaId: 1, revision: 4 }, { mediaId: 2, revision: 4 }]
 const detail = (id: number) => ({ id, revision: 4, title: '게시글 '+id, isFavorite: false, tags: [{ id: 7, name: '유지' }, { id: 8, name: '제거' }], files: { data: [{ filepath: 'C:/folder/file'+id+'.png' }], total: 1, hasNextPage: false } })
 function setup() {
-    const api = { get: vi.fn(async ({mediaId}) => ok(detail(mediaId))), edit: vi.fn(async ({mediaId}) => ok({...detail(mediaId),revision:5})), unregisterMedia: vi.fn(async ({mediaId})=>ok({mediaId,parentRemoved:true})), list: vi.fn(async()=>ok({data:selection.map(item=>detail(item.mediaId)),total:2,hasNextPage:false})) }
+    const api = { get: vi.fn(async ({mediaId}) => ok(detail(mediaId))), edit: vi.fn(async ({mediaId}) => ok({...detail(mediaId),revision:5})), unregisterMedia: vi.fn(async ({mediaId})=>ok({mediaId,parentRemoved:true})), unregisterFiles: vi.fn(async ({mediaId})=>ok({mediaId,parentRemoved:false,revision:5})), list: vi.fn(async()=>ok({data:selection.map(item=>detail(item.mediaId)),total:2,hasNextPage:false})) }
     const store = createGalleryStore(api as unknown as MediaApi)
     return { api, store }
 }
@@ -75,4 +75,33 @@ it('stops a pending batch when the gallery filter changes',async()=>{
     const running=store.bulk(selection,{kind:'favorite',value:true},vi.fn())
     store.setFilter({keyword:'다른 필터'} as any);pending.resolve(ok(detail(1)))
     expect((await running)?.failed).toHaveLength(2);expect(api.edit).not.toHaveBeenCalled()
+})
+
+it('unregisters only selected files and combines files from the same parent into one request', async () => {
+    const { api, store } = setup()
+    const targets = [{ mediaId: 1, revision: 4, fileIds: [11] }, { mediaId: 1, revision: 4, fileIds: [12, 11] }, selection[1]]
+    const progress = vi.fn()
+    expect(await store.bulk(targets, { kind: 'unregister' }, progress)).toEqual({ succeeded: [1, 2], failed: [] })
+    expect(api.unregisterFiles).toHaveBeenCalledExactlyOnceWith({ mediaId: 1, expectedRevision: 4, fileIds: [11, 12] })
+    expect(api.unregisterMedia).toHaveBeenCalledExactlyOnceWith({ mediaId: 2, expectedRevision: 4 })
+    expect(targets[0].fileIds).toEqual([11])
+    expect(progress).toHaveBeenLastCalledWith(2, 2)
+})
+it.each([false, true])('lets an explicitly selected collection cover its files regardless of selection order (%s)', async reverse => {
+    const { api, store } = setup()
+    const targets = [selection[0], { ...selection[0], fileIds: [11] }]
+    await store.bulk(reverse ? targets.reverse() : targets, { kind: 'unregister' }, vi.fn())
+    expect(api.unregisterMedia).toHaveBeenCalledExactlyOnceWith({ mediaId: 1, expectedRevision: 4 })
+    expect(api.unregisterFiles).not.toHaveBeenCalled()
+})
+it('preserves per-parent file failures and refuses inconsistent selected revisions', async () => {
+    const { api, store } = setup()
+    api.unregisterFiles.mockResolvedValueOnce(fail() as any)
+    const result = await store.bulk(selection.map(item => ({ ...item, fileIds: [item.mediaId * 10] })), { kind: 'unregister' }, vi.fn())
+    expect(result).toEqual({ succeeded: [2], failed: [{ mediaId: 1, message: 'JOB_ACTIVE' }] })
+    expect(api.unregisterMedia).not.toHaveBeenCalled()
+    api.unregisterFiles.mockClear(); api.get.mockClear()
+    const stale = await store.bulk([{ ...selection[0], fileIds: [11] }, { ...selection[0], revision: 5, fileIds: [12] }], { kind: 'unregister' }, vi.fn())
+    expect(stale?.failed).toEqual([{ mediaId: 1, message: expect.stringContaining('변경된 게시글') }])
+    expect(api.get).not.toHaveBeenCalled(); expect(api.unregisterFiles).not.toHaveBeenCalled()
 })

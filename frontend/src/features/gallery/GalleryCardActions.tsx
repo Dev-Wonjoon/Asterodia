@@ -18,6 +18,7 @@ interface GalleryCardActionsProps {
     onOpenFolder: () => void
     onEdit: (field: 'title' | 'tags') => void
     onUnregister: () => void
+    removalLabel?: string
     onView?: () => void
     onDetails?: () => void
     onAdd?: () => void
@@ -46,7 +47,7 @@ export function GalleryCardActions({
     onToggleFavorite,
     onOpenFolder,
     onEdit,
-    onUnregister, onView, onDetails, onAdd, addLabel = translate("gallery.album.add"), onEditAlbum, onRemoveFromAlbum, fileOnly = false, onToggleFiles, filesLabel, filesExpanded, onCreateAnimation, editorDisabled, readOnly = false
+    onUnregister, removalLabel = translate('gallery.deleteOrUnregister'), onView, onDetails, onAdd, addLabel = translate("gallery.album.add"), onEditAlbum, onRemoveFromAlbum, fileOnly = false, onToggleFiles, filesLabel, filesExpanded, onCreateAnimation, editorDisabled, readOnly = false
 }: GalleryCardActionsProps): React.JSX.Element {
     useLanguage()
     useSyncExternalStore(subscribeShortcuts, shortcutVersion)
@@ -268,7 +269,7 @@ export function GalleryCardActions({
                             onUnregister()
                         }}
                     >
-                        <Trash2 className="size-4" aria-hidden="true" />{translate("gallery.unregister")}</button>
+                        <Trash2 className="size-4" aria-hidden="true" />{removalLabel}</button>
                     </>}
                 </div>
             )}

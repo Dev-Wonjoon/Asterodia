@@ -1,12 +1,12 @@
 {
 	"fixed": {
-		"file_version": "2.2.5.0",
-		"product_version": "2.2.5.0"
+		"file_version": "2.2.6.0",
+		"product_version": "2.2.6.0"
 	},
 	"info": {
 		"0000": {
-			"FileVersion": "2.2.5",
-			"ProductVersion": "2.2.5",
+			"FileVersion": "2.2.6",
+			"ProductVersion": "2.2.6",
 			"CompanyName": "Dev-Wonjoon",
 			"FileDescription": "StorageBucket",
 			"LegalCopyright": "(c) 2025, My Company",

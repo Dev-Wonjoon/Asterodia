@@ -128,6 +128,20 @@ The archived Electron implementation and its database conversion assets have
 been removed starting with 2.1.0. Database tests cover rejection of Electron
 databases, Wails database upgrades and imports, and preservation of source data.
 
+## Windows release versions
+
+Starting with 2.2.6, Windows releases and automatic updates accept `major.minor.patch`,
+one lowercase fix letter (`2.2.6a` through `2.2.6z`), or a numeric fix (`2.2.6.1`).
+Letters represent stable fixes, not prereleases. The order is
+`2.2.6 < 2.2.6a < ... < 2.2.6z < 2.2.6.1 < 2.2.6.2 < 2.2.7`.
+Each base component is 0–65535; numeric fixes are 1–2427, without leading zeros.
+
+Windows numeric metadata uses a fourth component of 0 for the base release,
+1–26 for a–z, and `27 * fix` for numeric fixes. For example, `2.2.6a` maps to
+`2.2.6.1`, and release `2.2.6.1` maps to `2.2.6.27`. Displayed versions and Git tags
+retain the original spelling. All release assets and checksums must use the same tag.
+Install or update to 2.2.6 before using automatic updates for these extended formats.
+
 ## Responsible Use
 
 Use StorageBucket only with media you own or have permission to download

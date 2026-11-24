@@ -3,13 +3,17 @@ import { act, createElement as h } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { cleanupReact, clickButton, deferred, mount } from './reactHarness'
 import { GalleryPage } from '@renderer/features/gallery/GalleryPage'
+import { ConfirmProvider } from '@renderer/app/providers/ConfirmProvider'
 import { albumDragType } from '@renderer/features/gallery/useGallerySelection'
 import { useInfiniteScroll } from '@renderer/shared/hooks/useInfiniteScroll'
 import { useGalleryViewModel } from '@renderer/features/gallery/useGalleryViewModel'
-const mocks = vi.hoisted(() => ({ bulk: vi.fn(), unregister: vi.fn(), confirm: vi.fn(async () => true), refresh: vi.fn(), getSnapshot: vi.fn(), get: vi.fn(), create: vi.fn(), run: vi.fn(), directories: vi.fn(), on: vi.fn(), mediaGet: vi.fn(), mountEditor: vi.fn(), destroyEditor: vi.fn(), state: null as any }))
+const mocks = vi.hoisted(() => ({ realConfirm: false, bulk: vi.fn(), unregister: vi.fn(), confirm: vi.fn(async () => true), refresh: vi.fn(), getSnapshot: vi.fn(), get: vi.fn(), create: vi.fn(), run: vi.fn(), directories: vi.fn(), on: vi.fn(), mediaGet: vi.fn(), mountEditor: vi.fn(), destroyEditor: vi.fn(), state: null as any }))
 const api = {fileMove:{get:mocks.get,create:mocks.create,run:mocks.run},media:{directories:mocks.directories,albums:vi.fn(),saveAlbum:vi.fn(),mergeAlbum:vi.fn(),get:mocks.mediaGet},onMediaThumbnailUpdated:mocks.on,showItemInFolder:vi.fn()}
 vi.mock('../../internal/webserver/web/editor.js',()=>({mountMediaEditor:mocks.mountEditor}))
-vi.mock('@renderer/shared/hooks/useConfirm',()=>({useConfirm:()=>({confirm:mocks.confirm,isOpen:false})}))
+vi.mock('@renderer/shared/hooks/useConfirm', async importOriginal => {
+ const actual = await importOriginal<typeof import('@renderer/shared/hooks/useConfirm')>()
+ return { ...actual, useConfirm: () => mocks.realConfirm ? actual.useConfirm() : { confirm: mocks.confirm, isOpen: false } }
+})
 vi.mock('@renderer/shared/api',()=>({getApi:()=>api}))
 const store = {refresh:mocks.refresh,getSnapshot:mocks.getSnapshot,unregisterMedia:mocks.unregister,bulk:mocks.bulk,closeDetail:vi.fn(),toggleAlbum:vi.fn(),loadMore:vi.fn(),openDetail:vi.fn(),edit:vi.fn()}
 const downloads = { activeJobs: [] as any[], cancellingIds: [], openDetail: vi.fn(), closeDetail: vi.fn(), cancelDownload: vi.fn() }
@@ -20,7 +24,7 @@ vi.mock('@renderer/features/download/components/DownloadThumbnail',()=>({Downloa
 vi.mock('@renderer/features/download/components/DownloadDetailPane',()=>({DownloadDetailPane:()=>h('div',null,'선택한 다운로드 작업')}))
 vi.mock('@renderer/features/localimport/LocalImportPanel',()=>({LocalImportPanel:()=>null}))
 vi.mock('@renderer/features/gallery/MediaViewer',()=>({MediaViewer:({mediaId,fileId,onClose}:any)=>h('div',{role:'dialog','aria-label':`감상 ${mediaId} ${fileId ?? ''}`},h('button',{onClick:onClose},'감상 닫기'))}))
-afterEach(cleanupReact)
+afterEach(async () => { await cleanupReact(); mocks.realConfirm = false })
 
 it('navigates cards without changing selection and selects a range with Shift', async () => {
  setup(); await mount(h(GalleryPage))
@@ -43,6 +47,106 @@ it('opens card actions with the keyboard and protects typing and underlying sele
  expect(document.querySelector('[role="menu"]')).toBeNull(); expect(document.querySelector('[aria-label="선택 항목 작업"]')).not.toBeNull()
  expect(mocks.unregister).not.toHaveBeenCalled()
 })
+
+async function selectCard(index: number, surface = 'thumbnail', modifiers: MouseEventInit = {}) {
+ const card = document.querySelectorAll<HTMLElement>('article[data-selection-key]')[index]
+ const target = card.querySelector<HTMLElement>(surface === 'title' ? 'h2 button' : surface === 'body' ? 'p' : '[data-card-focus]')!
+ await act(async () => target.dispatchEvent(new MouseEvent('click', { detail: 1, bubbles: true, cancelable: true, ...modifiers })))
+ return target
+}
+async function pressDelete(options: KeyboardEventInit = {}) {
+ const event = new KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true, ...options })
+ await act(async () => document.activeElement!.dispatchEvent(event))
+ return event
+}
+function fileRows() {
+ mocks.state.list.page.data = [11, 12].map(id => ({ id: 1, title: '같은 묶음', revision: 4, sourceKind: 'local', fileCount: 3, createdAt: 1,
+  managedFileCount: 0, galleryFile: { id, mediaId: 1, fileKey: String(id), title: '파일 ' + id, kind: 'image', storageKind: 'external_reference', detectedFormat: 'png', filepath: 'C:/fixture/' + id + '.png' } }))
+}
+it.each(['thumbnail', 'title', 'body'])('confirms Delete after clicking the card %s', async surface => {
+ setup(); await mount(h(GalleryPage)); await selectCard(0, surface)
+ expect(document.activeElement).toBe(document.querySelector('[data-card-focus]'))
+ expect((await pressDelete()).defaultPrevented).toBe(true)
+ expect(mocks.confirm).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ danger: true, message: expect.stringContaining('1개') }))
+ expect(mocks.bulk).toHaveBeenCalledExactlyOnceWith([{ mediaId: 1, revision: 4 }], { kind: 'unregister' }, expect.any(Function))
+})
+it.each(['ctrl', 'shift'])('unregisters multiple individual file cards selected with %s', async modifier => {
+ setup(); fileRows(); mocks.bulk.mockResolvedValueOnce({ succeeded: [1], failed: [] })
+ await mount(h(GalleryPage)); await selectCard(0); await selectCard(1, 'title', modifier === 'ctrl' ? { ctrlKey: true } : { shiftKey: true })
+ expect(document.querySelectorAll('[data-selected=true]')).toHaveLength(2)
+ await pressDelete()
+ expect(mocks.confirm).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ message: expect.stringContaining('2개') }))
+ expect(mocks.bulk).toHaveBeenCalledExactlyOnceWith([{ mediaId: 1, revision: 4, fileIds: [11] }, { mediaId: 1, revision: 4, fileIds: [12] }], { kind: 'unregister' }, expect.any(Function))
+ expect(document.querySelectorAll('[data-selected=true]')).toHaveLength(0)
+})
+it('shows one real confirmation popup for checked collections and files, cancels safely, and retains failed selections', async () => {
+ setup(); const { file } = singleVideo()
+ Object.assign(mocks.state.list.page.data[1], { galleryFile: { ...file, id: 12, mediaId: 2 } })
+ mocks.realConfirm = true
+ await mount(h(ConfirmProvider, null, h(GalleryPage)))
+ const checks = [...document.querySelectorAll<HTMLInputElement>('input[data-gallery-select]')]
+ await act(async () => { checks[0].click(); checks[1].click(); checks[1].focus() })
+ await pressDelete()
+ const dialog = document.querySelector<HTMLElement>('[role=alertdialog]')!
+ expect(dialog).not.toBeNull(); expect(dialog.textContent).toContain('2개')
+ expect(document.querySelectorAll('[data-confirm-dialog]')).toHaveLength(1)
+ expect(mocks.bulk).not.toHaveBeenCalled()
+ expect(document.activeElement?.textContent).toBe('취소')
+ await pressDelete({ repeat: true })
+ expect(document.querySelectorAll('[data-confirm-dialog]')).toHaveLength(1)
+ await clickButton('취소')
+ expect(mocks.bulk).not.toHaveBeenCalled(); expect(document.querySelectorAll('[data-selected=true]')).toHaveLength(2)
+ await pressDelete()
+ const accept = document.querySelector<HTMLButtonElement>('[data-confirm-dialog] button:last-child')!
+ expect(accept.textContent).toBe('등록 해제')
+ await act(async () => accept.click())
+ expect(document.querySelector('[role=alertdialog]')).toBeNull()
+ expect(mocks.bulk).toHaveBeenCalledExactlyOnceWith([{ mediaId: 1, revision: 4 }, { mediaId: 2, revision: 4, fileIds: [12] }], { kind: 'unregister' }, expect.any(Function))
+ expect([...document.querySelectorAll('[data-selected=true]')].map(card => card.getAttribute('data-selection-key'))).toEqual(['file:12'])
+})
+it('confirms an unselected focused file and ignores typing, composition, and held Delete keys', async () => {
+ setup(); fileRows(); await mount(h(GalleryPage))
+ const card = document.querySelector<HTMLButtonElement>('[data-card-focus]')!
+ card.focus(); await pressDelete({ isComposing: true }); await pressDelete({ repeat: true })
+ expect(mocks.confirm).not.toHaveBeenCalled()
+ const input = document.createElement('input'); card.closest('article')!.append(input); input.focus(); await pressDelete()
+ expect(mocks.confirm).not.toHaveBeenCalled()
+ card.focus(); await pressDelete()
+ expect(mocks.bulk).toHaveBeenCalledExactlyOnceWith([{ mediaId: 1, revision: 4, fileIds: [11] }], { kind: 'unregister' }, expect.any(Function))
+})
+it('uses the same one-time confirmation from the selection bar for file-only selections', async () => {
+ setup(); fileRows(); await mount(h(GalleryPage)); await selectCard(0); await selectCard(1, 'thumbnail', { ctrlKey: true })
+ await clickButton('등록 해제')
+ expect(mocks.confirm).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ danger: true, message: expect.stringContaining('2개') }))
+ expect(mocks.bulk).toHaveBeenCalledOnce()
+})
+it('names app-managed deletion explicitly in the card menu, selection bar, and Delete popup', async () => {
+ setup(); mocks.state.list.page.data[0].managedFileCount = 2; await mount(h(GalleryPage)); await selectCard(0)
+ const bar = document.querySelector('[aria-label="선택 항목 작업"]')!
+ expect([...bar.querySelectorAll('button')].some(button => button.textContent === '파일 삭제')).toBe(true)
+ await clickButton('게시글 1 더보기')
+ const menu = document.querySelector<HTMLElement>('[role=menu]')!
+ expect(menu.textContent).toContain('파일 삭제'); expect(menu.textContent).not.toContain('등록 해제')
+ await act(async () => menu.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape',bubbles:true,cancelable:true})))
+ document.querySelector<HTMLButtonElement>('[data-card-focus]')!.focus(); await pressDelete()
+ expect(mocks.confirm).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({title:'파일 삭제',confirmLabel:'파일 삭제',message:expect.stringContaining('실제 파일 삭제: 2개')}))
+ expect(mocks.confirm.mock.lastCall![0].message).toContain('휴지통을 거치지 않습니다')
+})
+it('shows separate deletion, unregister, and album counts for a mixed selection', async () => {
+ setup(); mocks.state.list.page.data[0].managedFileCount = 1; mocks.state.list.page.data[1].isUserAlbum = true
+ await mount(h(GalleryPage)); await selectCard(0); await selectCard(1, 'thumbnail', {ctrlKey:true}); await pressDelete()
+ const options = mocks.confirm.mock.lastCall![0]
+ expect(options.confirmLabel).toBe('파일 삭제·항목 제거')
+ for (const text of ['실제 파일 삭제: 1개','등록 해제 — 원본 파일 유지: 1개','사용자 앨범 삭제 — 원본 파일 유지: 1개']) expect(options.message).toContain(text)
+})
+it('does not delete cards from an open card menu or while a write is in progress', async () => {
+ setup(); await mount(h(GalleryPage)); await selectCard(0)
+ await clickButton('게시글 1 더보기'); await pressDelete()
+ expect(mocks.confirm).not.toHaveBeenCalled(); expect(mocks.bulk).not.toHaveBeenCalled()
+ await cleanupReact(); setup(); mocks.state.busy = true; await mount(h(GalleryPage))
+ document.querySelector<HTMLButtonElement>('[data-card-focus]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true }))
+ expect(mocks.confirm).not.toHaveBeenCalled(); expect(mocks.bulk).not.toHaveBeenCalled()
+})
 function setup(){
  store.edit.mockReset().mockResolvedValue(true)
  mocks.refresh.mockReset()
@@ -58,11 +162,11 @@ function setup(){
  downloads.activeJobs=[]; downloads.openDetail.mockClear(); downloads.closeDetail.mockClear(); downloads.cancelDownload.mockClear()
  mocks.confirm.mockReset().mockResolvedValue(true);mocks.unregister.mockReset().mockResolvedValue(true)
  mocks.bulk.mockReset().mockResolvedValue({succeeded:[1],failed:[{mediaId:2,message:'시험 오류'}]})
- mocks.state={busy:false,needsRefresh:false,detail:{mediaId:null},list:{status:'ready',page:{data:[1,2].map(id=>({id,title:'게시글 '+id,sourceKind:'download',revision:4,createdAt:1,isFavorite:false,fileCount:2})),total:2,hasNextPage:false}}}
+ mocks.state={busy:false,needsRefresh:false,detail:{mediaId:null},list:{status:'ready',page:{data:[1,2].map(id=>({id,title:'게시글 '+id,sourceKind:'download',revision:4,createdAt:1,isFavorite:false,fileCount:2,managedFileCount:0})),total:2,hasNextPage:false}}}
  mocks.getSnapshot.mockImplementation(()=>mocks.state);mocks.on.mockReturnValue(()=>{});mocks.get.mockResolvedValue({ok:true,data:null});mocks.directories.mockResolvedValue({ok:true,data:{data:[{id:7,directoryPath:'C:/B'}],hasNextPage:false}});mocks.create.mockResolvedValue({ok:true,data:{jobId:'job'}});mocks.run.mockResolvedValue({ok:true,data:{jobId:'job'}})
 }
 function singleVideo(){
- const file={id:11,mediaId:1,title:'선택한 동영상',fileKey:'video',filepath:'C:/fixture/video.mp4',duration:2.5,kind:'video',detectedFormat:'mp4'}
+ const file={id:11,mediaId:1,title:'선택한 동영상',fileKey:'video',filepath:'C:/fixture/video.mp4',duration:2.5,kind:'video',detectedFormat:'mp4',storageKind:'external_reference'}
  const media=mocks.state.list.page.data[0]
  Object.assign(media,{fileCount:1,cover:{fileId:file.id,path:null,kind:'video'}})
  const result={ok:true,data:{...media,files:{data:[file],total:1,hasNextPage:false}}}
@@ -291,7 +395,7 @@ it('places selection actions beside the gallery title while keeping the main con
  expect(bar.querySelector('[role=status]')?.textContent).toBe('1개 선택')
  expect([...document.querySelectorAll('button')].some(item=>item.getAttribute('aria-label')==='게시글 1 더보기')).toBe(true)
  expect([...toolbar.querySelectorAll('button')].map(item=>item.textContent)).toEqual(initialControls)
- expect([...bar.querySelectorAll('button')].map(item=>item.textContent)).toEqual(['앨범에 추가','한 폴더에 모으기','병합','선택 작업','선택 해제'])
+ expect([...bar.querySelectorAll('button')].map(item=>item.textContent)).toEqual(['앨범에 추가','한 폴더에 모으기','병합','등록 해제','선택 작업','선택 해제'])
  await clickButton('메뉴')
  const clear=[...toolbar.querySelectorAll<HTMLButtonElement>('[role=menuitem]')].find(item=>item.textContent==='선택 해제')!
  await act(async()=>clear.click())
@@ -512,12 +616,12 @@ it('shows file actions in an expanded album and removes only that membership', a
  Object.assign(mocks.state.list.page.data[0],{isUserAlbum:true,title:'사진 앨범',galleryFile:{id:11,mediaId:77,title:'사진 11',kind:'image',filepath:'C:/fixture/second.jpg'}})
  await mount(h(GalleryPage));await clickButton('사진 11 더보기')
  const labels=[...document.querySelectorAll('[role="menuitem"]')].map(item=>item.textContent)
- expect(labels).toEqual(expect.arrayContaining(['감상하기','상세 정보','앨범에 추가','파일 위치 열기','앨범에서 제외']))
+ expect(labels).toEqual(expect.arrayContaining(['감상하기','상세 정보','앨범에 추가','파일 위치 열기','앨범에서 제거']))
  for(const label of ['앨범 편집','앨범 접기','등록 해제','제목 편집','즐겨찾기 추가']) expect(labels).not.toContain(label)
  await clickButton('파일 위치 열기')
  expect(api.showItemInFolder).toHaveBeenCalledExactlyOnceWith('C:/fixture/second.jpg')
  expect(mocks.mediaGet).not.toHaveBeenCalled()
- await clickButton('사진 11 더보기');await clickButton('앨범에서 제외')
+ await clickButton('사진 11 더보기');await clickButton('앨범에서 제거')
  expect(api.media.saveAlbum).toHaveBeenCalledExactlyOnceWith({albumId:1,expectedRevision:4,removeFileIds:[11]})
  expect(mocks.unregister).not.toHaveBeenCalled()
  expect(mocks.refresh).toHaveBeenCalledOnce()
@@ -528,15 +632,15 @@ it('keeps album actions on the album card and does not remove a file from a norm
  setup();expandedRows();await mount(h(GalleryPage))
  await clickButton('여행 더보기')
  expect(document.querySelector('[role="menu"]')?.textContent).toContain('앨범 편집')
- expect(document.querySelector('[role="menu"]')?.textContent).not.toContain('앨범에서 제외')
+ expect(document.querySelector('[role="menu"]')?.textContent).not.toContain('앨범에서 제거')
  await clickButton('여행 더보기');await clickButton('사진 11 더보기')
- expect(document.querySelector('[role="menu"]')?.textContent).not.toContain('앨범에서 제외')
+ expect(document.querySelector('[role="menu"]')?.textContent).not.toContain('앨범에서 제거')
 })
 
 it('preserves an album file when removing it has a revision conflict', async () => {
  setup();expandedRows();mocks.state.list.page.data[0].isUserAlbum=true
  api.media.saveAlbum.mockResolvedValueOnce({ok:false,error:{code:'REVISION_CONFLICT',message:'앨범이 변경되었습니다.'}})
- await mount(h(GalleryPage));await clickButton('사진 11 더보기');await clickButton('앨범에서 제외')
+ await mount(h(GalleryPage));await clickButton('사진 11 더보기');await clickButton('앨범에서 제거')
  expect(api.media.saveAlbum).toHaveBeenCalledOnce()
  expect(mocks.mediaGet).not.toHaveBeenCalled()
  expect(mocks.refresh).not.toHaveBeenCalled()

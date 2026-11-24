@@ -31,6 +31,7 @@ import { ActionButton } from '@renderer/shared/components/ui/ActionButton'
 import { Play, ChevronDown, ChevronUp, Square, SquareCheck } from 'lucide-react'
 import { useShortcutCommands } from '@renderer/shared/hooks/useShortcutCommands'
 import { useGalleryKeyboardFocus } from './useGalleryKeyboardFocus'
+import { prepareRemoval, removalConfirmation, removalCounts, removalLabel, selectedRemovalCounts } from './galleryRemoval'
 
 function CardSelectionIcon({ selected }: { selected: boolean }) {
     const Icon = selected ? SquareCheck : Square
@@ -96,7 +97,7 @@ export const GalleryPage = ({
     const [albumDropError, setAlbumDropError] = useState(''), [albumDropNotice, setAlbumDropNotice] = useState('')
     const [cardError, setCardError] = useState('')
     const [mergeSelection, setMergeSelection] = useState<MoveSelection[] | null>(null)
-    const bulk = useGalleryBulkActions(store, selection, pointerSelection.removeMedia)
+    const bulk = useGalleryBulkActions(store, [...pointerSelection.entries.values()], (ids, command) => pointerSelection.removeMedia(ids, command === 'unregister'))
     const [draftDirty, setDraftDirty] = useState(false)
     const dirtyRef = useRef(false)
     const onDirtyChange = useCallback((dirty: boolean) => {
@@ -229,8 +230,13 @@ export const GalleryPage = ({
         if (current.busy || current.needsRefresh) return
         const media = current.list.page.data.find(item => item.id === mediaId)
         if (!media) return
+        let counts
+        try { counts = await prepareRemoval([{ mediaId, revision: media.revision }], current.list.page.data, getApi().media) }
+        catch { setCardError(translate('gallery.cannotDetermineRemoval')); return }
+        if (generation.current !== own || store.getSnapshot().list.page !== current.list.page) return
         const draftWarning = current.detail.mediaId === mediaId && dirtyRef.current ? translate("gallery.unsavedTitleAndTagEditsWillAlsoClose") : ''
-        if (!await confirm({ title: media.isUserAlbum ? translate("gallery.deleteAlbum") : translate("gallery.unregisterCollection"), message: (media.isUserAlbum ? translate("gallery.deleteThisAlbumOriginalFilesAndOtherAlbumsWill") : translate("gallery.unregisterThisCollectionExternalOriginalsAndFilesWithUnknown")) + draftWarning, confirmLabel: media.isUserAlbum ? translate("gallery.deleteAlbum") : translate("gallery.unregister"), danger: true })) return
+        const options = removalConfirmation(counts, 1, true)
+        if (!await confirm({ ...options, message: options.message + draftWarning })) return
         const latest = store.getSnapshot()
         if (generation.current !== own || latest.busy || latest.needsRefresh || latest.detail.mediaId !== current.detail.mediaId || latest.list.page.data.find(item => item.id === mediaId)?.revision !== media.revision) return
         void store.unregisterMedia({ mediaId, expectedRevision: media.revision })
@@ -316,10 +322,15 @@ export const GalleryPage = ({
             else { const item = focusedMedia(); if (item) { if (item.galleryFile) albumControls.current?.addFiles([item.galleryFile.id]); else albumControls.current?.addMedia(item.id) } }
         } },
         'gallery.folder': { enabled: cardEnabled, run: () => { if (selection.length) void bulk.run('openFolders'); else { const item = focusedMedia(); if (item) void openCardFolder(item) } } },
-        'gallery.unregister': { enabled: () => cardEnabled() && !focusedMedia()?.galleryFile, run: () => { if (selection.length) void bulk.run('unregister'); else { const item = focusedMedia(); if (item) void unregisterMedia(item.id) } } },
+        'gallery.unregister': { enabled: () => !pageDisabled && !viewer && !pointerSelection.dragging && !pointerSelection.albumDrag && !tagCommand && (pointerSelection.entries.size > 0 || Boolean(focusedMedia())), run: () => {
+            const item = focusedMedia()
+            void bulk.run('unregister', [], item ? [{ mediaId: item.id, revision: item.revision, ...(item.galleryFile ? { fileIds: [item.galleryFile.id] } : {}) }] : [])
+        } },
     }, event => {
         const target = event.target as Element | null
-        if (!target || !listScrollRef.current?.contains(target) || target.closest('[role="menu"],[data-action-boundary]')) return false
+        if (!target || !listScrollRef.current?.contains(target) || target.closest('[role="menu"]')) return false
+        if (target.closest('input[type="checkbox"][data-gallery-select]')) return true
+        if (target.closest('[data-action-boundary]')) return false
         const isCard = Boolean(target.closest('[data-card-focus]'))
         return isCard || event.ctrlKey || event.altKey || event.metaKey
     })
@@ -475,6 +486,7 @@ export const GalleryPage = ({
                 <header data-action-boundary className="flex flex-wrap items-center gap-3 bg-[var(--bg-app)]">
                     <h1 className="shrink-0 text-lg font-semibold">{title}</h1>
                     <GallerySelectionBar count={selection.length + albumFileIds.length} groupCount={selection.length} fileCount={albumFileIds.length} total={list.status === 'ready' ? list.page.total : null} disabled={pageDisabled || pointerSelection.dragging}
+                        removalLabel={removalLabel(selectedRemovalCounts([...pointerSelection.entries.values()], list.page.data))}
                         onAdd={() => albumControls.current?.addSelection()} onMove={gatherSelection} onMerge={() => { if (!pageDisabled) setMergeSelection(selectedTargets()) }} onClear={clearSelection} onBulk={onBulk} />
                     <MediaEditLauncher compact controlRef={mediaEditControls} disabled={state.busy || bulk.busy || moveBusy || albumDropBusy || draftDirty} />
 
@@ -565,7 +577,7 @@ export const GalleryPage = ({
                             onView={() => setViewer({ mediaId: media.id, fileId: media.galleryFile?.id })}
                             onDetails={() => { void selectDetail(media.id, media.galleryFileOffset) }}
                             selection={!media.galleryFile && <label className="absolute right-2 top-2 z-10 flex size-7 items-center justify-center rounded-lg bg-[var(--bg-sidebar)] shadow-sm hover:bg-[var(--bg-hover)]" onClick={event => event.stopPropagation()}>
-                                <input type="checkbox" className="peer absolute inset-0 m-0 size-full cursor-pointer opacity-0 disabled:cursor-default" aria-label={media.title + translate("gallery.suffix.select")} checked={pointerSelection.entries.has(gallerySelectionKey(media))} disabled={toolbarDisabled} onChange={() => {}} onClick={event => pointerSelection.select(media, event, true)} />
+                                <input type="checkbox" data-gallery-select className="peer absolute inset-0 m-0 size-full cursor-pointer opacity-0 disabled:cursor-default" aria-label={media.title + translate("gallery.suffix.select")} checked={pointerSelection.entries.has(gallerySelectionKey(media))} disabled={toolbarDisabled} onChange={() => {}} onClick={event => pointerSelection.select(media, event, true)} />
                                 <CardSelectionIcon selected={pointerSelection.entries.has(gallerySelectionKey(media))} />
                             </label>}
                         >
@@ -574,7 +586,7 @@ export const GalleryPage = ({
                                 primaryActions={<>
                                     <ActionButton className="gallery-card-action" icon={<Play />} label={translate("viewer.open")} disabled={pageDisabled || media.fileCount === 0} onClick={() => setViewer({ mediaId: media.id, fileId: media.galleryFile?.id })} />
                                     {media.galleryFile && <label title={translate("gallery.selectFilesToAddToAnAlbum")} className="relative flex size-8 shrink-0 items-center justify-center rounded-lg hover:bg-[var(--bg-hover)]">
-                                        <input type="checkbox" className="peer absolute inset-0 m-0 size-full cursor-pointer opacity-0 disabled:cursor-default" aria-label={translate("gallery.selectToAddToAnAlbum", { title: media.galleryFile.title || translate("media.file") })} disabled={pageDisabled} checked={pointerSelection.entries.has(gallerySelectionKey(media))} onChange={() => {}} onClick={event => pointerSelection.select(media, event, true)} />
+                                        <input type="checkbox" data-gallery-select className="peer absolute inset-0 m-0 size-full cursor-pointer opacity-0 disabled:cursor-default" aria-label={translate("gallery.selectToAddToAnAlbum", { title: media.galleryFile.title || translate("media.file") })} disabled={pageDisabled} checked={pointerSelection.entries.has(gallerySelectionKey(media))} onChange={() => {}} onClick={event => pointerSelection.select(media, event, true)} />
                                         <CardSelectionIcon selected={pointerSelection.entries.has(gallerySelectionKey(media))} />
                                     </label>}
                                     {media.galleryCanCollapse !== false && (media.fileCount > 1 || media.galleryFile) && <ActionButton icon={media.galleryFile ? <ChevronUp /> : <ChevronDown />} label={`${media.isUserAlbum ? translate("gallery.album") : translate("media.file")} ${media.galleryFile ? translate("gallery.collapse") : translate("gallery.expand")}`} className="gallery-card-action" disabled={pageDisabled} aria-expanded={Boolean(media.galleryFile)} aria-label={`${media.title} ${media.isUserAlbum ? translate("gallery.album") : translate("media.file")} ${media.galleryFile ? translate("gallery.collapse") : translate("gallery.expand")}`} onClick={event => {
@@ -608,6 +620,7 @@ export const GalleryPage = ({
                                 fileOnly={Boolean(media.galleryFile)}
                                 onEdit={(field) => editDetail(media.id, field)}
                                 onUnregister={() => unregisterMedia(media.id)}
+                                removalLabel={removalLabel(removalCounts(media))}
                             />
                         </GalleryCard>
                     ])}

@@ -38,7 +38,7 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
-func fixtureProvider(t *testing.T, version, sums string, payload []byte) *appupdate.Provider {
+func fixtureProvider(t *testing.T, version, sums string, payload []byte, configure ...func(map[string]any)) *appupdate.Provider {
 	t.Helper()
 	const baseURL = "https://updates.test"
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +51,11 @@ func fixtureProvider(t *testing.T, version, sums string, payload []byte) *appupd
 			if sums != "missing" {
 				assets = append(assets, map[string]any{"id": 2, "name": "SHA256SUMS", "size": len(sums), "browser_download_url": baseURL + "/sums"})
 			}
-			_ = json.NewEncoder(w).Encode(map[string]any{"tag_name": version, "name": version, "body": "release notes", "prerelease": false, "draft": false, "assets": assets})
+			release := map[string]any{"tag_name": version, "name": version, "body": "release notes", "prerelease": false, "draft": false, "assets": assets}
+			for _, change := range configure {
+				change(release)
+			}
+			_ = json.NewEncoder(w).Encode(release)
 		case "/app":
 			_, _ = w.Write(payload)
 		case "/sums":
@@ -70,6 +74,39 @@ func fixtureProvider(t *testing.T, version, sums string, payload []byte) *appupd
 		t.Fatal(err)
 	}
 	return p
+}
+
+func TestExtendedReleaseUpdates(t *testing.T) {
+	payload := []byte("hotfix executable")
+	digest := sha256.Sum256(payload)
+	sums := hex.EncodeToString(digest[:]) + "  StorageBucket-windows-amd64.exe\n"
+	for _, pair := range [][2]string{{"2.2.5", "2.2.6"}, {"2.2.6", "2.2.6a"}, {"2.2.6a", "2.2.6b"}, {"2.2.6z", "2.2.6.1"}, {"2.2.6", "2.2.6.1"}, {"2.2.6.2", "2.2.6.10"}, {"2.2.6.2427", "2.2.7"}} {
+		provider := fixtureProvider(t, "v"+pair[1], sums, payload)
+		release, err := provider.Check(t.Context(), updater.CheckRequest{CurrentVersion: pair[0], Platform: "windows", Arch: "amd64"})
+		if err != nil || release == nil || release.Version != pair[1] || !bytes.Equal(release.Verification.Digest, digest[:]) {
+			t.Fatalf("%s -> %s: release=%v error=%v", pair[0], pair[1], release, err)
+		}
+		var output bytes.Buffer
+		if err = provider.Download(t.Context(), release, &output, nil); err != nil || !bytes.Equal(output.Bytes(), payload) {
+			t.Fatalf("download %s: %v", pair[1], err)
+		}
+	}
+	for _, pair := range [][2]string{{"2.2.6a", "2.2.6"}, {"2.2.6a", "2.2.6a"}, {"2.2.6.2", "2.2.6.1"}, {"2.2.7", "2.2.6.2427"}} {
+		provider := fixtureProvider(t, "v"+pair[1], "missing", payload)
+		if release, err := provider.Check(t.Context(), updater.CheckRequest{CurrentVersion: pair[0], Platform: "windows", Arch: "amd64"}); err != nil || release != nil {
+			t.Fatalf("downgrade/equal %s -> %s: %v %v", pair[0], pair[1], release, err)
+		}
+	}
+	for _, flag := range []string{"draft", "prerelease"} {
+		provider := fixtureProvider(t, "v2.2.6a", sums, payload, func(release map[string]any) { release[flag] = true })
+		if release, err := provider.Check(t.Context(), updater.CheckRequest{CurrentVersion: "2.2.6", Platform: "windows", Arch: "amd64"}); err != nil || release != nil {
+			t.Fatalf("unpublished release surfaced: %v %v", release, err)
+		}
+	}
+	provider := fixtureProvider(t, "v2.2.6.1", sums+sums, payload)
+	if _, err := provider.Check(t.Context(), updater.CheckRequest{CurrentVersion: "2.2.6", Platform: "windows", Arch: "amd64"}); err == nil {
+		t.Fatal("ambiguous checksum accepted")
+	}
 }
 
 func TestRequireChecksums(t *testing.T) {

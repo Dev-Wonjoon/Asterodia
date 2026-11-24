@@ -535,7 +535,18 @@ export function createGalleryStore(
 
     async function bulk(selection: MoveSelection[], action: GalleryBulkAction, progress: (done: number, total: number) => void): Promise<GalleryBulkResult | null> {
         if (snapshot.busy || snapshot.needsRefresh || !selection.length) return null
-        const targets = [...new Map(selection.map(item => [item.mediaId, { ...item }])).values()]
+        const grouped = new Map<number, MoveSelection>(), conflicts = new Set<number>()
+        for (const item of selection) {
+            const previous = grouped.get(item.mediaId)
+            if (previous && action.kind === 'unregister') {
+                if (previous.revision !== item.revision) conflicts.add(item.mediaId)
+                // A collection selection includes its files. File-only selections
+                // stay file-only and share one revision-checked request per parent.
+                if (previous.fileIds && item.fileIds) previous.fileIds = [...new Set([...previous.fileIds, ...item.fileIds])]
+                else delete previous.fileIds
+            } else grouped.set(item.mediaId, { ...item, ...(item.fileIds ? { fileIds: [...new Set(item.fileIds)] } : {}) })
+        }
+        const targets = [...grouped.values()]
         cancelReads()
         const own = session
         const operationFilter = filter
@@ -550,6 +561,7 @@ export function createGalleryStore(
                     continue
                 }
                 const outcome = await request(async (): Promise<MediaResult<true>> => {
+                    if (conflicts.has(target.mediaId)) return { ok: false, error: { code: 'REVISION_CONFLICT', message: translate("gallery.thisPostChangedAfterSelectionRefreshAndSelectIt"), context: {} } }
                     // Read the current revision without silently replacing the user's selection revision.
                     const current = await api.get({ mediaId: target.mediaId, fileLimit: 1, fileOffset: 0 })
                     if (!current.ok) return current
@@ -563,7 +575,9 @@ export function createGalleryStore(
                         const key = /^[a-z]:\//i.test(normalized) || normalized.startsWith('//') ? folder.toLowerCase() : folder
                         if (!folders.has(key)) { await action.open(path); folders.add(key) }
                     } else if (action.kind === 'unregister') {
-                        const response = await api.unregisterMedia({ mediaId: target.mediaId, expectedRevision: target.revision })
+                        const response = await (target.fileIds
+                            ? api.unregisterFiles({ mediaId: target.mediaId, expectedRevision: target.revision, fileIds: target.fileIds })
+                            : api.unregisterMedia({ mediaId: target.mediaId, expectedRevision: target.revision }))
                         if (!response.ok) return response
                         if (own === session) removed(response.data)
                     } else {

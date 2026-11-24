@@ -40,6 +40,11 @@ export function GalleryCard({ media, previewPath, resolveUrl, selected, active, 
     }
     return <article data-album-id={media.id} data-selection-key={selectionKey} data-selected={selected || undefined} data-detail-trigger
         draggable={onAlbumDragStart ? draggable : undefined} data-album-draggable={draggable || undefined}
+        onClickCapture={event => {
+            if (onSelect && !viewDisabled && event.detail === 1 && !(event.target as Element).closest('input,label,a,[data-action-boundary],button:not([data-card-select])')) {
+                event.currentTarget.querySelector<HTMLButtonElement>('[data-card-focus]')?.focus({ preventScroll: true })
+            }
+        }}
         onContextMenu={event => {
             if (!event.defaultPrevented && !(event.target as Element).closest('[data-card-menu]') && openCardMenu(event.currentTarget)) {
                 event.preventDefault()

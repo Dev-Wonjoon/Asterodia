@@ -14,9 +14,11 @@ function Get-VerifiedReleaseFile {
         $machine = if ($Arch -eq 'amd64') { 0x8664 } else { 0xaa64 }
         if ([BitConverter]::ToUInt16($pe, 4) -ne $machine) { throw "Executable architecture does not match $Arch." }
         $info = [Diagnostics.FileVersionInfo]::GetVersionInfo($Path)
-        $productVersion = '{0}.{1}.{2}' -f $info.ProductMajorPart, $info.ProductMinorPart, $info.ProductBuildPart
-        $fileVersion = '{0}.{1}.{2}' -f $info.FileMajorPart, $info.FileMinorPart, $info.FileBuildPart
-        if ($productVersion -ne $Version -or $fileVersion -ne $Version -or $info.ProductPrivatePart -ne 0 -or $info.FilePrivatePart -ne 0) {
+        $numericVersion = (& node (Join-Path $PSScriptRoot 'release-version.mjs') --windows-version $Version).Trim()
+        if ($LASTEXITCODE -ne 0) { throw 'Invalid release version.' }
+        $productVersion = '{0}.{1}.{2}.{3}' -f $info.ProductMajorPart, $info.ProductMinorPart, $info.ProductBuildPart, $info.ProductPrivatePart
+        $fileVersion = '{0}.{1}.{2}.{3}' -f $info.FileMajorPart, $info.FileMinorPart, $info.FileBuildPart, $info.FilePrivatePart
+        if ($productVersion -cne $numericVersion -or $fileVersion -cne $numericVersion -or $info.ProductVersion -cne $Version -or $info.FileVersion -cne $Version) {
             throw "Executable version $productVersion / $fileVersion does not match VERSION $Version."
         }
         $stream.Position = 0

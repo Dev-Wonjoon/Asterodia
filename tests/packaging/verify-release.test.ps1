@@ -57,7 +57,36 @@ try {
         $hash = (Get-FileHash -LiteralPath (Join-Path $output $name) -Algorithm SHA256).Hash.ToLowerInvariant()
         if ($lines -cnotcontains "$hash  $name") { throw "Incorrect final checksum: $arch" }
     }
-    Write-Output 'Release verification tests passed (both architectures, version, tag, tampering and unexpected files).'
+    foreach ($extendedVersion in @('2.2.6a', '2.2.6.1')) {
+        $extendedRoot = Join-Path $caseRoot $extendedVersion
+        New-Item -ItemType Directory -Force -Path $extendedRoot | Out-Null
+        Copy-Item -LiteralPath (Join-Path $caseRoot 'main.go') -Destination (Join-Path $extendedRoot 'main.go')
+        $numericVersion = (& node (Join-Path $testRepository 'tools/release-version.mjs') --windows-version $extendedVersion).Trim()
+        if ($LASTEXITCODE -ne 0) { throw 'Extended version conversion failed.' }
+        $extendedInfo = Get-Content -LiteralPath (Join-Path $testRepository 'build/windows/info.json') -Raw | ConvertFrom-Json
+        $extendedInfo.fixed.file_version = $numericVersion
+        $extendedInfo.fixed.product_version = $numericVersion
+        foreach ($locale in $extendedInfo.info.PSObject.Properties.Value) {
+            $locale.FileVersion = $extendedVersion
+            $locale.ProductVersion = $extendedVersion
+        }
+        $infoPath = Join-Path $extendedRoot 'info.json'
+        [IO.File]::WriteAllText($infoPath, ($extendedInfo | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
+        $manifest = Get-Content -LiteralPath (Join-Path $testRepository 'build/windows/wails.exe.manifest') -Raw
+        $manifest = [regex]::Replace($manifest, '(<assemblyIdentity[^>]*version=")[^"]+', { param($match) $match.Groups[1].Value + $numericVersion })
+        $manifestPath = Join-Path $extendedRoot 'app.manifest'
+        [IO.File]::WriteAllText($manifestPath, $manifest, [Text.UTF8Encoding]::new($false))
+        & wails3 generate syso -arch amd64 -icon (Join-Path $testRepository 'build/windows/icon.ico') -manifest $manifestPath -info $infoPath -out (Join-Path $extendedRoot 'resource_windows_amd64.syso')
+        if ($LASTEXITCODE -ne 0) { throw 'Extended version resource generation failed.' }
+        $env:GOARCH = 'amd64'
+        $extendedExe = Join-Path $extendedRoot 'app.exe'
+        Push-Location $extendedRoot
+        try { & go build -buildvcs=false -o $extendedExe . } finally { Pop-Location }
+        if ($LASTEXITCODE -ne 0) { throw 'Extended version fixture build failed.' }
+        Get-VerifiedReleaseFile -Path $extendedExe -Arch amd64 -Version $extendedVersion | Out-Null
+        Expect-Failure { Get-VerifiedReleaseFile -Path $extendedExe -Arch amd64 -Version $version } 'extended version mismatch'
+    }
+    Write-Output 'Release verification tests passed (both architectures, stable/letter/numeric versions, tag, tampering and unexpected files).'
 } finally {
     Pop-Location
     $env:GOOS = $oldOS; $env:GOARCH = $oldArch; $env:CGO_ENABLED = $oldCGO

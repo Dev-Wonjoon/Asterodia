@@ -3,22 +3,24 @@ package update
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
+	"strings"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/updater"
 	"github.com/wailsapp/wails/v3/pkg/updater/providers/github"
 )
 
-var stableVersion = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
-
 // Provider requires the exact portable executable and a SHA-256 checksum.
 // The framework's provider alone permits releases without a checksum sidecar.
 type Provider struct {
 	source   *github.Provider
+	client   *http.Client
+	baseURL  string
 	Progress func(int64, int64)
 }
 
@@ -33,7 +35,10 @@ func NewProvider(baseURL string, client *http.Client) (*Provider, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Provider{source: source}, nil
+	if baseURL == "" {
+		baseURL = "https://api.github.com"
+	}
+	return &Provider{source: source, client: client, baseURL: strings.TrimRight(baseURL, "/")}, nil
 }
 
 func MatchAsset(req updater.CheckRequest, assets []github.ReleaseAsset) int {
@@ -56,20 +61,123 @@ func MatchAsset(req updater.CheckRequest, assets []github.ReleaseAsset) int {
 func (p *Provider) Name() string { return p.source.Name() }
 
 func (p *Provider) Check(ctx context.Context, req updater.CheckRequest) (*updater.Release, error) {
-	release, err := p.source.Check(ctx, req)
-	if err != nil || release == nil {
-		return release, err
+	// Resolve and compare here: the framework's SemVer parser rejects both
+	// four-component versions and post-release letter suffixes.
+	body, status, err := p.fetch(ctx, p.baseURL+"/repos/"+Repository+"/releases/latest", 1<<20)
+	if err != nil {
+		return nil, err
 	}
-	if release.Channel != "stable" || !stableVersion.MatchString(release.Version) {
+	if status == http.StatusNotFound {
+		return nil, nil
+	}
+	if status != http.StatusOK {
+		return nil, fmt.Errorf("GitHub update API returned HTTP %d", status)
+	}
+	var published struct {
+		TagName     string    `json:"tag_name"`
+		Name        string    `json:"name"`
+		Body        string    `json:"body"`
+		HTMLURL     string    `json:"html_url"`
+		PublishedAt time.Time `json:"published_at"`
+		Draft       bool      `json:"draft"`
+		Prerelease  bool      `json:"prerelease"`
+		Assets      []struct {
+			ID          int64  `json:"id"`
+			Name        string `json:"name"`
+			Size        int64  `json:"size"`
+			URL         string `json:"browser_download_url"`
+			ContentType string `json:"content_type"`
+		} `json:"assets"`
+	}
+	if err = json.Unmarshal(body, &published); err != nil {
+		return nil, err
+	}
+	if published.Draft || published.Prerelease {
+		return nil, nil
+	}
+	version := published.TagName
+	if strings.HasPrefix(version, "v") || strings.HasPrefix(version, "V") {
+		version = version[1:]
+	}
+	if !validVersion(version) {
 		return nil, fmt.Errorf("정식 버전 형식의 릴리스만 업데이트할 수 있습니다")
 	}
-	if release.Verification == nil || release.Verification.DigestAlgo != "sha256" || len(release.Verification.Digest) != sha256.Size {
-		return nil, fmt.Errorf("업데이트 파일의 SHA256SUMS가 없거나 올바르지 않습니다")
+	comparison, err := CompareVersions(version, req.CurrentVersion)
+	if err != nil {
+		return nil, err
 	}
-	if release.Artifact.Size <= 0 || release.Artifact.Size > 512<<20 {
+	if comparison <= 0 {
+		return nil, nil
+	}
+	assets := make([]github.ReleaseAsset, len(published.Assets))
+	checksum := -1
+	for n, asset := range published.Assets {
+		assets[n].Name = asset.Name
+		if asset.Name == "SHA256SUMS" {
+			if checksum != -1 {
+				return nil, fmt.Errorf("업데이트 체크섬 파일이 중복되었습니다")
+			}
+			checksum = n
+		}
+	}
+	selected := MatchAsset(req, assets)
+	if selected < 0 || checksum < 0 {
+		return nil, fmt.Errorf("업데이트 실행 파일 또는 SHA256SUMS가 없거나 올바르지 않습니다")
+	}
+	asset := published.Assets[selected]
+	if asset.Size <= 0 || asset.Size > 512<<20 || asset.URL == "" {
 		return nil, fmt.Errorf("업데이트 파일 크기가 올바르지 않습니다")
 	}
-	return release, nil
+	sums, status, err := p.fetch(ctx, published.Assets[checksum].URL, 1<<20)
+	if err != nil {
+		return nil, err
+	}
+	if status != http.StatusOK {
+		return nil, fmt.Errorf("업데이트 체크섬을 읽지 못했습니다: HTTP %d", status)
+	}
+	var digest []byte
+	for _, line := range strings.Split(string(sums), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 2 || strings.TrimPrefix(fields[1], "*") != asset.Name {
+			continue
+		}
+		decoded, err := hex.DecodeString(fields[0])
+		if err != nil || len(decoded) != sha256.Size || digest != nil {
+			return nil, fmt.Errorf("업데이트 파일의 SHA256SUMS가 없거나 올바르지 않습니다")
+		}
+		digest = decoded
+	}
+	if digest == nil {
+		return nil, fmt.Errorf("업데이트 파일의 SHA256SUMS가 없거나 올바르지 않습니다")
+	}
+	return &updater.Release{
+		Version: version, Channel: "stable", Name: published.Name, Notes: published.Body, PublishedAt: published.PublishedAt,
+		Artifact:     updater.Artifact{Filename: asset.Name, Filetype: "exe", Size: asset.Size, Platform: req.Platform, Arch: req.Arch},
+		Verification: &updater.Verification{DigestAlgo: "sha256", Digest: digest},
+		Metadata:     map[string]any{"github.asset.id": asset.ID, "github.asset.url": asset.URL, "github.asset.contentType": asset.ContentType, "github.release.tag": published.TagName, "github.release.htmlURL": published.HTMLURL},
+	}, nil
+}
+
+func (p *Provider) fetch(ctx context.Context, url string, limit int64) ([]byte, int, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	response, err := p.client.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(response.Body, limit+1))
+	if err != nil {
+		return nil, response.StatusCode, err
+	}
+	if int64(len(body)) > limit {
+		return nil, response.StatusCode, fmt.Errorf("업데이트 메타데이터가 너무 큽니다")
+	}
+	return body, response.StatusCode, nil
 }
 
 func (p *Provider) Download(ctx context.Context, release *updater.Release, dst io.Writer, progress func(int64, int64)) error {

@@ -31,7 +31,7 @@ export const shortcuts = [
     define('gallery.createAlbum', 'gallery', "gallery.album.create", 'Ctrl+N'),
     define('gallery.addToAlbum', 'gallery', "gallery.album.add", 'Ctrl+Shift+A'),
     define('gallery.folder', 'gallery', "gallery.openFolder", 'Ctrl+Shift+O'),
-    define('gallery.unregister', 'gallery', "gallery.unregister", 'Delete'),
+    define('gallery.unregister', 'gallery', "gallery.deleteOrUnregister", 'Delete'),
     define('gallery.refresh', 'gallery', 'common.refresh', ''),
     define('gallery.gather', 'gallery', 'gallery.collectInOneFolder', ''),
     define('gallery.merge', 'gallery', 'gallery.merge', ''),
