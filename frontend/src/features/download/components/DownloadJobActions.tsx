@@ -18,7 +18,7 @@ export function DownloadJobActions({ job }: { job: DownloadJobDto }): React.JSX.
             {job.cleanupRequired && <button type="button" className={button} disabled={cleaning || executing || vm.deletingIds?.includes(job.id) || vm.batchRetry?.running} onClick={() => {
                 setCleaning(true)
                 void vm.cleanupDownload(job.id).finally(() => setCleaning(false))
-            }}>{cleaning ? translate("정리 중…") : translate("임시 파일 정리")}</button>}
+            }}>{cleaning ? translate("download.cleaningUp") : translate("download.cleanUpTemporaryFiles")}</button>}
             {action && !(job.state === 'pending' && executing) && (
                 <button
                     type="button"
@@ -36,12 +36,12 @@ export function DownloadJobActions({ job }: { job: DownloadJobDto }): React.JSX.
                     onClick={() => vm.runJob(job.id, action)}
                 >
                     {executing
-                        ? translate("실행 요청 중")
+                        ? translate("download.requestingExecution")
                         : action === 'manual_initial'
-                          ? translate("실행")
+                          ? translate("download.run")
                           : action === 'manual_retry'
-                            ? translate("재시도")
-                            : translate("다시 시작")}
+                            ? translate("download.retry")
+                            : translate("download.restart")}
                 </button>
             )}
             {canCancelDownload(job) && (
@@ -51,7 +51,7 @@ export function DownloadJobActions({ job }: { job: DownloadJobDto }): React.JSX.
                     disabled={!vm.ready || cancelling}
                     onClick={() => vm.cancelDownload(job.id)}
                 >
-                    {cancelling ? translate("취소 요청 중") : translate("취소 요청")}
+                    {cancelling ? translate("download.requestingCancellation") : translate("download.cancelJob")}
                 </button>
             )}
         </>

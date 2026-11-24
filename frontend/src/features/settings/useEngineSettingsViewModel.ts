@@ -26,7 +26,7 @@ export function useEngineSettingsViewModel() {
             if (!Object.keys(status).length) throw new Error('Empty engine status')
             if (mounted.current && revision === statusRevision.current) { setEngines(status); setStatusError(null) }
         } catch {
-            if (mounted.current && revision === statusRevision.current) setStatusError(translate("엔진 상태를 확인하지 못했습니다. 다시 확인해 주세요."))
+            if (mounted.current && revision === statusRevision.current) setStatusError(translate("settings.couldNotCheckEngineStatusPleaseCheckAgain"))
         } finally {
             if (mounted.current && revision === statusRevision.current) setLoading(false)
         }
@@ -58,14 +58,14 @@ export function useEngineSettingsViewModel() {
                 setInstalling(engine)
                 setProgress(previous => ({ ...previous, [engine]: initial }))
                 try {
-                    if (!await getApi().installEngine(engine, id)) throw new Error(translate("다시 시도해 주세요."))
+                    if (!await getApi().installEngine(engine, id)) throw new Error(translate("settings.pleaseTryAgain"))
                     if (!mounted.current) break
                     setProgress(previous => ({ ...previous, [engine]: { ...previous[engine], phase: 'completed', error: undefined } }))
                     setBatch(previous => previous && { ...previous, processed: previous.processed + 1, succeeded: previous.succeeded + 1 })
                     await refreshStatus()
                 } catch (error) {
                     if (!mounted.current) break
-                    const message = translate("{0} 설치에 실패했습니다. {1}", { "0": engine, "1": error instanceof Error ? error.message : translate("요청을 처리하지 못했습니다.") })
+                    const message = translate("settings.couldNotInstall", { engine: engine, reason: error instanceof Error ? error.message : translate("settings.couldNotProcessTheRequest") })
                     setProgress(previous => ({ ...previous, [engine]: { ...previous[engine], phase: 'failed', error: message } }))
                     setBatch(previous => previous && { ...previous, processed: previous.processed + 1, failed: [...previous.failed, engine] })
                     showToast(message, 'error')

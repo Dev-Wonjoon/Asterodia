@@ -34,6 +34,21 @@ it('keeps shuffled cycles unique and follows the same history backwards', () => 
     expect(new Set(nextCycle).size).toBe(4); expect(nextCycle[0]).not.toBe(order[3])
     expect(queue.previous()).toBe(nextCycle[2])
 })
+
+it('seeks video with J and L, retains arrow file navigation, and protects controls and composition', async () => {
+    const getFile = setup(); await flush()
+    const video = document.querySelector('video')!
+    Object.defineProperty(video, 'duration', { value: 100, configurable: true }); video.currentTime = 20
+    const send = (target: Element, key: string, options: KeyboardEventInit = {}) => target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...options }))
+    send(video, 'l'); expect(video.currentTime).toBe(25)
+    send(video, 'j'); expect(video.currentTime).toBe(20)
+    send(video, 'l', { isComposing: true }); expect(video.currentTime).toBe(20)
+    const slider = document.querySelector<HTMLInputElement>('.sbp-timeline')!
+    send(slider, 'ArrowRight'); await flush(); expect(getFile).toHaveBeenCalledTimes(1)
+    send(video, 'ArrowRight'); await flush(); expect(getFile).toHaveBeenLastCalledWith(2)
+    const audio = document.querySelector('audio')!; audio.currentTime = 15
+    send(audio, 'j'); expect(audio.currentTime).toBe(10)
+})
 it('opens only the current file, navigates video and audio with arrows, and stops on close', async () => {
     const trigger = document.createElement('button'); document.body.append(trigger); trigger.focus()
     const getFile = setup(); await flush()

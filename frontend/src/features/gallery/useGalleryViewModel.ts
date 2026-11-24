@@ -44,13 +44,13 @@ export function useGalleryViewModel(favoritesOnly = false, filter?: MediaFilter,
                 const filepath = result.data.files.data[0]?.filepath
 
                 if (!filepath) {
-                    showToast(translate("등록된 파일 경로를 찾지 못했습니다."), 'error')
+                    showToast(translate("gallery.couldNotFindTheRegisteredFilePath"), 'error')
                     return
                 }
 
                 await getApi().showItemInFolder(filepath)
             } catch {
-                showToast(translate("파일 위치를 열지 못했습니다."), 'error')
+                showToast(translate("gallery.couldNotOpenTheFileLocation"), 'error')
             }
         },
         [showToast]

@@ -6,18 +6,18 @@ import { useWebServerSettings } from './useWebServerSettings'
 export function WebServerSettings() {
     useLanguage()
     const vm = useWebServerSettings()
-    return <SettingSection title={translate("로컬 웹 서버")} description={translate("갤러리·검색·미디어 재생을 제공합니다. 모바일 편집은 별도로 허용할 수 있습니다.")}>
+    return <SettingSection title={translate("settings.localWebServer")} description={translate("settings.providesGalleryBrowsingSearchAndMediaPlaybackMobileEditing")}>
         <div className="space-y-3 px-4 py-3">
             <div className="flex items-center justify-between gap-3">
-                <span role="status" className="text-sm">{vm.loading ? translate("상태 확인 중…") : !vm.status ? translate("상태 확인 실패") : vm.status.running ? translate("실행 중") : translate("꺼짐")}</span>
-                <Button disabled={vm.loading || vm.busy || !vm.status} onClick={() => void vm.toggle()}>{vm.busy ? translate("처리 중…") : vm.status?.running ? translate("서버 종료") : translate("서버 시작")}</Button>
+                <span role="status" className="text-sm">{vm.loading ? translate("settings.checkingStatus") : !vm.status ? translate("settings.couldNotCheckStatus") : vm.status.running ? translate("settings.running") : translate("settings.off")}</span>
+                <Button disabled={vm.loading || vm.busy || !vm.status} onClick={() => void vm.toggle()}>{vm.busy ? translate("gallery.processing") : vm.status?.running ? translate("settings.stopServer") : translate("settings.startServer")}</Button>
             </div>
-            {vm.error && <p role="alert" className="text-sm text-red-500">{translateMessage(vm.error)} <button type="button" disabled={vm.busy} className="underline" onClick={() => void vm.refresh()}>{translate("다시 확인")}</button></p>}
+            {vm.error && <p role="alert" className="text-sm text-red-500">{translateMessage(vm.error)} <button type="button" disabled={vm.busy} className="underline" onClick={() => void vm.refresh()}>{translate("download.checkAgain")}</button></p>}
             {vm.status && <>
-                <p className="text-xs text-[var(--text-muted)]">{translate("로컬 주소 ")}<span className="select-text">{vm.status.url}</span></p>
-                <p className="text-xs text-[var(--text-muted)]">{translate("앱을 실행할 때는 꺼져 있으며, 앱 종료 시 서버도 종료됩니다.")}</p>
-                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(vm.status.editing)} disabled={vm.loading || vm.busy || !vm.status.running} onChange={() => void vm.toggleEditing()} />{translate("모바일 편집 허용")}</label>
-                <p className="text-xs text-[var(--text-muted)]">{translate("허용하면 Tailscale 접근 정책상 접속 가능한 기기에서 GIF·영상 편집 작업을 만들고 조회·취소할 수 있습니다. 서버 종료 시 허용도 꺼지며, 이미 등록된 작업은 PC에서 계속 처리합니다.")}</p>
+                <p className="text-xs text-[var(--text-muted)]">{translate("settings.localAddress")}<span className="select-text">{vm.status.url}</span></p>
+                <p className="text-xs text-[var(--text-muted)]">{translate("settings.offWhenTheAppStartsTheServerAlsoStops")}</p>
+                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(vm.status.editing)} disabled={vm.loading || vm.busy || !vm.status.running} onChange={() => void vm.toggleEditing()} />{translate("settings.allowMobileEditing")}</label>
+                <p className="text-xs text-[var(--text-muted)]">{translate("settings.devicesPermittedByYourTailscaleAccessPolicyCanCreate")}</p>
             </>}
         </div>
     </SettingSection>

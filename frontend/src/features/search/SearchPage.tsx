@@ -53,7 +53,7 @@ export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string
     return (
         <div className="flex h-full min-h-0 min-w-0 flex-col">
             {/* 검색 영역 */}
-            <div className="shrink-0 p-4 border-b border-[var(--border-line)] space-y-3">
+            <div data-keyboard-region tabIndex={-1} className="shrink-0 p-4 border-b border-[var(--border-line)] space-y-3">
                 {/* 키워드 검색 */}
                 <SearchSuggestions value={vm.keyword} filter={vm.filter} onChange={vm.setKeyword} onSubmit={vm.submitKeyword} onCompositionChange={vm.setSearchComposing} onSelect={item => {
                     if (item.kind === 'title') vm.submitKeyword(item.value)
@@ -67,12 +67,12 @@ export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string
                         <div className="flex items-center gap-2">
                             <input
                                 type="text"
-                                aria-label={translate("태그 추가")}
+                                aria-label={translate("gallery.addTags")}
                                 value={tagInput}
                                 maxLength={200}
                                 onChange={(e) => handleTagInput(e.target.value)}
                                 onKeyDown={handleTagKeyDown}
-                                placeholder={translate("태그 추가...")}
+                                placeholder={translate("search.addTag")}
                                 className="min-w-0 flex-1 px-3 py-1.5 text-sm rounded-lg
                                     bg-[var(--bg-hover)] text-[var(--text-main)]
                                     placeholder-[var(--text-placeholder)]
@@ -119,12 +119,12 @@ export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string
                     <div className="min-w-0 relative">
                         <input
                             type="text"
-                            aria-label={translate("플랫폼 추가")}
+                            aria-label={translate("search.addPlatform")}
                             maxLength={200}
                             value={platformInput}
                             onChange={(e) => handlePlatformInput(e.target.value)}
                             onKeyDown={handlePlatformKeyDown}
-                            placeholder={translate("플랫폼 추가...")}
+                            placeholder={translate("search.platform.placeholder")}
                             className="w-full px-3 py-1.5 text-sm rounded-lg
                                 bg-[var(--bg-hover)] text-[var(--text-main)]
                                 placeholder-[var(--text-placeholder)]
@@ -153,12 +153,12 @@ export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string
                     <div className="min-w-0 relative">
                         <input
                             type="text"
-                            aria-label={translate("작성자 추가")}
+                            aria-label={translate("search.addAuthor")}
                             maxLength={200}
                             value={authorInput}
                             onChange={(e) => handleAuthorInput(e.target.value)}
                             onKeyDown={handleAuthorKeyDown}
-                            placeholder={translate("작성자 추가...")}
+                            placeholder={translate("search.author.placeholder")}
                             className="w-full px-3 py-1.5 text-sm rounded-lg
                                 bg-[var(--bg-hover)] text-[var(--text-main)]
                                 placeholder-[var(--text-placeholder)]
@@ -196,7 +196,7 @@ export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string
                             >
                                 {tag}
                                 <button
-                                    aria-label={translate("태그 {0} 제거", { "0": tag })}
+                                    aria-label={translate("search.removeTag", { tag: tag })}
                                     onClick={() => vm.removeTag(tag)}
                                     className="hover:opacity-70"
                                 >
@@ -211,7 +211,7 @@ export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string
                             >
                                 {p}
                                 <button
-                                    aria-label={translate("플랫폼 {0} 제거", { "0": p })}
+                                    aria-label={translate("search.removePlatform", { platform: p })}
                                     onClick={() => vm.removePlatform(p)}
                                     className="hover:opacity-70"
                                 >
@@ -226,7 +226,7 @@ export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string
                             >
                                 {a}
                                 <button
-                                    aria-label={translate("작성자 {0} 제거", { "0": a })}
+                                    aria-label={translate("search.removeAuthor", { author: a })}
                                     onClick={() => vm.removeAuthor(a)}
                                     className="hover:opacity-70"
                                 >
@@ -237,7 +237,7 @@ export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string
                         <button
                             onClick={() => { vm.clearAll(); setTagInput(''); setPlatformInput(''); setAuthorInput('') }}
                             className="text-xs text-[var(--text-muted)] hover:text-[var(--text-main)]"
-                        >{translate("초기화")}</button>
+                        >{translate("search.reset")}</button>
                     </div>
                 )}
             </div>
@@ -251,9 +251,9 @@ export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string
 
             <div className="flex-1 min-h-0 overflow-hidden">
                 <Gallery
-                    title={translate("검색 결과")}
+                    title={translate("search.searchResults")}
                     filter={vm.filter}
-                    emptyMessage={translate("검색 결과가 없습니다.")}
+                    emptyMessage={translate("shortcuts.noSearchResults")}
                 />
             </div>
         </div>

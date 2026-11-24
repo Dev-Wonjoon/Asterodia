@@ -31,7 +31,7 @@ export function useDownloadViewModel() {
                 return false
             }
 
-            showToast(translate("다운로드 대기열에 등록했습니다."), 'info')
+            showToast(translate("download.addedToTheDownloadQueue"), 'info')
 
             return true
         },
@@ -54,9 +54,9 @@ export function useDownloadViewModel() {
     const cleanupDownload = useCallback(async (jobId: string) => {
         try {
             const result = await getApi().downloads.cleanup?.({ jobId })
-            if (result) showToast(result.ok ? translate("임시 파일 정리를 완료했습니다.") : translateError(result.error), result.ok ? 'success' : 'error')
+            if (result) showToast(result.ok ? translate("download.temporaryFilesCleanedUp") : translateError(result.error), result.ok ? 'success' : 'error')
             await store.refresh()
-        } catch { showToast(translate("임시 파일 정리를 완료하지 못했습니다."), 'error') }
+        } catch { showToast(translate("download.couldNotFinishCleaningUpTemporaryFiles"), 'error') }
     }, [store, showToast])
 
     return {

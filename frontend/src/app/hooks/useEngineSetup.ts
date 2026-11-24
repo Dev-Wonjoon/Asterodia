@@ -19,7 +19,7 @@ export function useEngineSetup(): { showSetup: boolean; checkingSetup: boolean; 
             .catch((error: unknown) => {
                 if (cancelled) return
                 console.error('[EngineSetup] Failed to load engine status:', error)
-                showToast(translate("엔진 상태를 확인하지 못했습니다."), 'error')
+                showToast(translate("common.couldNotCheckEngineStatus"), 'error')
             })
             .finally(() => { if (!cancelled) setCheckingSetup(false) })
         return () => {

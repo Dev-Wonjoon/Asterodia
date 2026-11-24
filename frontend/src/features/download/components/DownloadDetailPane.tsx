@@ -1,4 +1,4 @@
-import { translateError, translate, useLanguage } from '@renderer/shared/i18n'
+import { translateError, translateMessage, translate, useLanguage } from '@renderer/shared/i18n'
 import { downloadFailure } from '@contracts/download-api'
 import { useDownloadViewModel } from '../useDownloadViewModel'
 import { downloadPlatform, downloadStatus } from '../downloadPresentation'
@@ -11,26 +11,26 @@ export function DownloadDetailPane(): React.JSX.Element | null {
     useLanguage()
     const vm = useDownloadViewModel()
     const { data: job, loading, error } = vm.detail
-    if (loading) return <p role="status">{translate("작업 상세를 불러오는 중...")}</p>
+    if (loading) return <p role="status">{translate("download.loadingJobDetails")}</p>
     if (error)
         return (
             <div role="alert" className="space-y-3">
-                <p>{error.message}</p>
+                <p>{translateError(error)}</p>
                 <button
                     type="button"
                     className="underline"
                     onClick={() => vm.detail.jobId && void vm.openDetail(vm.detail.jobId)}
-                >{translate("다시 불러오기")}</button>
+                >{translate("download.reload")}</button>
             </div>
         )
     if (!job) return null
     const failure = job.errorCode ? downloadFailure(job.errorCode) : null
     return (
-        <section className="space-y-5" aria-label={translate("선택한 다운로드 작업")}>
-            <DownloadThumbnail url={job.url} title={job.title || translate("다운로드 썸네일")} />
+        <section className="space-y-5" aria-label={translate("download.selectedDownloadJob")}>
+            <DownloadThumbnail url={job.url} title={job.title || translate("download.downloadThumbnail")} />
             <div className="space-y-2">
                 <h3 className="break-words text-lg font-semibold">
-                    {job.title || translate("다운로드 작업")}
+                    {job.title || translate("download.downloadJob")}
                 </h3>
                 <p className="text-sm text-[var(--text-muted)]">{downloadPlatform(job.url)}</p>
                 <p className="select-text break-all text-sm">{job.url}</p>
@@ -41,24 +41,24 @@ export function DownloadDetailPane(): React.JSX.Element | null {
                 </p>
                 <DownloadProgress job={job} />
                 {job.phase === 'committing' && job.state === 'running' && (
-                    <p className="text-sm text-[var(--text-muted)]">{translate("저장 중에는 취소할 수 없습니다.")}</p>
+                    <p className="text-sm text-[var(--text-muted)]">{translate("download.cannotCancelWhileSaving")}</p>
                 )}
                 {job.cleanupRequired && (
-                    <p className="text-sm">{translate("임시 파일 정리가 필요합니다. 아래의 정리 버튼으로 처리한 뒤 다시 실행하세요.")}</p>
+                    <p className="text-sm">{translate("download.temporaryFilesNeedCleanupUseTheCleanupButtonBelow")}</p>
                 )}
-                {job.historyOnly && <p className="text-sm">{translate("가져오거나 이관한 작업 이력입니다. 새 다운로드는 위 URL 입력란에서 등록하세요.")}</p>}
+                {job.historyOnly && <p className="text-sm">{translate("download.thisIsImportedOrMigratedHistoryAddANew")}</p>}
                 {job.options === null && !job.historyOnly && (
-                    <p className="text-sm">{translate("이전 다운로드 옵션을 확인해야 다시 실행할 수 있습니다.")}</p>
+                    <p className="text-sm">{translate("download.reviewThePreviousDownloadOptionsBeforeRestarting")}</p>
                 )}
                 {failure && !failure.ok && (
                     <p role="alert" className="text-sm">
                         {translateError(failure.error)}
                         <br />
-                        <span className="text-[var(--text-muted)]">{translate("오류 코드: {0}", { "0": job.errorCode })}</span>
+                        <span className="text-[var(--text-muted)]">{translate("download.errorCode", { code: job.errorCode })}</span>
                     </p>
                 )}
                 {job.errorMessage && <div className="space-y-1 text-sm">
-                    <p className="font-medium">{translate("실제 오류")}</p>
+                    <p className="font-medium">{translate("download.errorDetails")}</p>
                     <pre className="max-h-52 overflow-auto whitespace-pre-wrap break-all rounded bg-[var(--bg-app)] p-3 font-mono text-xs">{job.errorMessage}</pre>
                 </div>}
             </div>
@@ -68,26 +68,26 @@ export function DownloadDetailPane(): React.JSX.Element | null {
             </div>
             {job.options && (
                 <div className="space-y-3">
-                    <h3 className="font-medium">{translate("다운로드 옵션")}</h3>
+                    <h3 className="font-medium">{translate("download.downloadOptions")}</h3>
                     <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-                        <dt className="text-[var(--text-muted)]">{translate("종류")}</dt>
+                        <dt className="text-[var(--text-muted)]">{translate("download.type")}</dt>
                         <dd>
                             {job.options.type === 'audio' || job.options.quality === 'audio'
-                                ? translate("오디오")
-                                : translate("영상")}
+                                ? translate("media.audio")
+                                : translate("media.video")}
                         </dd>
-                        <dt className="text-[var(--text-muted)]">{translate("화질")}</dt>
-                        <dd>{job.options.quality || translate("기본 화질")}</dd>
-                        <dt className="text-[var(--text-muted)]">{translate("형식")}</dt>
-                        <dd>{job.options.extension || translate("기본 형식")}</dd>
-                        <dt className="text-[var(--text-muted)]">{translate("재생목록")}</dt>
-                        <dd>{job.options.playlist ? translate("포함") : translate("단일 영상")}</dd>
+                        <dt className="text-[var(--text-muted)]">{translate("download.quality")}</dt>
+                        <dd>{job.options.quality || translate("download.defaultQuality")}</dd>
+                        <dt className="text-[var(--text-muted)]">{translate("download.format")}</dt>
+                        <dd>{job.options.extension || translate("download.defaultFormat")}</dd>
+                        <dt className="text-[var(--text-muted)]">{translate("download.playlist")}</dt>
+                        <dd>{job.options.playlist ? translate("download.included") : translate("download.singleVideo")}</dd>
                     </dl>
                 </div>
             )}
             {vm.halted && (
                 <p role="alert" className="text-sm">
-                    {vm.halted}
+                    {translateMessage(vm.halted)}
                 </p>
             )}
         </section>

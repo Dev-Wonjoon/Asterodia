@@ -63,7 +63,7 @@ export interface GalleryBulkResult {
 
 const transportError: MediaViewError = {
     code: 'TRANSPORT_ERROR',
-    get message() { return translate("응답을 확인하지 못했습니다. 새로고침으로 현재 상태를 확인하세요.") }
+    get message() { return translate("gallery.couldNotConfirmTheResponseRefreshToCheckThe") }
 }
 
 function emptyList(): GallerySnapshot['list'] {
@@ -256,7 +256,7 @@ export function createGalleryStore(
             if (page.hasNextPage && page.data.length === 0) {
                 return failList({
                     code: 'INVARIANT_VIOLATION',
-                    message: translate("다음 목록을 확인하지 못했습니다. 새로고침하세요.")
+                    message: translate("gallery.couldNotLoadTheNextPagePleaseRefresh")
                 })
             }
 
@@ -393,7 +393,7 @@ export function createGalleryStore(
     async function mutate<T>(
         action: () => Promise<MediaResult<T>>,
         apply: (data: T) => void,
-        successNotice: string | null = translate("변경을 반영했습니다.")
+        successNotice: string | null = translate("gallery.changesApplied")
     ): Promise<boolean> {
         if (snapshot.busy || snapshot.needsRefresh) {
             return false
@@ -445,7 +445,7 @@ export function createGalleryStore(
                 publish({
                     ...snapshot,
                     needsRefresh: true,
-                    notice: translate("변경은 반영됐지만 화면을 다시 불러오지 못했습니다. 새로고침하세요.")
+                    notice: translate("gallery.changesWereAppliedButTheViewCouldNotReload")
                 })
             }
 
@@ -546,18 +546,18 @@ export function createGalleryStore(
         try {
             for (const target of targets) {
                 if (own !== session || operationFilter !== filter || uncertain) {
-                    result.failed.push({ mediaId: target.mediaId, message: uncertain ? translate("이전 요청 결과를 확인한 뒤 다시 실행하세요.") : translate("화면이 변경되어 실행하지 않았습니다.") })
+                    result.failed.push({ mediaId: target.mediaId, message: uncertain ? translate("gallery.confirmThePreviousRequestResultBeforeRunningAgain") : translate("gallery.theViewChangedSoTheActionWasNotRun") })
                     continue
                 }
                 const outcome = await request(async (): Promise<MediaResult<true>> => {
                     // Read the current revision without silently replacing the user's selection revision.
                     const current = await api.get({ mediaId: target.mediaId, fileLimit: 1, fileOffset: 0 })
                     if (!current.ok) return current
-                    if (current.data.revision !== target.revision) return { ok: false, error: { code: 'REVISION_CONFLICT', message: translate("선택한 뒤 변경된 게시글입니다. 새로고침 후 다시 선택하세요."), context: {} } }
-                    if (own !== session || operationFilter !== filter) throw new Error(translate("화면이 변경됐습니다"))
+                    if (current.data.revision !== target.revision) return { ok: false, error: { code: 'REVISION_CONFLICT', message: translate("gallery.thisPostChangedAfterSelectionRefreshAndSelectIt"), context: {} } }
+                    if (own !== session || operationFilter !== filter) throw new Error(translate("gallery.theViewHasChanged"))
                     if (action.kind === 'openFolders') {
                         const path = current.data.files.data[0]?.filepath
-                        if (!path) return { ok: false, error: { code: 'NOT_FOUND', message: translate("등록된 파일 경로가 없습니다."), context: {} } }
+                        if (!path) return { ok: false, error: { code: 'NOT_FOUND', message: translate("gallery.noRegisteredFilePath"), context: {} } }
                         const normalized = path.replace(/\\/g, '/')
                         const folder = normalized.slice(0, normalized.lastIndexOf('/'))
                         const key = /^[a-z]:\//i.test(normalized) || normalized.startsWith('//') ? folder.toLowerCase() : folder

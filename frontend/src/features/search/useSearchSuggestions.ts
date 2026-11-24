@@ -44,7 +44,7 @@ export function useSearchSuggestions(text: string, filter: MediaFilter, enabled:
                 if (cache.current.size > 32) cache.current.delete(cache.current.keys().next().value!)
             }
         } catch (failure) {
-            if (serial.current === own && current.current === key) setError(failure instanceof Error ? failure.message : translate("추천 목록을 불러오지 못했습니다."))
+            if (serial.current === own && current.current === key) setError(failure instanceof Error ? failure.message : translate("search.couldNotLoadSuggestions"))
         } finally {
             if (serial.current === own) { busy.current = false; setLoading(false) }
         }

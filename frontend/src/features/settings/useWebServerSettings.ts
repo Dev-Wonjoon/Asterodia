@@ -25,7 +25,7 @@ export function useWebServerSettings() {
         let cancel!: () => void
         const deadline = new Promise<WebServerResult<WebServerStatus>>((_, reject) => {
             timer = setTimeout(() => reject(STATUS_TIMEOUT), STATUS_TIMEOUT_MS)
-            cancel = () => { clearTimeout(timer); reject(new Error(translate("상태 조회 해제"))) }
+            cancel = () => { clearTimeout(timer); reject(new Error(translate("settings.releaseStatusRequest"))) }
         })
         const request: StatusRead = { cancel }
         reading.current = request
@@ -40,8 +40,8 @@ export function useWebServerSettings() {
             if (mounted.current && own === revision.current) {
                 setStatus(null)
                 setError(problem === STATUS_TIMEOUT
-                    ? translate("웹 서버 상태 조회가 10초 안에 응답하지 않았습니다. 다시 확인해 주세요.")
-                    : translate("웹 서버 상태를 확인하지 못했습니다."))
+                    ? translate("settings.theWebServerStatusRequestDidNotRespondWithin")
+                    : translate("settings.couldNotCheckWebServerStatus"))
             }
         } finally {
             clearTimeout(timer)
@@ -82,7 +82,7 @@ export function useWebServerSettings() {
             if (result.ok) { setStatus(result.data); setError(result.data.error) }
             else setError(translateError(result.error))
         } catch {
-            if (mounted.current && own === revision.current) setError(translate("웹 서버 요청 결과를 받지 못했습니다. 상태를 다시 확인해 주세요."))
+            if (mounted.current && own === revision.current) setError(translate("settings.noWebServerResponseReceivedCheckStatusAgain"))
         } finally {
             if (own === revision.current) {
                 locked.current = false
@@ -101,7 +101,7 @@ export function useWebServerSettings() {
             if (result.ok) setStatus(result.data)
             else setError(translateError(result.error))
         } catch {
-            if (mounted.current && own === revision.current) setError(translate("모바일 편집 허용 상태를 바꾸지 못했습니다."))
+            if (mounted.current && own === revision.current) setError(translate("settings.couldNotChangeMobileEditingPermission"))
         } finally {
             if (own === revision.current) { locked.current = false; if (mounted.current) setBusy(false) }
         }

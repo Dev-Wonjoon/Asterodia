@@ -1,3 +1,4 @@
+import { translate } from './i18n.js';
 import { mountMediaViewer } from './viewer.js';
 'use strict';
 import { mountMediaEditor } from './editor.js';
@@ -19,10 +20,10 @@ async function request(path, signal) {
     catch (error) {
         if (error.name === 'AbortError')
             throw error;
-        throw new Error('서버에 연결하지 못했습니다. PC 앱의 서버 상태를 확인해 주세요.');
+        throw new Error(translate("common.couldNotConnectToTheServerCheckTheServer"));
     }
     if (!response.ok)
-        throw new Error(response.status === 404 ? '등록된 미디어를 찾지 못했습니다.' : '서버에 연결하지 못했습니다. PC 앱의 서버 상태를 확인해 주세요.');
+        throw new Error(response.status === 404 ? translate("common.theRegisteredMediaCouldNotBeFound") : translate("common.couldNotConnectToTheServerCheckTheServer"));
     return response.json();
 }
 function text(tag, value) {
@@ -32,15 +33,15 @@ function text(tag, value) {
 }
 function fileURL(id, variant) {
     if (!Number.isSafeInteger(id) || id <= 0)
-        throw new Error('파일 ID를 확인하세요.');
+        throw new Error(translate("common.checkTheFileId"));
     return '/api/files/' + id + '/' + variant;
 }
 function updateFeed() {
     el('refresh').disabled = state.busy;
     el('load-more').disabled = state.busy;
     el('load-more').hidden = !state.next && !state.moreError;
-    el('load-more').textContent = state.moreError ? '다시 시도' : '더 불러오기';
-    el('feed-status').textContent = state.busy ? '불러오는 중…' : `${state.items.length} / ${state.total}개 항목` + (!state.next && state.items.length ? ' · 모든 항목을 불러왔습니다.' : '');
+    el('load-more').textContent = state.moreError ? translate("common.retry") : translate("gallery.loadMore");
+    el('feed-status').textContent = state.busy ? translate("gallery.loading") : translate("web.items", { loaded: state.items.length, total: state.total }) + (!state.next && state.items.length ? translate("common.allItemsLoaded") : '');
     el('gallery').setAttribute('aria-busy', String(state.busy));
     feedObserver?.disconnect();
     if (!state.busy && state.next && !state.moreError && !el('detail').open) feedObserver?.observe(el('gallery-sentinel'));
@@ -65,16 +66,16 @@ async function load({ append = false, count = Math.max(24, state.offset) } = {})
             const page = await request('/api/library?' + query, state.controller.signal);
             if (serial !== state.serial) return null;
             if (append && page.offset !== undefined && page.offset !== offset) return load();
-            if (page.hasNextPage && !page.data.length) throw new Error('다음 목록을 확인하지 못했습니다. 다시 시도해 주세요.');
+            if (page.hasNextPage && !page.data.length) throw new Error(translate("common.couldNotLoadTheNextItemsPleaseTryAgain"));
             rows.push(...page.data); offset += page.data.length;
             total = page.total; hasNext = page.hasNextPage;
         } while (!append && hasNext && offset < count);
         const existing = new Set(append ? state.items.map(itemKey) : []);
         const unique = [...new Map(rows.map(item => [itemKey(item), item])).values()];
         state.items = unique; state.offset = offset; state.total = total; state.next = hasNext; state.moreError = false;
-        el('count').textContent = '총 ' + total + '개 항목';
+        el('count').textContent = translate("web.itemsInTotal", { count: total });
         renderGallery(append ? unique.filter(item => !existing.has(itemKey(item))) : unique, append);
-        el('message').textContent = unique.length ? '' : state.q ? '검색 결과가 없습니다.' : '아직 등록된 미디어가 없습니다.';
+        el('message').textContent = unique.length ? '' : state.q ? translate("shortcuts.noSearchResults") : translate("common.noMediaHasBeenRegisteredYet");
         saveExpandedAlbums(expanded);
         return true;
     } catch (error) {
@@ -97,7 +98,7 @@ function renderGallery(items, append) {
             button.addEventListener('click', () => openDetail(item.id, item.galleryFileOffset));
             const cover = document.createElement('div');
             cover.className = 'cover';
-            cover.append(text('span', item.cover?.kind === 'audio' ? '오디오' : item.cover?.kind === 'video' ? '영상' : '미디어'));
+            cover.append(text('span', item.cover?.kind === 'audio' ? translate("media.audio") : item.cover?.kind === 'video' ? translate("media.video") : translate("common.media")));
             const file = item.galleryFile;
             if (file || item.cover) {
                 const image = document.createElement('img');
@@ -109,14 +110,14 @@ function renderGallery(items, append) {
             }
             const body = document.createElement('div');
             body.className = 'card-body';
-            body.append(text('h2', file ? file.title || `파일 ${item.galleryFileOffset + 1}` : item.title), text('small', file ? `${item.title} · ${item.galleryFileOffset + 1} / ${item.fileCount}` : item.fileCount + '개 파일'));
+            body.append(text('h2', file ? file.title || translate("web.file", { number: item.galleryFileOffset + 1 }) : item.title), text('small', file ? `${item.title} · ${item.galleryFileOffset + 1} / ${item.fileCount}` : translate("web.files", { count: item.fileCount })));
             button.append(cover, body);
             card.append(button);
-            const watch = text('button', '감상하기'); watch.type = 'button'; watch.className = 'album-toggle'; watch.disabled = item.fileCount === 0;
+            const watch = text('button', translate("viewer.open")); watch.type = 'button'; watch.className = 'album-toggle'; watch.disabled = item.fileCount === 0;
             watch.addEventListener('click', () => openViewer(item.id, item.galleryFile?.id)); card.append(watch);
 
             if (item.fileCount > 1 || file) {
-                const toggle = text('button', file ? '앨범 닫기' : '앨범 펼치기'); toggle.type = 'button'; toggle.className = 'album-toggle'; toggle.setAttribute('aria-expanded', String(Boolean(file))); toggle.setAttribute('aria-label', item.title + ' ' + toggle.textContent);
+                const toggle = text('button', file ? translate("common.collapseAlbum") : translate("common.expandAlbum")); toggle.type = 'button'; toggle.className = 'album-toggle'; toggle.setAttribute('aria-expanded', String(Boolean(file))); toggle.setAttribute('aria-label', item.title + ' ' + toggle.textContent);
                 toggle.addEventListener('click', async () => {
                     if (state.busy) return;
                     const previous = state.expanded;
@@ -157,7 +158,7 @@ async function openDetail(id, fileOffset = 0) {
 async function loadFiles() {
     const serial = ++state.detailSerial;
     clearFiles();
-    el('detail-message').textContent = '미디어를 읽고 있습니다…';
+    el('detail-message').textContent = translate("web.loadingMedia");
     el('file-previous').disabled = true;
     el('file-next').disabled = true;
     try {
@@ -192,18 +193,18 @@ async function loadFiles() {
                             player.src = fileURL(file.id, 'preview');
                             return;
                         }
-                        player.replaceWith(text('p', '이 브라우저에서 표시하거나 재생할 수 없는 형식입니다.'));
+                        player.replaceWith(text('p', translate("common.thisBrowserCannotDisplayOrPlayThisFormat")));
                     });
                 }
                 figure.append(player);
             }
             else
-                figure.append(text('p', '표시를 지원하지 않는 미디어입니다.'));
-            figure.append(text('figcaption', file.title || '파일 ' + file.id));
-            const watch = text('button', '감상하기'); watch.type = 'button'; watch.addEventListener('click', () => openViewer(state.media, file.id)); figure.append(watch);
+                figure.append(text('p', translate("common.thisMediaFormatIsNotSupported")));
+            figure.append(text('figcaption', file.title || translate("web.file", { number: file.id })));
+            const watch = text('button', translate("viewer.open")); watch.type = 'button'; watch.addEventListener('click', () => openViewer(state.media, file.id)); figure.append(watch);
 
             if (file.kind === 'video'||file.kind==='image'&&file.detectedFormat==='gif') {
-                const edit = text('button',file.kind==='image'?'GIF 편집':'GIF 만들기·영상 자르기');
+                const edit = text('button',file.kind==='image'?translate("editor.editGif"):translate("editor.createGifOrTrimVideo"));
                 edit.type = 'button';
                 edit.dataset.edit = 'true';
                 edit.hidden = !editAccess.enabled;
@@ -212,8 +213,8 @@ async function loadFiles() {
             }
             el('files').append(figure);
         }
-        el('detail-message').textContent = '파일 ' + detail.files.total + '개';
-        el('file-page').textContent = (Math.floor(state.fileOffset / 24) + 1) + ' 페이지';
+        el('detail-message').textContent = translate("web.fileCount", { count: detail.files.total });
+        el('file-page').textContent = translate("web.page", { number: Math.floor(state.fileOffset / 24) + 1 });
         el('file-previous').disabled = state.fileOffset === 0;
         el('file-next').disabled = !state.fileNext;
     }
@@ -226,8 +227,8 @@ let searchTimer;
 function applySearch() { clearTimeout(searchTimer); state.q = el('keyword').value; state.offset = 0; void load({ count: 24 }); }
 function renderSearchFilters() {
     el('search-filters').replaceChildren();
-    for (const [field,label] of [['tags','태그'],['authors','작성자']]) for (const value of state[field]) {
-        const button = text('button',label + ': ' + value + ' ×'); button.type = 'button'; button.setAttribute('aria-label',label + ' ' + value + ' 제거');
+    for (const [field,label] of [['tags',translate("media.tags")],['authors',translate("media.author")]]) for (const value of state[field]) {
+        const button = text('button',label + ': ' + value + ' ×'); button.type = 'button'; button.setAttribute('aria-label',label + ' ' + value + translate("common.remove"));
         button.addEventListener('click',()=>{state[field]=state[field].filter(item=>item!==value); renderSearchFilters(); applySearch();}); el('search-filters').append(button);
     }
 }
@@ -274,7 +275,7 @@ function openEditor(file) { if (openedEditor)
 el('edit-history').addEventListener('click', () => openEditor());
 async function loadEditAccess() { try {
     editAccess = await request('/api/edit/status');
-    el('access-mode').textContent = editAccess.enabled ? '편집 허용' : '읽기 전용';
+    el('access-mode').textContent = editAccess.enabled ? translate("common.editingAllowed") : translate("common.readOnly");
     el('edit-history').hidden = !editAccess.enabled;
     for (const button of document.querySelectorAll('button[data-edit]'))
         button.hidden = !editAccess.enabled;

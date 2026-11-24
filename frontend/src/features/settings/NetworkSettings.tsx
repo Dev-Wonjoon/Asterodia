@@ -8,7 +8,7 @@ import { useToast } from '@renderer/shared/hooks/useToast'
 import { WebServerSettings } from './WebServerSettings'
 
 const BROWSER_OPTIONS = [
-    { value: '', get label() { return translate("사용 안 함") } },
+    { value: '', get label() { return translate("shortcuts.disabled") } },
     { value: 'chrome', label: 'Chrome' },
     { value: 'firefox', label: 'Firefox' },
     { value: 'edge', label: 'Edge' }
@@ -25,14 +25,14 @@ export const NetworkSettings = (): React.JSX.Element => {
         let active = true
         void Promise.all([getApi().getCookieBrowser(), getApi().getCookieFilePath()])
             .then(([browser, file]) => { if (active) { setBrowser(browser); setCookieFile(file) } })
-            .catch(() => { if (active) showToast(translate("네트워크 설정을 읽지 못했습니다."), 'error') })
+            .catch(() => { if (active) showToast(translate("settings.couldNotReadNetworkSettings"), 'error') })
         return () => { active = false }
     }, [showToast])
 
     async function save(action: () => Promise<void>): Promise<void> {
         if (saving) return
         setSaving(true)
-        try { await action() } catch { showToast(translate("네트워크 설정을 저장하지 못했습니다."), 'error') }
+        try { await action() } catch { showToast(translate("settings.couldNotSaveNetworkSettings"), 'error') }
         finally { setSaving(false) }
     }
 
@@ -52,13 +52,13 @@ export const NetworkSettings = (): React.JSX.Element => {
         <div className="space-y-6">
         <WebServerSettings />
         <SettingSection
-            title={translate("네트워크 설정")}
-            description={translate("다운로드 시 사용되는 네트워크 관련 설정입니다.")}
+            title={translate("settings.networkSettings")}
+            description={translate("settings.networkSettingsUsedForDownloads")}
         >
             <SettingRow
-                label={translate("쿠키 브라우저")}
-                description={translate("브라우저에서 쿠키를 자동으로 가져옵니다.")}
-                value={BROWSER_OPTIONS.find((o) => o.value === browser)?.label || translate("사용 안 함")}
+                label={translate("settings.cookieBrowser")}
+                description={translate("settings.automaticallyReadCookiesFromABrowser")}
+                value={BROWSER_OPTIONS.find((o) => o.value === browser)?.label || translate("shortcuts.disabled")}
                 action={
                     <select
                         disabled={saving}
@@ -75,14 +75,14 @@ export const NetworkSettings = (): React.JSX.Element => {
                 }
             />
             <SettingRow
-                label={translate("쿠키 파일")}
-                description={translate("Netscape 형식의 cookies.txt 파일을 직접 지정합니다.")}
-                value={cookieFile || translate("설정되지 않음")}
+                label={translate("settings.cookieFile")}
+                description={translate("settings.selectACookiesTxtFileInNetscapeFormat")}
+                value={cookieFile || translate("settings.notSet")}
                 action={
                     <div className="flex gap-2">
-                        <Button disabled={saving} onClick={handleSelectCookieFile}>{translate("선택")}</Button>
+                        <Button disabled={saving} onClick={handleSelectCookieFile}>{translate("settings.select")}</Button>
                         {cookieFile && (
-                            <Button disabled={saving} variant="ghost" onClick={handleClearCookieFile}>{translate("초기화")}</Button>
+                            <Button disabled={saving} variant="ghost" onClick={handleClearCookieFile}>{translate("search.reset")}</Button>
                         )}
                     </div>
                 }

@@ -1,4 +1,5 @@
 import { translate, bindText, bindAttribute, localizeWidget } from './i18n.js'
+import { matchShortcut, isComposing } from './shortcuts.js';
 const preferenceKey = 'storagebucket:player-seek-seconds:v1';
 const audioPreferenceKey = 'storagebucket:player-audio:v1';
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -20,9 +21,9 @@ export function formatTime(value) {
 }
 
 // Shared by the desktop WebView and the browser. Owns all listeners and timers.
-export function mountVideoPlayer(host, { src, title = translate("동영상"), poster, onError, keyboardSeek = true } = {}) {
+export function mountVideoPlayer(host, { src, title = translate("media.videoTitle"), poster, onError, keyboardSeek = true } = {}) {
     const doc = host.ownerDocument, root = doc.createElement('section');
-    root.className = 'sb-player'; bindAttribute(root, 'aria-label', () => title + translate(" 플레이어")); root.tabIndex = 0;
+    root.className = 'sb-player'; bindAttribute(root, 'aria-label', () => title + translate("player.player")); root.tabIndex = 0;
     const node = (tag, className, text) => { const el = doc.createElement(tag); if (className) el.className = className; if (typeof text === 'function') bindText(el, text); else if (text) bindText(el, () => text); return el; };
     const listeners = [];
     const on = (el, event, fn, options) => { el.addEventListener(event, fn, options); listeners.push(() => el.removeEventListener(event, fn, options)); };
@@ -44,34 +45,34 @@ export function mountVideoPlayer(host, { src, title = translate("동영상"), po
     const feedback = node('div', 'sbp-feedback'); feedback.setAttribute('role', 'status'); feedback.setAttribute('aria-live', 'polite');
     const message = node('p', 'sbp-message'); message.hidden = true;
     const overlay = node('div', 'sbp-overlay'), seek = node('input', 'sbp-timeline');
-    seek.type = 'range'; seek.min = '0'; seek.max = '0'; seek.step = '0.1'; seek.value = '0'; bindAttribute(seek, 'aria-label', () => translate("재생 위치"));
+    seek.type = 'range'; seek.min = '0'; seek.max = '0'; seek.step = '0.1'; seek.value = '0'; bindAttribute(seek, 'aria-label', () => translate("player.playbackPosition"));
     const controls = node('div', 'sbp-controls');
     let clickTimer, hideTimer, feedbackTimer, lastTap = null, touchStart = null, lastTouch = -Infinity, seconds = readSeekSeconds(), destroyed = false;
     function showFeedback(text) { bindText(feedback, () => text); feedback.classList.add('is-visible'); clearTimeout(feedbackTimer); feedbackTimer = setTimeout(() => feedback.classList.remove('is-visible'), 900); }
     function wake() { root.classList.add('is-awake'); clearTimeout(hideTimer); if (!video.paused) hideTimer = setTimeout(() => root.classList.remove('is-awake'), 2500); }
     function togglePlay() {
-        if (video.paused) { const pending = video.play(); pending?.catch(() => { if (!destroyed) { bindText(message, () => translate("재생을 시작하지 못했습니다. 다시 시도해 주세요.")); message.hidden = false; } }); }
+        if (video.paused) { const pending = video.play(); pending?.catch(() => { if (!destroyed) { bindText(message, () => translate("player.couldNotStartPlaybackTryAgain")); message.hidden = false; } }); }
         else video.pause();
         wake();
     }
     function jump(delta) {
-        if (!Number.isFinite(video.duration) || video.duration <= 0) { showFeedback(translate("재생을 시작한 뒤 이동할 수 있습니다.")); return; }
+        if (!Number.isFinite(video.duration) || video.duration <= 0) { showFeedback(translate("player.startPlaybackBeforeSeeking")); return; }
         video.currentTime = clamp(video.currentTime + delta, 0, video.duration);
-        showFeedback((delta < 0 ? '↶ ' : '↷ ') + Math.abs(delta) + translate("초")); sync(); wake();
+        showFeedback((delta < 0 ? '↶ ' : '↷ ') + Math.abs(delta) + translate("editor.s")); sync(); wake();
     }
-    const play = button(() => (translate("재생")), '▶', togglePlay, controls);
-    const mute = button(() => (translate("음소거")), '♪', () => { video.muted = !video.muted; audioChanged(); }, controls);
-    const volume = node('input', 'sbp-volume'); volume.type = 'range'; volume.min = '0'; volume.max = '1'; volume.step = '0.05'; volume.value = '1'; bindAttribute(volume, 'aria-label', () => translate("음량"));
+    const play = button(() => (translate("player.play")), '▶', togglePlay, controls);
+    const mute = button(() => (translate("player.mute")), '♪', () => { video.muted = !video.muted; audioChanged(); }, controls);
+    const volume = node('input', 'sbp-volume'); volume.type = 'range'; volume.min = '0'; volume.max = '1'; volume.step = '0.05'; volume.value = '1'; bindAttribute(volume, 'aria-label', () => translate("player.volume"));
     on(volume, 'input', () => { video.volume = Number(volume.value); video.muted = video.volume === 0; audioChanged(); }); controls.append(volume);
     const time = node('output', 'sbp-time', '0:00 / 0:00'); controls.append(time);
-    const rate = node('select', 'sbp-rate'); bindAttribute(rate, 'aria-label', () => translate("재생 속도"));
+    const rate = node('select', 'sbp-rate'); bindAttribute(rate, 'aria-label', () => translate("player.playbackSpeed"));
     for (const value of [.25, .5, .75, 1, 1.25, 1.5, 1.75, 2]) { const option = node('option', '', value + '×'); option.value = String(value); option.selected = value === 1; rate.append(option); }
     on(rate, 'change', () => { video.playbackRate = Number(rate.value); }); controls.append(rate);
     const settings = node('div', 'sbp-settings'); settings.hidden = true;
-    const settingLabel = node('label', '', () => (translate("더블 클릭·탭 이동 (초)"))); const interval = node('input'); interval.type = 'number'; interval.min = '1'; interval.max = '300'; interval.step = '1'; interval.value = String(seconds);
+    const settingLabel = node('label', '', () => (translate("player.doubleClickTapSeekSeconds"))); const interval = node('input'); interval.type = 'number'; interval.min = '1'; interval.max = '300'; interval.step = '1'; interval.value = String(seconds);
     on(interval, 'change', () => { const n = Number(interval.value); if (Number.isInteger(n) && n >= 1 && n <= 300) { seconds = n; try { localStorage.setItem(preferenceKey, String(n)); } catch {} } interval.value = String(seconds); });
-    settingLabel.append(interval); settings.append(settingLabel, node('small', '', () => (translate("왼쪽은 뒤로, 오른쪽은 앞으로 이동합니다."))));
-    const settingsButton = button(() => (translate("플레이어 설정")), '⚙', () => { settings.hidden = !settings.hidden; settingsButton.setAttribute('aria-expanded', String(!settings.hidden)); wake(); if (!settings.hidden) interval.focus(); }, controls);
+    settingLabel.append(interval); settings.append(settingLabel, node('small', '', () => (translate("player.leftSeeksBackwardRightSeeksForward"))));
+    const settingsButton = button(() => (translate("player.playerSettings")), '⚙', () => { settings.hidden = !settings.hidden; settingsButton.setAttribute('aria-expanded', String(!settings.hidden)); wake(); if (!settings.hidden) interval.focus(); }, controls);
     icon(settingsButton, 'settings');
     settingsButton.setAttribute('aria-expanded', 'false');
     let expandedDialog = null;
@@ -81,17 +82,17 @@ export function mountVideoPlayer(host, { src, title = translate("동영상"), po
         const dialog = expandedDialog; expandedDialog = null;
         root.classList.remove('is-expanded'); host.append(root); dialog.remove();
         doc.body.style.overflow = previousOverflow;
-        bindAttribute(fullscreen, 'aria-label', () => translate("전체화면")); if (!destroyed) fullscreen.focus({ preventScroll: true }); wake();
+        bindAttribute(fullscreen, 'aria-label', () => translate("player.fullscreen")); if (!destroyed) fullscreen.focus({ preventScroll: true }); wake();
     }
     function expandInWindow() {
         const dialog = node('dialog', 'sbp-fullscreen-dialog');
-        bindAttribute(dialog, 'aria-label', () => title + translate(" 전체화면")); dialog.setAttribute('data-detail-trigger', '');
+        bindAttribute(dialog, 'aria-label', () => title + translate("player.suffix.fullscreen")); dialog.setAttribute('data-detail-trigger', '');
         previousOverflow = doc.body.style.overflow; doc.body.style.overflow = 'hidden';
         expandedDialog = dialog; doc.body.append(dialog); dialog.append(root); root.classList.add('is-expanded');
         on(dialog, 'close', leaveExpanded);
-        dialog.showModal(); bindAttribute(fullscreen, 'aria-label', () => translate("전체화면 종료")); root.focus(); wake();
+        dialog.showModal(); bindAttribute(fullscreen, 'aria-label', () => translate("player.exitFullscreen")); root.focus(); wake();
     }
-    const fullscreen = button(() => (translate("전체화면")), '⛶', async () => {
+    const fullscreen = button(() => (translate("player.fullscreen")), '⛶', async () => {
         if (expandedDialog) { expandedDialog.close(); return; }
         try {
             if (doc.fullscreenElement === root) await doc.exitFullscreen();
@@ -100,19 +101,19 @@ export function mountVideoPlayer(host, { src, title = translate("동영상"), po
         } catch { if (!destroyed) expandInWindow(); }
     }, controls);
     icon(fullscreen, 'fullscreen');
-    const jumps = node('div', 'sbp-jumps'); bindAttribute(jumps, 'aria-label', () => translate("시간 이동"));
+    const jumps = node('div', 'sbp-jumps'); bindAttribute(jumps, 'aria-label', () => translate("player.seek"));
     for (const delta of [-300, -60, -30, -10, 10, 30, 60, 300]) {
-        const text = () => (delta < 0 ? '-' : '+') + (Math.abs(delta) >= 60 ? Math.abs(delta) / 60 + translate("분") : Math.abs(delta) + translate("초"));
-        const b = button(() => text() + translate(" 이동"), text, () => jump(delta), jumps); b.dataset.seconds = String(delta);
+        const text = () => (delta < 0 ? '-' : '+') + (Math.abs(delta) >= 60 ? Math.abs(delta) / 60 + translate("player.min") : Math.abs(delta) + translate("editor.s"));
+        const b = button(() => text() + translate("player.suffix.seek"), text, () => jump(delta), jumps); b.dataset.seconds = String(delta);
     }
-    const error = () => { bindText(message, () => translate("현재 환경에서 재생할 수 없습니다. 파일 경로나 지원 코덱을 확인해 주세요.")); message.hidden = false; message.setAttribute('role', 'alert'); onError?.(); wake(); };
+    const error = () => { bindText(message, () => translate("player.cannotPlayInTheCurrentEnvironmentCheckTheFile")); message.hidden = false; message.setAttribute('role', 'alert'); onError?.(); wake(); };
     function sync() {
         const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
         seek.disabled = !duration; seek.max = String(duration); seek.value = String(video.currentTime || 0);
         seek.setAttribute('aria-valuetext', formatTime(video.currentTime) + ' / ' + formatTime(duration));
         bindText(time, () => formatTime(video.currentTime) + ' / ' + formatTime(duration));
-        icon(play, video.paused ? 'play' : 'pause'); bindAttribute(play, 'aria-label', () => video.paused ? translate("재생") : translate("일시정지")); bindAttribute(play, 'title', () => video.paused ? translate("재생") : translate("일시정지"));
-        icon(mute, video.muted || !video.volume ? 'muted' : 'volume'); bindAttribute(mute, 'aria-label', () => video.muted ? translate("음소거 해제") : translate("음소거"));
+        icon(play, video.paused ? 'play' : 'pause'); bindAttribute(play, 'aria-label', () => video.paused ? translate("player.play") : translate("player.pause")); bindAttribute(play, 'title', () => video.paused ? translate("player.play") : translate("player.pause"));
+        icon(mute, video.muted || !video.volume ? 'muted' : 'volume'); bindAttribute(mute, 'aria-label', () => video.muted ? translate("player.unmute") : translate("player.mute"));
         volume.value = String(video.muted ? 0 : video.volume); root.classList.toggle('is-paused', video.paused);
         for (const b of jumps.children) b.disabled = !duration;
     }
@@ -143,21 +144,26 @@ export function mountVideoPlayer(host, { src, title = translate("동영상"), po
     for (const event of ['loadedmetadata', 'durationchange', 'timeupdate', 'ratechange', 'ended', 'emptied']) on(video, event, sync);
     on(video, 'volumechange', audioChanged);
     on(video, 'play', () => { message.hidden = true; sync(); wake(); }); on(video, 'pause', () => { sync(); wake(); });
-    on(video, 'waiting', () => { bindText(message, () => translate("불러오는 중…")); message.hidden = false; }); on(video, 'playing', () => { message.hidden = true; });
+    on(video, 'waiting', () => { bindText(message, () => translate("gallery.loading")); message.hidden = false; }); on(video, 'playing', () => { message.hidden = true; });
     on(video, 'error', error); on(root, 'pointermove', wake); on(root, 'focusin', wake);
-    on(doc, 'fullscreenchange', () => { bindAttribute(fullscreen, 'aria-label', () => doc.fullscreenElement === root ? translate("전체화면 종료") : translate("전체화면")); });
+    on(doc, 'fullscreenchange', () => { bindAttribute(fullscreen, 'aria-label', () => doc.fullscreenElement === root ? translate("player.exitFullscreen") : translate("player.fullscreen")); });
     on(root, 'keydown', event => {
+        if (event.defaultPrevented || isComposing(event)) return;
         if (event.key === 'Escape' && !settings.hidden) { event.preventDefault(); event.stopPropagation(); settings.hidden = true; settingsButton.setAttribute('aria-expanded', 'false'); settingsButton.focus(); return; }
         if (event.target !== root && event.target !== video) return;
-        const key = event.key.toLowerCase();
-        if ([' ', 'k', 'arrowleft', 'arrowright', 'm', 'f'].includes(key)) { event.preventDefault(); event.stopPropagation(); }
-        if (key === ' ' || key === 'k') togglePlay();
-        if (keyboardSeek && (key === 'arrowleft' || key === 'arrowright')) jump(key === 'arrowleft' ? -seconds : seconds);
-        if (key === 'm') { video.muted = !video.muted; audioChanged(); }
-        if (key === 'f') fullscreen.click();
-        if (key === 'escape') { settings.hidden = true; settingsButton.setAttribute('aria-expanded', 'false'); }
+        const item = matchShortcut(event, 'player');
+        if (item) { event.preventDefault(); event.stopPropagation(); keyboardAction(item.id); }
+        else if (keyboardSeek && !event.ctrlKey && !event.altKey && !event.metaKey && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            event.preventDefault(); event.stopPropagation(); jump(event.key === 'ArrowLeft' ? -seconds : seconds);
+        }
     });
+    function keyboardAction(id) {
+        if (id === 'player.play' || id === 'player.playAlternative') togglePlay();
+        if (id === 'player.backward' || id === 'player.forward') jump(id === 'player.backward' ? -5 : 5);
+        if (id === 'player.mute') { video.muted = !video.muted; audioChanged(); }
+        if (id === 'player.fullscreen') fullscreen.click();
+    }
     overlay.append(seek, controls); screen.append(video, feedback, message, overlay, settings); root.append(screen, jumps); host.append(root); sync(); wake();
     const stopLanguage = localizeWidget(root);
-    return { video, root, destroy() { stopLanguage(); destroyed = true; leaveExpanded(); clearTimeout(clickTimer); clearTimeout(hideTimer); clearTimeout(feedbackTimer); listeners.forEach(remove => remove()); if (doc.fullscreenElement === root) doc.exitFullscreen()?.catch(() => {}); video.pause(); video.removeAttribute('src'); video.load(); root.remove(); } };
+    return { video, root, keyboardAction, destroy() { stopLanguage(); destroyed = true; leaveExpanded(); clearTimeout(clickTimer); clearTimeout(hideTimer); clearTimeout(feedbackTimer); listeners.forEach(remove => remove()); if (doc.fullscreenElement === root) doc.exitFullscreen()?.catch(() => {}); video.pause(); video.removeAttribute('src'); video.load(); root.remove(); } };
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent, type MouseEvent, type RefObject } from 'react'
 import { translate } from '@renderer/shared/i18n'
+import { isComposing } from '../../../../internal/webserver/web/shortcuts.js'
 import type { MoveSelection } from '@contracts/file-move-api'
 import type { MediaSummaryDto } from '@contracts/media-v2'
 
@@ -49,7 +50,7 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
         event.dataTransfer.setData(albumDragType, JSON.stringify(drag))
         // Use a compact count badge instead of a large card as the native drag image.
         const badge = document.createElement('div')
-        badge.textContent = translate("묶음 {0}개 · 개별 파일 {1}개", { "0": drag.mediaIds.length, "1": drag.fileIds.length })
+        badge.textContent = translate("gallery.collectionsIndividualFiles", { collections: drag.mediaIds.length, files: drag.fileIds.length })
         badge.style.cssText = 'position:fixed;top:-1000px;left:0;padding:10px 14px;border-radius:8px;background:#252532;color:white;font:14px sans-serif;white-space:nowrap'
         document.body.append(badge)
         event.dataTransfer.setDragImage(badge, 12, 12)
@@ -176,8 +177,9 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
         function cancelPointer() { if (gesture.current) stop(true) }
         function lost(event: globalThis.PointerEvent) { if (gesture.current?.active && gesture.current.id === event.pointerId && event.target === root) stop(true) }
         function escape(event: KeyboardEvent) {
+            if (event.defaultPrevented || isComposing(event)) return
             if (event.key === 'Escape' && albumDragRef.current) { event.preventDefault(); event.stopPropagation(); endAlbumDrag(); return }
-            if (event.key !== 'Escape' || blocked.current || document.querySelector('dialog[open],[data-confirm-dialog]') || (event.target instanceof Element && event.target.closest('input:not([type="checkbox"]),textarea,select,[contenteditable="true"]'))) return
+            if (event.key !== 'Escape' || blocked.current || document.querySelector('dialog[open],[aria-modal="true"],[data-confirm-dialog],[role="menu"],[role="listbox"],[data-keyboard-detail]') || (event.target instanceof Element && event.target.closest('input:not([type="checkbox"]),textarea,select,[contenteditable="true"]'))) return
             if (gesture.current || selected.current.size) {
                 event.preventDefault(); event.stopPropagation()
                 if (gesture.current) stop(true); else clear()

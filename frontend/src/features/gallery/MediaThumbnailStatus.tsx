@@ -53,7 +53,7 @@ export function MediaThumbnailStatus({
                 }
             } catch {
                 if (active) {
-                    setError(translate("썸네일 상태를 확인하지 못했습니다."))
+                    setError(translate("gallery.couldNotCheckThumbnailStatus"))
                 }
             }
         }
@@ -77,7 +77,7 @@ export function MediaThumbnailStatus({
                 await readStatus()
             } catch {
                 if (active) {
-                    setError(translate("썸네일 재시도를 요청하지 못했습니다."))
+                    setError(translate("gallery.couldNotRequestAThumbnailRetry"))
                 }
             } finally {
                 if (active) {
@@ -111,29 +111,29 @@ export function MediaThumbnailStatus({
         return null
     }
 
-    let message = translate("썸네일 상태 확인 중...")
+    let message = translate("gallery.checkingThumbnailStatus")
 
     switch (status?.state) {
         case 'missing':
-            message = translate("썸네일 생성 작업이 등록되어 있지 않습니다.")
+            message = translate("gallery.noThumbnailGenerationJobRegistered")
             break
 
         case 'pending':
-            message = translate("썸네일 생성 대기 중")
+            message = translate("gallery.waitingToGenerateThumbnail")
             break
 
         case 'running':
-            message = translate("썸네일 생성 중")
+            message = translate("gallery.generatingThumbnail")
             break
 
         case 'failed':
             message = status.canRetry
-                ? translate("썸네일을 가져오지 못했습니다.")
-                : translate("썸네일 생성을 완료하지 못했습니다.")
+                ? translate("gallery.couldNotLoadTheThumbnail")
+                : translate("gallery.couldNotFinishGeneratingTheThumbnail")
             break
 
         case 'blocked':
-            message = translate("썸네일 생성이 보류되었습니다.")
+            message = translate("gallery.thumbnailGenerationIsOnHold")
             break
 
         case 'registered':
@@ -155,7 +155,7 @@ export function MediaThumbnailStatus({
         <div
             data-thumbnail-file={fileId}
             data-thumbnail-state={status?.state ?? 'loading'}
-            aria-label={translate("{0} 썸네일 상태", { "0": title })}
+            aria-label={translate("gallery.thumbnailStatus", { title: title })}
             aria-busy={requesting}
             className="space-y-2 text-sm"
         >
@@ -171,14 +171,14 @@ export function MediaThumbnailStatus({
                 <button
                     type="button"
                     className={button}
-                    aria-label={translate("{0} 썸네일 다시 시도", { "0": title })}
+                    aria-label={translate("gallery.retryThumbnail", { title: title })}
                     disabled={disabled || requesting}
                     onClick={(event) => {
                         event.stopPropagation()
                         request('retry')
                     }}
                 >
-                    {requesting ? translate("요청 중...") : translate("썸네일 다시 시도")}
+                    {requesting ? translate("gallery.operation.requesting") : translate("gallery.thumbnail.retry")}
                 </button>
             )}
 
@@ -186,13 +186,13 @@ export function MediaThumbnailStatus({
                 <button
                     type="button"
                     className={button}
-                    aria-label={translate("{0} 썸네일 상태 새로고침", { "0": title })}
+                    aria-label={translate("gallery.refreshThumbnailStatus", { title: title })}
                     disabled={disabled || requesting}
                     onClick={(event) => {
                         event.stopPropagation()
                         request('read')
                     }}
-                >{translate("상태 새로고침")}</button>
+                >{translate("gallery.refreshStatus")}</button>
             )}
         </div>
     )

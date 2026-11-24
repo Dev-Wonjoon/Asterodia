@@ -24,7 +24,7 @@ export const BaseModal = ({
     useEffect(() => {
         if (!onClose) return
         const handleEsc = (e: KeyboardEvent): void => {
-            if (e.key === 'Escape') onClose()
+            if (e.key === 'Escape' && !e.defaultPrevented && !e.isComposing && e.keyCode !== 229) onClose()
         }
         document.addEventListener('keydown', handleEsc)
         return () => document.removeEventListener('keydown', handleEsc)

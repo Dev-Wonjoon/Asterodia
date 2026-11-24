@@ -1,3 +1,11 @@
 @import 'tailwindcss';
 @import './theme.css';
 @import './animations.css';
+.keyboard-shortcut-hint[data-shortcut]::after {
+    content: attr(data-shortcut);
+    margin-left: auto;
+    padding-left: 0.5rem;
+    white-space: nowrap;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+}

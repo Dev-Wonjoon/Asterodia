@@ -17,17 +17,17 @@ type Prompt = PromptContent & { id: number }
 function promptOptions(prompt: Prompt): ConfirmOptions {
     switch (prompt.kind) {
         case 'available': return {
-            title: translate("새 버전 업데이트"),
-            message: translate("현재 버전: {0}\n새 버전: {1} · {2}\n\n{3}\n\n업데이트를 다운로드할까요?", { "0": prompt.status.currentVersion, "1": prompt.status.version, "2": formatBytes(prompt.status.size), "3": prompt.status.notes || translate("등록된 변경 사항이 없습니다.") }),
-            confirmLabel: translate("업데이트"), cancelLabel: translate("나중에"),
+            title: translate("settings.newVersionUpdate"),
+            message: translate("settings.currentVersionNewVersionDownloadTheUpdate", { currentVersion: prompt.status.currentVersion, newVersion: prompt.status.version, size: formatBytes(prompt.status.size), notes: prompt.status.notes || translate("settings.noReleaseNotesAvailable") }),
+            confirmLabel: translate("settings.update"), cancelLabel: translate("settings.later"),
         }
         case 'ready': return {
-            title: translate("업데이트 준비 완료"),
-            message: translate("StorageBucket {0} 다운로드와 검증이 완료되었습니다.\n지금 앱을 다시 시작하여 적용할까요? 진행 중인 작업이 있으면 적용을 미룹니다.", { "0": prompt.status.version }),
-            confirmLabel: translate("지금 재시작"), cancelLabel: translate("나중에"),
+            title: translate("settings.updateReady"),
+            message: translate("settings.storagebucketHasBeenDownloadedAndVerifiedRestartTheApp", { version: prompt.status.version }),
+            confirmLabel: translate("settings.restartNow"), cancelLabel: translate("settings.later"),
         }
-        case 'latest': return { title: translate("업데이트 확인"), message: translate("최신 버전입니다."), confirmLabel: translate("확인"), cancelLabel: translate("닫기") }
-        case 'error': return { title: translate("업데이트 실패"), message: prompt.message, confirmLabel: prompt.retry ? translate("다시 시도") : translate("확인"), cancelLabel: translate("닫기") }
+        case 'latest': return { title: translate("settings.checkForUpdates"), message: translate("settings.youAreUpToDate"), confirmLabel: translate("common.confirm"), cancelLabel: translate("common.close") }
+        case 'error': return { title: translate("settings.updateFailed"), message: prompt.message, confirmLabel: prompt.retry ? translate("common.retry") : translate("common.confirm"), cancelLabel: translate("common.close") }
     }
 }
 
@@ -78,7 +78,7 @@ export function AppUpdateProvider({ children, blocked = false, leaveGuard }: { c
                     if (['checking', 'downloading', 'verifying', 'installing', 'restarting'].includes(result.data.state)) delay = 750
                 } else setError(translateError(result.error))
             } catch {
-                if (!stopped && own === generation.current) setError(translate("업데이트 상태를 확인하지 못했습니다."))
+                if (!stopped && own === generation.current) setError(translate("settings.couldNotCheckUpdateStatus"))
             } finally {
                 if (!stopped) timer = setTimeout(() => void poll(), delay)
             }
@@ -101,7 +101,7 @@ export function AppUpdateProvider({ children, blocked = false, leaveGuard }: { c
             return result
         } catch {
             if (!alive.current) return null
-            const message = translate("업데이트 요청 결과를 받지 못했습니다. 상태를 확인한 뒤 다시 시도하세요.")
+            const message = translate("settings.noUpdateResponseReceivedCheckStatusBeforeTryingAgain")
             setError(message)
             return { ok: false, error: { code: 'UPDATE_REQUEST_FAILED', message } }
         } finally {
@@ -114,7 +114,7 @@ export function AppUpdateProvider({ children, blocked = false, leaveGuard }: { c
         const result = await request(action)
         if (!result || !alive.current) return
         if (!result.ok || result.data.error || result.data.state === 'error') {
-            enqueue({ kind: 'error', retry: action === 'restart' ? undefined : action, message: result.ok ? result.data.error || translate("업데이트를 완료하지 못했습니다.") : translateError(result.error) })
+            enqueue({ kind: 'error', retry: action === 'restart' ? undefined : action, message: result.ok ? result.data.error || translate("settings.couldNotCompleteTheUpdate") : translateError(result.error) })
             return
         }
         const data = result.data
@@ -153,7 +153,7 @@ export function AppUpdateProvider({ children, blocked = false, leaveGuard }: { c
                 } else if (prompt.kind === 'error' && prompt.retry) await run(prompt.retry)
             } catch {
                 if (alive.current) {
-                    const message = translate("업데이트 진행 여부를 확인하지 못했습니다. 작업을 저장한 뒤 다시 시도하세요.")
+                    const message = translate("settings.couldNotConfirmUpdateProgressSaveYourWorkAnd")
                     setError(message)
                     enqueue({ kind: 'error', message })
                 }

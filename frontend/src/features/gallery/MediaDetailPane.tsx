@@ -145,7 +145,7 @@ export function MediaDetailPane({
 
         if (
             draft?.dirty &&
-            !await confirm({ title: translate("저장된 제목 불러오기"), message: translate("작성 중인 제목을 버리고 현재 저장된 제목을 불러올까요?"), confirmLabel: translate("불러오기") })
+            !await confirm({ title: translate("gallery.reloadSavedTitle"), message: translate("gallery.discardYourTitleDraftAndLoadTheCurrentlySaved"), confirmLabel: translate("gallery.load") })
         ) {
             return
         }
@@ -162,7 +162,7 @@ export function MediaDetailPane({
         try {
             await getApi().showItemInFolder(filepath)
         } catch {
-            showToast(translate("파일 위치를 열지 못했습니다."), 'error')
+            showToast(translate("gallery.couldNotOpenTheFileLocation"), 'error')
         }
     }
 
@@ -170,12 +170,12 @@ export function MediaDetailPane({
         'rounded-lg border border-[var(--border-line)] px-3 py-2 text-sm disabled:opacity-40'
 
     return (
-        <section aria-label={translate("묶음 상세")} className="space-y-5">
-            {detail.status === 'loading' && <p role="status">{translate("상세 정보를 불러오는 중...")}</p>}
+        <section aria-label={translate("gallery.collectionDetails")} className="space-y-5">
+            {detail.status === 'loading' && <p role="status">{translate("gallery.loadingDetails")}</p>}
 
             {detail.error && <p role="alert">{translateError(detail.error)}</p>}
 
-            {detail.status === 'idle' && <p>{translate("새로고침하여 상세 정보를 확인하세요.")}</p>}
+            {detail.status === 'idle' && <p>{translate("gallery.refreshToViewDetails")}</p>}
 
             {data && (
                 <>
@@ -184,19 +184,19 @@ export function MediaDetailPane({
                             <h3 className="break-words font-medium">{data.title}</h3>
 
                             <p className="text-sm text-[var(--text-muted)]">
-                                {data.isUserAlbum ? translate("사용자 앨범") : data.sourceKind === 'local'
-                                    ? translate("로컬 폴더")
+                                {data.isUserAlbum ? translate("gallery.userAlbums") : data.sourceKind === 'local'
+                                    ? translate("gallery.localFolder")
                                     : data.sourceKind === 'download'
-                                      ? translate("다운로드")
-                                      : translate("기존 자료")}
-                                {' · ' + translate('파일 {0}개', { '0': data.fileCount })}
+                                      ? translate("navigation.downloads")
+                                      : translate("gallery.existingMedia")}
+                                {' · ' + translate("gallery.files.count", { count: data.fileCount })}
                             </p>
 
                             {data.requestUrl && (
                                 <p className="break-all text-sm">{data.requestUrl}</p>
                             )}
 
-                            <p className="text-sm">{translate("표지: {0}", { "0": data.coverMode === 'manual' ? translate("사용자 지정") : translate("자동") })}</p>
+                            <p className="text-sm">{translate("gallery.cover", { filename: data.coverMode === 'manual' ? translate("gallery.custom") : translate("download.auto") })}</p>
 
                             <div className="flex flex-wrap gap-2">
                                 <button
@@ -212,7 +212,7 @@ export function MediaDetailPane({
                                         })
                                     }
                                 >
-                                    {data.isFavorite ? translate("즐겨찾기 해제") : translate("즐겨찾기 추가")}
+                                    {data.isFavorite ? translate("gallery.favorite.remove") : translate("gallery.favorite.add")}
                                 </button>
 
                                 <button
@@ -226,7 +226,7 @@ export function MediaDetailPane({
                                             cover: { mode: 'auto' }
                                         })
                                     }
-                                >{translate("표지 자동 선택")}</button>
+                                >{translate("gallery.chooseCoverAutomatically")}</button>
                             </div>
                         </div>
                     </div>
@@ -238,7 +238,7 @@ export function MediaDetailPane({
                         }}
                         className="space-y-2"
                     >
-                        <label className="block text-sm">{translate("사용자 지정 제목")}<input
+                        <label className="block text-sm">{translate("gallery.customTitle")}<input
                                 ref={titleInput}
                                 value={draft?.title ?? ''}
                                 disabled={state.busy || !draft}
@@ -260,7 +260,7 @@ export function MediaDetailPane({
                         </label>
 
                         {staleDraft && (
-                            <p role="alert" className="text-sm">{translate("제목을 작성한 뒤 저장된 정보가 변경됐습니다. 초안을 확인하고 저장된 제목을 다시 불러오세요.")}</p>
+                            <p role="alert" className="text-sm">{translate("gallery.theSavedTitleChangedAfterYouStartedEditingReview")}</p>
                         )}
 
                         <div className="flex flex-wrap gap-2">
@@ -268,14 +268,14 @@ export function MediaDetailPane({
                                 type="submit"
                                 className={button}
                                 disabled={disabled || !draft?.dirty || staleDraft}
-                            >{translate("제목 저장")}</button>
+                            >{translate("gallery.saveTitle")}</button>
 
                             <button
                                 type="button"
                                 className={button}
                                 disabled={state.busy}
                                 onClick={resetDraft}
-                            >{translate("저장된 제목 불러오기")}</button>
+                            >{translate("gallery.reloadSavedTitle")}</button>
 
                             <button
                                 type="button"
@@ -284,7 +284,7 @@ export function MediaDetailPane({
                                 onClick={async () => {
                                     if (
                                         draft?.dirty &&
-                                        !await confirm({ title: translate("원본 제목으로 되돌리기"), message: translate("작성 중인 제목을 버리고 원본 제목으로 되돌릴까요?"), confirmLabel: translate("되돌리기") })
+                                        !await confirm({ title: translate("gallery.restoreOriginalTitle"), message: translate("gallery.discardYourTitleDraftAndRestoreTheOriginalTitle"), confirmLabel: translate("gallery.restore") })
                                     ) {
                                         return
                                     }
@@ -312,7 +312,7 @@ export function MediaDetailPane({
                                             )
                                         })
                                 }}
-                            >{translate("원본 제목으로 되돌리기")}</button>
+                            >{translate("gallery.restoreOriginalTitle")}</button>
                         </div>
                     </form>
 
@@ -323,7 +323,7 @@ export function MediaDetailPane({
                             void addTag()
                         }}
                     >
-                        <h3 className="text-sm font-medium">{translate("태그")}</h3>
+                        <h3 className="text-sm font-medium">{translate("media.tags")}</h3>
 
                         <div className="flex flex-wrap gap-2">
                             {data.tags.map((tag) => (
@@ -336,7 +336,7 @@ export function MediaDetailPane({
                                     <button
                                         type="button"
                                         disabled={disabled}
-                                        aria-label={tag.name + translate(" 태그 연결 해제")}
+                                        aria-label={tag.name + translate("gallery.unlinkTag")}
                                         onClick={() =>
                                             void store.edit({
                                                 mediaId: data.id,
@@ -353,18 +353,18 @@ export function MediaDetailPane({
                             ))}
 
                             {!data.tags.length && (
-                                <span className="text-sm text-[var(--text-muted)]">{translate("연결된 태그가 없습니다.")}</span>
+                                <span className="text-sm text-[var(--text-muted)]">{translate("gallery.noLinkedTags")}</span>
                             )}
                         </div>
 
                         <div className="flex gap-2">
                             <input
                                 ref={tagInput}
-                                aria-label={translate("추가할 태그 이름")}
+                                aria-label={translate("gallery.tagNameToAdd")}
                                 value={newTagName}
                                 disabled={state.busy}
                                 onChange={(event) => setNewTagName(event.target.value)}
-                                placeholder={translate("태그 이름")}
+                                placeholder={translate("gallery.tagName")}
                                 className="min-w-0 flex-1 rounded-lg border border-[var(--border-line)] bg-[var(--bg-app)] p-2 text-sm"
                             />
 
@@ -372,13 +372,13 @@ export function MediaDetailPane({
                                 type="submit"
                                 className={button}
                                 disabled={disabled || !newTagName.trim()}
-                            >{translate("추가")}</button>
+                            >{translate("gallery.add")}</button>
                         </div>
                     </form>
 
                     <div className="space-y-3">
-                        <h3 className="font-medium">{translate("파일 {0}개", { "0": data.files.total })}</h3>
-                        {onAddMedia && <ActionButton icon={<ListPlus />} label={translate("전체 추가")} title={translate("파일 {0}개 전체를 앨범에 추가", { "0": data.fileCount })} disabled={disabled || hasDraft || data.fileCount === 0} onClick={() => onAddMedia(data.id)} />}
+                        <h3 className="font-medium">{translate("gallery.files.count", { count: data.files.total })}</h3>
+                        {onAddMedia && <ActionButton icon={<ListPlus />} label={translate("gallery.addAll")} title={translate("gallery.addAllFilesToAnAlbum", { count: data.fileCount })} disabled={disabled || hasDraft || data.fileCount === 0} onClick={() => onAddMedia(data.id)} />}
 
                         {data.files.data.map((file) => (
                             <article
@@ -386,9 +386,9 @@ export function MediaDetailPane({
                                 className="flex flex-col gap-3 rounded-lg border border-[var(--border-line)] p-3"
                             >
                                 <div className="flex flex-wrap gap-2">
-                                    {onViewFile && <ActionButton icon={<Play />} label={translate("감상하기")} disabled={disabled} onClick={() => onViewFile(file.id)} />}
-                                    {onAddFiles && <ActionButton icon={<ListPlus />} label={translate("앨범에 추가")} disabled={disabled || hasDraft} onClick={() => onAddFiles([file.id])} />}
-                                    {onGatherFiles && <ActionButton icon={<FolderInput />} label={translate("한 폴더에 모으기")} disabled={disabled} onClick={() => onGatherFiles([file.id])} />}
+                                    {onViewFile && <ActionButton icon={<Play />} label={translate("viewer.open")} disabled={disabled} onClick={() => onViewFile(file.id)} />}
+                                    {onAddFiles && <ActionButton icon={<ListPlus />} label={translate("gallery.album.add")} disabled={disabled || hasDraft} onClick={() => onAddFiles([file.id])} />}
+                                    {onGatherFiles && <ActionButton icon={<FolderInput />} label={translate("gallery.collectInOneFolder")} disabled={disabled} onClick={() => onGatherFiles([file.id])} />}
                                 </div>
                                 {(file.kind === 'video' || file.kind === 'audio') && <MediaPlayer key={`${file.id}:${data.revision}`} path={file.filepath} kind={file.kind} title={file.title ?? file.fileKey} poster={file.thumbnailPath} />}
                                 {file.kind !== 'video' && file.kind !== 'audio' && <MediaPreview
@@ -420,10 +420,10 @@ export function MediaDetailPane({
 
                                     <p className="text-xs text-[var(--text-muted)]">
                                         {file.storageKind === 'external_reference'
-                                            ? translate("외부 원본 참조")
+                                            ? translate("gallery.externalOriginalReference")
                                             : file.storageKind === 'unverified_legacy'
-                                              ? translate("보관 방식 미확인")
-                                              : translate("앱 관리 파일")}
+                                              ? translate("gallery.unknownStorageOwnership")
+                                              : translate("gallery.appManagedFile")}
 
                                         {file.detectedFormat ? ' · ' + file.detectedFormat : ''}
                                     </p>
@@ -436,7 +436,7 @@ export function MediaDetailPane({
                                         className={button}
                                         disabled={state.busy}
                                         onClick={() => void showFile(file.filepath)}
-                                    >{translate("파일 위치")}</button>
+                                    >{translate("gallery.fileLocation")}</button>
 
                                     <button
                                         type="button"
@@ -452,15 +452,15 @@ export function MediaDetailPane({
                                                 }
                                             })
                                         }
-                                    >{translate("표지 지정")}</button>
+                                    >{translate("gallery.setAsCover")}</button>
 
                                     <button
                                         type="button"
                                         className={button}
                                         disabled={disabled}
                                         onClick={async () => {
-                                            const warning = hasDraft ? translate("\n\n파일 등록 해제로 묶음이 제거되면 작성 중인 제목·태그도 닫힙니다.") : ''
-                                            if (!await confirm({ title: data.isUserAlbum ? translate("앨범에서 빼기") : translate("파일 등록 해제"), message: (data.isUserAlbum ? translate("이 앨범에서 파일을 뺄까요? 원본 파일과 다른 앨범은 유지됩니다.") : translate("이 파일의 등록을 해제할까요? 외부 원본과 보관 방식 미확인 원본은 삭제하지 않습니다. 앱 관리 파일의 정리는 별도로 처리합니다.")) + warning, confirmLabel: data.isUserAlbum ? translate("앨범에서 빼기") : translate("등록 해제"), danger: true }) || !canContinue()) return
+                                            const warning = hasDraft ? translate("gallery.ifUnregisteringTheFileRemovesItsCollectionUnsavedTitle") : ''
+                                            if (!await confirm({ title: data.isUserAlbum ? translate("gallery.album.removeFile") : translate("gallery.unregisterFile"), message: (data.isUserAlbum ? translate("gallery.removeThisFileFromTheAlbumOriginalFilesAnd") : translate("gallery.unregisterThisFileExternalOriginalsAndFilesWithUnknown")) + warning, confirmLabel: data.isUserAlbum ? translate("gallery.album.removeFile") : translate("gallery.unregister"), danger: true }) || !canContinue()) return
                                             void store.unregisterFiles({
                                                 mediaId: data.id,
                                                 expectedRevision: data.revision,
@@ -468,7 +468,7 @@ export function MediaDetailPane({
                                             })
                                         }}
                                     >
-                                        {data.isUserAlbum ? translate("앨범에서 빼기") : translate("등록 해제")}
+                                        {data.isUserAlbum ? translate("gallery.album.removeFile") : translate("gallery.unregister")}
                                     </button>
                                 </div>
                             </article>
@@ -484,11 +484,11 @@ export function MediaDetailPane({
                                         Math.max(0, detail.offset - MEDIA_PAGE_SIZE)
                                     )
                                 }
-                            >{translate("이전 파일")}</button>
+                            >{translate("gallery.previousFiles")}</button>
 
                             <span className="text-sm">
                                 {Math.floor(detail.offset / MEDIA_PAGE_SIZE) + 1}
-                                {translate(" 페이지")}
+                                {translate("gallery.page")}
                             </span>
 
                             <button
@@ -498,7 +498,7 @@ export function MediaDetailPane({
                                 onClick={() =>
                                     void store.loadDetail(detail.offset + MEDIA_PAGE_SIZE)
                                 }
-                            >{translate("다음 파일")}</button>
+                            >{translate("gallery.nextFiles")}</button>
                         </div>
                     </div>
 
@@ -507,15 +507,15 @@ export function MediaDetailPane({
                         className={button + ' text-red-500'}
                         disabled={disabled}
                         onClick={async () => {
-                            const warning = hasDraft ? translate("\n\n작성 중인 제목·태그도 닫힙니다.") : ''
-                            if (!await confirm({ title: data.isUserAlbum ? translate("앨범 삭제") : translate("묶음 등록 해제"), message: (data.isUserAlbum ? translate("앨범을 삭제할까요? 원본 파일과 다른 앨범은 유지됩니다.") : translate("묶음의 등록을 해제할까요? 외부 원본과 보관 방식 미확인 원본은 삭제하지 않습니다. 앱 관리 파일의 정리는 별도로 처리합니다.")) + warning, confirmLabel: data.isUserAlbum ? translate("앨범 삭제") : translate("등록 해제"), danger: true }) || !canContinue()) return
+                            const warning = hasDraft ? translate("gallery.unsavedTitleAndTagEditsWillAlsoClose") : ''
+                            if (!await confirm({ title: data.isUserAlbum ? translate("gallery.deleteAlbum") : translate("gallery.unregisterCollection"), message: (data.isUserAlbum ? translate("gallery.deleteThisAlbumOriginalFilesAndOtherAlbumsWill") : translate("gallery.unregisterThisCollectionExternalOriginalsAndFilesWithUnknown")) + warning, confirmLabel: data.isUserAlbum ? translate("gallery.deleteAlbum") : translate("gallery.unregister"), danger: true }) || !canContinue()) return
                             void store.unregisterMedia({
                                 mediaId: data.id,
                                 expectedRevision: data.revision
                             })
                         }}
                     >
-                        {data.isUserAlbum ? translate("앨범 삭제") : translate("묶음 등록 해제")}
+                        {data.isUserAlbum ? translate("gallery.deleteAlbum") : translate("gallery.unregisterCollection")}
                     </button>
                 </>
             )}

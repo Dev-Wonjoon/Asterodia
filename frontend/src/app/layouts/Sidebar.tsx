@@ -11,7 +11,7 @@ import { useDownloadViewModel } from '@renderer/features/download/useDownloadVie
 const SIDEBAR_MENUS: Array<{ id: AppMenu; label: string; icon: ReactNode }> = [
     {
         id: 'gallery',
-        get label() { return translate("갤러리") },
+        get label() { return translate("navigation.gallery") },
         icon: (
             <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -31,12 +31,12 @@ const SIDEBAR_MENUS: Array<{ id: AppMenu; label: string; icon: ReactNode }> = [
     },
     {
         id: 'downloads',
-        get label() { return translate("다운로드") },
+        get label() { return translate("navigation.downloads") },
         icon: <Download className="size-6" />
     },
     {
         id: 'search',
-        get label() { return translate("검색") },
+        get label() { return translate("navigation.search") },
         icon: (
             <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -56,7 +56,7 @@ const SIDEBAR_MENUS: Array<{ id: AppMenu; label: string; icon: ReactNode }> = [
     },
     {
         id: 'favorites',
-        get label() { return translate("즐겨찾기") },
+        get label() { return translate("navigation.favorites") },
         icon: (
             <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -99,11 +99,12 @@ export const Sidebar = ({
         return () => clearTimeout(timer)
     }, [modeNotice])
     const { requestedIds } = useDownloadViewModel()
-    const themeLabel = theme === 'dark' ? translate("라이트모드 전환") : translate("다크모드 전환")
-    const toggleLabel = collapsed ? translate("사이드바 펼치기") : translate("사이드바 접기")
+    const themeLabel = theme === 'dark' ? translate("common.switchToLightMode") : translate("common.switchToDarkMode")
+    const toggleLabel = collapsed ? translate("common.expandSidebar") : translate("common.collapseSidebar")
 
     return (
         <aside
+            data-keyboard-region tabIndex={-1}
             id="app-sidebar"
             className="w-full h-full flex flex-col shadow-2xl transition-colors duration-200 bg-[var(--bg-sidebar)] border-r border-[var(--border-line)]"
         >
@@ -146,7 +147,7 @@ export const Sidebar = ({
             </div>
 
             <nav
-                aria-label={translate("주 메뉴")}
+                aria-label={translate("common.mainNavigation")}
                 className="flex-1 min-h-0 px-3 py-4 flex flex-col gap-1 overflow-y-auto"
             >
                 {SIDEBAR_MENUS.map((menu) => (
@@ -154,7 +155,7 @@ export const Sidebar = ({
                         key={menu.id}
                         label={
                             menu.id === 'downloads' && requestedIds.length > 0
-                                ? translate("다운로드 · 요청 {0}", { "0": requestedIds.length })
+                                ? translate("common.downloadsRequested", { count: requestedIds.length })
                                 : menu.label
                         }
                         icon={menu.icon}
@@ -172,7 +173,7 @@ export const Sidebar = ({
             >
                 <div className={collapsed ? 'w-full' : 'flex-1 min-w-0'}>
                     <SidebarItem
-                        label={translate("설정")}
+                        label={translate("navigation.settings")}
                         icon={<Settings className="size-6" />}
                         isActive={activeMenu === 'settings'}
                         collapsed={collapsed}
@@ -197,10 +198,10 @@ export const Sidebar = ({
                     </button>
                     <button
                         type="button"
-                        onClick={() => { setModeNotice(mode === 'icons' ? translate("설명 모드 · 버튼에 마우스를 올리거나 포커스하면 기능명이 표시됩니다.") : translate("아이콘 모드")); toggleActionDisplay() }}
-                        aria-label={translate("기능 버튼 설명 모드")}
+                        onClick={() => { setModeNotice(mode === 'icons' ? translate("common.labelModeHoverOverOrFocusAButtonTo") : translate("common.iconMode")); toggleActionDisplay() }}
+                        aria-label={translate("common.buttonLabelMode")}
                         aria-pressed={mode === 'details'}
-                        title={mode === 'icons' ? translate("아이콘 모드 · 설명 모드로 전환") : translate("설명 모드 · 아이콘 모드로 전환")}
+                        title={mode === 'icons' ? translate("common.iconModeSwitchToLabelMode") : translate("common.labelModeSwitchToIconMode")}
                         className={(collapsed ? 'size-7' : 'size-9') + ' shrink-0 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)]'}
                     >
                         {mode === 'icons' ? <TextCursorInput className="size-5" aria-hidden="true" /> : <Grid2X2 className="size-5" aria-hidden="true" />}

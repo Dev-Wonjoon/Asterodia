@@ -1,7 +1,8 @@
 import { translate, bindText, bindAttribute, localizeWidget, getLocale, translateError, translateMessage } from "./i18n.js"
+import { matchShortcut, isComposing, isTextInput, shortcutKeys, shortcuts, formatShortcut, shortcutAria } from './shortcuts.js';
 // Shared by the React desktop launcher and the mobile web page. The server owns
 // immutable frame IDs; this UI sends crop coordinates and deleted IDs only.
-const labels = { get pending() { return translate("대기 중") }, get preparing() { return translate("프레임 준비 중") }, get ready() { return translate("편집 가능") }, get running() { return translate("변환 중") }, get verifying() { return translate("결과 확인 중") }, get publishing() { return translate("저장 중") }, get completed() { return translate("완료") }, get failed() { return translate("실패") }, get cancelled() { return translate("취소됨") }, get interrupted() { return translate("중단됨") }, get released() { return translate("정리됨") }, get stop_unconfirmed() { return translate("앱 재시작 필요") } };
+const labels = { get pending() { return translate("editor.pending") }, get preparing() { return translate("editor.preparingFrames") }, get ready() { return translate("editor.readyToEdit") }, get running() { return translate("editor.converting") }, get verifying() { return translate("editor.checkingOutput") }, get publishing() { return translate("download.saving") }, get completed() { return translate("download.completed") }, get failed() { return translate("download.failed") }, get cancelled() { return translate("download.cancelled") }, get interrupted() { return translate("download.interrupted") }, get released() { return translate("editor.released") }, get stop_unconfirmed() { return translate("editor.appRestartRequired") } };
 const active = value => ['pending', 'preparing', 'running', 'verifying', 'publishing'].includes(value);
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, Math.round(n)));
 export function formatEditTime(seconds) {
@@ -94,8 +95,8 @@ export function mountRangeControl(host, { label, count, values, change, format }
         handle.type = 'button';
         handle.className = 'sbe-range-handle sbe-range-' + side;
         handle.setAttribute('role', 'slider');
-        bindAttribute(handle, 'aria-label', () => readLabel() + ' ' + (side === 'start' ? translate("시작") : translate("종료")) + translate(" 손잡이"));
-        bindAttribute(handle, 'title', () => handle.getAttribute('aria-label') + translate(" (←·↓ / →·↑: 한 칸, Home / End: 처음·끝)"));
+        bindAttribute(handle, 'aria-label', () => readLabel() + ' ' + (side === 'start' ? translate("editor.start") : translate("download.finished")) + translate("editor.handle"));
+        bindAttribute(handle, 'title', () => handle.getAttribute('aria-label') + translate("editor.oneStepHomeEndFirstLast"));
         handle.setAttribute('aria-keyshortcuts', 'ArrowLeft ArrowDown ArrowRight ArrowUp Home End');
         const grip = doc.createElement('span');
         bindText(grip, () => 'Ⅱ');
@@ -190,39 +191,37 @@ export function mountMediaEditor(host, options) {
     }
     function button(text, action, parent, className = '') { const el = node('button', text, className); el.type = 'button'; el.addEventListener('click', event => void action(event)); parent?.append(el); return el; }
     const dialog = node('dialog', undefined, 'sb-editor');
-    bindAttribute(dialog, 'aria-label', () => translate("GIF 만들기·동영상 자르기"));
+    bindAttribute(dialog, 'aria-label', () => translate("editor.launch"));
     host.append(dialog);
     const heading = node('header', undefined, 'sbe-heading');
-    const title = node('h2', () => (translate("GIF 만들기·동영상 자르기")));
+    const title = node('h2', () => (translate("editor.launch")));
     heading.append(title);
     const headingActions = node('div', undefined, 'sbe-heading-actions');
     heading.append(headingActions);
-    const shortcutToggle = button(() => (translate("단축키 안내")), () => showShortcuts(shortcutsPanel.hidden), headingActions, 'sbe-shortcut-toggle');
+    const shortcutToggle = button(() => (translate("editor.keyboardShortcuts")), () => showShortcuts(shortcutsPanel.hidden), headingActions, 'sbe-shortcut-toggle');
     const keyboardIcon = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
     keyboardIcon.setAttribute('viewBox', '0 0 24 24'); keyboardIcon.setAttribute('width', '18'); keyboardIcon.setAttribute('height', '18');
     keyboardIcon.setAttribute('fill', 'none'); keyboardIcon.setAttribute('stroke', 'currentColor'); keyboardIcon.setAttribute('stroke-width', '1.7'); keyboardIcon.setAttribute('aria-hidden', 'true');
     const keyboardPath = doc.createElementNS('http://www.w3.org/2000/svg', 'path');
     keyboardPath.setAttribute('d', 'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1ZM6 9h2m3 0h2m3 0h2M6 12h2m3 0h2m3 0h2M7 16h10');
     keyboardIcon.append(keyboardPath); shortcutToggle.prepend(keyboardIcon);
-    const closeEditor = button(() => (translate("닫기")), () => dialog.close(), headingActions);
-    bindAttribute(closeEditor, 'title', () => translate("편집기 닫기 (Esc)"));
+    const closeEditor = button(() => (translate("common.close")), () => dialog.close(), headingActions);
+    bindAttribute(closeEditor, 'title', () => translate("editor.closeEditorEsc"));
     dialog.append(heading);
     const shortcutsPanel = node('section', undefined, 'sbe-shortcuts');
     shortcutsPanel.id = 'sbe-shortcuts-' + crypto.randomUUID(); shortcutsPanel.hidden = true; shortcutsPanel.tabIndex = -1;
-    shortcutsPanel.setAttribute('role', 'region'); bindAttribute(shortcutsPanel, 'aria-label', () => translate("편집 단축키 안내"));
+    shortcutsPanel.setAttribute('role', 'region'); bindAttribute(shortcutsPanel, 'aria-label', () => translate("editor.editingKeyboardShortcuts"));
     shortcutToggle.setAttribute('aria-controls', shortcutsPanel.id); shortcutToggle.setAttribute('aria-expanded', 'false');
     const shortcutHeading = node('div', undefined, 'sbe-shortcuts-heading');
-    shortcutHeading.append(node('h3', () => (translate("단축키 안내"))));
-    button(() => (translate("단축키 안내 닫기")), () => showShortcuts(false), shortcutHeading);
+    shortcutHeading.append(node('h3', () => (translate("editor.keyboardShortcuts"))));
+    button(() => (translate("editor.closeKeyboardShortcuts")), () => showShortcuts(false), shortcutHeading);
     shortcutsPanel.append(shortcutHeading);
     const shortcutMode = node('p', '', 'sbe-hint'); shortcutsPanel.append(shortcutMode);
-    const frameShortcuts = [
-        { get label() { return translate("이전 프레임") }, keys: '←', aria: 'ArrowLeft' },
-        { get label() { return translate("다음 프레임") }, keys: '→', aria: 'ArrowRight' },
-        { get label() { return translate("선택 프레임 삭제") }, keys: 'Delete', aria: 'Delete' },
-        { get label() { return translate("실행 취소") }, keys: 'Ctrl+Z / ⌘+Z', aria: 'Control+z Meta+z' },
-        { get label() { return translate("다시 실행") }, keys: 'Ctrl+Shift+Z / ⌘+Shift+Z', aria: 'Control+Shift+z Meta+Shift+z' },
-    ];
+    const frameShortcuts = ['editor.previous', 'editor.next', 'editor.delete', 'editor.undo', 'editor.redo'].map(id => ({
+        get label() { return translate(shortcuts.find(item => item.id === id).label); },
+        get keys() { const keys = shortcutKeys(id); return keys ? formatShortcut(keys) + (keys.startsWith('Ctrl+') ? ' / ' + formatShortcut(keys.replace('Ctrl+', '⌘+')) : '') : translate("shortcuts.disabled"); },
+        get aria() { return shortcutAria(shortcutKeys(id)); },
+    }));
     function shortcutGroup(label, rows, hint) {
         const group = node('section', undefined, 'sbe-shortcut-group');
         group.append(node('h4', label));
@@ -236,16 +235,17 @@ export function mountMediaEditor(host, options) {
         shortcutsPanel.append(group);
         return group;
     }
-    const frameShortcutGroup = shortcutGroup(() => (translate("프레임 편집")), [...frameShortcuts, { get label() { return translate("프레임 범위 선택") }, get keys() { return translate("Shift+클릭") } }, { get label() { return translate("개별 선택 추가·해제") }, get keys() { return translate("Ctrl+클릭 / ⌘+클릭") } }, { get label() { return translate("연속 프레임 선택") }, get keys() { return translate("드래그") } }], () => (translate("프레임 행 또는 체크박스에서 선택합니다. Ctrl+Shift+클릭은 기존 선택에 범위를 추가합니다. 드래그 중 Esc는 선택을 되돌립니다. 입력창에서는 입력창의 기본 동작을 우선합니다.")));
-    const rangeShortcutGroup = shortcutGroup(() => (translate("구간 손잡이")), [
-        { get label() { return translate("이전 값으로 한 칸 이동") }, keys: '← / ↓' },
-        { get label() { return translate("다음 값으로 한 칸 이동") }, keys: '→ / ↑' },
-        { get label() { return translate("허용 범위의 처음·끝으로 이동") }, keys: 'Home / End' },
-    ], () => (translate("시작 또는 종료 손잡이에 초점을 맞춘 뒤 사용합니다. 손잡이에 초점이 있으면 방향키로 구간 경계를 조절합니다.")));
-    shortcutGroup(() => (translate("공통")), [
-        { get label() { return translate("다음·이전 조작 항목으로 이동") }, keys: 'Tab / Shift+Tab' },
-        { get label() { return translate("단축키 안내 또는 편집기 닫기") }, keys: 'Esc' },
-    ], () => (translate("안내가 열려 있으면 Esc로 안내를 먼저 닫습니다.")));
+    const frameShortcutGroup = shortcutGroup(() => (translate("editor.frameEditing")), [...frameShortcuts, { get label() { return translate("editor.selectFrameRange") }, get keys() { return translate("editor.shiftClick") } }, { get label() { return translate("editor.toggleIndividualSelection") }, get keys() { return translate("editor.ctrlClickClick") } }, { get label() { return translate("editor.selectConsecutiveFrames") }, get keys() { return translate("editor.drag") } }], () => (translate("editor.selectUsingFrameRowsOrCheckboxesCtrlShiftClick")));
+    const rangeShortcutGroup = shortcutGroup(() => (translate("editor.rangeHandles")), [
+        { get label() { return translate("editor.moveOneStepBack") }, keys: '← / ↓' },
+        { get label() { return translate("editor.moveOneStepForward") }, keys: '→ / ↑' },
+        { get label() { return translate("editor.moveToTheFirstOrLastAllowedValue") }, keys: 'Home / End' },
+    ], () => (translate("editor.focusTheStartOrEndHandleFirstArrowKeys")));
+    shortcutGroup(() => (translate("editor.general")), [
+        ...['editor.start', 'editor.end', 'editor.export'].map(id => ({ get label() { return translate(shortcuts.find(item => item.id === id).label); }, get keys() { return shortcutKeys(id) || translate("shortcuts.disabled"); } })),
+        { get label() { return translate("editor.moveToTheNextOrPreviousControl") }, keys: 'Tab / Shift+Tab' },
+        { get label() { return translate("editor.closeShortcutsOrEditor") }, keys: 'Esc' },
+    ], () => (translate("editor.whenShortcutsAreOpenEscClosesThemFirst")));
     dialog.append(shortcutsPanel);
     let shortcutScroll = 0;
     function showShortcuts(open) {
@@ -285,7 +285,7 @@ export function mountMediaEditor(host, options) {
     async function unwrap(promise) {
         let timer;
         try {
-            const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(translate("요청 응답을 받지 못했습니다. PC 작업 목록을 확인한 뒤 다시 요청하세요."))), 15000); });
+            const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(translate("editor.noResponseReceivedCheckThePcJobListBefore"))), 15000); });
             const result = await Promise.race([promise, timeout]);
             if (!result.ok) {
                 const e = new Error(translateError(result.error));
@@ -303,12 +303,12 @@ export function mountMediaEditor(host, options) {
             return;
         busy = true;
         sync();
-        report(translate("처리 중…"));
+        report(translate("gallery.processing"));
         try {
             await work();
         }
         catch (e) {
-            report(e.message || translate("요청 결과를 받지 못했습니다. 작업 목록에서 확인하거나 다시 요청하세요."), true);
+            report(e.message || translate("editor.noResultReceivedCheckTheJobListOrTry"), true);
         }
         finally {
             busy = false;
@@ -316,7 +316,7 @@ export function mountMediaEditor(host, options) {
                 sync();
         }
     }
-    function stopPlayback() { playing = false; playbackVersion++; clearTimeout(playTimer); bindText(play, () => translate("편집 결과 재생")); }
+    function stopPlayback() { playing = false; playbackVersion++; clearTimeout(playTimer); bindText(play, () => translate("editor.playEditedOutput")); }
     const storageKey = () => `storagebucket-edit-v1:${session.id}`;
     function persist() {
         if (!session || !crop)
@@ -325,7 +325,7 @@ export function mountMediaEditor(host, options) {
             localStorage.setItem(storageKey(), JSON.stringify({ crop, appliedCrop, clipStart, clipEnd, deleted, undo, redo }));
         }
         catch {
-            report(translate("브라우저 저장 공간이 부족하여 편집 초안을 보관하지 못했습니다."), true);
+            report(translate("editor.browserStorageIsFullCouldNotSaveTheEditing"), true);
         }
     }
     function snapshot() { return { crop: { ...crop }, appliedCrop: appliedCrop ? { ...appliedCrop } : null, clipStart, clipEnd, deleted: deleted.toJSON().map(r => ({ ...r })) }; }
@@ -355,7 +355,7 @@ export function mountMediaEditor(host, options) {
     }
     const setup = node('section', undefined, 'sbe-setup');
     const sourceSurface = node('section', undefined, 'sbe-source-surface');
-    const sourceTitle = node('h3', () => (file?.title || translate("편집 미리보기")));
+    const sourceTitle = node('h3', () => (file?.title || translate("editor.editingPreview")));
     sourceSurface.append(sourceTitle);
     content.append(sourceSurface, setup);
     let source = null, paintedSession = null, quickCrop = false, preciseCrop = null, quickPrepareRetry = null;
@@ -368,14 +368,14 @@ export function mountMediaEditor(host, options) {
         source.playsInline = true;
         source.className = 'sbe-source';
         sourceSurface.append(source);
-        source.addEventListener('error', () => report(translate("이 브라우저는 원본을 재생하지 못합니다. 프레임 정밀 편집에서 편집용 미리보기로 확인할 수 있습니다.")));
+        source.addEventListener('error', () => report(translate("editor.thisBrowserCannotPlayTheOriginalUseTheEditing")));
     }
-    const cropPlaceholder = node('p', () => (file ? translate("원본 영상을 읽고 있습니다. 재생 정보가 준비되면 바로 구간을 선택할 수 있습니다.") : translate("영상 카드의 ⋯ 메뉴에서 “GIF, WebP로 만들기”를 선택해 주세요. 기존 편집 자료는 아래에서 다시 열 수 있습니다.")), 'sbe-crop-placeholder');
+    const cropPlaceholder = node('p', () => (file ? translate("editor.readingTheOriginalVideoYouCanSelectARange") : translate("editor.chooseCreateGifOrWebpFromAVideoCard")), 'sbe-crop-placeholder');
     sourceSurface.append(cropPlaceholder);
     const overview = node('section', undefined, 'sbe-overview');
-    bindAttribute(overview, 'aria-label', () => translate("전체 영상 미리보기"));
-    overview.append(node('h3', () => translate("전체 영상 미리보기")));
-    const overviewStatus = node('p', () => translate("대표 화면을 먼저 표시합니다. 선택한 구간만 정밀 프레임으로 불러옵니다."), 'sbe-hint');
+    bindAttribute(overview, 'aria-label', () => translate("editor.videoOverview"));
+    overview.append(node('h3', () => translate("editor.videoOverview")));
+    const overviewStatus = node('p', () => translate("editor.representativeImagesAppearFirstLoadPreciseFramesOnlyFor"), 'sbe-hint');
     const overviewGrid = node('div', undefined, 'sbe-overview-grid');
     overview.append(overviewStatus, overviewGrid);
     sourceSurface.append(overview);
@@ -401,7 +401,7 @@ export function mountMediaEditor(host, options) {
         const tiles = Array.from({length:12}, (_, index) => {
             const tile = button(() => formatEditTime(overviewDuration * index / 12), () => selectOverview(index), overviewGrid);
             tile.className = 'sbe-overview-frame';
-            bindAttribute(tile, 'aria-label', () => translate("{0} 구간 선택", {"0":formatEditTime(overviewDuration * index / 12)}));
+            bindAttribute(tile, 'aria-label', () => translate("editor.selectTheIntervalAt", {seconds:formatEditTime(overviewDuration * index / 12)}));
             const image = node('img'); image.hidden = true; image.draggable = false; image.alt = '';
             tile.prepend(image);
             return {tile,image};
@@ -420,7 +420,7 @@ export function mountMediaEditor(host, options) {
                 for (const [n, {tile}] of tiles.entries()) {
                     const text = [...tile.childNodes].find(child => child.nodeType === 3);
                     if (text) text.textContent = formatEditTime(overviewDuration * n / 12);
-                    bindAttribute(tile, 'aria-label', () => translate("{0} 구간 선택", {"0":formatEditTime(overviewDuration * n / 12)}));
+                    bindAttribute(tile, 'aria-label', () => translate("editor.selectTheIntervalAt", {seconds:formatEditTime(overviewDuration * n / 12)}));
                 }
             } catch {
                 if (dead) return;
@@ -433,15 +433,15 @@ export function mountMediaEditor(host, options) {
     function field(label, element, parent = fields) { const wrap = node('label', label); wrap.append(element); parent.append(wrap); return element; }
     function numeric(label, value, min, max, step = 1, parent = fields) { const el = node('input'); el.type = 'number'; el.value = String(value); el.min = String(min); el.max = String(max); el.step = String(step); return field(label, el, parent); }
     const kind = node('select');
-    for (const [value, text] of [['gif', () => translate("GIF 만들기")], ['webp', () => translate("animated WebP 만들기")], ['trim', () => translate("동영상 자르기")]]) {
+    for (const [value, text] of [['gif', () => translate("editor.createGif")], ['webp', () => translate("editor.createAnimatedWebp")], ['trim', () => translate("editor.trimVideo")]]) {
         const o = node('option', text);
         o.value = value;
         kind.append(o);
     }
-    field(() => (translate("작업 종류")), kind);
-    const start = numeric(() => (translate("시작 시간(초)")), 0, 0, file?.duration || 86400, .01);
-    const end = numeric(() => (translate("종료 시간(초)")), file?.duration || 3, .01, file?.duration || 86400, .01);
-    const fps = numeric(() => (translate("애니메이션 FPS")), 10, 1, Number.MAX_SAFE_INTEGER);
+    field(() => (translate("editor.jobType")), kind);
+    const start = numeric(() => (translate("editor.startTimeSeconds")), 0, 0, file?.duration || 86400, .01);
+    const end = numeric(() => (translate("editor.endTimeSeconds")), file?.duration || 3, .01, file?.duration || 86400, .01);
+    const fps = numeric(() => (translate("editor.animationFps")), 10, 1, Number.MAX_SAFE_INTEGER);
     start.parentElement.hidden = end.parentElement.hidden = fps.parentElement.hidden = true;
     if (sourceGIF) {
         fps.parentElement.hidden = true;
@@ -450,8 +450,8 @@ export function mountMediaEditor(host, options) {
     const mute = node('input');
     let sourceRangeTouched = false;
     mute.type = 'checkbox';
-    field(() => (translate("영상 소리 제거")), mute);
-    const sourceRange = mountRangeControl(setup, { label: () => translate("원본 구간 선택"), count: () => Math.max(1, Math.round((Number.isFinite(source?.duration) && source.duration > 0 ? source.duration : file?.duration || 3) * 100)), values: () => [Math.round(+start.value * 100), Math.round(+end.value * 100)], format: n => formatEditTime(n / 100), change: (a, b, side) => {
+    field(() => (translate("editor.removeVideoAudio")), mute);
+    const sourceRange = mountRangeControl(setup, { label: () => translate("editor.originalRangeSelection"), count: () => Math.max(1, Math.round((Number.isFinite(source?.duration) && source.duration > 0 ? source.duration : file?.duration || 3) * 100)), values: () => [Math.round(+start.value * 100), Math.round(+end.value * 100)], format: n => formatEditTime(n / 100), change: (a, b, side) => {
             start.value = (a / 100).toFixed(2);
             end.value = (b / 100).toFixed(2);
             sourceRangeTouched = true;
@@ -472,7 +472,7 @@ export function mountMediaEditor(host, options) {
             end.value = String(sourceRangeTouched ? Math.min(+end.value, source.duration) : source.duration);
             sourceRange.update();
             if (!session && source.videoWidth > 0 && source.videoHeight > 0) {
-                useSession({ id: crypto.randomUUID(), localQuick: true, fileId: file.id, title: file.title || translate("영상"), state: 'ready', width: source.videoWidth, height: source.videoHeight, frameCount: 0, progress: 100,
+                useSession({ id: crypto.randomUUID(), localQuick: true, fileId: file.id, title: file.title || translate("media.video"), state: 'ready', width: source.videoWidth, height: source.videoHeight, frameCount: 0, progress: 100,
                     options: { fileId: file.id, quickVideo: true, fullSource: true, kind: 'gif', start: 0, end: source.duration, fps: 1000 } });
             }
         }
@@ -481,7 +481,7 @@ export function mountMediaEditor(host, options) {
     source?.addEventListener('loadeddata', () => { if (session?.options.quickVideo && quickCrop) void paint(); });
     if (sourceGIF) {
         start.parentElement.hidden = end.parentElement.hidden = true;
-        setup.append(node('p', () => (translate("GIF는 원본 프레임과 재생 간격을 유지합니다. 프레임 준비 후 남길 구간을 정하세요.")), 'sbe-hint'));
+        setup.append(node('p', () => (translate("editor.gifPreservesOriginalFramesAndTimingAfterPreparationChoose")), 'sbe-hint'));
     }
     const setupActions = node('div', undefined, 'sbe-actions');
     setup.append(setupActions);
@@ -497,15 +497,15 @@ export function mountMediaEditor(host, options) {
                 createRetry = null; sync();
             } else { (side === 'start' ? start : end).value = source.currentTime.toFixed(2); sourceRange.update(); }
         }
-        button(() => (translate("현재 위치를 시작으로")), () => setSourceBound('start'), sourceActions);
-        button(() => (translate("현재 위치를 종료로")), () => setSourceBound('end'), sourceActions);
+        button(() => (translate("editor.setStartToCurrentPosition")), () => setSourceBound('start'), sourceActions);
+        button(() => (translate("editor.setEndToCurrentPosition")), () => setSourceBound('end'), sourceActions);
         let segmentEnd = null;
-        button(() => (translate("선택 구간 재생")), () => {
+        button(() => (translate("editor.playSelectedRange")), () => {
             if (+end.value <= +start.value)
-                return report(translate("종료 시간은 시작 시간보다 뒤여야 합니다."), true);
+                return report(translate("editor.endTimeMustBeAfterStartTime"), true);
             segmentEnd = +end.value;
             source.currentTime = +start.value;
-            source.play().catch(() => report(translate("원본 구간을 재생하지 못했습니다."), true));
+            source.play().catch(() => report(translate("editor.couldNotPlayTheOriginalRange"), true));
         }, sourceActions);
         source.addEventListener('timeupdate', () => {
             if (segmentEnd !== null && source.currentTime >= segmentEnd) {
@@ -514,13 +514,13 @@ export function mountMediaEditor(host, options) {
         });
         source.addEventListener('pause', () => { segmentEnd = null; });
     }
-    setup.append(node('p', () => (translate("원본 영상의 구간을 바로 선택하고 저장할 수 있습니다. 프레임별 삭제는 선택 구간의 “프레임 정밀 편집”을 여세요.")), 'sbe-hint'));
-    const prepare = button(() => (translate("프레임 정밀 편집")), () => action(async () => {
+    setup.append(node('p', () => (translate("editor.selectAndSaveARangeFromTheOriginalVideo")), 'sbe-hint'));
+    const prepare = button(() => (translate("editor.preciseFrameEditing")), () => action(async () => {
         if (!file)
             return;
         const bounded = !sourceGIF && (Number.isFinite(source?.duration) && source.duration > 0 || file.duration > 0);
         const req = { fileId: file.id, fullSource: !bounded, ...(bounded ? { originalFrames: true } : {}), start: bounded ? session?.state === 'ready' ? frameTime(clipStart) ?? +start.value : +start.value : 0, end: bounded ? session?.state === 'ready' ? frameTime(clipEnd) ?? +end.value : +end.value : 0, fps: 1000, width: 0, kind: 'gif' };
-        if (session && !session.options.quickVideo && (deleted.length || undo.length) && !confirm(translate("새 프레임을 준비할까요? 현재 편집 초안은 기존 편집 자료에서 다시 열 수 있습니다.")))
+        if (session && !session.options.quickVideo && (deleted.length || undo.length) && !confirm(translate("editor.prepareNewFramesYouCanReopenTheCurrentDraft")))
             return;
         if (!prepareRetry || JSON.stringify(prepareRetry.payload) !== JSON.stringify(req))
             prepareRetry = { payload: req, id: crypto.randomUUID() };
@@ -531,10 +531,10 @@ export function mountMediaEditor(host, options) {
         prepareRetry = null;
         preciseCrop = crop ? { crop: { ...crop }, appliedCrop: { ...(appliedCrop || crop) } } : null;
         useSession(value);
-        report(translate("선택 구간의 프레임을 준비하고 있습니다. 아래 진행 상태를 확인해 주세요."));
+        report(translate("editor.preparingFramesForTheSelectedRangeCheckProgressBelow"));
         await refresh();
     }), setupActions, 'sbe-primary');
-    setup.append(node('p', () => (translate("출력은 원본·크롭 픽셀을 그대로 유지합니다. 삭제한 프레임과 해당 재생 시간을 함께 제거하며 원본은 보존합니다.")), 'sbe-hint'));
+    setup.append(node('p', () => (translate("editor.outputPreservesOriginalOrCroppedPixelsDeletedFramesAnd")), 'sbe-hint'));
     if (!file)
         setup.hidden = true;
     const workspace = node('section', undefined, 'sbe-workspace');
@@ -546,13 +546,13 @@ export function mountMediaEditor(host, options) {
     workspace.append(summary);
     const gifWorkspace = node('div', undefined, 'sbe-edit-layout');
     const editMain = node('div', undefined, 'sbe-edit-main'), frameAside = node('aside', undefined, 'sbe-frame-aside');
-    bindAttribute(frameAside, 'aria-label', () => translate("프레임 탐색"));
+    bindAttribute(frameAside, 'aria-label', () => translate("editor.frameNavigation"));
     frameAside.hidden = true;
-    frameAside.append(node('h3', () => (translate("프레임"))));
+    frameAside.append(node('h3', () => (translate("editor.frames"))));
     editorBody.prepend(frameAside);
     gifWorkspace.append(editMain);
     workspace.append(gifWorkspace);
-    const clipControl = mountRangeControl(workspace, { label: () => translate("남길 구간"), count: () => editableCount(session), values: () => [clipStart, clipEnd || editableCount(session)], format: n => frameLabel(n), change: (a, b, side, done, previous) => {
+    const clipControl = mountRangeControl(workspace, { label: () => translate("editor.rangeToKeep"), count: () => editableCount(session), values: () => [clipStart, clipEnd || editableCount(session)], format: n => frameLabel(n), change: (a, b, side, done, previous) => {
             stopPlayback();
             clipStart = a;
             clipEnd = b;
@@ -584,10 +584,10 @@ export function mountMediaEditor(host, options) {
     sourceSurface.insertBefore(sourceRange.root, sourceSurface.children[1]);
     const stage = node('canvas', undefined, 'sbe-stage');
     stage.tabIndex = 0;
-    bindAttribute(stage, 'aria-label', () => translate("크롭 영역 편집. 모서리와 테두리에서 크기 조절, 영역 안에서 이동. 새 영역은 새 영역 그리기로 선택"));
+    bindAttribute(stage, 'aria-label', () => translate("editor.editCropAreaResizeAtEdgesAndCornersMove"));
     stage.style.cursor = 'default';
     const cropSurface = node('section', undefined, 'sbe-crop-surface');
-    bindAttribute(cropSurface, 'aria-label', () => translate("크롭 편집"));
+    bindAttribute(cropSurface, 'aria-label', () => translate("editor.cropEditing"));
     cropSurface.hidden = true;
     sourceSurface.append(cropSurface);
     cropSurface.append(stage);
@@ -647,11 +647,11 @@ export function mountMediaEditor(host, options) {
     cropSurface.append(cropFields);
     const cropInputs = {};
     let cropMode = 'adjust';
-    const drawArea = button(() => (translate("새 영역 그리기")), () => { cropMode = 'draw'; stage.style.cursor = 'crosshair'; drawArea.setAttribute('aria-pressed', 'true'); adjustArea.setAttribute('aria-pressed', 'false'); report(translate("영상 위에서 드래그하여 새 크롭 영역을 그리세요.")); }, cropFields);
-    const adjustArea = button(() => (translate("영역 이동·크기 조절")), () => { cropMode = 'adjust'; stage.style.cursor = 'default'; drawArea.setAttribute('aria-pressed', 'false'); adjustArea.setAttribute('aria-pressed', 'true'); report(translate("영역 안에서 이동하거나 모서리·테두리에서 크기를 조절하세요.")); }, cropFields);
+    const drawArea = button(() => (translate("editor.drawNewArea")), () => { cropMode = 'draw'; stage.style.cursor = 'crosshair'; drawArea.setAttribute('aria-pressed', 'true'); adjustArea.setAttribute('aria-pressed', 'false'); report(translate("editor.dragOverTheVideoToDrawANewCrop")); }, cropFields);
+    const adjustArea = button(() => (translate("editor.moveOrResizeArea")), () => { cropMode = 'adjust'; stage.style.cursor = 'default'; drawArea.setAttribute('aria-pressed', 'false'); adjustArea.setAttribute('aria-pressed', 'true'); report(translate("editor.moveInsideTheAreaOrResizeAtItsEdges")); }, cropFields);
     drawArea.setAttribute('aria-pressed', 'false');
     adjustArea.setAttribute('aria-pressed', 'true');
-    for (const [key, label] of [['x', () => translate("왼쪽")], ['y', () => translate("위쪽")], ['width', () => translate("너비")], ['height', () => translate("높이")]]) {
+    for (const [key, label] of [['x', () => translate("editor.left")], ['y', () => translate("editor.top")], ['width', () => translate("editor.width")], ['height', () => translate("editor.height")]]) {
         const input = numeric(label, 0, 0, Number.MAX_SAFE_INTEGER, 1, cropFields);
         cropInputs[key] = input;
         let before = null;
@@ -676,37 +676,37 @@ export function mountMediaEditor(host, options) {
             remember(previous);
         });
     }
-    button(() => (translate("전체 영역")), () => {
+    button(() => (translate("editor.fullArea")), () => {
         if (!session)
             return;
         const before = snapshot();
         crop = { x: 0, y: 0, width: session.width, height: session.height };
         remember(before);
     }, cropFields);
-    cropSurface.append(node('p', () => (translate("모서리나 테두리를 드래그해 크기를 바꾸거나 영역 안에서 위치를 옮기세요. 새 사각형을 만들려면 새 영역 그리기를 선택하세요.")), 'sbe-hint'));
+    cropSurface.append(node('p', () => (translate("editor.dragEdgesOrCornersToResizeOrDragInside")), 'sbe-hint'));
     const frameActions = node('div', undefined, 'sbe-actions');
     editMain.append(frameActions);
-    const previousFrame = button(() => (translate("이전 프레임")), () => { seekFrame(Math.max(0, current - 1)); }, frameActions);
-    const nextFrame = button(() => (translate("다음 프레임")), () => { seekFrame(Math.min(session.frameCount - 1, current + 1)); }, frameActions);
+    const previousFrame = button(() => (translate("editor.previousFrame")), () => { seekFrame(Math.max(0, current - 1)); }, frameActions);
+    const nextFrame = button(() => (translate("editor.nextFrame")), () => { seekFrame(Math.min(session.frameCount - 1, current + 1)); }, frameActions);
     const position = node('span');
     frameActions.append(position);
     const frameSlider = node('input');
     frameSlider.type = 'range';
     frameSlider.min = '0';
-    bindAttribute(frameSlider, 'aria-label', () => translate("현재 프레임"));
+    bindAttribute(frameSlider, 'aria-label', () => translate("editor.currentFrame"));
     frameSlider.addEventListener('input', () => { seekFrame(+frameSlider.value); });
     editMain.append(frameSlider);
     const rangeActions = node('div', undefined, 'sbe-actions');
     editMain.append(rangeActions);
-    const rangeFrom = numeric(() => (translate("선택 시작 번호")), 1, 1, Number.MAX_SAFE_INTEGER, 1, rangeActions), rangeTo = numeric(() => (translate("선택 끝 번호")), 1, 1, Number.MAX_SAFE_INTEGER, 1, rangeActions);
-    button(() => (translate("범위 선택")), () => { selection = selectedFrameRange(Math.max(0, +rangeFrom.value - 1), Math.min(session.frameCount - 1, +rangeTo.value - 1)); anchor = Math.max(0, +rangeFrom.value - 1); frameSelectionBase = new FrameRanges(selection.ranges); sync(); }, rangeActions);
-    button(() => (translate("선택 해제")), () => { selection.clear(); anchor = null; frameSelectionBase.clear(); sync(); }, rangeActions);
-    const deleteButton = button(() => (translate("선택 프레임 삭제")), () => {
+    const rangeFrom = numeric(() => (translate("editor.selectionStartNumber")), 1, 1, Number.MAX_SAFE_INTEGER, 1, rangeActions), rangeTo = numeric(() => (translate("editor.selectionEndNumber")), 1, 1, Number.MAX_SAFE_INTEGER, 1, rangeActions);
+    button(() => (translate("editor.selectRange")), () => { selection = selectedFrameRange(Math.max(0, +rangeFrom.value - 1), Math.min(session.frameCount - 1, +rangeTo.value - 1)); anchor = Math.max(0, +rangeFrom.value - 1); frameSelectionBase = new FrameRanges(selection.ranges); sync(); }, rangeActions);
+    button(() => (translate("gallery.selection.clear")), () => { selection.clear(); anchor = null; frameSelectionBase.clear(); sync(); }, rangeActions);
+    const deleteButton = button(() => (translate("editor.deleteSelectedFrames")), () => {
         if (!session || !selection.size || busy)
             return;
         const combined = new FrameRanges([...deleted.ranges, ...selection.ranges]);
         if (combined.ranges.reduce((n, r) => n + Math.max(0, Math.min(r.last, clipEnd - 1) - Math.max(r.first, clipStart) + 1), 0) >= clipEnd - clipStart)
-            return report(translate("최소 한 프레임은 남겨야 합니다."), true);
+            return report(translate("editor.keepAtLeastOneFrame"), true);
         const before = snapshot();
         deleted = combined;
         selection.clear();
@@ -714,14 +714,14 @@ export function mountMediaEditor(host, options) {
         remember(before);
         grid.focus({ preventScroll: true });
     }, rangeActions);
-    const undoButton = button(() => (translate("실행 취소")), () => {
+    const undoButton = button(() => (translate("editor.undo")), () => {
         if (!undo.length)
             return;
         stopPlayback();
         redo.push(snapshot());
         restore(undo.pop());
     }, rangeActions);
-    const redoButton = button(() => (translate("다시 실행")), () => {
+    const redoButton = button(() => (translate("editor.redo")), () => {
         if (!redo.length)
             return;
         stopPlayback();
@@ -729,15 +729,15 @@ export function mountMediaEditor(host, options) {
         restore(redo.pop());
     }, rangeActions);
     [previousFrame, nextFrame, deleteButton, undoButton, redoButton].forEach(describeShortcut);
-    const applyCrop = button(() => (translate("모든 프레임에 크롭 적용")), () => {
+    const applyCrop = button(() => (translate("editor.applyCropToAllFrames")), () => {
         if (!crop || JSON.stringify(crop) === JSON.stringify(appliedCrop))
             return;
         const before = snapshot();
         appliedCrop = { ...crop };
         remember(before);
-        report(translate("남기는 모든 프레임에 같은 크롭 영역을 적용했습니다."));
+        report(translate("editor.appliedTheSameCropAreaToAllRetainedFrames"));
     }, cropFields, 'sbe-primary');
-    const quickCropToggle = button(() => (translate("크롭 영역 조절")), () => {
+    const quickCropToggle = button(() => (translate("editor.adjustCropArea")), () => {
         quickCrop = !quickCrop;
         if (source) source.pause();
         sync();
@@ -745,25 +745,25 @@ export function mountMediaEditor(host, options) {
     const cropState = node('p', '', 'sbe-hint');
     cropFields.append(cropState);
     const grid = node('nav', undefined, 'sbe-frames');
-    bindAttribute(grid, 'aria-label', () => translate("GIF 프레임 목록"));
+    bindAttribute(grid, 'aria-label', () => translate("editor.gifFrameList"));
     grid.tabIndex = 0;
-    const frameSelectionCount = node('p', () => (translate("Shift·Ctrl 클릭 또는 드래그로 선택")), 'sbe-frame-selection');
+    const frameSelectionCount = node('p', () => (translate("editor.selectWithShiftCtrlClickOrDrag")), 'sbe-frame-selection');
     frameSelectionCount.setAttribute('aria-live', 'polite');
     frameAside.append(frameSelectionCount);
     frameAside.append(grid);
     const paging = node('div', undefined, 'sbe-actions');
     frameAside.append(paging);
-    const prevPage = button(() => (translate("이전 48장")), () => { page--; navTarget = Math.max(0, page * 48); void renderFrames(); }, paging), pageText = node('span');
+    const prevPage = button(() => (translate("editor.previous48Frames")), () => { page--; navTarget = Math.max(0, page * 48); void renderFrames(); }, paging), pageText = node('span');
     paging.append(pageText);
-    const nextPage = button(() => (translate("다음 48장")), () => { page++; navTarget = Math.min(session.frameCount - 1, page * 48); void renderFrames(); }, paging);
+    const nextPage = button(() => (translate("editor.next48Frames")), () => { page++; navTarget = Math.min(session.frameCount - 1, page * 48); void renderFrames(); }, paging);
     const previewBox = node('div', undefined, 'sbe-preview');
     editMain.append(previewBox);
-    const play = button(() => (translate("편집 결과 재생")), () => {
+    const play = button(() => (translate("editor.playEditedOutput")), () => {
         if (playing)
             return stopPlayback();
         playing = true;
         const version = ++playbackVersion;
-        bindText(play, () => translate("재생 멈추기"));
+        bindText(play, () => translate("editor.stopPlayback"));
         let n = current;
         async function tick() {
             if (!playing || dead || version !== playbackVersion)
@@ -788,13 +788,13 @@ export function mountMediaEditor(host, options) {
                 if (version !== playbackVersion)
                     return;
                 stopPlayback();
-                report(translate("프레임을 불러오지 못했습니다. PC 연결을 확인하세요."), true);
+                report(translate("editor.couldNotLoadFramesCheckThePcConnection"), true);
             }
         }
         void tick();
     }, previewBox);
     const previewCanvas = node('canvas');
-    bindAttribute(previewCanvas, 'aria-label', () => translate("크롭·삭제 적용 미리보기"));
+    bindAttribute(previewCanvas, 'aria-label', () => translate("editor.previewWithCropAndDeletions"));
     previewBox.append(previewCanvas);
     let layoutFrame = null, lastPreview = null;
     function fitCanvas(canvas, width, height) {
@@ -830,39 +830,39 @@ export function mountMediaEditor(host, options) {
     const qualityBox = node('section', undefined, 'sbe-quality');
     workspace.append(qualityBox);
     const preset = node('select');
-    for (const [value, text] of [['small', () => translate("작은 용량")], ['balanced', () => translate("균형")], ['high', () => translate("고화질")], ['max', () => translate("최대 화질")], ['custom', () => translate("사용자 지정")]]) {
+    for (const [value, text] of [['small', () => translate("editor.smallSize")], ['balanced', () => translate("editor.balanced")], ['high', () => translate("editor.highQuality")], ['max', () => translate("editor.maximumQuality")], ['custom', () => translate("gallery.custom")]]) {
         const o = node('option', text);
         o.value = value;
         preset.append(o);
     }
-    field(() => (translate("화질 프리셋")), preset, qualityBox);
-    const quality = numeric(() => (translate("화질(1–100)")), 80, 1, 100, 1, qualityBox);
+    field(() => (translate("editor.qualityPreset")), preset, qualityBox);
+    const quality = numeric(() => (translate("editor.quality1100")), 80, 1, 100, 1, qualityBox);
     const compression = node('select');
-    for (const [value, text] of [['lossy', () => translate("손실 압축")], ['lossless', () => translate("무손실 압축")]]) {
+    for (const [value, text] of [['lossy', () => translate("editor.lossy")], ['lossless', () => translate("editor.lossless")]]) {
         const option = node('option', text); option.value = value; compression.append(option);
     }
-    field(() => (translate("WebP 압축 방식")), compression, qualityBox);
+    field(() => (translate("editor.webpCompression")), compression, qualityBox);
     const advanced = node('details', undefined, 'sbe-quality-advanced');
-    advanced.append(node('summary', () => (translate("고급 설정"))));
+    advanced.append(node('summary', () => (translate("editor.advancedSettings"))));
     const advancedFields = node('div', undefined, 'sbe-advanced-fields');
     advanced.append(advancedFields); qualityBox.append(advanced);
     const effort = node('select');
-    for (const [value, text] of [['fast', () => translate("빠르게")], ['normal', () => translate("보통")], ['precise', () => translate("정밀하게")]]) {
+    for (const [value, text] of [['fast', () => translate("editor.fast")], ['normal', () => translate("editor.normal")], ['precise', () => translate("editor.precise")]]) {
         const o = node('option', text);
         o.value = value;
         effort.append(o);
     }
-    field(() => (translate("압축률")), effort, advancedFields);
+    field(() => (translate("editor.compressionLevel")), effort, advancedFields);
     const dither = node('select');
-    for (const [value, text] of [['auto', () => translate("자동")], ['sierra2_4a', () => translate("Sierra · 균형")], ['sierra3', () => translate("Sierra3 · 정밀")], ['floyd_steinberg', 'Floyd–Steinberg'], ['bayer', () => translate("Bayer · 규칙적 패턴")], ['atkinson', 'Atkinson'], ['none', () => translate("없음")]]) {
+    for (const [value, text] of [['auto', () => translate("download.auto")], ['sierra2_4a', () => translate("editor.sierraBalanced")], ['sierra3', () => translate("editor.sierra3Precise")], ['floyd_steinberg', 'Floyd–Steinberg'], ['bayer', () => translate("editor.bayerRegularPattern")], ['atkinson', 'Atkinson'], ['none', () => translate("editor.none")]]) {
         const option = node('option', text); option.value = value; dither.append(option);
     }
-    field(() => (translate("GIF 디더링")), dither, advancedFields);
+    field(() => (translate("editor.gifDithering")), dither, advancedFields);
     const webpPreset = node('select');
-    for (const [value, text] of [['none', () => translate("기본")], ['photo', () => translate("사진")], ['drawing', () => translate("그림")], ['icon', () => translate("아이콘")], ['text', () => translate("텍스트")]]) {
+    for (const [value, text] of [['none', () => translate("editor.default")], ['photo', () => translate("editor.photo")], ['drawing', () => translate("editor.picture")], ['icon', () => translate("editor.icon")], ['text', () => translate("editor.text")]]) {
         const option = node('option', text); option.value = value; webpPreset.append(option);
     }
-    field(() => (translate("WebP 최적화 유형")), webpPreset, advancedFields);
+    field(() => (translate("editor.webpOptimizationType")), webpPreset, advancedFields);
     const algorithmHint = node('p', '', 'sbe-hint'); advanced.append(algorithmHint);
     let qualityFormat = 'gif';
     function qualityValue() {
@@ -895,7 +895,7 @@ export function mountMediaEditor(host, options) {
         dither.parentElement.hidden = webp;
         webpPreset.parentElement.hidden = !webp;
         webpPreset.disabled = lossless;
-        bindText(algorithmHint, () => !webp ? translate("디더링은 제한된 GIF 색상으로 그라데이션을 표현하는 방식입니다. 자동은 압축률에 맞춰 선택합니다.") : lossless ? translate("무손실 압축에서는 최적화 유형을 적용하지 않습니다.") : webpPreset.value === 'none' ? translate("화면 내용에 맞는 압축 설정을 선택할 수 있습니다. 일반적인 영상은 기본으로 두세요.") : translate("최적화 유형을 선택하면 압축률은 자동으로 설정됩니다."));
+        bindText(algorithmHint, () => !webp ? translate("editor.ditheringRepresentsGradientsUsingGifSLimitedColorsAuto") : lossless ? translate("editor.optimizationTypeDoesNotApplyToLosslessCompression") : webpPreset.value === 'none' ? translate("editor.chooseCompressionSettingsForTheContentLeaveRegularVideos") : translate("editor.selectingAnOptimizationTypeSetsCompressionAutomatically"));
         if (preset.value !== 'custom') {
             quality.value = String({ small: 60, balanced: 80, high: 95, max: 100 }[preset.value] || 80);
             effort.value = 'normal';
@@ -911,14 +911,14 @@ export function mountMediaEditor(host, options) {
     for (const el of [preset, quality, effort, compression, dither, webpPreset])
         el.addEventListener('change', syncQuality);
     const qualityHint = node('p', '', 'sbe-hint');
-    bindText(qualityHint, () => translate("프레임 재생은 편집 확인용입니다. “화질 확인”은 현재 위치부터 남긴 프레임을 최대 2초, 실제 설정으로 변환합니다."));
+    bindText(qualityHint, () => translate("editor.framePlaybackIsForCheckingEditsCheckQualityConverts"));
     qualityBox.append(qualityHint);
-    qualityBox.append(node('p', () => (translate("화질 변경은 크기·FPS·편집 내용을 바꾸지 않습니다. WebP 무손실에서는 화질 값이 압축 효율과 처리 시간에 영향을 줍니다.")), 'sbe-hint'));
-    qualityBox.append(node('p', () => (translate("화질 확인 결과는 최근 8개를 임시 보관합니다.")), 'sbe-hint'));
-    const sample = button(() => (translate("화질 확인")), () => action(() => submit(true)), qualityBox);
+    qualityBox.append(node('p', () => (translate("editor.qualityChangesDoNotAffectSizeFpsOrEdits")), 'sbe-hint'));
+    qualityBox.append(node('p', () => (translate("editor.theLatest8QualityPreviewsAreKeptTemporarily")), 'sbe-hint'));
+    const sample = button(() => (translate("editor.checkQuality")), () => action(() => submit(true)), qualityBox);
     const resourceBox = node('section', undefined, 'sbe-resources');
     workspace.append(resourceBox);
-    bindAttribute(resourceBox, 'aria-label', () => translate("처리 PC 자원"));
+    bindAttribute(resourceBox, 'aria-label', () => translate("editor.processingPcResources"));
     let resourceTimer, resourceReading = false, resourceSerial = 0;
     const bytes = n => n >= 1024 ** 3 ? (n / 1024 ** 3).toFixed(2) + ' GiB' : n >= 1024 ** 2 ? (n / 1024 ** 2).toFixed(0) + ' MiB' : n >= 1024 ? (n / 1024).toFixed(1) + ' KiB' : n + ' B';
     function scheduleResources() {
@@ -937,9 +937,9 @@ export function mountMediaEditor(host, options) {
             if (dead || serial !== resourceSerial)
                 return;
             const heading = node('div', undefined, 'sbe-resources-heading');
-            heading.append(node('h3', () => (translate("처리 PC 자원"))));
+            heading.append(node('h3', () => (translate("editor.processingPcResources"))));
             if (r.estimateKnown)
-                heading.append(node('span', () => (r.basis === 'sampled' ? translate("미리보기 실측 반영") : translate("계산 추정")), 'sbe-resource-badge'));
+                heading.append(node('span', () => (r.basis === 'sampled' ? translate("editor.basedOnMeasuredPreview") : translate("editor.calculatedEstimate")), 'sbe-resource-badge'));
             const cards = node('div', undefined, 'sbe-resource-grid');
             function card(title, label, known, value, detail, estimateLabel, estimateKnown, estimate, unknownEstimate) {
                 const section = node('section', undefined, 'sbe-resource-card');
@@ -953,7 +953,7 @@ export function mountMediaEditor(host, options) {
                     amount.append(node('strong', number), node('span', unit, 'sbe-resource-unit'));
                 } else {
                     amount.classList.add('is-unknown');
-                    bindText(amount, () => translate("확인 불가"));
+                    bindText(amount, () => translate("editor.unavailable"));
                 }
                 metric.append(amount);
                 if (detail)
@@ -967,32 +967,32 @@ export function mountMediaEditor(host, options) {
             const low = bytes(r.lowRam), high = bytes(r.highRam);
             const [lowNumber, lowUnit] = low.split(' '), [, highUnit] = high.split(' ');
             const range = lowUnit === highUnit ? `${lowNumber}–${high}` : `${low} – ${high}`;
-            const memory = card(translate("메모리 · RAM"), translate("사용 가능"), r.memoryKnown, r.availableRam,
-                r.memoryKnown ? translate("전체 {0}", { "0": bytes(r.totalRam) }) : translate("PC 메모리 정보를 읽지 못했습니다."),
-                translate("추가 RAM 예상"), r.estimateKnown, range, translate("추정 불가"));
+            const memory = card(translate("editor.memoryRam"), translate("editor.available"), r.memoryKnown, r.availableRam,
+                r.memoryKnown ? translate("editor.total", { duration: bytes(r.totalRam) }) : translate("editor.couldNotReadPcMemoryInformation"),
+                translate("editor.estimatedAdditionalRam"), r.estimateKnown, range, translate("editor.cannotEstimate"));
             memory.classList.add('sbe-resource-memory');
             memory.classList.toggle('is-warning', Boolean(r.pressure));
-            const disk = card(translate("저장 공간"), translate("남은 공간"), r.diskKnown, r.diskAvailable,
-                r.diskKnown ? '' : translate("저장 공간 정보를 읽지 못했습니다."),
-                translate("임시·결과 예상"), r.diskEstimateKnown, bytes(r.diskEstimate), translate("화질 확인 후 추정"));
+            const disk = card(translate("editor.storage"), translate("editor.freeSpace"), r.diskKnown, r.diskAvailable,
+                r.diskKnown ? '' : translate("editor.couldNotReadStorageInformation"),
+                translate("editor.estimatedTemporaryAndOutputSpace"), r.diskEstimateKnown, bytes(r.diskEstimate), translate("editor.estimatedAfterQualityCheck"));
             disk.classList.add('sbe-resource-disk');
             resourceBox.replaceChildren(heading, cards);
             if (r.live?.known) {
                 const live = node('div', undefined, 'sbe-resource-live');
-                live.append(node('span', () => (translate("실행 중 인코더 RAM"))), node('strong', bytes(r.live.currentBytes)), node('span', () => (translate("관측 최대 {0}", { "0": bytes(r.live.observedPeakBytes) }))));
+                live.append(node('span', () => (translate("editor.activeEncoderRam"))), node('strong', bytes(r.live.currentBytes)), node('span', () => (translate("editor.observedPeak", { peak: bytes(r.live.observedPeakBytes) }))));
                 resourceBox.append(live);
             }
             if (r.note)
                 resourceBox.append(node('p', r.note, 'sbe-hint sbe-resource-note'));
             if (r.pressure) {
                 const warning = node('div', undefined, 'sbe-resource-warning');
-                warning.append(node('strong', () => (translate("메모리 여유 부족 예상"))), node('p', () => (translate("예상 RAM이 현재 여유보다 큽니다. 다른 작업을 줄이거나 설정을 조정할 수 있습니다. 그대로 실행할 수도 있습니다."))));
+                warning.append(node('strong', () => (translate("editor.lowAvailableMemoryExpected"))), node('p', () => (translate("editor.estimatedRamExceedsAvailableMemoryReduceOtherWorkOr"))));
                 resourceBox.append(warning);
             }
         }
         catch (e) {
             if (!dead)
-                bindText(resourceBox, () => translate("처리 PC 자원 정보를 가져오지 못했습니다. ") + e.message);
+                bindText(resourceBox, () => translate("editor.couldNotGetProcessingPcResourceInformation") + e.message);
         }
         finally {
             resourceReading = false;
@@ -1002,7 +1002,7 @@ export function mountMediaEditor(host, options) {
         if (!session || session.state !== 'ready')
             return;
         if ((session.options.quickVideo ? kind.value : session.options.kind) !== 'trim' && JSON.stringify(crop) !== JSON.stringify(appliedCrop))
-            throw new Error(translate("변경한 크롭을 모든 프레임에 적용한 뒤 저장하세요."));
+            throw new Error(translate("editor.applyTheUpdatedCropToAllFramesBeforeSaving"));
         const quick = session.options.quickVideo;
         const value = { ...payload(), preview, previewStart: preview && !quick ? nextRetained(current) : 0 };
         if (preview && quick) {
@@ -1018,14 +1018,14 @@ export function mountMediaEditor(host, options) {
                 await new Promise(resolve => setTimeout(resolve, 150));
                 prepared = api.getSession ? await unwrap(api.getSession({id: prepared.id})) : (await unwrap(api.list())).sessions.find(item => item.id === prepared.id) || prepared;
             }
-            if (prepared.state !== 'ready') throw new Error(prepared.error || translate("원본 영상 정보를 읽지 못했습니다."));
+            if (prepared.state !== 'ready') throw new Error(prepared.error || translate("editor.couldNotReadOriginalVideoInformation"));
             if (dead || session !== localSession) return;
             quickPrepareRetry = null;
             const previous = session;
             session = prepared;
             if (session.width !== previous.width || session.height !== previous.height) {
                 crop = appliedCrop = { x: 0, y: 0, width: session.width, height: session.height };
-                throw new Error(translate("원본 크기를 다시 확인했습니다. 크롭 영역을 확인한 뒤 다시 저장하세요."));
+                throw new Error(translate("editor.originalDimensionsCheckedAgainReviewTheCropAreaBefore"));
             }
             value.sessionId = prepared.id;
             persist();
@@ -1050,21 +1050,21 @@ export function mountMediaEditor(host, options) {
         if (createRetry === pending)
             createRetry = null;
         selectedJob = job.id;
-        report(preview ? translate("화질 확인을 등록했습니다. 최대 2초를 변환하며 갤러리에 등록하지 않습니다.") : translate("저장 작업을 등록했습니다. 화면을 닫거나 연결이 끊겨도 PC에서 계속 처리합니다."));
+        report(preview ? translate("editor.qualityCheckQueuedConvertsUpTo2SecondsWithout") : translate("editor.saveJobQueuedProcessingContinuesOnThePcIf"));
         await refresh();
     }
-    const save = button(() => (translate("GIF 저장")), () => action(() => submit(false)), workspace, 'sbe-primary');
+    const save = button(() => (translate("editor.saveGif")), () => action(() => submit(false)), workspace, 'sbe-primary');
     const history = node('section', undefined, 'sbe-history');
-    history.append(node('h3', () => (translate("편집 자료·작업"))));
+    history.append(node('h3', () => (translate("editor.editingDataAndJobs"))));
     const sessionLimit = 20;
     const sessionCount = node('p', '', 'sbe-hint');
-    bindAttribute(sessionCount, 'aria-label', () => translate("편집 초안 보관 개수"));
+    bindAttribute(sessionCount, 'aria-label', () => translate("editor.editingDraftRetentionCount"));
     const jobCount = node('p', '', 'sbe-hint');
-    bindAttribute(jobCount, 'aria-label', () => translate("작업 내역 보관 개수"));
-    const sessionLimitHint = node('p', () => (translate("편집 초안과 작업 내역은 각각 최근 20개를 보관하며, 초과하면 오래된 항목부터 자동 정리합니다. 진행 중인 작업과 복구 대상은 보호하며, 원본 영상과 저장된 결과는 유지됩니다.")), 'sbe-hint');
+    bindAttribute(jobCount, 'aria-label', () => translate("editor.jobHistoryRetentionCount"));
+    const sessionLimitHint = node('p', () => (translate("editor.theLatest20DraftsAnd20JobHistoryEntries")), 'sbe-hint');
     history.append(sessionCount, jobCount, sessionLimitHint);
     content.append(history);
-    button(() => (translate("목록 새로고침")), () => refresh(), history);
+    button(() => (translate("editor.refreshList")), () => refresh(), history);
     const sessionList = node('div'), jobList = node('div'), resultBox = node('div', undefined, 'sbe-result');
     history.append(sessionList, jobList, resultBox);
     function useSession(value) {
@@ -1120,7 +1120,7 @@ export function mountMediaEditor(host, options) {
             appliedCrop = boundedCrop(preciseCrop.appliedCrop, value.width, value.height);
             preciseCrop = null;
         }
-        bindText(title, () => value.title + translate(" · 편집"));
+        bindText(title, () => value.title + translate("editor.edit"));
         bindText(sourceTitle, () => value.title);
         if (value.options.kind === 'trim')
             kind.value = 'trim';
@@ -1132,7 +1132,7 @@ export function mountMediaEditor(host, options) {
             void requestTiming(value.frameCount - 1);
         }
         if (value.state === 'ready')
-            report(value.options.quickVideo ? translate("남길 구간을 선택한 뒤 저장하세요. 선택한 구간만 변환합니다.") : value.options.kind === 'gif' ? translate("프레임을 불러왔습니다. 위쪽 “남길 구간” 손잡이로 사용할 부분을 정하고 크롭하거나 프레임을 삭제하세요.") : translate("영상 준비가 끝났습니다. 남길 구간과 소리 옵션을 확인한 뒤 저장하세요."));
+            report(value.options.quickVideo ? translate("editor.selectTheRangeToKeepAndSaveOnlyThe") : value.options.kind === 'gif' ? translate("editor.framesLoadedUseTheRangeToKeepHandlesAbove") : translate("editor.videoReadyCheckTheRangeAndAudioOptionsBefore"));
         sync();
     }
     function validSnapshot(value) { return value && value.crop && Array.isArray(value.deleted); }
@@ -1150,19 +1150,19 @@ export function mountMediaEditor(host, options) {
                 p = await unwrap(api.frames({ id, offset }));
             while (['pending', 'running'].includes(p.state)) {
                 if (dead || session?.id !== id)
-                    throw new Error(translate("편집 화면이 변경되었습니다."));
+                    throw new Error(translate("editor.theEditingViewHasChanged"));
                 await new Promise(resolve => setTimeout(resolve, 600));
                 p = await unwrap(api.frameStatus({ id, offset }));
             }
             if ((session?.options.nativeGIF || session?.options.nativeVideo) && !p.times?.length)
-                throw new Error(translate("원본 프레임 재생 시간 정보를 읽지 못했습니다. 편집 자료를 다시 준비하세요."));
+                throw new Error(translate("editor.couldNotReadOriginalFrameTimingPrepareTheEditing"));
             cacheTiming(p);
             if (session?.id === id) {
                 clipControl.update(current);
                 bindText(position, () => framePosition(current));
             }
             if (p.state !== 'ready')
-                throw new Error(p.error || translate("프레임 준비 실패. 페이지를 다시 열어 재시도하세요."));
+                throw new Error(p.error || translate("editor.framePreparationFailedReopenThePageToRetry"));
         })();
         pages.set(key, pending);
         try {
@@ -1177,7 +1177,7 @@ export function mountMediaEditor(host, options) {
         if (imageCache.has(key))
             return imageCache.get(key);
         await ensurePage(n);
-        const promise = new Promise((resolve, reject) => { const img = new Image(); img.onload = () => resolve(img); img.onerror = () => reject(new Error(translate("프레임 로딩 실패"))); img.src = frameURL(session.id, n); });
+        const promise = new Promise((resolve, reject) => { const img = new Image(); img.onload = () => resolve(img); img.onerror = () => reject(new Error(translate("editor.frameLoadingFailed"))); img.src = frameURL(session.id, n); });
         imageCache.set(key, promise);
         if (imageCache.size > 8)
             imageCache.delete(imageCache.keys().next().value);
@@ -1238,7 +1238,7 @@ export function mountMediaEditor(host, options) {
         }
         catch {
             if (!dead && serial === paintSerial)
-                report(translate("프레임을 불러오지 못했습니다. 편집 자료와 PC 연결을 확인하세요."), true);
+                report(translate("editor.couldNotLoadFramesCheckEditingDataAndThe"), true);
         }
     }
     function cacheTiming(p) {
@@ -1275,8 +1275,8 @@ export function mountMediaEditor(host, options) {
             return frameTimes.get(n) ?? null;
         return session.options.start + n / session.options.fps;
     }
-    function frameLabel(n) { const t = frameTime(n); return t === null ? translate("{0}번 프레임", { "0": n + 1 }) : formatEditTime(t); }
-    function framePosition(n) { return translate("{0} / {1}장 · {2}{3}", { "0": n + 1, "1": session.frameCount, "2": frameLabel(n), "3": deleted.has(n) ? translate(" · 삭제한 프레임") : '' }); }
+    function frameLabel(n) { const t = frameTime(n); return t === null ? translate("editor.frame", { frame: n + 1 }) : formatEditTime(t); }
+    function framePosition(n) { return translate("editor.frames.position", { current: n + 1, total: session.frameCount, time: frameLabel(n), deletedLabel: deleted.has(n) ? translate("editor.deletedFrame") : '' }); }
     function nextRetained(n) { const first = deleted.next(Math.max(clipStart, n), clipEnd); return first ?? deleted.next(clipStart, clipEnd); }
     function seekFrame(n, reveal = true) {
         if (!session)
@@ -1405,12 +1405,12 @@ export function mountMediaEditor(host, options) {
             for (let n = first; n < end; n++) {
                 const tile = node('div', undefined, 'sbe-frame');
                 tile.dataset.frame = String(n);
-                const view = button(() => (translate("{0}번 프레임", { "0": n + 1 })), event => { event.stopPropagation(); selectFrame(n, event); }, tile);
-                bindAttribute(view, 'aria-label', () => translate("{0}번 프레임 보기", { "0": n + 1 }));
+                const view = button(() => (translate("editor.frame", { frame: n + 1 })), event => { event.stopPropagation(); selectFrame(n, event); }, tile);
+                bindAttribute(view, 'aria-label', () => translate("editor.viewFrame", { frame: n + 1 }));
                 const check = node('input');
                 check.type = 'checkbox';
-                bindAttribute(check, 'aria-label', () => translate("{0}번 프레임 선택", { "0": n + 1 }));
-                bindAttribute(check, 'title', () => translate("프레임 선택 (Shift+클릭: 범위 선택, Ctrl+클릭: 개별 선택)"));
+                bindAttribute(check, 'aria-label', () => translate("editor.selectFrame", { frame: n + 1 }));
+                bindAttribute(check, 'title', () => translate("editor.frameSelectionShiftClickRangeCtrlClickIndividual"));
                 check.addEventListener('click', event => {
                     event.stopPropagation(); selectFrame(n, event, true);
                 });
@@ -1436,7 +1436,7 @@ export function mountMediaEditor(host, options) {
                 button.removeAttribute('aria-current');
         }
         bindText(pageText, () => `${first + 1}–${end} / ${count}`);
-        const selectionText = selection.size ? translate("{0}개 선택 · Delete로 삭제", { "0": selection.size }) : translate("Shift·Ctrl 클릭 또는 드래그로 선택");
+        const selectionText = selection.size ? translate("editor.selectedPressDeleteToRemove", { count: selection.size }) : translate("editor.selectWithShiftCtrlClickOrDrag");
         if (frameSelectionCount.textContent !== selectionText) bindText(frameSelectionCount, () => selectionText);
         prevPage.disabled = first === 0;
         nextPage.disabled = end >= count;
@@ -1453,8 +1453,8 @@ export function mountMediaEditor(host, options) {
         if (!session)
             return '';
         if (session.options.nativeGIF || session.options.nativeVideo)
-            return translate("원본 프레임 간격 유지");
-        return translate("약 ") + (retainedCount() / session.options.fps).toFixed(2) + translate("초");
+            return translate("editor.preserveOriginalFrameTiming");
+        return translate("download.about") + (retainedCount() / session.options.fps).toFixed(2) + translate("editor.s");
     }
     function sync() {
         if (dead)
@@ -1462,7 +1462,7 @@ export function mountMediaEditor(host, options) {
         fps.disabled = kind.value === 'trim' || sourceGIF || !!session?.options.nativeGIF;
         mute.disabled = kind.value !== 'trim';
         prepare.disabled = busy || !file;
-        bindText(prepare, () => sourceGIF ? translate("프레임 불러오기") : translate("프레임 정밀 편집"));
+        bindText(prepare, () => sourceGIF ? translate("editor.loadFrames") : translate("editor.preciseFrameEditing"));
         prepare.hidden = !sourceGIF && kind.value === 'trim';
         workspace.hidden = !session;
         clipControl.root.hidden = session?.state !== 'ready';
@@ -1479,7 +1479,7 @@ export function mountMediaEditor(host, options) {
         }
         sourceActions.hidden = !source || !sourceMatches || !!session && !timeMode(session);
         quickCropToggle.hidden = !quick || trimMode;
-        bindText(quickCropToggle, () => quickCrop ? translate("영상으로 돌아가기") : translate("크롭 영역 조절"));
+        bindText(quickCropToggle, () => quickCrop ? translate("editor.backToVideo") : translate("editor.adjustCropArea"));
         quickCropToggle.setAttribute('aria-pressed', String(quickCrop));
         cropSurface.hidden = !cropEditing;
         cropPlaceholder.hidden = frameEditing || Boolean(source) && sourceMatches || trimMode;
@@ -1487,7 +1487,7 @@ export function mountMediaEditor(host, options) {
         editorBody.classList.toggle('has-frames', Boolean(frameEditing));
         frameShortcutGroup.hidden = !frameEditing;
         rangeShortcutGroup.hidden = !(session?.state === 'ready' || !setup.hidden && !sourceGIF);
-        bindText(shortcutMode, () => !session || session.state !== 'ready' ? translate("편집 자료를 열고 준비가 끝나면 해당 모드의 단축키가 표시됩니다.") : frameEditing ? translate("GIF·WebP 프레임 편집에서 사용할 수 있는 단축키입니다.") : translate("동영상 자르기에서는 구간 손잡이와 공통 단축키를 사용할 수 있습니다."));
+        bindText(shortcutMode, () => !session || session.state !== 'ready' ? translate("editor.shortcutsForTheCurrentModeAppearAfterEditingData") : frameEditing ? translate("editor.keyboardShortcutsForGifAndWebpFrameEditing") : translate("editor.videoTrimmingSupportsRangeHandleAndGeneralShortcuts"));
         sourceRange.root.hidden = !file || sourceGIF || !!session;
         sourceRange.update();
         if (!session) {
@@ -1501,8 +1501,8 @@ export function mountMediaEditor(host, options) {
         gifWorkspace.hidden = !frameEditing;
         muteLabel.hidden = gif || !ready;
         mute.disabled = !ready;
-        bindText(summary, () => quick ? translate("{0} · 선택 구간 {1}초", { "0": session.title, "1": (frameTime(clipEnd)-frameTime(clipStart)).toFixed(2) }) : `${session.title} · ${session.cancelling ? translate("취소 중") : labels[session.state] || session.state} ${session.progress}%` + (ready && gif ? translate(" · {0}장 중 {1}장 남음 · {2} · {3}×{4}px", { "0": session.frameCount, "1": retainedCount(), "2": retainedDuration(), "3": crop?.width || session.width, "4": crop?.height || session.height }) : '') + (session.error ? ` · ${session.error}` : ''));
-        bindText(save, () => gif ? (kind.value === 'webp' ? translate("WebP 저장") : translate("GIF 저장")) : translate("잘라낸 영상 저장"));
+        bindText(summary, () => quick ? translate("editor.selectedRangeS", { title: session.title, seconds: (frameTime(clipEnd)-frameTime(clipStart)).toFixed(2) }) : `${session.title} · ${session.cancelling ? translate("gallery.cancelling") : labels[session.state] || session.state} ${session.progress}%` + (ready && gif ? translate("editor.ofFramesRetainedPx", { total: session.frameCount, retained: retainedCount(), duration: retainedDuration(), width: crop?.width || session.width, height: crop?.height || session.height }) : '') + (session.error ? ` · ${session.error}` : ''));
+        bindText(save, () => gif ? (kind.value === 'webp' ? translate("editor.saveWebp") : translate("editor.saveGif")) : translate("editor.saveTrimmedVideo"));
         qualityBox.hidden = !gif || !ready;
         sample.disabled = busy || !ready;
         if (ready && !resourceBox.childNodes.length)
@@ -1513,17 +1513,17 @@ export function mountMediaEditor(host, options) {
         clipControl.update(current);
         if (ready && quick) {
             start.value = String(frameTime(clipStart)); end.value = String(frameTime(clipEnd));
-            bindText(applyCrop, () => translate("크롭 적용"));
+            bindText(applyCrop, () => translate("editor.applyCrop"));
             for (const key of Object.keys(cropInputs)) {
                 cropInputs[key].max = String(key === 'x' || key === 'width' ? session.width : session.height);
                 if (doc.activeElement !== cropInputs[key]) cropInputs[key].value = String(crop[key]);
             }
-            bindText(cropState, () => JSON.stringify(crop) === JSON.stringify(appliedCrop) ? translate("{0}×{1}px 적용됨", { "0": appliedCrop.width, "1": appliedCrop.height }) : translate("크롭 변경 후 크롭 적용을 누르세요."));
-            bindText(qualityHint, () => translate("선택 구간을 원본 프레임으로 변환합니다. 화질 확인은 현재 위치 근처에서 최대 2초만 처리합니다."));
+            bindText(cropState, () => JSON.stringify(crop) === JSON.stringify(appliedCrop) ? translate("editor.pxApplied", { width: appliedCrop.width, height: appliedCrop.height }) : translate("editor.afterChangingTheCropSelectApplyCrop"));
+            bindText(qualityHint, () => translate("editor.convertsTheSelectedRangeFromOriginalFramesQualityCheck"));
             if (quickCrop) void paint();
             return;
         }
-        bindText(applyCrop, () => translate("모든 프레임에 크롭 적용"));
+        bindText(applyCrop, () => translate("editor.applyCropToAllFrames"));
         if (ready && gif) {
             if (!crop)
                 crop = { x: 0, y: 0, width: session.width, height: session.height };
@@ -1538,7 +1538,7 @@ export function mountMediaEditor(host, options) {
             frameSlider.value = String(current);
             bindText(position, () => framePosition(current));
             clipControl.update(current);
-            bindText(cropState, () => JSON.stringify(crop) === JSON.stringify(appliedCrop) ? translate("모든 프레임에 {0}×{1}px 적용됨", { "0": appliedCrop?.width, "1": appliedCrop?.height }) : translate("크롭 변경 후 모든 프레임에 적용을 누르세요."));
+            bindText(cropState, () => JSON.stringify(crop) === JSON.stringify(appliedCrop) ? translate("editor.pxAppliedToAllFrames", { width: appliedCrop?.width, height: appliedCrop?.height }) : translate("editor.afterChangingTheCropApplyItToAllFrames"));
             previousFrame.disabled = current === 0;
             nextFrame.disabled = current === session.frameCount - 1;
             deleteButton.disabled = !selection.size;
@@ -1638,28 +1638,31 @@ export function mountMediaEditor(host, options) {
     stage.addEventListener('lostpointercapture', cancelCropPointer);
     view.addEventListener('blur', cancelCropPointer);
     dialog.addEventListener('keydown', event => {
+        if (event.defaultPrevented || isComposing(event)) return;
         if (event.key === 'Escape' && framePointer?.active) { event.preventDefault(); event.stopPropagation(); stopFrameDrag(true); return; }
         if (event.key === 'Escape' && !shortcutsPanel.hidden) {
             event.preventDefault(); event.stopPropagation(); showShortcuts(false); return;
         }
+        if (matchShortcut(event, 'app')?.id === 'app.help') { event.preventDefault(); showShortcuts(shortcutsPanel.hidden); return; }
         const frameCheckbox = grid.contains(event.target) && event.target.tagName === 'INPUT' && event.target.type === 'checkbox';
-        if (shortcutsPanel.contains(event.target) || busy || !session || session.state !== 'ready' || timeMode(session) || !frameCheckbox && (['INPUT', 'SELECT', 'TEXTAREA'].includes(event.target.tagName) || event.target.isContentEditable))
+        if (shortcutsPanel.contains(event.target) || busy || !session || session.state !== 'ready' || !frameCheckbox && isTextInput(event.target))
             return;
-        if (event.key === 'ArrowLeft') {
-            event.preventDefault();
-            previousFrame.click();
-        }
-        if (event.key === 'ArrowRight') {
-            event.preventDefault();
-            nextFrame.click();
-        }
-        if (event.key === 'Delete') {
-            event.preventDefault();
-            deleteButton.click();
-        }
-        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
-            event.preventDefault();
-            (event.shiftKey ? redoButton : undoButton).click();
+        const item = matchShortcut(event, 'editor');
+        if (!item) return;
+        if (timeMode(session) && ['editor.previous', 'editor.next', 'editor.delete'].includes(item.id)) return;
+        event.preventDefault(); event.stopPropagation();
+        if (item.id === 'editor.previous') previousFrame.click();
+        if (item.id === 'editor.next') nextFrame.click();
+        if (item.id === 'editor.delete') deleteButton.click();
+        if (item.id === 'editor.undo') undoButton.click();
+        if (item.id === 'editor.redo') redoButton.click();
+        if (item.id === 'editor.export' && !save.disabled && confirm(translate("editor.exportUsingTheCurrentOutputSettings"))) save.click();
+        if (item.id === 'editor.start' || item.id === 'editor.end') {
+            const before = snapshot();
+            const position = timeMode(session) && source ? Math.round((source.currentTime - session.options.start) * 1000) : current;
+            if (item.id === 'editor.start') clipStart = clamp(position, 0, clipEnd - 1);
+            else clipEnd = clamp(position + (timeMode(session) ? 0 : 1), clipStart + 1, editableCount(session));
+            remember(before); clipControl.update(); sync();
         }
     });
     let historyKey = '';
@@ -1670,24 +1673,24 @@ export function mountMediaEditor(host, options) {
             return;
         }
         historyKey = key;
-        bindText(sessionCount, () => translate("편집 초안 {0}개 · 최근 {1}개 자동 보관", { "0": sessions.length, "1": sessionLimit }));
-        bindText(jobCount, () => translate("작업 내역 {0}개 · 최근 {1}개 자동 보관", { "0": jobs.length, "1": sessionLimit }));
+        bindText(sessionCount, () => translate("editor.editingDraftsLatestKeptAutomatically", { count: sessions.length, limit: sessionLimit }));
+        bindText(jobCount, () => translate("editor.jobHistoryEntriesLatestKeptAutomatically", { count: jobs.length, limit: sessionLimit }));
         sessionList.replaceChildren();
         jobList.replaceChildren();
         for (const item of sessions) {
             const row = node('div', undefined, 'sbe-record');
-            row.append(node('span', () => (`${item.title} · ${item.options.kind === 'gif' ? 'GIF' : translate("영상")} · ${labels[item.state] || item.state} ${item.progress}%${item.cancelling ? translate(" · 취소 중") : ''}`)));
-            button(() => (translate("열기")), () => {
+            row.append(node('span', () => (`${item.title} · ${item.options.kind === 'gif' ? 'GIF' : translate("media.video")} · ${labels[item.state] || item.state} ${item.progress}%${item.cancelling ? translate("editor.cancelling") : ''}`)));
+            button(() => (translate("common.open")), () => {
                 useSession(item);
                 mainPane.scrollTop = 0;
                 const target = item.state === 'ready' && item.options.kind !== 'trim' ? stage : closeEditor;
                 target.focus({ preventScroll: true });
             }, row);
             if (active(item.state))
-                button(() => (translate("취소")), () => action(async () => { await unwrap(api.cancel({ id: item.id })); await refresh(); }), row);
+                button(() => (translate("common.cancel")), () => action(async () => { await unwrap(api.cancel({ id: item.id })); await refresh(); }), row);
             else
-                button(() => (translate("편집 초안 삭제")), () => action(async () => {
-                    if (!confirm(translate("이 편집 초안과 임시 프레임을 삭제할까요? 원본 영상과 저장된 결과는 유지됩니다.")))
+                button(() => (translate("editor.deleteEditingDraft")), () => action(async () => {
+                    if (!confirm(translate("editor.deleteThisEditingDraftAndTemporaryFramesOriginalVideo")))
                         return;
                     await unwrap(api.release({ id: item.id }));
                     try {
@@ -1705,22 +1708,22 @@ export function mountMediaEditor(host, options) {
         }
         for (const job of jobs) {
             const row = node('div', undefined, 'sbe-record');
-            row.append(node('span', () => (`${(job.preview ? translate("화질 확인 · ") : '') + (job.options.kind === 'webp' ? 'WebP' : job.options.kind === 'gif' ? 'GIF' : translate("영상"))} · ${new Date(job.createdAt).toLocaleString(getLocale())} · ${job.cancelling ? translate("취소 중") : labels[job.state] || job.state} ${job.progress}%${job.error ? ' · ' + job.error : ''}`)));
+            row.append(node('span', () => (`${(job.preview ? translate("editor.qualityCheck") : '') + (job.options.kind === 'webp' ? 'WebP' : job.options.kind === 'gif' ? 'GIF' : translate("media.video"))} · ${new Date(job.createdAt).toLocaleString(getLocale())} · ${job.cancelling ? translate("gallery.cancelling") : labels[job.state] || job.state} ${job.progress}%${job.error ? ' · ' + job.error : ''}`)));
             if (job.resources?.known)
-                row.append(node('span', () => (translate("인코더 RAM {0} · 관측 최대 {1}", { "0": bytes(job.resources.currentBytes), "1": bytes(job.resources.observedPeakBytes) }))));
+                row.append(node('span', () => (translate("editor.encoderRamObservedPeak", { memory: bytes(job.resources.currentBytes), peak: bytes(job.resources.observedPeakBytes) }))));
             if (active(job.state) && job.state !== 'publishing')
-                button(() => (translate("취소")), () => action(async () => { await unwrap(api.cancel({ id: job.id })); await refresh(); }), row);
+                button(() => (translate("common.cancel")), () => action(async () => { await unwrap(api.cancel({ id: job.id })); await refresh(); }), row);
             if (job.state === 'completed' && (job.resultFileId || job.preview))
-                button(() => (translate("결과 보기")), () => { selectedJob = job.id; renderResult(); }, row);
+                button(() => (translate("editor.viewResult")), () => { selectedJob = job.id; renderResult(); }, row);
             if (['failed', 'cancelled', 'interrupted'].includes(job.state)) {
-                const retry = button(() => (translate("같은 설정으로 다시 실행")), () => action(async () => { const next = await unwrap(api.create({ ...job.options, requestId: crypto.randomUUID() })); selectedJob = next.id; await refresh(); }), row);
+                const retry = button(() => (translate("editor.runAgainWithTheSameSettings")), () => action(async () => { const next = await unwrap(api.create({ ...job.options, requestId: crypto.randomUUID() })); selectedJob = next.id; await refresh(); }), row);
                 retry.disabled = !sessions.some(item => item.id === (job.sessionId || job.options.sessionId) && item.state === 'ready');
-                if (retry.disabled) bindAttribute(retry, 'title', () => translate("편집 초안을 다시 준비한 뒤 저장하세요."));
+                if (retry.disabled) bindAttribute(retry, 'title', () => translate("editor.prepareTheEditingDraftAgainBeforeSaving"));
             }
             jobList.append(row);
         }
         if (!sessions.length && !jobs.length)
-            sessionList.append(node('p', () => (translate("편집 자료와 작업이 없습니다."))));
+            sessionList.append(node('p', () => (translate("editor.noEditingDataOrJobs"))));
         renderResult();
     }
     let shownResult = '';
@@ -1740,19 +1743,19 @@ export function mountMediaEditor(host, options) {
             return;
         const media = node(job.options.kind !== 'trim' ? 'img' : 'video');
         if (job.options.kind !== 'trim')
-            bindAttribute(media, 'alt', () => job.preview ? translate("실제 화질 미리보기") : translate("생성한 애니메이션"));
+            bindAttribute(media, 'alt', () => job.preview ? translate("editor.actualQualityPreview") : translate("editor.generatedAnimation"));
         else {
             media.controls = true;
             media.playsInline = true;
         }
         media.src = resultURL(job.id);
         resultBox.append(media);
-        const link = node('a', () => (translate("결과 다운로드")));
+        const link = node('a', () => (translate("editor.downloadResult")));
         link.href = resultURL(job.id) + '?download=1';
         link.download = '';
         resultBox.append(link);
         if (options.reveal && !job.preview)
-            button(() => (translate("PC 파일 위치")), () => action(() => options.reveal(job.id)), resultBox);
+            button(() => (translate("editor.pcFileLocation")), () => action(() => options.reveal(job.id)), resultBox);
     }
     async function refresh() {
         if (dead || reading)
@@ -1786,7 +1789,7 @@ export function mountMediaEditor(host, options) {
                     session = null;
                     imageCache.clear();
                     lastPreview = null;
-                    report(translate("오래된 편집 초안이 정리되었습니다. 원본을 다시 열어 편집을 시작할 수 있습니다."));
+                    report(translate("editor.anOldEditingDraftWasCleanedUpReopenThe"));
                 }
             }
             renderHistory();
@@ -1796,7 +1799,7 @@ export function mountMediaEditor(host, options) {
         }
         catch (e) {
             if (!dead)
-                report(e.message || translate("PC에 연결하지 못했습니다. 연결되면 작업 상태를 다시 확인합니다."), true);
+                report(e.message || translate("editor.couldNotConnectToThePcJobStatusWill"), true);
         }
         finally {
             reading = false;

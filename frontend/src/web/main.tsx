@@ -18,9 +18,9 @@ function WebApp() {
             <a href="/" className="min-w-0 truncate font-semibold text-[var(--color-primary)]">Storage Bucket</a>
             <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">
                 <LanguageSelect />
-                <button type="button" className="rounded-lg p-2 hover:bg-[var(--bg-hover)]" aria-label={translate("테마 변경")} onClick={toggleTheme}>{theme === 'dark' ? <Sun className="size-5" /> : <Moon className="size-5" />}</button>
-                <button type="button" className="rounded-lg p-2 hover:bg-[var(--bg-hover)]" aria-label={mode === 'icons' ? translate("설명 모드로 전환") : translate("아이콘 모드로 전환")} onClick={toggle}>{mode === 'icons' ? <TextCursorInput className="size-5" /> : <Grid2X2 className="size-5" />}</button>
-                <a href={'/licenses?lang=' + language} className="text-xs text-[var(--text-muted)]">{translate("라이선스")}</a>
+                <button type="button" className="rounded-lg p-2 hover:bg-[var(--bg-hover)]" aria-label={translate("common.changeTheme")} onClick={toggleTheme}>{theme === 'dark' ? <Sun className="size-5" /> : <Moon className="size-5" />}</button>
+                <button type="button" className="rounded-lg p-2 hover:bg-[var(--bg-hover)]" aria-label={mode === 'icons' ? translate("common.switchToLabelMode") : translate("common.switchToIconMode")} onClick={toggle}>{mode === 'icons' ? <TextCursorInput className="size-5" /> : <Grid2X2 className="size-5" />}</button>
+                <a href={'/licenses?lang=' + language} className="text-xs text-[var(--text-muted)]">{translate("settings.licenses")}</a>
             </div>
         </header>
         <main className="min-h-0 flex-1"><SearchPage Gallery={WebGalleryPage} /></main>

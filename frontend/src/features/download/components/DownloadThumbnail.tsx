@@ -8,7 +8,7 @@ export function DownloadThumbnail({
     url,
     localPath,
     completed = false,
-    title = translate("다운로드 썸네일"),
+    title = translate("download.downloadThumbnail"),
     fullWidth = false
 }: {
     url: string
@@ -92,19 +92,19 @@ export function DownloadThumbnail({
                 <div className="flex flex-col items-center gap-0.5">
                     <Download className="size-6" aria-hidden="true" />
 
-                    <span className="text-xs">{loading ? translate("미리보기 준비 중") : translate("썸네일 없음")}</span>
+                    <span className="text-xs">{loading ? translate("download.preparingPreview") : translate("download.noThumbnail")}</span>
 
                     {!loading && (
                         <button
                             type="button"
                             data-detail-trigger
-                            aria-label={translate("썸네일 다시 불러오기")}
+                            aria-label={translate("download.reloadThumbnail")}
                             className="text-[11px] leading-4 underline"
                             onClick={(event) => {
                                 event.stopPropagation()
                                 setReload((value) => value + 1)
                             }}
-                        >{translate("다시 시도")}</button>
+                        >{translate("common.retry")}</button>
                     )}
                 </div>
             )}

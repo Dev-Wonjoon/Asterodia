@@ -8,7 +8,7 @@ import { ProgressBar } from '@renderer/shared/components/ui/ProgressBar'
 import { formatBytes } from '@renderer/shared/utils/formatBytes'
 
 export const moveRunning = (state: string) => state === 'running' || state === 'pausing'
-export const moveLabel = (state: string) => ({ pending: translate("시작 대기"), running: translate("이동 중"), pausing: translate("중단 중"), paused: translate("중단됨"), interrupted: translate("중단됨 · 이어하기 가능"), completed: translate("이동 완료"), completed_with_errors: translate("일부 처리 필요"), failed: translate("실패"), copying: translate("복사 중"), verified: translate("검증 완료"), committed: translate("원본 정리 대기"), cleanup_pending: translate("원본 정리 필요"), excluded: translate("대상 폴더에 있음") }[state] ?? state)
+export const moveLabel = (state: string) => ({ pending: translate("gallery.waitingToStart"), running: translate("gallery.moving"), pausing: translate("gallery.stopping"), paused: translate("download.interrupted"), interrupted: translate("gallery.stoppedCanResume"), completed: translate("gallery.moveCompleted"), completed_with_errors: translate("gallery.someItemsNeedAttention"), failed: translate("download.failed"), copying: translate("gallery.copying"), verified: translate("gallery.verified"), committed: translate("gallery.awaitingSourceCleanup"), cleanup_pending: translate("gallery.sourceCleanupRequired"), excluded: translate("gallery.alreadyInDestinationFolder") }[state] ?? state)
 
 export interface FileMoveControls { choose: (selection?: MoveSelection[]) => void; track: (jobId: string, error?: string) => void }
 
@@ -53,7 +53,7 @@ export function FileMovePanel({ selection, disabled, onCreated, onChanged, compa
      counts.current = signature
      if (moveRunning(result.data.state)) timer = setTimeout(() => void poll(), 500)
     }
-   } catch { if (!stopped) setError(translate("이동 상태를 확인하지 못했습니다. 상태 새로고침을 눌러주세요.")) }
+   } catch { if (!stopped) setError(translate("gallery.couldNotCheckMoveStatusSelectRefreshStatus")) }
   }
   void poll()
   return () => { stopped = true; mounted.current = false; clearTimeout(timer) }
@@ -68,7 +68,7 @@ export function FileMovePanel({ selection, disabled, onCreated, onChanged, compa
    setHasMoreDirectories(result.data.hasNextPage)
    if (!append) setDirectory('')
    setChoosing(true)
-  } catch { if (mounted.current) setError(translate("대상 폴더를 불러오지 못했습니다.")) }
+  } catch { if (mounted.current) setError(translate("gallery.couldNotLoadDestinationFolders")) }
   finally { if (mounted.current) setBusy(false) }
  }
  async function start() {
@@ -78,8 +78,8 @@ export function FileMovePanel({ selection, disabled, onCreated, onChanged, compa
   starting.current = true
   setError('')
   try {
-   const verb = operation === 'copy' ? translate("복사") : translate("이동")
-   if (!await confirm({ title: translate("한 폴더에 모으기"), confirmLabel: translate("{0} 시작", { "0": verb }), message: translate("선택한 앨범·파일을 아래 폴더로 {0}할까요?\n{1}\n{2} 같은 이름은 번호를 붙여 보존합니다.", { "0": verb, "1": target.directoryPath, "2": operation === 'copy' ? translate("원본 파일과 앨범의 파일 위치는 유지합니다.") : translate("복사·검증 후 원본을 정리하고 모든 앨범의 파일 위치를 갱신합니다.") }) }) || !mounted.current) return
+   const verb = operation === 'copy' ? translate("gallery.copy") : translate("gallery.move")
+   if (!await confirm({ title: translate("gallery.collectInOneFolder"), confirmLabel: translate("gallery.start", { operation: verb }), message: translate("gallery.theSelectedAlbumsAndFilesToTheFolderBelow", { operation: verb, path: target.directoryPath, operationHint: operation === 'copy' ? translate("gallery.originalFilesAndAlbumFileLocationsWillBeKept") : translate("gallery.afterCopyingAndVerificationOriginalsAreCleanedUpAnd") }) }) || !mounted.current) return
    setBusy(true)
    const created = await api.fileMove.create({ selection: effectiveSelection, directoryId: target.id, operation })
    if (!mounted.current) return
@@ -88,7 +88,7 @@ export function FileMovePanel({ selection, disabled, onCreated, onChanged, compa
    const result = await api.fileMove.run({ jobId: created.data.jobId })
    if (!mounted.current) return
    if (!result.ok) setError(translateError(result.error))
-  } catch { if (mounted.current) setError(translate("요청 결과를 확인하지 못했습니다. 상태를 새로고침한 뒤 이어하기를 확인하세요.")) }
+  } catch { if (mounted.current) setError(translate("gallery.couldNotConfirmTheResultRefreshStatusAndCheck")) }
   finally { starting.current = false; if (mounted.current) { setBusy(false); setRefresh(v => v + 1) } }
  }
  async function action(kind: 'run' | 'pause' | 'retry') {
@@ -98,7 +98,7 @@ export function FileMovePanel({ selection, disabled, onCreated, onChanged, compa
    const result = await api.fileMove[kind]({ jobId: status.jobId })
    if (!mounted.current) return
    if (!result.ok) setError(translateError(result.error))
-  } catch { if (mounted.current) setError(translate("요청 결과를 확인하지 못했습니다. 상태를 새로고침하세요.")) }
+  } catch { if (mounted.current) setError(translate("gallery.couldNotConfirmTheResultRefreshStatus")) }
   finally { if (mounted.current) { setBusy(false);setRefresh(v => v + 1) } }
  }
  const running = status && moveRunning(status.state)
@@ -106,42 +106,42 @@ export function FileMovePanel({ selection, disabled, onCreated, onChanged, compa
  useEffect(() => { onBusyChange?.(busy || choosing) }, [busy, choosing, onBusyChange])
  const button = 'rounded-lg border border-[var(--border-line)] px-3 py-2 text-sm disabled:opacity-40'
  if (compact && !error && !choosing && !status) return null
- return <section aria-label={translate("파일 이동")} className="space-y-3">
+ return <section aria-label={translate("gallery.moveFiles")} className="space-y-3">
   {!compact && <div className="flex flex-wrap items-center gap-2">
-   <span className="text-sm">{translate("게시글 {0}개 선택", { "0": selection.length })}</span>
-   <button className={button} disabled={busy || disabled || !!running || !selection.length} onClick={() => { setChosen(null); setOperation('copy'); void folders() }}>{translate("한 폴더에 모으기")}</button>
-   {selection.length > 0 && <button className={button} disabled={busy} onClick={onCreated}>{translate("선택 해제")}</button>}
+   <span className="text-sm">{translate("gallery.postsSelected", { count: selection.length })}</span>
+   <button className={button} disabled={busy || disabled || !!running || !selection.length} onClick={() => { setChosen(null); setOperation('copy'); void folders() }}>{translate("gallery.collectInOneFolder")}</button>
+   {selection.length > 0 && <button className={button} disabled={busy} onClick={onCreated}>{translate("gallery.selection.clear")}</button>}
   </div>}
   {error && <p role="alert" className="text-sm text-red-500">{translateMessage(error)}</p>}
   {choosing && <div className="space-y-3 rounded-xl border border-[var(--border-line)] p-4">
-   <p className="text-sm">{translate("가져오기로 등록한 대상 폴더를 선택하세요. 앨범 구분은 유지합니다.")}</p>
+   <p className="text-sm">{translate("gallery.selectADestinationFolderRegisteredThroughImportAlbumGrouping")}</p>
    <form className="flex flex-wrap gap-2" onSubmit={event => { event.preventDefault(); void folders() }}>
-    <input aria-label={translate("대상 폴더 검색")} value={keyword} onChange={event => setKeyword(event.target.value)} className="min-w-0 flex-1 rounded border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-2" />
-    <button className={button} disabled={busy}>{translate("검색")}</button>
+    <input aria-label={translate("gallery.searchDestinationFolders")} value={keyword} onChange={event => setKeyword(event.target.value)} className="min-w-0 flex-1 rounded border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-2" />
+    <button className={button} disabled={busy}>{translate("navigation.search")}</button>
    </form>
-   <select aria-label={translate("모으기 방식")} value={operation} disabled={busy} onChange={event => setOperation(event.target.value as 'copy' | 'move')} className="w-full rounded border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-2"><option value="copy">{translate("복사해서 모으기 · 원본 유지")}</option><option value="move">{translate("이동해서 모으기 · 원본 위치 변경")}</option></select>
-   <select aria-label={translate("이동할 폴더")} value={directory} onChange={event => setDirectory(event.target.value)} className="w-full min-w-0 rounded border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-2">
-    <option value="">{translate("폴더 선택")}</option>{directories.map(item => <option key={item.id} value={item.id}>{item.directoryPath}</option>)}
+   <select aria-label={translate("gallery.collectionMethod")} value={operation} disabled={busy} onChange={event => setOperation(event.target.value as 'copy' | 'move')} className="w-full rounded border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-2"><option value="copy">{translate("gallery.copyFilesKeepOriginals")}</option><option value="move">{translate("gallery.moveFilesChangeOriginalLocations")}</option></select>
+   <select aria-label={translate("gallery.destinationFolder")} value={directory} onChange={event => setDirectory(event.target.value)} className="w-full min-w-0 rounded border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-2">
+    <option value="">{translate("gallery.selectFolder")}</option>{directories.map(item => <option key={item.id} value={item.id}>{item.directoryPath}</option>)}
    </select>
-   {!directories.length && <p className="text-sm">{translate("등록된 폴더가 없습니다. 먼저 로컬 폴더 가져오기를 사용하세요.")}</p>}
-   {hasMoreDirectories && <button className={button} disabled={busy} onClick={() => void folders(true)}>{translate("폴더 더 불러오기")}</button>}
-   <div className="flex gap-2"><button className={button} disabled={busy || disabled || !directory || !effectiveSelection.length} onClick={() => void start()}>{operation === 'copy' ? translate("복사 시작") : translate("이동 시작")}</button><button className={button} disabled={busy} onClick={() => { setChoosing(false); setChosen(null) }}>{translate("닫기")}</button></div>
+   {!directories.length && <p className="text-sm">{translate("gallery.noRegisteredFoldersImportALocalFolderFirst")}</p>}
+   {hasMoreDirectories && <button className={button} disabled={busy} onClick={() => void folders(true)}>{translate("gallery.loadMoreFolders")}</button>}
+   <div className="flex gap-2"><button className={button} disabled={busy || disabled || !directory || !effectiveSelection.length} onClick={() => void start()}>{operation === 'copy' ? translate("gallery.startCopying") : translate("gallery.startMoving")}</button><button className={button} disabled={busy} onClick={() => { setChoosing(false); setChosen(null) }}>{translate("common.close")}</button></div>
   </div>}
   {status && hidden !== status.jobId && <div className="space-y-3 rounded-xl border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-4">
-   <div className="flex items-center justify-between gap-3"><p className="font-medium">{status.operation === 'copy' ? translate("복사 · ") : translate("이동 · ")}{moveLabel(status.state)}</p>{!running && <button aria-label={translate("이동 결과 닫기")} className={button} onClick={() => setHidden(status.jobId)}>×</button>}</div>
+   <div className="flex items-center justify-between gap-3"><p className="font-medium">{status.operation === 'copy' ? translate("gallery.operation.copyPrefix") : translate("gallery.operation.movePrefix")}{moveLabel(status.state)}</p>{!running && <button aria-label={translate("gallery.closeMoveResults")} className={button} onClick={() => setHidden(status.jobId)}>×</button>}</div>
    <p className="break-all text-xs">{status.directory}</p>
-   {!!status.albumId && <p className="text-sm">{translate("묶음 생성 완료 · 파일 모으기 결과는 아래에서 확인하세요.")}</p>}
-   <p className="text-sm">{translate("전체 {0}개 · 완료 {1}개 · 실패 {2}개 · 원본 정리 대기 {3}개", { "0": status.total, "1": status.completed, "2": status.failed, "3": status.cleanupPending })}</p>
-   <ProgressBar label={translate("파일 이동 진행률")} value={status.totalBytes > 0 ? status.processedBytes / status.totalBytes * 100 : status.total ? (status.completed + status.cleanupPending) / status.total * 100 : 0} />
+   {!!status.albumId && <p className="text-sm">{translate("gallery.collectionCreatedCheckFileCollectionResultsBelow")}</p>}
+   <p className="text-sm">{translate("gallery.totalCompletedFailedAwaitingSourceCleanup", { total: status.total, completed: status.completed, failed: status.failed, pendingCleanup: status.cleanupPending })}</p>
+   <ProgressBar label={translate("gallery.fileMoveProgress")} value={status.totalBytes > 0 ? status.processedBytes / status.totalBytes * 100 : status.total ? (status.completed + status.cleanupPending) / status.total * 100 : 0} />
    <p className="break-all text-xs">{formatBytes(status.processedBytes)} / {formatBytes(status.totalBytes)}{status.current && ` · ${status.current}`}</p>
    <div className="flex flex-wrap gap-2">
-    {running ? <button className={button} disabled={busy || status.state === 'pausing'} onClick={() => void action('pause')}>{translate("중단")}</button> : status.state !== 'completed' && <button className={button} disabled={busy || disabled} onClick={() => void action(status.failed || status.cleanupPending ? 'retry' : 'run')}>{status.failed || status.cleanupPending ? translate("실패·정리 재시도") : translate("이어하기")}</button>}
-    <button className={button} disabled={busy} onClick={() => { setError(''); setRefresh(v => v + 1) }}>{translate("상태 새로고침")}</button>
+    {running ? <button className={button} disabled={busy || status.state === 'pausing'} onClick={() => void action('pause')}>{translate("gallery.stop")}</button> : status.state !== 'completed' && <button className={button} disabled={busy || disabled} onClick={() => void action(status.failed || status.cleanupPending ? 'retry' : 'run')}>{status.failed || status.cleanupPending ? translate("gallery.retryFailuresAndCleanup") : translate("gallery.resume")}</button>}
+    <button className={button} disabled={busy} onClick={() => { setError(''); setRefresh(v => v + 1) }}>{translate("gallery.refreshStatus")}</button>
    </div>
-   <details><summary className="cursor-pointer text-sm">{translate("파일별 결과")}</summary><ul className="mt-2 max-h-64 space-y-2 overflow-auto text-xs">{status.items.map(item => <li key={item.id} className="break-all"><span>{moveLabel(item.state)} · {item.source}</span>{item.target && <p>→ {item.target}</p>}{item.error && <p className="text-red-500">{translateMessage(item.error)}</p>}</li>)}</ul>
-    <div className="mt-2 flex gap-2"><button className={button} disabled={offset === 0} onClick={() => setOffset(v => Math.max(0, v - 100))}>{translate("이전 결과")}</button><button className={button} disabled={!status.hasMore} onClick={() => setOffset(v => v + 100)}>{translate("다음 결과")}</button></div>
+   <details><summary className="cursor-pointer text-sm">{translate("gallery.perFileResults")}</summary><ul className="mt-2 max-h-64 space-y-2 overflow-auto text-xs">{status.items.map(item => <li key={item.id} className="break-all"><span>{moveLabel(item.state)} · {item.source}</span>{item.target && <p>→ {item.target}</p>}{item.error && <p className="text-red-500">{translateMessage(item.error)}</p>}</li>)}</ul>
+    <div className="mt-2 flex gap-2"><button className={button} disabled={offset === 0} onClick={() => setOffset(v => Math.max(0, v - 100))}>{translate("gallery.previousResults")}</button><button className={button} disabled={!status.hasMore} onClick={() => setOffset(v => v + 100)}>{translate("gallery.nextResults")}</button></div>
    </details>
   </div>}
-  {status && hidden === status.jobId && <button className={button} onClick={() => setHidden('')}>{translate("최근 이동 결과 보기")}</button>}
+  {status && hidden === status.jobId && <button className={button} onClick={() => setHidden('')}>{translate("gallery.viewRecentMoveResults")}</button>}
  </section>
 }

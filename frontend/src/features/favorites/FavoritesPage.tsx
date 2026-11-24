@@ -3,5 +3,5 @@ import { GalleryPage } from '../gallery/GalleryPage'
 
 export const FavoritesPage = (): React.JSX.Element => {
     useLanguage()
-    return <GalleryPage favoritesOnly title={translate('즐겨찾기')} />
+    return <GalleryPage favoritesOnly title={translate("navigation.favorites")} />
 }

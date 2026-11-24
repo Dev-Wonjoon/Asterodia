@@ -31,7 +31,7 @@ export function useGeneralSettingsViewModel(): GeneralSettingsViewModel {
             .catch((error: unknown) => {
                 if (cancelled) return
                 console.error('[Settings] Failed to load download path:', error)
-                showToast(translate("다운로드 경로를 읽지 못했습니다."), 'error')
+                showToast(translate("settings.couldNotReadTheDownloadLocation"), 'error')
             })
         return () => {
             cancelled = true
@@ -43,7 +43,7 @@ export function useGeneralSettingsViewModel(): GeneralSettingsViewModel {
             if (value) setDownloadPath(value)
         } catch (error) {
             console.error('[Settings] Failed to change download path:', error)
-            showToast(translate("다운로드 경로를 변경하지 못했습니다."), 'error')
+            showToast(translate("settings.couldNotChangeTheDownloadLocation"), 'error')
         }
     }, [showToast])
     const importDatabase = useCallback(async (): Promise<void> => {
@@ -60,9 +60,9 @@ export function useGeneralSettingsViewModel(): GeneralSettingsViewModel {
             }
             if (result.data.cancelled) return
             setImportResult(result.data)
-            showToast(translate("데이터베이스 병합을 완료했습니다."), 'success')
+            showToast(translate("settings.databaseMergeCompleted"), 'success')
         } catch {
-            setImportError(translate("병합 응답을 확인하지 못했습니다. 갤러리에서 결과를 확인한 뒤 다시 시도하세요."))
+            setImportError(translate("settings.couldNotConfirmTheMergeResponseCheckTheGallery"))
         } finally {
             importLock.current = false
             setImporting(false)

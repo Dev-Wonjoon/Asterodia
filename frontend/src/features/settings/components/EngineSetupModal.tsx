@@ -17,9 +17,9 @@ export function EngineSetupModal({ onComplete }: EngineStatusProps): React.JSX.E
     return (
         <BaseModal onClose={busy ? undefined : onComplete}>
             <div className="max-h-[85vh] w-[min(680px,calc(100vw-32px))] overflow-y-auto border border-[var(--border-line)] p-6">
-                <h2 className="text-lg font-semibold mb-1 text-[var(--text-main)]">{translate("엔진 설정")}</h2>
-                <p className="text-sm mb-5 text-[var(--text-muted)]">{translate("다운로드에 필요한 엔진이 설치되어 있지 않습니다.")}</p>
-                {statusError && <div role="alert" className="mb-3 text-sm text-red-500">{translateMessage(statusError)} <button type="button" onClick={() => void refreshStatus()}>{translate("다시 확인")}</button></div>}
+                <h2 className="text-lg font-semibold mb-1 text-[var(--text-main)]">{translate("settings.engineSetup")}</h2>
+                <p className="text-sm mb-5 text-[var(--text-muted)]">{translate("settings.enginesRequiredForDownloadingAreNotInstalled")}</p>
+                {statusError && <div role="alert" className="mb-3 text-sm text-red-500">{translateMessage(statusError)} <button type="button" onClick={() => void refreshStatus()}>{translate("download.checkAgain")}</button></div>}
                 <EngineInstallActions installer={installer} />
 
                 <div className="space-y-3 mb-5">
@@ -33,14 +33,14 @@ export function EngineSetupModal({ onComplete }: EngineStatusProps): React.JSX.E
                                     <span className="font-medium text-[var(--text-main)]">{name}</span>
                                     {status.installed && (
                                         <span className="ml-2 break-words text-xs text-green-500">
-                                            {status.version || translate("설치됨")}
+                                            {status.version || translate("download.installed")}
                                         </span>
                                     )}
                                 </div>
                                 {status.installed ? (
                                     <span className="text-xs text-green-500">✓</span>
                                 ) : (
-                                    <span className="text-xs text-[var(--text-muted)]">{translate('미설치')}</span>
+                                    <span className="text-xs text-[var(--text-muted)]">{translate("settings.notInstalled")}</span>
                                 )}
                             </div>
                             <EngineInstallProgress name={name} progress={progress[name]} />
@@ -54,7 +54,7 @@ export function EngineSetupModal({ onComplete }: EngineStatusProps): React.JSX.E
                         disabled={busy}
                         className="px-4 py-2 rounded-xl text-sm border border-[var(--border-line)] text-[var(--text-main)] disabled:opacity-50"
                     >
-                        {allInstalled ? translate("시작하기") : translate("나중에")}
+                        {allInstalled ? translate("settings.getStarted") : translate("settings.later")}
                     </button>
                 </div>
             </div>

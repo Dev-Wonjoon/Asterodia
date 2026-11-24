@@ -26,10 +26,13 @@ func TestLocalizedLicensePageAndSharedTranslationAssets(t *testing.T) {
 			t.Fatal("license text was removed or rendered as executable markup")
 		}
 	}
-	for _, asset := range []string{"/i18n.js", "/translations.js"} {
+	for _, asset := range []string{"/i18n.js", "/translations.js", "/shortcuts.js", "/langs/ko.json", "/langs/en.json"} {
 		code, header, body := f.request(t, "GET", asset, nil)
 		if code != 200 || len(body) == 0 || !strings.Contains(header.Get("Content-Security-Policy"), "script-src 'self'") {
 			t.Fatalf("shared translation asset %s: %d", asset, code)
+		}
+		if strings.HasSuffix(asset, ".json") && !strings.Contains(header.Get("Content-Type"), "application/json") {
+			t.Fatalf("language catalog has incorrect MIME type: %s", header.Get("Content-Type"))
 		}
 	}
 }

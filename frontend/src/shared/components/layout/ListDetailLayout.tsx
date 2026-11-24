@@ -94,7 +94,7 @@ export function ListDetailLayout({
         <div
             ref={root}
             onKeyDown={(event) => {
-                if (open && event.key === 'Escape' && !event.defaultPrevented) {
+                if (open && event.key === 'Escape' && !event.defaultPrevented && !event.nativeEvent.isComposing && event.keyCode !== 229) {
                     event.preventDefault()
                     if (!closeDisabled) onClose()
                 }
@@ -103,6 +103,7 @@ export function ListDetailLayout({
         >
             <div
                 ref={listRef}
+                data-keyboard-region tabIndex={-1}
                 inert={open && overlay}
                 className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 md:p-6"
             >
@@ -114,6 +115,8 @@ export function ListDetailLayout({
                         <div className="motion-backdrop absolute inset-0 z-20 bg-black/30" aria-hidden="true" />
                     )}
                     <aside
+                        data-keyboard-detail
+                        data-keyboard-region tabIndex={-1}
                         ref={panel}
                         role={overlay ? 'dialog' : undefined}
                         aria-labelledby={headingId}
@@ -133,9 +136,9 @@ export function ListDetailLayout({
                                 type="button"
                                 disabled={closeDisabled}
                                 onClick={onClose}
-                                aria-label={detailLabel + translate(" 닫기")}
+                                aria-label={detailLabel + translate("common.suffix.close")}
                                 className="rounded-lg border border-[var(--border-line)] px-3 py-2 text-sm disabled:opacity-40"
-                            >{translate("닫기")}</button>
+                            >{translate("common.close")}</button>
                         </header>
                         <div key={detailKey} className="motion-page min-h-0 flex-1 overflow-y-auto p-5">
                             {detail}

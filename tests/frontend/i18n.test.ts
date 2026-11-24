@@ -6,6 +6,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from '../../frontend/node_modules/typescript/lib/typescript.js'
 import { catalogs } from '../../internal/webserver/web/translations.js'
+import { shortcuts } from '../../internal/webserver/web/shortcuts.js'
 import { languageKey, resolveLanguage, subscribeLanguage } from '../../internal/webserver/web/i18n.js'
 import { getLanguage, getLanguagePreference, getLocale, setLanguage, translate, translateMessage, translateError, formatNumber, formatDate } from '@renderer/shared/i18n'
 import { LanguageSelect } from '@renderer/shared/i18n/LanguageSelect'
@@ -44,7 +45,7 @@ it('saves language choices, updates document language, and returns to system det
     setLanguage('en')
     expect(localStorage.getItem(languageKey)).toBe('en')
     expect(getLanguage()).toBe('en'); expect(document.documentElement.lang).toBe('en')
-    expect(translate('갤러리')).toBe('Gallery')
+    expect(translate("navigation.gallery")).toBe('Gallery')
     setLanguage('system')
     expect(getLanguagePreference()).toBe('system')
     expect(getLanguage()).toBe('ko'); expect(document.documentElement.lang).toBe('ko')
@@ -53,7 +54,7 @@ it('saves language choices, updates document language, and returns to system det
 it('keeps the chosen language usable when preference storage is blocked', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw Error('blocked') })
     setLanguage('en')
-    expect(getLanguage()).toBe('en'); expect(translate('설정')).toBe('Settings')
+    expect(getLanguage()).toBe('en'); expect(translate("navigation.settings")).toBe('Settings')
     setLanguage('ko')
     expect(getLanguage()).toBe('ko')
 })
@@ -74,7 +75,7 @@ it('responds to other tabs and system language changes, and releases its listene
 
 it('preserves interpolation values and formats dates and numbers in the selected locale', () => {
     setLanguage('en')
-    expect(translate('엔진: {0}', { '0': '{1} <script>' })).toBe('Engine: {1} <script>')
+    expect(translate("download.engine", { engine: '{1} <script>' })).toBe('Engine: {1} <script>')
     expect(translate('unknown key')).toBe('unknown key')
     expect(translate('__proto__')).toBe('__proto__')
     expect(formatNumber(1234567)).toBe('1,234,567')
@@ -86,14 +87,14 @@ it('preserves interpolation values and formats dates and numbers in the selected
 
 it('uses English if a translation is missing from the selected catalog', () => {
     const ko = catalogs.ko as Record<string, string>
-    const original = ko['검색']
-    delete ko['검색']
-    try { expect(translate('검색')).toBe('Search') }
-    finally { ko['검색'] = original }
+    const original = ko["navigation.search"]
+    delete ko["navigation.search"]
+    try { expect(translate("navigation.search")).toBe('Search') }
+    finally { ko["navigation.search"] = original }
 })
 
 it('retranslates messages already held in state and supplies English guidance for backend error codes', () => {
-    const message = translate('묶음 {0}개 · 파일 {1}개를 추가했습니다.', { '0': 2, '1': 3 })
+    const message = translate("settings.addedCollectionsAndFiles", { collections: 2, files: 3 })
     setLanguage('en')
     expect(translateMessage(message)).toBe('Added 2 collections and 3 files.')
     expect(translateError({ code: 'REVISION_CONFLICT', message: '서버의 별도 충돌 안내' })).toContain('Refresh')
@@ -108,8 +109,11 @@ it('has complete catalogs, matching interpolation parameters, and no missing UI 
     const parameters = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map(match => match[1]).sort()
     expect(Object.keys(ko).sort()).toEqual(Object.keys(en).sort())
     for (const [key, value] of Object.entries(en)) {
+        expect(key).toMatch(/^[a-zA-Z][a-zA-Z0-9]*(\.[a-zA-Z0-9]+)+$/)
+        expect(ko[key].trim(), key).not.toBe('')
         expect(value.trim(), key).not.toBe('')
         expect(parameters(value), key).toEqual(parameters(ko[key]))
+        expect(parameters(value).every(name => !/^\d+$/.test(name)), key).toBe(true)
     }
     const files: string[] = []
     function collect(directory: string) {
@@ -121,7 +125,20 @@ it('has complete catalogs, matching interpolation parameters, and no missing UI 
     }
     const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
     collect(path.join(root, 'frontend/src'))
-    files.push(...['editor', 'player', 'viewer'].map(name => path.join(root, `internal/webserver/web/${name}.js`)))
+    files.push(...['editor', 'player', 'viewer', 'app', 'search', 'shortcuts', 'i18n'].map(name => path.join(root, `internal/webserver/web/${name}.js`)))
+    for (const language of ['ko', 'en']) {
+        const filename = path.join(root, `internal/webserver/web/langs/${language}.json`)
+        const source = ts.parseJsonText(filename, readFileSync(filename, 'utf8'))
+        function validate(node: ts.Node) {
+            if (ts.isObjectLiteralExpression(node)) {
+                const keys = node.properties.map(property => property.name?.getText(source))
+                expect(new Set(keys).size, `${language}: duplicate JSON key`).toBe(keys.length)
+            }
+            ts.forEachChild(node, validate)
+        }
+        validate(source)
+    }
+    for (const shortcut of shortcuts) expect(en[shortcut.label], shortcut.id).toBeDefined()
     for (const filename of files) {
         const source = ts.createSourceFile(filename, readFileSync(filename, 'utf8'), ts.ScriptTarget.Latest, true)
         function visit(node: ts.Node) {
@@ -132,6 +149,14 @@ it('has complete catalogs, matching interpolation parameters, and no missing UI 
         }
         visit(source)
     }
+})
+
+it('renders structured application messages in the current language without translating user values', () => {
+    const message = { key: 'gallery.album.add', values: {} }
+    expect(translateMessage(message)).toBe('앨범에 추가')
+    setLanguage('en')
+    expect(translateMessage(message)).toBe('Add to album')
+    expect(translate('download.engine', { engine: '갤러리 {engine}' })).toBe('Engine: 갤러리 {engine}')
 })
 
 it('switches real search controls without replacing input nodes or losing a draft', async () => {

@@ -30,5 +30,5 @@ export function MediaEditLauncher({ file, disabled = false, compact = false, con
         })
         return () => editor.destroy()
     }, [open, activeFile?.id])
-    return <>{!compact && <button type="button" disabled={disabled} onClick={() => openEditor()} className="rounded-lg border border-[var(--border-line)] px-3 py-2 text-sm disabled:opacity-40">{file ? (file.kind==='image'?translate("GIF 편집"):translate("GIF 만들기·영상 자르기")) : translate("GIF, WebP로 만들기")}</button>}<div ref={host} style={{ display: 'contents' }} /></>
+    return <>{!compact && <button type="button" disabled={disabled} onClick={() => openEditor()} className="rounded-lg border border-[var(--border-line)] px-3 py-2 text-sm disabled:opacity-40">{file ? (file.kind==='image'?translate("editor.editGif"):translate("editor.createGifOrTrimVideo")) : translate("gallery.editor.createAnimation")}</button>}<div ref={host} style={{ display: 'contents' }} /></>
 }

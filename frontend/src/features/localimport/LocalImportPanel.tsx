@@ -22,17 +22,17 @@ export function LocalImportPanel({ disabled, onComplete, compact = false, contro
     useEffect(() => { onBusyChange?.(vm.busy) }, [vm.busy, onBusyChange])
     useEffect(() => { onHasResultChange?.(!!job) }, [!!job, onHasResultChange])
     if (compact && !vm.error && (vm.dismissed || (!job && !vm.busy))) return null
-    if (vm.dismissed) return <section aria-label={translate("로컬 폴더 가져오기")} className="flex flex-wrap items-center gap-2">
-        <button type="button" className={button} disabled={disabled || vm.busy} onClick={() => void vm.choose()}>{translate("폴더 가져오기")}</button>
-        <button type="button" className={button} onClick={vm.reopen}>{translate("최근 결과")}</button>
+    if (vm.dismissed) return <section aria-label={translate("localImport.importLocalFolder")} className="flex flex-wrap items-center gap-2">
+        <button type="button" className={button} disabled={disabled || vm.busy} onClick={() => void vm.choose()}>{translate("gallery.importFolder")}</button>
+        <button type="button" className={button} onClick={vm.reopen}>{translate("localImport.recentResults")}</button>
         {vm.error && <p role="alert" className="text-sm text-red-500">{translateMessage(vm.error)}</p>}
     </section>
-    return <section aria-label={translate("로컬 폴더 가져오기")} className="space-y-3 rounded-xl border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-4">
+    return <section aria-label={translate("localImport.importLocalFolder")} className="space-y-3 rounded-xl border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-            <div><h2 className="font-medium">{translate("로컬 폴더 가져오기")}</h2><p className="mt-1 text-xs text-[var(--text-muted)]">{translate("하위 폴더의 이미지·영상·오디오를 등록합니다. 원본은 이동하거나 복사하지 않습니다.")}</p></div>
+            <div><h2 className="font-medium">{translate("localImport.importLocalFolder")}</h2><p className="mt-1 text-xs text-[var(--text-muted)]">{translate("localImport.registerImagesVideosAndAudioInSubfoldersOriginalsAre")}</p></div>
             <div className="flex items-center gap-2">
-                <button type="button" className={button} disabled={disabled || vm.busy} onClick={() => void vm.choose()}>{translate("폴더 선택")}</button>
-                {vm.canDismiss && <button type="button" aria-label={translate("가져오기 결과 닫기")} title={translate("가져오기 결과 닫기")} onClick={vm.dismiss}
+                <button type="button" className={button} disabled={disabled || vm.busy} onClick={() => void vm.choose()}>{translate("gallery.selectFolder")}</button>
+                {vm.canDismiss && <button type="button" aria-label={translate("localImport.closeImportResults")} title={translate("localImport.closeImportResults")} onClick={vm.dismiss}
                     className="rounded-lg p-2 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><X size={18} aria-hidden="true" /></button>}
             </div>
         </div>
@@ -40,67 +40,67 @@ export function LocalImportPanel({ disabled, onComplete, compact = false, contro
         {job && <>
             <p className="break-all text-sm">{job.root}</p>
             <div role="status" aria-live="polite" className="space-y-1 text-sm text-[var(--text-muted)]">
-                <p>{stopping && running ? translate("중단 처리 중…") : states[job.state] ?? job.state}</p>
-                <p>{job.scanComplete ? translate("전체 {0}개 · 처리 {1}개 ({2}%)", { "0": number(job.counts.discovered), "1": number(job.counts.processed), "2": (progress ?? 0).toFixed(1) }) : translate("발견 {0}개 · 전체 수 확인 중", { "0": number(job.counts.discovered) })}</p>
+                <p>{stopping && running ? translate("localImport.stopping") : states[job.state] ?? job.state}</p>
+                <p>{job.scanComplete ? translate("localImport.totalProcessed", { total: number(job.counts.discovered), processed: number(job.counts.processed), percent: (progress ?? 0).toFixed(1) }) : translate("localImport.foundCountingTotal", { count: number(job.counts.discovered) })}</p>
             </div>
-            <ProgressBar label={translate("폴더 가져오기 진행률")} value={progress} />
+            <ProgressBar label={translate("localImport.folderImportProgress")} value={progress} />
             <div className="space-y-1 text-xs text-[var(--text-muted)]">
-                <p>{translate("신규 {0}개 · 갱신 {1}개 · 기등록 {2}개 · 실패 {3}개 · 사용자 제외 {4}개", { "0": number(job.counts.added), "1": number(job.counts.updated), "2": number(job.counts.unchanged), "3": number(job.counts.failed), "4": number(job.counts.userExcluded) })}</p>
-                <p>{translate("처리 용량 {0} / {1} · {2}/초 · {3}개/초 (평균)", { "0": formatBytes(job.counts.processedBytes), "1": formatBytes(job.counts.totalBytes), "2": formatBytes(job.bytesPerSecond), "3": job.filesPerSecond.toFixed(1) })}</p>
-                <p>{translate("탐색 제외 {0}개 · 탐색 오류 {1}건 · 완료 {2}개 폴더 · 일부 실패 {3}개 폴더", { "0": number(job.counts.scanExcluded), "1": number(job.counts.scanErrors), "2": number(job.counts.completedFolders), "3": number(job.counts.failedFolders) })}</p>
-                {job.currentPath && <p className="break-all">{translate("현재: {0}", { "0": job.currentPath })}</p>}
-                <p>{translate("다른 화면으로 이동해도 작업은 계속됩니다. 중단하거나 앱을 종료해도 완료한 파일은 유지됩니다.")}</p>
+                <p>{translate("localImport.newUpdatedExistingFailedExcluded", { added: number(job.counts.added), updated: number(job.counts.updated), existing: number(job.counts.unchanged), failed: number(job.counts.failed), excluded: number(job.counts.userExcluded) })}</p>
+                <p>{translate("localImport.processedSFilesSAverage", { processedSize: formatBytes(job.counts.processedBytes), totalSize: formatBytes(job.counts.totalBytes), bytesPerSecond: formatBytes(job.bytesPerSecond), filesPerSecond: job.filesPerSecond.toFixed(1) })}</p>
+                <p>{translate("localImport.skippedScanErrorsCompletedFoldersPartiallyFailedFolders", { skipped: number(job.counts.scanExcluded), scanErrors: number(job.counts.scanErrors), completed: number(job.counts.completedFolders), failed: number(job.counts.failedFolders) })}</p>
+                {job.currentPath && <p className="break-all">{translate("localImport.current", { path: job.currentPath })}</p>}
+                <p>{translate("localImport.workContinuesWhenYouSwitchViewsCompletedFilesAre")}</p>
             </div>
             {job.error && <p role="alert" className="break-words text-sm text-red-500">{translateMessage(job.error)}</p>}
-            {job.largeFolders > 0 && <p role="alert" className="text-sm text-amber-600">{translate("파일이 5만 개를 넘는 폴더가 {0}개 있습니다. 처리 시간이 길어질 수 있으며 계속 등록할 수 있습니다.", { "0": number(job.largeFolders) })}</p>}
-            {!job.canResume && <p className="text-sm text-[var(--text-muted)]">{translate("이전 방식으로 만든 작업입니다. 같은 폴더를 다시 탐색해 주세요.")}</p>}
-            {job.state === 'ready' && <p className="text-xs text-[var(--text-muted)]">{translate("목록을 확인한 뒤 등록하세요. 이미지 검사는 ImageMagick, 영상·오디오 검사는 FFmpeg와 FFprobe가 필요합니다.")}</p>}
+            {job.largeFolders > 0 && <p role="alert" className="text-sm text-amber-600">{translate("localImport.foldersContainOver50000FilesProcessingMayTake", { count: number(job.largeFolders) })}</p>}
+            {!job.canResume && <p className="text-sm text-[var(--text-muted)]">{translate("localImport.thisJobUsesAnOlderFormatScanTheSame")}</p>}
+            {job.state === 'ready' && <p className="text-xs text-[var(--text-muted)]">{translate("localImport.reviewTheListBeforeRegisteringImageChecksRequireImagemagick")}</p>}
             <div className="flex flex-wrap gap-2">
-                {job.state === 'ready' && job.canResume && <button type="button" className={button} disabled={disabled || vm.requesting} onClick={() => void vm.run()}>{translate("등록 시작")}</button>}
-                {['scanning', 'ready', 'running'].includes(job.state) && <button type="button" className={button} disabled={vm.requesting || stopping} onClick={() => void vm.pause()}>{translate("중단")}</button>}
-                {canResume(job) && <button type="button" className={button} disabled={disabled || vm.requesting} onClick={() => void vm.resume()}>{job.scanComplete ? translate("이어하기") : translate("탐색 이어하기")}</button>}
+                {job.state === 'ready' && job.canResume && <button type="button" className={button} disabled={disabled || vm.requesting} onClick={() => void vm.run()}>{translate("localImport.startRegistration")}</button>}
+                {['scanning', 'ready', 'running'].includes(job.state) && <button type="button" className={button} disabled={vm.requesting || stopping} onClick={() => void vm.pause()}>{translate("gallery.stop")}</button>}
+                {canResume(job) && <button type="button" className={button} disabled={disabled || vm.requesting} onClick={() => void vm.resume()}>{job.scanComplete ? translate("gallery.resume") : translate("localImport.resumeScanning")}</button>}
                 {!vm.busy && job.canResume && job.counts.failed > 0 && <>
-                    <button type="button" className={button} disabled={disabled} onClick={() => void vm.retry()}>{translate("실패 파일 재시도")}</button>
-                    <button type="button" className={button} disabled={disabled} onClick={() => void vm.exclude()}>{translate("실패 파일 모두 제외")}</button>
+                    <button type="button" className={button} disabled={disabled} onClick={() => void vm.retry()}>{translate("localImport.retryFailedFiles")}</button>
+                    <button type="button" className={button} disabled={disabled} onClick={() => void vm.exclude()}>{translate("localImport.excludeAllFailedFiles")}</button>
                 </>}
-                {!vm.busy && <button type="button" className={button} disabled={disabled} onClick={() => void vm.rescan()}>{translate("같은 폴더 다시 탐색")}</button>}
-                <button type="button" className={button} disabled={vm.requesting} onClick={() => void vm.refresh()}>{translate("상태 새로고침")}</button>
-                <button type="button" className={button} aria-expanded={vm.showFiles} onClick={() => vm.setShowFiles(!vm.showFiles)}>{translate("파일별 결과 {0}", { "0": vm.showFiles ? translate("접기") : translate("보기") })}</button>
+                {!vm.busy && <button type="button" className={button} disabled={disabled} onClick={() => void vm.rescan()}>{translate("localImport.scanTheSameFolderAgain")}</button>}
+                <button type="button" className={button} disabled={vm.requesting} onClick={() => void vm.refresh()}>{translate("gallery.refreshStatus")}</button>
+                <button type="button" className={button} aria-expanded={vm.showFiles} onClick={() => vm.setShowFiles(!vm.showFiles)}>{translate("localImport.perFileResults", { action: vm.showFiles ? translate("gallery.collapse") : translate("localImport.view") })}</button>
             </div>
             {vm.showFiles && <div className="space-y-2 rounded border border-[var(--border-line)] p-3">
-                <label className="text-sm">{translate("파일 상태 ")}<select aria-label={translate("파일 상태")} className="rounded bg-[var(--bg-sidebar)] p-1" value={vm.fileState} onChange={e => vm.setFileState(e.target.value as LocalImportFileFilter)}>
-                    <option value="failed">{translate("실패")}</option><option value="pending">{translate("등록 대기")}</option><option value="excluded">{translate("사용자 제외")}</option><option value="">{translate("전체")}</option>
+                <label className="text-sm">{translate("localImport.fileStatus")}<select aria-label={translate("localImport.filter.fileStatus")} className="rounded bg-[var(--bg-sidebar)] p-1" value={vm.fileState} onChange={e => vm.setFileState(e.target.value as LocalImportFileFilter)}>
+                    <option value="failed">{translate("download.failed")}</option><option value="pending">{translate("localImport.awaitingRegistration")}</option><option value="excluded">{translate("localImport.excludedByUser")}</option><option value="">{translate("gallery.all")}</option>
                 </select></label>
-                <p className="text-xs text-[var(--text-muted)]">{translate("진행 중에는 중단 후 파일을 제외하거나 재시도할 수 있습니다. 재시도는 현재 파일 상태를 다시 검사합니다.")}</p>
+                <p className="text-xs text-[var(--text-muted)]">{translate("localImport.stopTheRunningJobToExcludeOrRetryFiles")}</p>
                 {vm.fileError && <p role="alert" className="text-sm text-red-500">{translateMessage(vm.fileError)}</p>}
-                {!vm.filePage && !vm.fileError && <p className="text-sm">{translate("파일 목록을 불러오는 중…")}</p>}
-                {vm.filePage?.total === 0 && <p className="text-sm">{translate("해당 파일이 없습니다.")}</p>}
-                <ul aria-label={translate("파일별 가져오기 결과")} className="max-h-72 space-y-2 overflow-y-auto text-sm">
+                {!vm.filePage && !vm.fileError && <p className="text-sm">{translate("localImport.loadingFiles")}</p>}
+                {vm.filePage?.total === 0 && <p className="text-sm">{translate("localImport.noMatchingFiles")}</p>}
+                <ul aria-label={translate("localImport.perFileImportResults")} className="max-h-72 space-y-2 overflow-y-auto text-sm">
                     {vm.filePage?.files.map(file => <li key={file.id} className="space-y-1 border-b border-[var(--border-line)] pb-2">
                         <p className="break-all">{file.path} · {states[file.state] ?? file.state}</p>
                         {file.error && <p className="break-words text-red-500">{translateMessage(file.error)}</p>}
                         <div className="flex gap-2">
-                            {['failed', 'excluded'].includes(file.state) && <button type="button" className={button} disabled={disabled || vm.busy} onClick={() => void vm.retry(file.id)}>{translate("재시도")}</button>}
-                            {['pending', 'failed'].includes(file.state) && <button type="button" className={button} disabled={disabled || vm.busy} onClick={() => void vm.exclude(file.id)}>{translate("이번 작업에서 제외")}</button>}
+                            {['failed', 'excluded'].includes(file.state) && <button type="button" className={button} disabled={disabled || vm.busy} onClick={() => void vm.retry(file.id)}>{translate("download.retry")}</button>}
+                            {['pending', 'failed'].includes(file.state) && <button type="button" className={button} disabled={disabled || vm.busy} onClick={() => void vm.exclude(file.id)}>{translate("localImport.excludeFromThisJob")}</button>}
                         </div>
                     </li>)}
                 </ul>
                 {(vm.filePage?.total ?? 0) > 25 && <div className="flex items-center gap-3 text-sm">
-                    <button type="button" className={button} disabled={vm.fileOffset === 0 || vm.requesting} onClick={() => vm.setFileOffset(Math.max(0, vm.fileOffset - 25))}>{translate("파일 이전")}</button>
+                    <button type="button" className={button} disabled={vm.fileOffset === 0 || vm.requesting} onClick={() => vm.setFileOffset(Math.max(0, vm.fileOffset - 25))}>{translate("localImport.previousFiles")}</button>
                     <span>{vm.fileOffset + 1}–{vm.fileOffset + (vm.filePage?.files.length ?? 0)} / {vm.filePage?.total}</span>
-                    <button type="button" className={button} disabled={!vm.filePage?.hasNextPage || vm.requesting} onClick={() => vm.setFileOffset(vm.fileOffset + 25)}>{translate("파일 다음")}</button>
+                    <button type="button" className={button} disabled={!vm.filePage?.hasNextPage || vm.requesting} onClick={() => vm.setFileOffset(vm.fileOffset + 25)}>{translate("localImport.nextFiles")}</button>
                 </div>}
             </div>}
-            <ul className="max-h-64 space-y-2 overflow-y-auto text-sm" aria-label={translate("폴더별 가져오기 결과")}>
+            <ul className="max-h-64 space-y-2 overflow-y-auto text-sm" aria-label={translate("localImport.perFolderImportResults")}>
                 {vm.page?.folders.map(folder => <li key={folder.id} className="rounded border border-[var(--border-line)] px-3 py-2">
-                    <p className="break-all">{translate("{0} · 파일 {1}개 · {2}", { "0": folder.path === '.' ? translate("선택한 폴더") : folder.path, "1": number(folder.fileCount), "2": states[folder.state] ?? folder.state })}</p>
+                    <p className="break-all">{translate("localImport.files", { path: folder.path === '.' ? translate("localImport.selectedFolder") : folder.path, files: number(folder.fileCount), state: states[folder.state] ?? folder.state })}</p>
                     {folder.error && <p className="mt-1 break-words text-red-500">{translateMessage(folder.error)}</p>}
                 </li>)}
             </ul>
             {(vm.page?.total ?? 0) > 25 && <div className="flex items-center gap-3 text-sm">
-                <button type="button" className={button} disabled={vm.offset === 0 || vm.requesting} onClick={() => vm.goTo(Math.max(0, vm.offset - 25))}>{translate("이전")}</button>
+                <button type="button" className={button} disabled={vm.offset === 0 || vm.requesting} onClick={() => vm.goTo(Math.max(0, vm.offset - 25))}>{translate("download.previous")}</button>
                 <span>{vm.offset + 1}–{vm.offset + (vm.page?.folders.length ?? 0)} / {vm.page?.total}</span>
-                <button type="button" className={button} disabled={!vm.page?.hasNextPage || vm.requesting} onClick={() => vm.goTo(vm.offset + 25)}>{translate("다음")}</button>
+                <button type="button" className={button} disabled={!vm.page?.hasNextPage || vm.requesting} onClick={() => vm.goTo(vm.offset + 25)}>{translate("download.next")}</button>
             </div>}
         </>}
     </section>

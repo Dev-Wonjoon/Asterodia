@@ -30,7 +30,7 @@ export function MediaPreview({
                 className={
                     className + ' flex items-center justify-center text-sm text-[var(--text-muted)]'
                 }
-            >{translate("미리보기 없음")}</div>
+            >{translate("common.noPreview")}</div>
         )
     }
 

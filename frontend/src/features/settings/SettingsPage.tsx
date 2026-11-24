@@ -5,11 +5,13 @@ import { GeneralSettings } from '@renderer/features/settings/GeneralSettings'
 import { EngineSettings } from '@renderer/features/settings/EngineSettings'
 import { LicenseSettings } from '@renderer/features/settings/LicenseSettings'
 import { NetworkSettings } from '@renderer/features/settings/NetworkSettings'
+import { ShortcutSettings } from './ShortcutSettings'
 
 const SETTINGS_TABS = [
+    { id: 'shortcuts', get label() { return translate("shortcuts.title") }, icon: <span aria-hidden="true">⌨</span> },
     {
         id: 'general',
-        get label() { return translate("일반") },
+        get label() { return translate("settings.general") },
         icon: (
             <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -34,7 +36,7 @@ const SETTINGS_TABS = [
     },
     {
         id: 'engine',
-        get label() { return translate("엔진") },
+        get label() { return translate("settings.engines") },
         icon: (
             <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -54,7 +56,7 @@ const SETTINGS_TABS = [
     },
     {
         id: 'license',
-        get label() { return translate("라이선스") },
+        get label() { return translate("settings.licenses") },
         icon: (
             <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -74,7 +76,7 @@ const SETTINGS_TABS = [
     },
     {
         id: 'network',
-        get label() { return translate("네트워크") },
+        get label() { return translate("settings.network") },
         icon: (
             <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -102,6 +104,8 @@ export const SettingsPage = ({ updateRequest = 0 }: { updateRequest?: number }):
 
     const renderContent = (): React.JSX.Element => {
         switch (activeTab) {
+            case 'shortcuts':
+                return <ShortcutSettings />
             case 'general':
                 return <GeneralSettings />
             case 'engine':

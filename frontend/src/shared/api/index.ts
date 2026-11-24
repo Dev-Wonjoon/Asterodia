@@ -21,7 +21,7 @@ function wire<T>(request: unknown): T { return request as T; }
 async function response<T>(pending: Promise<Result>): Promise<T> {
     const value = await pending;
     if (typeof value.ok !== "boolean" || (!value.ok && !value.error)) {
-        throw new Error(translate("앱 서비스 응답 형식이 올바르지 않습니다."));
+        throw new Error(translate("common.invalidAppServiceResponse"));
     }
     return value as T;
 }
@@ -101,7 +101,7 @@ const api: AppApi = {
             });
 
             if (kind !== "yt-dlp" && kind !== "gallery-dl") {
-                throw new Error(translate("엔진을 선택하지 못했습니다."));
+                throw new Error(translate("common.couldNotSelectAnEngine"));
             }
 
             return kind;
@@ -127,14 +127,14 @@ const api: AppApi = {
         const statuses = await EngineManager.Status();
 
         if (statuses === null) {
-            throw new Error(translate("엔진 상태 응답이 비어 있습니다."));
+            throw new Error(translate("common.theEngineStatusResponseIsEmpty"));
         }
 
         const result: Record<string, EngineStatus> = {};
 
         for (const [name, status] of Object.entries(statuses)) {
             if (status === undefined) {
-                throw new Error(translate("{0}의 상태 응답이 없습니다.", { "0": name }));
+                throw new Error(translate("common.noStatusResponseFor", { engine: name }));
             }
 
             result[name] = status;

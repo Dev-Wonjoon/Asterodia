@@ -38,7 +38,7 @@ export function useLocalImportViewModel(onComplete: () => void) {
             const result = await getApi().localImport.get({ jobId, offset: position, limit: 25 })
             if (!alive.current || revision !== requestRevision.current) return
             if (result.ok) { accept(result.data); setError(null) } else setError(translateError(result.error))
-        } catch { if (alive.current && revision === requestRevision.current) setError(translate("가져오기 상태를 읽지 못했습니다. 새로고침해 주세요.")) }
+        } catch { if (alive.current && revision === requestRevision.current) setError(translate("localImport.couldNotReadImportStatusPleaseRefresh")) }
     }, [accept])
     useEffect(() => { void load() }, [load])
     useEffect(() => {
@@ -56,7 +56,7 @@ export function useLocalImportViewModel(onComplete: () => void) {
         void getApi().localImport.files({ jobId: job.id, fileState, offset: fileOffset, limit: 25 }).then(result => {
             if (stale) return
             if (result.ok) setFilePage(result.data); else setFileError(translateError(result.error))
-        }).catch(() => { if (!stale) setFileError(translate("파일 목록을 읽지 못했습니다.")) })
+        }).catch(() => { if (!stale) setFileError(translate("localImport.couldNotReadTheFileList")) })
         return () => { stale = true }
     }, [showFiles, job?.id, job?.revision, fileState, fileOffset])
     const execute = useCallback(async (operation: () => Promise<LocalImportResult<LocalImportPage | boolean>>) => {
@@ -69,7 +69,7 @@ export function useLocalImportViewModel(onComplete: () => void) {
             if (typeof result.data === 'object') {
                 if (result.data.job) { setOffset(0); setFileOffset(0); accept(result.data) }
             } else await load(job?.id, offset)
-        } catch { if (alive.current) setError(translate("요청 결과를 확인하지 못했습니다. 상태를 새로고침해 주세요.")) }
+        } catch { if (alive.current) setError(translate("localImport.couldNotConfirmTheResultPleaseRefreshStatus")) }
         finally { lock.current = false; if (alive.current) setRequesting(false) }
     }, [accept, job?.id, load, offset])
     const goTo = (position: number) => { setOffset(position); void load(job?.id, position) }

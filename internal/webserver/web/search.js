@@ -1,15 +1,16 @@
+import { translate } from './i18n.js';
 // The mobile adapter uses the same paged Go search API as the desktop combobox.
 export function mountSearchSuggestions({ input, form, request, parameters, onApply, onInput }) {
-    const labels = { title: '제목', tag: '태그', author: '작성자', platform: '플랫폼' };
+    const labels = { title: translate("media.title"), tag: translate("media.tags"), author: translate("media.author"), platform: translate("media.platform") };
     const wrapper = document.createElement('div');
     wrapper.className = 'search-input';
     input.before(wrapper); wrapper.append(input);
     const popup = document.createElement('div');
     popup.className = 'search-popup'; popup.hidden = true;
-    const list = document.createElement('div'); list.className = 'search-options'; list.id = 'search-options'; list.setAttribute('role', 'listbox'); list.setAttribute('aria-label', '검색 추천');
+    const list = document.createElement('div'); list.className = 'search-options'; list.id = 'search-options'; list.setAttribute('role', 'listbox'); list.setAttribute('aria-label', translate("search.searchSuggestions"));
     const status = document.createElement('p'); status.setAttribute('role', 'status');
-    const more = document.createElement('button'); more.type = 'button'; more.textContent = '추천 더 보기';
-    const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = '다시 시도'; retry.hidden = true;
+    const more = document.createElement('button'); more.type = 'button'; more.textContent = translate("search.moreSuggestions");
+    const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = translate("common.retry"); retry.hidden = true;
     popup.append(list, status, more, retry); wrapper.append(popup);
     input.setAttribute('role', 'combobox'); input.setAttribute('aria-autocomplete', 'list'); input.setAttribute('aria-controls', list.id); input.setAttribute('aria-expanded', 'false');
     let serial = 0, timer, controller, composing = false, items = [], active = -1, next = false, revision = null, busy = false, failure = false;
@@ -24,7 +25,7 @@ export function mountSearchSuggestions({ input, form, request, parameters, onApp
             const value = document.createElement('span'); value.textContent = item.value;
             button.append(kind, value); button.addEventListener('mousedown', e => e.preventDefault()); button.addEventListener('click', () => choose(item)); list.append(button);
         });
-        status.textContent = failure ? '추천 목록을 불러오지 못했습니다.' : busy ? '추천을 찾고 있습니다…' : items.length ? '' : '일치하는 후보가 없습니다.';
+        status.textContent = failure ? translate("search.couldNotLoadSuggestions") : busy ? translate("search.findingSuggestions") : items.length ? '' : translate("search.noMatchingSuggestions");
         more.hidden = !next || busy || failure; retry.hidden = !failure;
         list.setAttribute('aria-busy', String(busy));
         if (active >= 0 && items[active]) input.setAttribute('aria-activedescendant', list.id + '-' + active);

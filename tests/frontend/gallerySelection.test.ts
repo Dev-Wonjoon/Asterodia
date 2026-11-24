@@ -21,6 +21,28 @@ vi.mock('@renderer/features/download/components/DownloadDetailPane',()=>({Downlo
 vi.mock('@renderer/features/localimport/LocalImportPanel',()=>({LocalImportPanel:()=>null}))
 vi.mock('@renderer/features/gallery/MediaViewer',()=>({MediaViewer:({mediaId,fileId,onClose}:any)=>h('div',{role:'dialog','aria-label':`감상 ${mediaId} ${fileId ?? ''}`},h('button',{onClick:onClose},'감상 닫기'))}))
 afterEach(cleanupReact)
+
+it('navigates cards without changing selection and selects a range with Shift', async () => {
+ setup(); await mount(h(GalleryPage))
+ const cards = [...document.querySelectorAll<HTMLButtonElement>('[data-card-focus]')]
+ const press = async (value: string, shiftKey = false) => { await act(async () => { document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: value, shiftKey, bubbles: true, cancelable: true })) }) }
+ cards[0].focus(); expect(cards[0].tabIndex).toBe(0); expect(cards[1].tabIndex).toBe(-1)
+ await press('ArrowRight'); expect(document.activeElement).toBe(cards[1]); expect(document.querySelector('[aria-label="선택 항목 작업"]')).toBeNull()
+ await press('Home'); await press('ArrowRight', true)
+ expect(document.querySelector('[aria-label="선택 항목 작업"]')?.textContent).toContain('2개 선택')
+ await press('Escape'); expect(document.querySelector('[aria-label="선택 항목 작업"]')).toBeNull()
+ await press(' '); expect(document.querySelector('[aria-label="선택 항목 작업"]')?.textContent).toContain('1개 선택')
+})
+it('opens card actions with the keyboard and protects typing and underlying selection under a menu', async () => {
+ setup(); await mount(h(GalleryPage))
+ const card = document.querySelector<HTMLButtonElement>('[data-card-focus]')!; card.focus()
+ await act(async () => { card.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true })) })
+ await act(async () => { card.dispatchEvent(new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true, cancelable: true })) })
+ const menu = document.querySelector<HTMLElement>('[role="menu"]')!; expect(menu).not.toBeNull()
+ await act(async () => { menu.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })) })
+ expect(document.querySelector('[role="menu"]')).toBeNull(); expect(document.querySelector('[aria-label="선택 항목 작업"]')).not.toBeNull()
+ expect(mocks.unregister).not.toHaveBeenCalled()
+})
 function setup(){
  store.edit.mockReset().mockResolvedValue(true)
  mocks.refresh.mockReset()

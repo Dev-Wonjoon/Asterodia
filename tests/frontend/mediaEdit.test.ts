@@ -798,6 +798,20 @@ function key(target: Element, value: string, options: KeyboardEventInit = {}) {
     target.dispatchEvent(event)
     return event
 }
+
+it('sets range boundaries with I and O and confirms export with Ctrl+Enter', async () => {
+    const api = await setup()
+    const stage = document.querySelector<HTMLElement>('.sbe-stage')!
+    stage.focus()
+    key(stage, 'ArrowRight'); key(stage, 'ArrowRight'); key(stage, 'i')
+    key(stage, 'ArrowRight'); key(stage, 'ArrowRight'); key(stage, 'o')
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    key(stage, 'Enter', { ctrlKey: true }); await flush()
+    expect(api.create).not.toHaveBeenCalled()
+    confirm.mockReturnValue(true)
+    key(stage, 'Enter', { ctrlKey: true }); await flush()
+    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ rangeStart: 2, rangeEnd: 5 }))
+})
 it('opens an accessible shortcut guide and closes it without closing the editor or losing scroll position',async()=>{
     await setup()
     const toggle=button('단축키 안내'), help=shortcutHelp(), dialog=document.querySelector<HTMLElement>('.sb-editor')!, pane=document.querySelector<HTMLElement>('.sbe-main-pane')!

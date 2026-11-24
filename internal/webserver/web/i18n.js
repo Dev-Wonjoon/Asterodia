@@ -56,7 +56,7 @@ const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const messagePatterns = [];
 const messageKeys = new Map();
 for (const key of Object.keys(catalogs.en)) {
-    for (const text of new Set([key, catalogs.en[key]])) {
+    for (const text of new Set([catalogs.ko[key], catalogs.en[key]])) {
         messageKeys.set(text, key);
         if (!/\{\w+\}/.test(text)) continue;
         const names = [], pieces = []; let end = 0;
@@ -71,6 +71,7 @@ for (const key of Object.keys(catalogs.en)) {
 // Used only for application messages held in state, never user media metadata.
 export function translateMessage(message) {
     if (!message) return message;
+    if (typeof message === 'object' && typeof message.key === 'string') return translate(message.key, message.values);
     const key = messageKeys.get(message);
     if (key) return translate(key);
     for (const { key, names, pattern } of messagePatterns) {
@@ -80,23 +81,24 @@ export function translateMessage(message) {
     return message;
 }
 const errorMessages = {
-    INVALID_ARGUMENT: '요청 값을 확인하세요.', NOT_FOUND: '요청한 항목을 찾을 수 없습니다.',
-    NOT_READY: '아직 사용할 준비가 되지 않았습니다.', REVISION_CONFLICT: '정보가 변경되었습니다. 새로고침 후 다시 확인하세요.',
-    INTERNAL_ERROR: '요청을 처리하지 못했습니다.', DATABASE_ERROR: '데이터베이스 작업을 처리하지 못했습니다.',
-    INVALID_LOCATION: '파일 위치를 확인하세요.', JOB_ACTIVE: '이미 처리 중인 작업이 있습니다.',
-    FILE_MOVE_FAILED: '파일 복사·이동을 완료하지 못했습니다.', LOCAL_IMPORT_FAILED: '폴더 가져오기를 완료하지 못했습니다.',
-    DATABASE_IMPORT_FAILED: '데이터베이스 가져오기를 완료하지 못했습니다.', EDIT_FAILED: '미디어 편집을 완료하지 못했습니다.',
-    FINALIZING: '작업을 마무리하고 있습니다. 잠시 후 다시 시도하세요.', LIMIT_EXCEEDED: '허용된 한도를 초과했습니다.',
-    NOT_RETRYABLE: '이 작업은 다시 시도할 수 없습니다.', UPDATE_RESTARTING: '업데이트를 적용하기 위해 앱을 다시 시작합니다…',
-    UPDATE_BUSY: '업데이트 작업이 진행 중입니다.', UPDATE_NOT_READY: '업데이트 준비가 끝나지 않았습니다.',
-    UPDATE_RESTART_FAILED: '업데이트 재시작에 실패했습니다.', UPDATE_UNAVAILABLE: '현재 실행 환경에서는 자동 업데이트를 지원하지 않습니다.',
-    UPDATE_WORK_ACTIVE: '진행 중인 작업을 마친 뒤 업데이트를 적용하세요.', SERVER_START_FAILED: '웹 서버를 시작하지 못했습니다.',
+    INVALID_ARGUMENT: "common.checkTheRequestValues", NOT_FOUND: "common.theRequestedItemWasNotFound",
+    NOT_READY: "common.thisFeatureIsNotReadyYet", REVISION_CONFLICT: "common.theInformationHasChangedRefreshAndCheckAgain",
+    INTERNAL_ERROR: "settings.couldNotProcessTheRequest", DATABASE_ERROR: "common.couldNotProcessTheDatabaseOperation",
+    INVALID_LOCATION: "common.checkTheFileLocation", JOB_ACTIVE: "common.aJobIsAlreadyRunning",
+    FILE_MOVE_FAILED: "common.couldNotFinishCopyingOrMovingFiles", LOCAL_IMPORT_FAILED: "common.couldNotCompleteTheFolderImport",
+    DATABASE_IMPORT_FAILED: "common.couldNotCompleteTheDatabaseImport", EDIT_FAILED: "common.couldNotCompleteMediaEditing",
+    FINALIZING: "common.theJobIsFinishingTryAgainShortly", LIMIT_EXCEEDED: "common.theAllowedLimitWasExceeded",
+    NOT_RETRYABLE: "common.thisJobCannotBeRetried", UPDATE_RESTARTING: "settings.restartingTheAppToApplyTheUpdate",
+    UPDATE_BUSY: "common.anUpdateIsInProgress", UPDATE_NOT_READY: "common.theUpdateIsNotReadyYet",
+    UPDATE_RESTART_FAILED: "common.couldNotRestartForTheUpdate", UPDATE_UNAVAILABLE: "settings.automaticUpdatesAreNotSupportedInThisEnvironment",
+    UPDATE_WORK_ACTIVE: "common.finishActiveJobsBeforeApplyingTheUpdate", SERVER_START_FAILED: "common.couldNotStartTheWebServer",
 };
 export function translateError(error) {
-    const source = error?.message || errorMessages[error?.code] || '요청을 처리하지 못했습니다.';
+    const fallbackKey = errorMessages[error?.code] || errorMessages.INTERNAL_ERROR;
+    const source = error?.message || translate(fallbackKey);
     const translated = translateMessage(source);
     if (translated !== source || getLanguage() === 'ko' || !/[가-힣]/.test(source)) return translated;
-    const fallback = translate(errorMessages[error?.code] || '요청을 처리하지 못했습니다.');
+    const fallback = translate(fallbackKey);
     return error?.code ? `${fallback} (${error.code})` : fallback;
 }
 export function formatNumber(value) { return new Intl.NumberFormat(getLocale()).format(value); }

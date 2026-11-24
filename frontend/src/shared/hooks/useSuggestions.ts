@@ -55,7 +55,7 @@ export function useSuggestions(
 
                 setSuggestions([])
 
-                setError(translate("자동완성을 불러오지 못했습니다. 다시 입력해 주세요."))
+                setError(translate("common.couldNotLoadAutocompleteSuggestionsPleaseTypeAgain"))
             }
         },
         [fetch, selected]
