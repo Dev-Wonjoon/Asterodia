@@ -20,6 +20,30 @@ function setup(ids = [1, 2, 3]) {
         contentURL: file => `/media/${file.id}`, previewURL: file => `/preview/${file.id}`, thumbnailURL: () => null })
     return getFile
 }
+it.each([false, true])('wraps previous from the first file to the last with repeat=%s', repeat => {
+    const queue = createViewerQueue([1, 2, 3], 1)
+    queue.setRepeat(repeat)
+    expect(queue.hasPrevious).toBe(true)
+    expect(queue.previous()).toBe(3)
+    expect(queue.index).toBe(2)
+    expect(queue.repeat).toBe(repeat)
+    expect(queue.previous()).toBe(2)
+    expect(queue.previous()).toBe(1)
+    expect(queue.previous()).toBe(3)
+})
+
+it.each([{ ids: [] }, { ids: [7] }, { ids: [7, 7] }])('keeps previous unavailable for fewer than two unique files: $ids', ({ ids }) => {
+    const queue = createViewerQueue(ids, 7)
+    for (const repeat of [false, true]) {
+        queue.setRepeat(repeat)
+        expect(queue.hasPrevious).toBe(false)
+        expect(queue.previous()).toBe(ids[0])
+        queue.next()
+        expect(queue.hasPrevious).toBe(false)
+        expect(queue.previous()).toBe(ids[0])
+    }
+})
+
 it('keeps shuffled cycles unique and follows the same history backwards', () => {
     const queue = createViewerQueue([1, 2, 3, 4, 4], 2, () => 0.25)
     queue.setShuffle(true)
@@ -28,11 +52,50 @@ it('keeps shuffled cycles unique and follows the same history backwards', () => 
     while (queue.hasNext) order.push(queue.next())
     expect(new Set(order).size).toBe(4)
     expect(queue.hasNext).toBe(false)
+    for (const id of order.slice(0, -1).reverse()) expect(queue.previous()).toBe(id)
+    expect(queue.previous()).toBe(order[3])
     expect(queue.previous()).toBe(order[2]); expect(queue.next()).toBe(order[3])
     queue.setRepeat(true)
     const nextCycle = [queue.next(), queue.next(), queue.next(), queue.next()]
     expect(new Set(nextCycle).size).toBe(4); expect(nextCycle[0]).not.toBe(order[3])
     expect(queue.previous()).toBe(nextCycle[2])
+    for (const id of [...order, ...nextCycle.slice(0, 2)].reverse()) expect(queue.previous()).toBe(id)
+    expect(queue.index).toBe(0)
+    expect(queue.previous()).toBe(order[3])
+    expect(queue.previous()).toBe(order[2])
+    expect(queue.next()).toBe(order[3])
+})
+
+it.each(['button', 'keyboard'])('wraps from the first video to the last image using the previous %s', async input => {
+    const getFile = setup(); await flush()
+    expect(option('앨범 반복').checked).toBe(false)
+    expect(button('← 이전').disabled).toBe(false)
+    if (input === 'button') button('← 이전').click()
+    else document.querySelector('video')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }))
+    await flush()
+    expect(getFile).toHaveBeenLastCalledWith(3)
+    expect(document.querySelector('.sbv-image')).not.toBeNull()
+    expect(document.querySelector('video')).toBeNull()
+    expect(document.querySelector('.sbv-count')?.textContent).toBe('3 / 3')
+    expect(button('다음 →').disabled).toBe(true)
+    button('← 이전').click(); await flush()
+    expect(getFile).toHaveBeenLastCalledWith(2)
+    expect(document.querySelector('audio')).not.toBeNull()
+})
+
+it.each([{ ids: [] }, { ids: [1] }])('disables previous in the viewer for fewer than two files: $ids', async ({ ids }) => {
+    const getFile = setup(ids); await flush()
+    expect(button('← 이전').disabled).toBe(true)
+    if (ids.length) {
+        option('앨범 반복').click()
+        button('다음 →').click(); await flush()
+        expect(button('← 이전').disabled).toBe(true)
+    }
+    const calls = getFile.mock.calls.length
+    button('← 이전').click()
+    viewer!.dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }))
+    await flush()
+    expect(getFile).toHaveBeenCalledTimes(calls)
 })
 
 it('seeks video with J and L, retains arrow file navigation, and protects controls and composition', async () => {
@@ -53,7 +116,7 @@ it('opens only the current file, navigates video and audio with arrows, and stop
     const trigger = document.createElement('button'); document.body.append(trigger); trigger.focus()
     const getFile = setup(); await flush()
     expect(getFile).toHaveBeenCalledExactlyOnceWith(1)
-    expect(document.querySelectorAll('video')).toHaveLength(1); expect(button('← 이전').disabled).toBe(true)
+    expect(document.querySelectorAll('video')).toHaveLength(1); expect(button('← 이전').disabled).toBe(false)
     document.querySelector('video')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); await flush()
     expect(getFile).toHaveBeenLastCalledWith(2); expect(document.querySelector('video')).toBeNull(); expect(document.querySelector('audio')).not.toBeNull()
     expect(document.querySelector('.sbv-count')?.textContent).toBe('2 / 3')

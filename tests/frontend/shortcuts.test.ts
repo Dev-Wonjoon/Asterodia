@@ -58,6 +58,33 @@ it('does not intercept editable fields, composition, handled events, or backgrou
     key(modal, '1', { ctrlKey: true }); key(modal, 'f'); expect(gallery).toHaveBeenCalledOnce(); expect(favorite).not.toHaveBeenCalled()
     modal.remove(); key(document.body, 'f'); expect(favorite).toHaveBeenCalledOnce()
 })
+it('accepts gallery commands from selection checkboxes while protecting typing controls and composition', async () => {
+    const favorite = vi.fn(), all = vi.fn(), remove = vi.fn()
+    function Harness() {
+        useShortcutCommands('gallery', {
+            'gallery.favorite': { run: favorite }, 'gallery.all': { run: all }, 'gallery.unregister': { run: remove }
+        })
+        return h('article', null,
+            h('input', { type: 'checkbox', 'data-gallery-select': true }),
+            h('input', { type: 'text' }), h('input', { type: 'checkbox' }),
+            h('textarea'), h('div', { contentEditable: true, suppressContentEditableWarning: true }, h('span', null, 'editing')))
+    }
+    await mount(h(Harness))
+    const checkbox = document.querySelector<HTMLInputElement>('[data-gallery-select]')!
+    checkbox.focus()
+    expect(key(checkbox, 'f', { code: 'KeyF' }).defaultPrevented).toBe(true)
+    expect(key(checkbox, 'a', { code: 'KeyA', ctrlKey: true }).defaultPrevented).toBe(true)
+    expect(key(checkbox, 'Delete').defaultPrevented).toBe(true)
+    expect(favorite).toHaveBeenCalledOnce(); expect(all).toHaveBeenCalledOnce(); expect(remove).toHaveBeenCalledOnce()
+    key(checkbox, 'f', { code: 'KeyF', isComposing: true })
+    key(checkbox, 'f', { code: 'KeyF', keyCode: 229 })
+    for (const control of document.querySelectorAll('input:not([data-gallery-select]),textarea,[contenteditable] span')) {
+        expect(key(control, 'f', { code: 'KeyF' }).defaultPrevented).toBe(false)
+        expect(key(control, 'a', { ctrlKey: true }).defaultPrevented).toBe(false)
+        expect(key(control, 'Delete').defaultPrevented).toBe(false)
+    }
+    expect(favorite).toHaveBeenCalledOnce(); expect(all).toHaveBeenCalledOnce(); expect(remove).toHaveBeenCalledOnce()
+})
 it('captures shortcut settings, shows conflict messages in English, and disables with Backspace', async () => {
     await mount(h(ShortcutSettings))
     const input = document.querySelector<HTMLInputElement>('input[aria-label="미디어 검색 · 앱 공통"]')!

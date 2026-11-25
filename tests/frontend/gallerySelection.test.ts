@@ -115,6 +115,38 @@ it('opens card actions with the keyboard and protects typing and underlying sele
  expect(document.querySelector('[role="menu"]')).toBeNull(); expect(document.querySelector('[aria-label="선택 항목 작업"]')).not.toBeNull()
  expect(mocks.unregister).not.toHaveBeenCalled()
 })
+it.each(['checkbox','title','action'])('accepts card commands from the %s without requiring thumbnail focus', async surface => {
+ setup(); await mount(h(GalleryPage))
+ const card=document.querySelector<HTMLElement>('article[data-selection-key]')!
+ const control=card.querySelector<HTMLElement>(surface==='checkbox'?'input[data-gallery-select]':surface==='title'?'h2 button':'[data-action-boundary] button')!
+ await act(async()=>control.focus())
+ const favorite=new KeyboardEvent('keydown',{key:'f',code:'KeyF',bubbles:true,cancelable:true})
+ await act(async()=>control.dispatchEvent(favorite))
+ expect(favorite.defaultPrevented).toBe(true)
+ expect(store.edit).toHaveBeenCalledWith({mediaId:1,expectedRevision:4,isFavorite:true})
+ const all=new KeyboardEvent('keydown',{key:'a',code:'KeyA',ctrlKey:true,bubbles:true,cancelable:true})
+ await act(async()=>control.dispatchEvent(all))
+ expect(all.defaultPrevented).toBe(true)
+ expect(document.querySelectorAll('[data-selected=true]')).toHaveLength(2)
+ const tags=new KeyboardEvent('keydown',{key:'t',code:'KeyT',bubbles:true,cancelable:true})
+ await act(async()=>control.dispatchEvent(tags))
+ expect(tags.defaultPrevented).toBe(true)
+ expect(document.querySelector('[role=dialog]')?.textContent).toContain('태그 추가')
+})
+it.each(['checkbox','title','action'])('keeps native Enter and Space on the card %s', async surface => {
+ setup(); store.openDetail.mockClear(); await mount(h(GalleryPage))
+ const card=document.querySelector<HTMLElement>('article[data-selection-key]')!
+ const control=card.querySelector<HTMLElement>(surface==='checkbox'?'input[data-gallery-select]':surface==='title'?'h2 button':'[data-action-boundary] button')!
+ await act(async()=>control.focus())
+ for(const key of ['Enter',' ']){
+  const event=new KeyboardEvent('keydown',{key,bubbles:true,cancelable:true})
+  await act(async()=>control.dispatchEvent(event))
+  expect(event.defaultPrevented).toBe(false)
+ }
+ expect(document.querySelector('[aria-label="선택 항목 작업"]')).toBeNull()
+ expect(store.openDetail).not.toHaveBeenCalled()
+ expect(document.querySelector('[aria-label^="감상 "]')).toBeNull()
+})
 
 async function selectCard(index: number, surface = 'thumbnail', modifiers: MouseEventInit = {}) {
  const card = document.querySelectorAll<HTMLElement>('article[data-selection-key]')[index]
@@ -137,6 +169,52 @@ it.each(['thumbnail', 'title', 'body'])('confirms Delete after clicking the card
  expect((await pressDelete()).defaultPrevented).toBe(true)
  expect(mocks.confirm).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ danger: true, message: expect.stringContaining('1개') }))
  expect(mocks.bulk).toHaveBeenCalledExactlyOnceWith([{ mediaId: 1, revision: 4 }], { kind: 'unregister' }, expect.any(Function))
+})
+it.each(['body', 'input', 'card'])('confirms Delete after marquee selection with initial focus on %s', async initialFocus => {
+ setup(); const { file } = singleVideo()
+ Object.assign(mocks.state.list.page.data[1], { galleryFile: { ...file, id: 12, mediaId: 2 } })
+ mocks.realConfirm = true
+ await mount(h(ConfirmProvider, null, h(GalleryPage)))
+ const grid = document.querySelector<HTMLElement>('.motion-gallery-grid')!
+ const root = grid.closest<HTMLElement>('[data-keyboard-region]')!
+ const bounds = vi.spyOn(grid, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 260, 640))
+ const animation = vi.spyOn(globalThis, 'requestAnimationFrame').mockReturnValue(0)
+ const input = document.createElement('input'); document.body.append(input)
+ const pointer = async (type: string, target: EventTarget, x: number, y: number) => {
+  await act(async () => target.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse', button: 0, clientX: x, clientY: y })))
+ }
+ try {
+  if (initialFocus === 'input') input.focus()
+  else if (initialFocus === 'card') document.querySelector<HTMLElement>('[data-card-focus]')!.focus()
+  else (document.activeElement as HTMLElement)?.blur()
+  await pointer('pointerdown', root, 280, 700)
+  await pointer('pointermove', window, 0, 0)
+  await pressDelete()
+  expect(document.querySelector('[data-confirm-dialog]')).toBeNull()
+  expect(mocks.bulk).not.toHaveBeenCalled()
+  await pointer('pointerup', window, 0, 0)
+  expect(document.querySelectorAll('[data-selected=true]')).toHaveLength(2)
+  expect(document.activeElement).toBe(root)
+  expect((await pressDelete()).defaultPrevented).toBe(true)
+  expect(document.querySelectorAll('[data-confirm-dialog]')).toHaveLength(1)
+  expect(document.querySelector('[data-confirm-dialog]')?.textContent).toContain('2개')
+  expect(mocks.bulk).not.toHaveBeenCalled()
+  await clickButton('취소')
+  expect(document.activeElement).toBe(root)
+  expect(document.querySelectorAll('[data-selected=true]')).toHaveLength(2)
+  expect(mocks.bulk).not.toHaveBeenCalled()
+  root.append(input); input.focus()
+  expect((await pressDelete()).defaultPrevented).toBe(false)
+  expect(document.querySelector('[data-confirm-dialog]')).toBeNull()
+  root.focus()
+  await pressDelete({ isComposing: true }); await pressDelete({ repeat: true })
+  expect(document.querySelector('[data-confirm-dialog]')).toBeNull()
+  await pressDelete()
+  await act(async () => document.querySelector<HTMLButtonElement>('[data-confirm-dialog] button:last-child')!.click())
+  expect(mocks.bulk).toHaveBeenCalledExactlyOnceWith([{ mediaId: 1, revision: 4 }, { mediaId: 2, revision: 4, fileIds: [12] }], { kind: 'unregister' }, expect.any(Function))
+ } finally {
+  await cleanupReact(); input.remove(); bounds.mockRestore(); animation.mockRestore()
+ }
 })
 it.each(['ctrl', 'shift'])('unregisters multiple individual file cards selected with %s', async modifier => {
  setup(); fileRows(); mocks.bulk.mockResolvedValueOnce({ succeeded: [1], failed: [] })

@@ -14,7 +14,7 @@ export function createViewerQueue(values, startId, random = Math.random) {
         get current() { return timeline[position]; },
         get count() { return ids.length; },
         get index() { return ids.length ? position % ids.length : 0; },
-        get hasPrevious() { return position > 0; },
+        get hasPrevious() { return ids.length > 1; },
         get hasNext() { return position + 1 < timeline.length || repeat && ids.length > 0; },
         get shuffled() { return shuffled; },
         get repeat() { return repeat; },
@@ -26,7 +26,10 @@ export function createViewerQueue(values, startId, random = Math.random) {
             timeline = shuffled ? [current, ...mix(ids.filter(id => id !== current))] : [...ids];
             position = shuffled ? 0 : Math.max(0, ids.indexOf(current));
         },
-        previous() { if (position > 0) position--; return timeline[position]; },
+        previous() {
+            if (ids.length > 1) position = position > 0 ? position - 1 : ids.length - 1;
+            return timeline[position];
+        },
         next() {
             if (position + 1 >= timeline.length && repeat && ids.length) {
                 const cycle = shuffled ? mix(ids) : [...ids];

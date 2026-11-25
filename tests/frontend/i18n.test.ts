@@ -125,7 +125,7 @@ it('has complete catalogs, matching interpolation parameters, and no missing UI 
     }
     const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
     collect(path.join(root, 'frontend/src'))
-    files.push(...['editor', 'player', 'viewer', 'app', 'search', 'shortcuts', 'i18n', 'output-controls'].map(name => path.join(root, `internal/webserver/web/${name}.js`)))
+    files.push(...['editor', 'player', 'viewer', 'viewer-viewport', 'viewer-picker', 'app', 'search', 'shortcuts', 'i18n', 'output-controls'].map(name => path.join(root, `internal/webserver/web/${name}.js`)))
     for (const language of ['ko', 'en']) {
         const filename = path.join(root, `internal/webserver/web/langs/${language}.json`)
         const source = ts.parseJsonText(filename, readFileSync(filename, 'utf8'))

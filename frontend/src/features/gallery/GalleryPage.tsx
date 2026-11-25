@@ -32,6 +32,7 @@ import { useGalleryBulkActions, type BulkCommand } from './useGalleryBulkActions
 import { ActionButton } from '@renderer/shared/components/ui/ActionButton'
 import { Play, ChevronDown, ChevronUp, Square, SquareCheck } from 'lucide-react'
 import { useShortcutCommands } from '@renderer/shared/hooks/useShortcutCommands'
+import { matchShortcut } from '../../../../internal/webserver/web/shortcuts.js'
 import { useGalleryKeyboardFocus } from './useGalleryKeyboardFocus'
 import { ContentFilterNotice } from '@renderer/shared/components/ui/ContentFilterNotice'
 import { prepareRemoval, removalConfirmation, removalCounts, removalLabel, selectedRemovalCounts } from './galleryRemoval'
@@ -352,10 +353,18 @@ export const GalleryPage = ({
     }, event => {
         const target = event.target as Element | null
         if (!target || !listScrollRef.current?.contains(target) || target.closest('[role="menu"]')) return false
-        if (target.closest('input[type="checkbox"][data-gallery-select]')) return true
+        const card = target.closest('[data-selection-key]')
+        if (card && pointerSelection.gridRef.current?.contains(card)) {
+            // Enter/Space activate a focused title, action button or checkbox.
+            // Other card commands work from every control inside that card.
+            const control = target.closest('button,input,a[href]')
+            const nativeActivation = (event.key === 'Enter' || event.key === ' ') && !event.ctrlKey && !event.altKey && !event.metaKey
+            return !(nativeActivation && control && !control.matches('[data-card-focus]'))
+        }
         if (target.closest('[data-action-boundary]')) return false
-        const isCard = Boolean(target.closest('[data-card-focus]'))
-        return isCard || event.ctrlKey || event.altKey || event.metaKey
+        if (target === listScrollRef.current && pointerSelection.entries.size > 0
+            && matchShortcut(event, 'gallery')?.id === 'gallery.unregister') return true
+        return event.ctrlKey || event.altKey || event.metaKey
     })
     selectionLocked.current = pageDisabled || tagCommand !== null || viewer !== null
     useEffect(() => { if (!pointerSelection.albumDrag || pageDisabled) setHoveredAlbumId(null) }, [pointerSelection.albumDrag, pageDisabled])

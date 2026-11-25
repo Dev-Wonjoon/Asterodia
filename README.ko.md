@@ -11,7 +11,19 @@ StorageBucket은 이미지·영상·오디오를 관리하기 위한 데스크�
 [다운로드](https://github.com/Dev-Wonjoon/StorageBucket/releases) ·
 [문제 신고](https://github.com/Dev-Wonjoon/StorageBucket/issues)
 
-<!-- StorageBucket 2.0의 실제 화면을 추가해 주세요. -->
+## 스크린샷
+
+### 갤러리와 다운로드 진행 상황
+
+![StorageBucket 갤러리와 다운로드 진행 상황](./docs/images/img1.png)
+
+### WebP 편집
+
+![StorageBucket WebP 편집기](./docs/images/img2.png)
+
+### 영상 재생
+
+![StorageBucket 동영상 플레이어](./docs/images/img3.png)
 
 ## 주요 기능
 

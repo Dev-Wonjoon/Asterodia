@@ -21,12 +21,13 @@ export function formatTime(value) {
 }
 
 // Shared by the desktop WebView and the browser. Owns all listeners and timers.
-export function mountVideoPlayer(host, { src, kind = 'video', title = translate("media.videoTitle"), poster, onError, keyboardSeek = true } = {}) {
+export function mountVideoPlayer(host, { src, kind = 'video', title = translate("media.videoTitle"), poster, onError, keyboardSeek = true, externalScreen = false, fullscreenAction } = {}) {
     const doc = host.ownerDocument, root = doc.createElement('section');
     root.className = 'sb-player' + (kind === 'audio' ? ' sbp-audio' : ''); bindAttribute(root, 'aria-label', () => title + translate("player.player")); root.tabIndex = 0;
     const node = (tag, className, text) => { const el = doc.createElement(tag); if (className) el.className = className; if (typeof text === 'function') bindText(el, text); else if (text) bindText(el, () => text); return el; };
-    const listeners = [];
-    const on = (el, event, fn, options) => { el.addEventListener(event, fn, options); listeners.push(() => el.removeEventListener(event, fn, options)); };
+    if (externalScreen) root.classList.add('sbp-external-screen');
+    const listeners = new Set();
+    const on = (el, event, fn, options) => { el.addEventListener(event, fn, options); const remove = () => { el.removeEventListener(event, fn, options); listeners.delete(remove); }; listeners.add(remove); return remove; };
     const button = (label, text, action, parent) => { const el = node('button', '', text); el.type = 'button'; const read = typeof label === 'function' ? label : () => label; bindAttribute(el, 'aria-label', read); bindAttribute(el, 'title', read); on(el, 'click', action); parent.append(el); return el; };
     const icons = {
         play: '<path d="M8 5v14l11-7z" fill="currentColor" stroke="none"/>',
@@ -101,6 +102,7 @@ export function mountVideoPlayer(host, { src, kind = 'video', title = translate(
         dialog.showModal(); bindAttribute(fullscreen, 'aria-label', () => translate("player.exitFullscreen")); root.focus(); wake();
     }
     const fullscreen = button(() => (translate("player.fullscreen")), '⛶', async () => {
+        if (fullscreenAction) { fullscreenAction(); return; }
         if (expandedDialog) { expandedDialog.close(); return; }
         try {
             if (doc.fullscreenElement === root) await doc.exitFullscreen();
@@ -123,30 +125,38 @@ export function mountVideoPlayer(host, { src, kind = 'video', title = translate(
         icon(play, video.paused ? 'play' : 'pause'); bindAttribute(play, 'aria-label', () => video.paused ? translate("player.play") : translate("player.pause")); bindAttribute(play, 'title', () => video.paused ? translate("player.play") : translate("player.pause"));
         icon(mute, video.muted || !video.volume ? 'muted' : 'volume'); bindAttribute(mute, 'aria-label', () => video.muted ? translate("player.unmute") : translate("player.mute"));
         volume.value = String(video.muted ? 0 : video.volume); root.classList.toggle('is-paused', video.paused);
+        rate.value = String(video.playbackRate);
         for (const b of jumps.children) b.disabled = !duration;
     }
     function audioChanged() {
         try { localStorage.setItem(audioPreferenceKey, JSON.stringify({ volume: video.volume, muted: video.muted })); } catch {}
         sync();
     }
-    function sideAt(x) { const r = surface.getBoundingClientRect(); return x < r.left + r.width / 2 ? -1 : 1; }
-    on(surface, 'click', event => {
-        if (performance.now() - lastTouch < 700 || event.detail > 1) return;
-        root.focus({ preventScroll: true });
-        clearTimeout(clickTimer); clickTimer = setTimeout(togglePlay, 500);
-    });
-    on(surface, 'dblclick', event => { event.preventDefault(); if (performance.now() - lastTouch < 700) return; clearTimeout(clickTimer); jump(sideAt(event.clientX) * seconds); });
-    // Pointer gestures avoid synthetic click/dblclick duplication on touch screens.
-    on(surface, 'pointerdown', event => { if (event.pointerType === 'touch' && event.isPrimary !== false) { lastTouch = performance.now(); touchStart = { id: event.pointerId, x: event.clientX, y: event.clientY, at: lastTouch }; } });
-    on(surface, 'pointerup', event => {
-        if (event.pointerType !== 'touch' || !touchStart || touchStart.id !== event.pointerId) return;
-        const now = performance.now(), start = touchStart; touchStart = null; lastTouch = now;
-        if (now - start.at > 350 || Math.hypot(event.clientX - start.x, event.clientY - start.y) > 20) { lastTap = null; return; }
-        const side = sideAt(event.clientX);
-        if (lastTap && now - lastTap.at <= 300 && lastTap.side === side) { clearTimeout(clickTimer); lastTap = null; jump(side * seconds); }
-        else { clearTimeout(clickTimer); lastTap = { at: now, side }; clickTimer = setTimeout(() => { lastTap = null; togglePlay(); }, 300); }
-    });
-    on(surface, 'pointercancel', () => { touchStart = null; lastTap = null; clearTimeout(clickTimer); });
+    function attachSurface(target, { focus = () => root.focus({ preventScroll: true }) } = {}) {
+        const owned = [];
+        const listen = (event, fn) => owned.push(on(target, event, fn));
+        function sideAt(x) { const r = target.getBoundingClientRect(); return x < r.left + r.width / 2 ? -1 : 1; }
+        listen('click', event => {
+            if (performance.now() - lastTouch < 700 || event.detail > 1) return;
+            focus();
+            clearTimeout(clickTimer); clickTimer = setTimeout(togglePlay, 500);
+        });
+        listen('dblclick', event => { event.preventDefault(); if (performance.now() - lastTouch < 700) return; focus(); clearTimeout(clickTimer); jump(sideAt(event.clientX) * seconds); });
+        // Pointer gestures avoid synthetic click/dblclick duplication on touch screens.
+        listen('pointerdown', event => { if (event.pointerType === 'touch' && event.isPrimary !== false) { lastTouch = performance.now(); touchStart = { id: event.pointerId, x: event.clientX, y: event.clientY, at: lastTouch }; } });
+        listen('pointerup', event => {
+            if (event.pointerType !== 'touch' || !touchStart || touchStart.id !== event.pointerId) return;
+            const now = performance.now(), start = touchStart; touchStart = null; lastTouch = now;
+            if (now - start.at > 350 || Math.hypot(event.clientX - start.x, event.clientY - start.y) > 20) { lastTap = null; return; }
+            const side = sideAt(event.clientX);
+            focus();
+            if (lastTap && now - lastTap.at <= 300 && lastTap.side === side) { clearTimeout(clickTimer); lastTap = null; jump(side * seconds); }
+            else { clearTimeout(clickTimer); lastTap = { at: now, side }; clickTimer = setTimeout(() => { lastTap = null; togglePlay(); }, 300); }
+        });
+        listen('pointercancel', () => { touchStart = null; lastTap = null; clearTimeout(clickTimer); });
+        return () => { owned.forEach(remove => remove()); touchStart = null; lastTap = null; clearTimeout(clickTimer); };
+    }
+    attachSurface(surface);
     on(seek, 'input', () => { if (Number.isFinite(video.duration)) video.currentTime = clamp(Number(seek.value), 0, video.duration); sync(); });
     on(seek, 'pointermove', event => { const r = seek.getBoundingClientRect(); seek.title = formatTime(clamp((event.clientX - r.left) / Math.max(1, r.width), 0, 1) * Number(seek.max)); });
     for (const event of ['loadedmetadata', 'durationchange', 'timeupdate', 'ratechange', 'ended', 'emptied']) on(video, event, sync);
@@ -173,5 +183,5 @@ export function mountVideoPlayer(host, { src, kind = 'video', title = translate(
     }
     overlay.append(seek, controls); if (surface !== video) screen.append(surface); screen.append(video, feedback, message, overlay, settings); root.append(screen, jumps); host.append(root); sync(); wake();
     const stopLanguage = localizeWidget(root);
-    return { video, root, keyboardAction, destroy() { stopLanguage(); destroyed = true; leaveExpanded(); clearTimeout(clickTimer); clearTimeout(hideTimer); clearTimeout(feedbackTimer); listeners.forEach(remove => remove()); if (doc.fullscreenElement === root) doc.exitFullscreen()?.catch(() => {}); video.pause(); video.removeAttribute('src'); video.load(); root.remove(); } };
+    return { video, root, keyboardAction, attachSurface, destroy() { stopLanguage(); destroyed = true; leaveExpanded(); clearTimeout(clickTimer); clearTimeout(hideTimer); clearTimeout(feedbackTimer); listeners.forEach(remove => remove()); if (doc.fullscreenElement === root) doc.exitFullscreen()?.catch(() => {}); video.pause(); video.removeAttribute('src'); video.load(); root.remove(); } };
 }

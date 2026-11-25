@@ -10,7 +10,7 @@ export function WebServerSettings() {
         <div className="space-y-3 px-4 py-3">
             <div className="flex items-center justify-between gap-3">
                 <span role="status" className="text-sm">{vm.loading ? translate("settings.checkingStatus") : !vm.status ? translate("settings.couldNotCheckStatus") : vm.status.running ? translate("settings.running") : translate("settings.off")}</span>
-                <Button disabled={vm.loading || vm.busy || !vm.status} onClick={() => void vm.toggle()}>{vm.busy ? translate("gallery.processing") : vm.status?.running ? translate("settings.stopServer") : translate("settings.startServer")}</Button>
+                <Button variant={vm.status?.running ? 'danger' : 'primary'} disabled={vm.loading || vm.busy || !vm.status} onClick={() => void vm.toggle()}>{vm.busy ? translate("gallery.processing") : vm.status?.running ? translate("settings.serverRunningStop") : translate("settings.startServer")}</Button>
             </div>
             {vm.error && <p role="alert" className="text-sm text-red-500">{translateMessage(vm.error)} <button type="button" disabled={vm.busy} className="underline" onClick={() => void vm.refresh()}>{translate("download.checkAgain")}</button></p>}
             {vm.status && <>

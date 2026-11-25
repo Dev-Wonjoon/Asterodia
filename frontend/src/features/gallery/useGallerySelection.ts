@@ -159,6 +159,7 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
             if (!own.active && Math.hypot(own.x - root.scrollLeft - event.clientX, own.y - root.scrollTop - event.clientY) < 6) return
             if (!own.active) {
                 own.active = true; suppressClick.current = true; suppressRepeatedClick.current = true
+                root.focus({ preventScroll: true })
                 try { root.setPointerCapture?.(own.id) } catch { /* native capture can be unavailable in synthetic events */ }
                 setDragBase(own.base); setDragging(true); frame.current = requestAnimationFrame(autoScroll)
             }

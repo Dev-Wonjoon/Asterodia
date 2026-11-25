@@ -11,7 +11,19 @@ on your PC, and organize your library with tags and favorites.
 [Downloads](https://github.com/Dev-Wonjoon/StorageBucket/releases) ·
 [Report an Issue](https://github.com/Dev-Wonjoon/StorageBucket/issues)
 
-<!-- Add screenshots of the StorageBucket 2.0 interface here. -->
+## Screenshots
+
+### Gallery and Download Progress
+
+![StorageBucket gallery and download progress](./docs/images/img1.png)
+
+### WebP Editing
+
+![StorageBucket WebP editor](./docs/images/img2.png)
+
+### Video Playback
+
+![StorageBucket video player](./docs/images/img3.png)
 
 ## Features
 

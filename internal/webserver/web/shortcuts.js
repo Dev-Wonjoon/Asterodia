@@ -39,6 +39,9 @@ export const shortcuts = [
     define('downloads.refresh', 'downloads', 'common.refresh', ''),
     define('viewer.previous', 'viewer', "gallery.previousFiles", 'ArrowLeft', true),
     define('viewer.next', 'viewer', "gallery.nextFiles", 'ArrowRight', true),
+    define('viewer.zoomIn', 'viewer', 'viewer.zoomIn', 'Ctrl++', true),
+    define('viewer.zoomOut', 'viewer', 'viewer.zoomOut', 'Ctrl+-', true),
+    define('viewer.fit', 'viewer', 'viewer.fit', 'Ctrl+0'),
     define('player.play', 'player', "common.playPause", 'Space'),
     define('player.playAlternative', 'player', "common.playPause", 'K'),
     define('player.backward', 'player', "common.back5Seconds", 'J', true),
@@ -83,6 +86,9 @@ export function eventChord(event) {
     if (/^Key[A-Z]$/.test(event.code)) key = event.code.slice(3);
     else if (/^Digit[0-9]$/.test(event.code)) key = event.code.slice(5);
     else if (event.code === 'Comma') key = ',';
+    // US/Korean main keyboard and numeric keypad use different chords for +.
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && (['+', '='].includes(key) || event.code === 'NumpadAdd')) return 'Ctrl++';
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.code === 'NumpadSubtract') return 'Ctrl+-';
     if (['Control', 'Alt', 'Shift', 'Meta', 'Process', 'Dead', 'Unidentified'].includes(key)) return '';
     if (key === ' ') key = 'Space';
     if (key?.length === 1) key = key.toUpperCase();

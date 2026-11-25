@@ -13,3 +13,11 @@
 @media(prefers-reduced-motion:reduce){.sb-player button{transition:none}}
 
 .sbp-fullscreen-dialog{width:100vw!important;max-width:none!important;height:100dvh!important;max-height:none!important;inset:0;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;background:#000;overflow:hidden}.sbp-fullscreen-dialog::backdrop{background:#000}
+
+/* The viewer draws this video's frames into its panes; controls keep their size. */
+.sbp-external-screen .sbp-screen{display:block;min-height:0}
+.sbp-external-screen .sbp-screen>video{position:absolute;width:1px!important;height:1px!important;opacity:0;pointer-events:none}
+.sbp-external-screen .sbp-overlay{position:relative;padding:6px 10px;background:#171717;opacity:1;pointer-events:auto}
+.sbp-external-screen .sbp-message{position:relative;inset:auto}
+.sbp-external-screen .sbp-feedback{top:auto;bottom:100%;z-index:3;font-size:14px}
+.sbp-external-screen .sbp-settings{bottom:100%;top:auto;max-height:50vh}

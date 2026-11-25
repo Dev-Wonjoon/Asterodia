@@ -20,6 +20,8 @@ export function MediaViewer({ mediaId, fileId, onClose }: { mediaId: number; fil
         const viewer = mountMediaViewer({ mediaId, fileId,
             getSequence: (id: number) => unwrap(api.sequence({ mediaId: id })),
             getFile: (id: number) => unwrap(api.readFile({ fileId: id })),
+            listMedia: ({ keyword, offset }: { keyword: string; offset: number }) => unwrap(api.list({ limit: 50, offset, filter: { keyword } })),
+            getAlbum: (id: number, offset: number) => unwrap(api.get({ mediaId: id, fileOffset: offset, fileLimit: 50 })),
             contentURL: (file: MediaFileDto) => toMediaUrl(file.filepath),
             previewURL: (file: MediaFileDto) => toMediaUrl(file.previewPath ?? file.thumbnailPath),
             thumbnailURL: (file: MediaFileDto) => toMediaUrl(file.thumbnailPath), onClose,

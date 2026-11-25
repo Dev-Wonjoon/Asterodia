@@ -15,10 +15,11 @@ export function useShortcutCommands(scope: string, commands: Record<string, Comm
             const helpInViewer = scope === 'app' && matchShortcut(event, scope)?.id === 'app.help' && dialog?.classList.contains('sb-viewer')
             if (dialog && !helpInViewer || current.current.accepts?.(event) === false) return
             let item = matchShortcut(event, scope)
-            // Selection checkboxes can unregister cards; typing controls keep their own keys.
-            const selectionDelete = scope === 'gallery' && item?.id === 'gallery.unregister'
+            // Gallery selection checkboxes are command targets, not typing fields.
+            // The gallery accepts callback preserves their native activation keys.
+            const selectionCheckbox = scope === 'gallery'
                 && (event.target as Element | null)?.closest?.('input[type="checkbox"][data-gallery-select]')
-            if (scope !== 'app' && isTextInput(event.target) && !selectionDelete) return
+            if (scope !== 'app' && isTextInput(event.target) && !selectionCheckbox) return
             // Shift + navigation extends gallery selection using the same configurable direction.
             if (!item && scope === 'gallery' && event.shiftKey && !event.defaultPrevented) {
                 item = matchShortcut({ key: event.key, code: event.code, shiftKey: false, ctrlKey: event.ctrlKey, altKey: event.altKey, metaKey: event.metaKey,

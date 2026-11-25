@@ -293,6 +293,8 @@ function openViewer(mediaId, fileId) {
     mediaViewer = mountMediaViewer({ mediaId, fileId,
         getSequence: id => request('/api/library/' + id + '/sequence'),
         getFile: id => request('/api/files/' + id + '/info'),
+        listMedia: ({ keyword, offset }) => request('/api/library?' + new URLSearchParams({ q: keyword, offset: String(offset), limit: '50' })),
+        getAlbum: (id, offset) => request('/api/library/' + id + '?fileOffset=' + offset),
         contentURL: file => fileURL(file.id, 'content'),
         previewURL: file => fileURL(file.id, 'preview'),
         thumbnailURL: file => fileURL(file.id, 'thumbnail'),
