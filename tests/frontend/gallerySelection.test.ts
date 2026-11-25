@@ -65,6 +65,46 @@ it('navigates and extends selection beyond the mounted window, including Home an
   expect(document.querySelectorAll('article').length).toBeLessThan(20)
  } finally { await cleanupReact(); bounds.mockRestore(); size.mockRestore() }
 })
+it('keeps card navigation, selection and Delete working after a refresh moves the offscreen focused card', async () => {
+ setup()
+ const first=mocks.state.list.page.data[0]
+ mocks.state.list.page.data=Array.from({length:1000},(_,index)=>({...first,id:index+1,title:'게시글 '+(index+1)}))
+ mocks.state.list.page.total=1000
+ const {useState}=await import('react')
+ let refresh=()=>{}
+ function RefreshingGallery(){
+  const [version,setVersion]=useState(0)
+  refresh=()=>setVersion(value=>value+1)
+  return h(GalleryPage,{title:'갤러리 '+version})
+ }
+ const size=vi.spyOn(HTMLElement.prototype,'clientHeight','get').mockImplementation(function(){return this.classList.contains('overflow-y-auto')?600:0})
+ const bounds=vi.spyOn(HTMLElement.prototype,'getBoundingClientRect').mockImplementation(function(){
+  const scroll=this.closest<HTMLElement>('.overflow-y-auto')?.scrollTop??0
+  if(this.classList.contains('overflow-y-auto'))return new DOMRect(0,0,700,600)
+  if(this.classList.contains('motion-gallery-grid'))return new DOMRect(0,100-scroll,700,Number.parseFloat(this.style.height))
+  if(this.hasAttribute('data-gallery-key'))return new DOMRect(Number.parseFloat(this.style.left),100-scroll+Number.parseFloat(this.style.top),320,200)
+  return new DOMRect()
+ })
+ try{
+  await mount(h(RefreshingGallery))
+  const original=document.querySelector<HTMLButtonElement>('[data-card-focus]')!
+  await act(async()=>original.focus())
+  const root=original.closest<HTMLElement>('.overflow-y-auto')!
+  await act(async()=>{root.scrollTop=20000;refresh()})
+  await act(async()=>{
+   mocks.state.list.page.data=[{...first,id:1001,title:'새 항목'},...mocks.state.list.page.data]
+   refresh()
+  })
+  expect(document.activeElement).toBe(original)
+  const press=async(key:string)=>act(async()=>document.activeElement!.dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true,cancelable:true})))
+  await press('ArrowRight')
+  expect(document.activeElement?.closest('article')?.getAttribute('data-album-id')).toBe('2')
+  await press(' ')
+  expect(document.querySelector('[aria-label="선택 항목 작업"]')?.textContent).toContain('1개 선택')
+  await pressDelete()
+  expect(mocks.bulk).toHaveBeenCalledExactlyOnceWith([{mediaId:2,revision:4}],{kind:'unregister'},expect.any(Function))
+ }finally{await cleanupReact();bounds.mockRestore();size.mockRestore()}
+})
 it('opens card actions with the keyboard and protects typing and underlying selection under a menu', async () => {
  setup(); await mount(h(GalleryPage))
  const card = document.querySelector<HTMLButtonElement>('[data-card-focus]')!; card.focus()

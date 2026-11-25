@@ -172,6 +172,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: release-ready
@@ -185,5 +188,7 @@ jobs:
         run: |
           # gh creates a draft, uploads all three assets, then publishes it.
           # Existing releases are not overwritten on reruns.
-          gh release create $env:RELEASE_TAG release/StorageBucket-windows-amd64.exe release/StorageBucket-windows-arm64.exe release/SHA256SUMS --verify-tag --generate-notes --title $env:RELEASE_TAG --latest
+          $notesPath = ".github/release-notes/$($env:RELEASE_TAG).md"
+          $notesArguments = if (Test-Path -LiteralPath $notesPath -PathType Leaf) { @('--notes-file', $notesPath) } else { @('--generate-notes') }
+          gh release create $env:RELEASE_TAG release/StorageBucket-windows-amd64.exe release/StorageBucket-windows-arm64.exe release/SHA256SUMS --verify-tag @notesArguments --title $env:RELEASE_TAG --latest
           if ($LASTEXITCODE -ne 0) { throw 'Release publication failed. Inspect the existing draft before retrying.' }

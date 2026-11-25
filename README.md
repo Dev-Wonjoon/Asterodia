@@ -157,12 +157,14 @@ Windows numeric metadata uses a fourth component of 0 for the base release,
 1–26 for a–z, and `27 * fix` for numeric fixes. For example, `2.2.6a` maps to
 `2.2.6.1`, and release `2.2.6.1` maps to `2.2.6.27`. Displayed versions and Git tags
 retain the original spelling. All release assets and checksums must use the same tag.
-Install or update to 2.2.6 before using automatic updates for these extended formats.
+Release 2.2.8 uses a three-component version so 2.2.5 and 2.2.6 clients can
+recognize it through automatic updates. After installing 2.2.8, clients can
+also recognize combined numeric and letter fixes.
 Combined numeric and letter fixes add the letter offset to `27 * fix`, so
 `2.2.7.2a` maps to `2.2.7.55`. The final component must not exceed 65535
 (fix 2427 supports only a–f). Versions through 2.2.7.2 cannot recognize this
 combined format; download and replace the executable manually once to install
-2.2.7.2a and enable future combined-format updates.
+2.2.7.2a, or update to the compatible 2.2.8 release, to enable future combined-format updates.
 
 ## Responsible Use
 

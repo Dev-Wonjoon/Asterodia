@@ -12,6 +12,8 @@ let frames: Map<number, FrameRequestCallback>, serial: number
 let observers: Set<{ callback: ResizeObserverCallback; disconnect: ReturnType<typeof vi.fn> }>
 let virtual: ReturnType<typeof useVirtualGallery>, selection: ReturnType<typeof useGallerySelection>
 let updateRows: (count: number) => void
+let changeRows: (change: (items: MediaSummaryDto[]) => MediaSummaryDto[]) => void
+let disableCards: (disabled: boolean) => void
 const rows = (count: number) => Array.from({ length: count }, (_, id) => ({ id, revision: 1, title: `Card ${id}`, fileCount: 1 } as MediaSummaryDto))
 
 beforeEach(() => {
@@ -39,7 +41,10 @@ afterEach(async () => { await cleanupReact(); vi.restoreAllMocks(); vi.unstubAll
 
 function Harness({ count = 1000 }: { count?: number }) {
     const [items, setItems] = useState(() => rows(count))
+    const [disabled, setDisabled] = useState(false)
+    disableCards = setDisabled
     updateRows = count => setItems(rows(count))
+    changeRows = change => setItems(change)
     const root = useRef<HTMLDivElement>(null), blocked = useRef(false), geometry = useRef<GalleryGeometry | null>(null)
     selection = useGallerySelection(items, blocked, root, 'same', geometry)
     virtual = useVirtualGallery(selection.gridRef, root, items.map(galleryDisplayKey), geometry)
@@ -49,7 +54,7 @@ function Harness({ count = 1000 }: { count?: number }) {
             const item = items[index]
             return h('div', { key: item.id, 'data-gallery-key': galleryDisplayKey(item), style: virtual.slotStyle(index) },
                 h('article', { 'data-album-id': item.id, 'data-selection-key': gallerySelectionKey(item), 'data-selected': selection.entries.has(gallerySelectionKey(item)) || undefined },
-                    h('button', { 'data-card-focus': true, onClick: event => selection.select(item, event) }, item.title),
+                    h('button', { 'data-card-focus': true, disabled, onClick: event => selection.select(item, event) }, item.title),
                     h('img', { src: `/thumbnail/${item.id}` })))
         })))
 }
@@ -112,6 +117,76 @@ it('retains only focused and native drag source cards outside the visible range'
     await tick()
     expect(button(0)).toBeNull(); expect(button(1)).toBeNull()
     expect(cards().length).toBeLessThan(20)
+})
+it('keeps the same offscreen focused card when refresh prepends or removes earlier rows', async () => {
+    await mount(h(Harness))
+    const original = button(0)
+    await act(async () => original.focus())
+    await scroll(20000)
+    await act(async () => changeRows(items => [{ ...items[0], id: -1 }, ...items]))
+    expect(document.activeElement).toBe(original)
+    expect(original.isConnected).toBe(true)
+    await act(async () => changeRows(items => items.filter(item => item.id !== -1)))
+    expect(document.activeElement).toBe(original)
+    expect(cards().length).toBeLessThan(20)
+})
+it('keeps focus when reordering moves the focused card out of the mounted window', async () => {
+    await mount(h(Harness))
+    const last = button(Number(cards().at(-1)!.dataset.albumId))
+    await act(async () => last.focus())
+    await act(async () => changeRows(items => [...items.slice(100), ...items.slice(0, 100)]))
+    expect(document.activeElement).toBe(last)
+    expect(last.isConnected).toBe(true)
+    expect(cards().length).toBeLessThan(20)
+})
+it('restores keyboard focus and a Tab stop to a visible card if the focused item is removed', async () => {
+    await mount(h(Harness))
+    await act(async () => button(0).focus())
+    await scroll(20000)
+    await act(async () => changeRows(items => items.filter(item => item.id !== 0)))
+    expect(document.activeElement?.matches('[data-card-focus]')).toBe(true)
+    expect(document.activeElement?.closest('article')?.getAttribute('data-album-id')).not.toBe('0')
+    expect((document.activeElement as HTMLElement).tabIndex).toBe(0)
+    expect(document.querySelectorAll('button[tabindex="0"]')).toHaveLength(1)
+})
+it('does not steal focus from an input outside the gallery when the old active card is removed', async () => {
+    await mount(h(Harness))
+    const input = document.createElement('input'); document.body.append(input)
+    await act(async () => { button(0).focus(); input.focus() })
+    await act(async () => changeRows(items => items.filter(item => item.id !== 0)))
+    expect(document.activeElement).toBe(input)
+    input.remove()
+})
+it('restores a card shortcut target after refresh temporarily disables the focused button', async () => {
+    const setAttribute = HTMLElement.prototype.setAttribute
+    // Model the browser moving focus away when a focused button is disabled.
+    vi.spyOn(HTMLElement.prototype, 'setAttribute').mockImplementation(function(name, value) {
+        if (name === 'disabled' && document.activeElement === this) (this as HTMLElement).blur()
+        setAttribute.call(this, name, value)
+    })
+    await mount(h(Harness))
+    const original = button(0)
+    await act(async () => original.focus())
+    await act(async () => disableCards(true))
+    expect(document.activeElement).toBe(document.body)
+    await act(async () => disableCards(false))
+    expect(document.activeElement).toBe(original)
+    expect(original.tabIndex).toBe(0)
+})
+it('cancels pending focus restoration when the user moves to an external input during refresh', async () => {
+    const setAttribute = HTMLElement.prototype.setAttribute
+    vi.spyOn(HTMLElement.prototype, 'setAttribute').mockImplementation(function(name, value) {
+        if (name === 'disabled' && document.activeElement === this) (this as HTMLElement).blur()
+        setAttribute.call(this, name, value)
+    })
+    await mount(h(Harness))
+    const input = document.createElement('input'); document.body.append(input)
+    await act(async () => button(0).focus())
+    await act(async () => disableCards(true))
+    await act(async () => input.focus())
+    await act(async () => disableCards(false))
+    expect(document.activeElement).toBe(input)
+    input.remove()
 })
 it('selects cards crossed by a marquee even after they have scrolled out of the DOM', async () => {
     await mount(h(Harness))

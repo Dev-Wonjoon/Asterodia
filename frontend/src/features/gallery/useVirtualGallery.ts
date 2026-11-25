@@ -8,7 +8,7 @@ export interface GalleryGeometry {
     bounds(key: string, origin?: DOMRect): DOMRect | null
 }
 
-type Layout = { width: number; columns: number; pitch: number; start: number; end: number; retained: number[] }
+type Layout = { width: number; columns: number; pitch: number; start: number; end: number; retained: string[] }
 
 /** Keep card components/images near the viewport. List metadata remains available to selection. */
 export function useVirtualGallery(
@@ -22,6 +22,9 @@ export function useVirtualGallery(
     const latestKeys = useRef(keys); latestKeys.current = keys
     const heights = useRef(new Map<string, number>())
     const dragging = useRef<string | null>(null)
+    const focusKey = useRef<string | undefined>(undefined)
+    const committingFocus = useRef(false)
+    committingFocus.current = gridRef.current?.contains(document.activeElement) ?? false
     const frame = useRef(0)
     const positions = useMemo(() => new Map(keys.map((key, index) => [key, index])), [keys])
     const positionsRef = useRef(positions); positionsRef.current = positions
@@ -54,11 +57,12 @@ export function useVirtualGallery(
         const rowCount = Math.ceil(latestKeys.current.length / columns)
         const start = Math.max(0, Math.min(rowCount - 1, Math.floor(top / pitch)) - OVERSCAN) * columns
         const end = Math.min(latestKeys.current.length, (Math.ceil((top + (root.clientHeight || 600)) / pitch) + OVERSCAN) * columns)
-        const retained = new Set<number>()
-        const focused = grid.contains(document.activeElement) ? (document.activeElement as Element).closest<HTMLElement>('[data-gallery-key]')?.dataset.galleryKey : undefined
+        const retained = new Set<string>()
+        const focused = grid.contains(document.activeElement) ? (document.activeElement as Element).closest<HTMLElement>('[data-gallery-key]')?.dataset.galleryKey
+            : document.activeElement === document.body ? focusKey.current : undefined
         for (const key of [focused, dragging.current]) {
             const index = key ? positionsRef.current.get(key) : undefined
-            if (index !== undefined && (index < start || index >= end)) retained.add(index)
+            if (key && index !== undefined && (index < start || index >= end)) retained.add(key)
         }
         const next = { width, columns, pitch, start, end, retained: [...retained] }
         if (next.width !== previous.width || next.columns !== previous.columns || next.pitch !== previous.pitch ||
@@ -78,16 +82,24 @@ export function useVirtualGallery(
     }
     if (geometryRef) geometryRef.current = { bounds }
 
+    // Capture the live focus key before React removes/reorders children. A data
+    // refresh can move a visible card out of the window before measure runs.
+    if (gridRef.current?.contains(document.activeElement)) focusKey.current = (document.activeElement as Element).closest<HTMLElement>('[data-gallery-key]')?.dataset.galleryKey
+    const focusedKey = document.activeElement === document.body || gridRef.current?.contains(document.activeElement) ? focusKey.current : undefined
+    const retainedKeys = [...layout.retained, focusedKey, dragging.current]
     const indices = [...new Set([
         ...Array.from({ length: Math.max(0, Math.min(keys.length, layout.end) - layout.start) }, (_, i) => layout.start + i),
-        ...layout.retained.filter(index => index < keys.length)
+        ...retainedKeys.flatMap(key => {
+            const index = key ? positions.get(key) : undefined
+            return index === undefined ? [] : [index]
+        })
     ])].sort((a, b) => a - b)
     const renderedKey = indices.join(',')
     useLayoutEffect(() => {
         const present = new Set(keys)
         for (const key of heights.current.keys()) if (!present.has(key)) heights.current.delete(key)
     }, [keys])
-    useLayoutEffect(() => { measure() })
+    useLayoutEffect(() => { committingFocus.current = false; measure() })
     useLayoutEffect(() => {
         const grid = gridRef.current, root = scrollRef.current
         if (!grid || !root) return
@@ -99,17 +111,29 @@ export function useVirtualGallery(
             dragging.current = (event.target as Element).closest<HTMLElement>('[data-gallery-key]')?.dataset.galleryKey ?? null
         }
         const dragEnd = () => { dragging.current = null; schedule() }
+        const rememberFocus = (event: FocusEvent) => {
+            const target = event.target instanceof Element ? event.target : null
+            focusKey.current = target && grid.contains(target) ? target.closest<HTMLElement>('[data-gallery-key]')?.dataset.galleryKey : undefined
+            schedule()
+        }
+        const leaveFocus = (event: FocusEvent) => {
+            const target = event.target instanceof HTMLElement ? event.target : null
+            // A deliberate blur releases the extra card. React removing,
+            // moving or disabling the focused control keeps its logical key.
+            if (!event.relatedTarget && target?.isConnected && !target.matches(':disabled') && !committingFocus.current) focusKey.current = undefined
+            schedule()
+        }
         const observer = new ResizeObserver(schedule)
         observer.observe(root); observer.observe(grid)
         for (const slot of grid.querySelectorAll(':scope > [data-gallery-key]')) observer.observe(slot)
         root.addEventListener('scroll', schedule, { passive: true })
-        grid.addEventListener('focusin', schedule); grid.addEventListener('focusout', schedule)
+        document.addEventListener('focusin', rememberFocus); grid.addEventListener('focusout', leaveFocus)
         grid.addEventListener('dragstart', dragStart, true)
         window.addEventListener('dragend', dragEnd)
         return () => {
             cancelAnimationFrame(frame.current); observer.disconnect()
             root.removeEventListener('scroll', schedule)
-            grid.removeEventListener('focusin', schedule); grid.removeEventListener('focusout', schedule)
+            document.removeEventListener('focusin', rememberFocus); grid.removeEventListener('focusout', leaveFocus)
             grid.removeEventListener('dragstart', dragStart, true); window.removeEventListener('dragend', dragEnd)
         }
     }, [gridRef, scrollRef, renderedKey])
