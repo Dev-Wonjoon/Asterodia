@@ -237,7 +237,8 @@ func (s *Service) Restart(ctx context.Context) api.Result {
 	return s.Status()
 }
 
-// CheckIdle also covers background jobs after their submission call returns.
+// CheckIdle covers durable work after submission. Thumbnail cache generation is
+// restartable: Close joins its worker and Start requeues any interrupted cache.
 func CheckIdle(ctx context.Context, db *sql.DB) error {
 	if db == nil {
 		return fmt.Errorf("진행 중인 작업 상태를 확인하지 못했습니다")
@@ -248,7 +249,7 @@ func CheckIdle(ctx context.Context, db *sql.DB) error {
 	+(SELECT count(*) FROM local_import_job WHERE state IN ('scanning','pending','running') OR cleanup_required=1)
 	+(SELECT count(*) FROM file_move_job WHERE state IN ('running','pausing'))
 	+(SELECT count(*) FROM file_move_item WHERE state IN ('copying','verified','committed','cleanup_pending'))
-	+(SELECT count(*) FROM maintenance_task WHERE state IN ('pending','running'))
+	+(SELECT count(*) FROM maintenance_task WHERE state IN ('pending','running') AND coalesce(kind,'')<>'preview_generation')
 	+(SELECT count(*) FROM media_edit_session WHERE state IN ('pending','preparing','stop_unconfirmed'))
 	+(SELECT count(*) FROM media_edit_job WHERE state IN ('pending','running','verifying','publishing','stop_unconfirmed'))
 	+(SELECT count(*) FROM media_edit_page WHERE state IN ('pending','running'))`).Scan(&active)

@@ -994,10 +994,31 @@ it('defers thumbnail refreshes until the active album drag ends', async () => {
  vi.useFakeTimers()
  try {
   await dragEvent('dragstart', sourceCard(1), transfer)
-  await act(async () => { mocks.on.mock.lastCall![0](); await vi.advanceTimersByTimeAsync(100) })
+  await act(async () => { mocks.on.mock.lastCall![0](); await vi.advanceTimersByTimeAsync(500) })
   expect(mocks.refresh).not.toHaveBeenCalled()
   expect(document.querySelector('[aria-label="선택 항목 작업"]')).toBeNull()
   await dragEvent('dragend', sourceCard(1), transfer)
+  expect(mocks.refresh).toHaveBeenCalledOnce()
+ } finally { vi.useRealTimers() }
+})
+
+it('coalesces continuous thumbnail events, preserves focus and selection, and clears trailing work on unmount', async () => {
+ setup(); await mount(h(GalleryPage)); await selectCard(0)
+ const focused = document.activeElement, pending = deferred<boolean>()
+ mocks.refresh.mockReturnValueOnce(pending.promise)
+ vi.useFakeTimers()
+ try {
+  const notify = mocks.on.mock.lastCall![0]
+  for (let i=0;i<5;i++) await act(async () => { notify(); await vi.advanceTimersByTimeAsync(100) })
+  expect(mocks.refresh).toHaveBeenCalledExactlyOnceWith({background:true})
+  expect(document.activeElement).toBe(focused)
+  expect(document.querySelector('[aria-label="선택 항목 작업"]')?.textContent).toContain('1개 선택')
+  for (let i=0;i<10;i++) notify()
+  await act(async()=>{await vi.advanceTimersByTimeAsync(1000)})
+  expect(mocks.refresh).toHaveBeenCalledOnce()
+  await act(async()=>{pending.resolve(true)})
+  await cleanupReact()
+  await vi.advanceTimersByTimeAsync(1000)
   expect(mocks.refresh).toHaveBeenCalledOnce()
  } finally { vi.useRealTimers() }
 })

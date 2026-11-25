@@ -118,6 +118,7 @@ export function createGalleryStore(
     let listToken = 0
     let detailToken = 0
     let refreshQueued = false
+    let backgroundRefresh: Promise<boolean> | null = null
     let session = 0
 
     function publish(next: GallerySnapshot) {
@@ -159,12 +160,16 @@ export function createGalleryStore(
     }
 
     async function loadList(
-        mode: 'refresh' | 'append' = 'refresh',
+        mode: 'refresh' | 'append' | 'background' = 'refresh',
         internal = false,
         refreshCountOverride?: number
     ): Promise<boolean> {
         const append = mode === 'append'
+        const background = mode === 'background'
         const previous = snapshot.list
+
+        if (background && (snapshot.busy || snapshot.needsRefresh || previous.status !== 'ready'
+            || previous.refreshing || previous.loadingMore || previous.error || previous.moreError)) return false
 
         if (snapshot.busy && !internal) {
             if (!append) refreshQueued = true
@@ -197,7 +202,7 @@ export function createGalleryStore(
         let total = previous.page.total
         let hasNextPage = false
 
-        publish({
+        if (!background) publish({
             ...snapshot,
             list: {
                 ...previous,
@@ -210,6 +215,7 @@ export function createGalleryStore(
         })
 
         function failList(error: MediaViewError): false {
+            if (background) return false
             if (expandAlbums && !append) expandedAlbums = snapshot.expandedMediaIds ?? []
             publish({
                 ...snapshot,
@@ -644,7 +650,15 @@ export function createGalleryStore(
             })
         },
 
-        refresh: () => refresh(),
+        refresh: (options?: { background?: boolean }) => {
+            if (!options?.background) return refresh()
+            if (backgroundRefresh) return backgroundRefresh
+            const pending = loadList('background')
+            backgroundRefresh = pending
+            const clear = () => { if (backgroundRefresh === pending) backgroundRefresh = null }
+            void pending.then(clear, clear)
+            return pending
+        },
 
         loadMore: () => loadList('append'),
 

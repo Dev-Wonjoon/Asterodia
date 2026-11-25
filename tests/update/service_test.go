@@ -268,7 +268,7 @@ func TestBackgroundWorkBlocksRestart(t *testing.T) {
 			defer memory.Close()
 			memory.SetMaxOpenConns(1)
 			for _, name := range []string{"download_queue", "local_import_job", "file_move_job", "file_move_item", "maintenance_task", "media_edit_session", "media_edit_job", "media_edit_page"} {
-				if _, err = memory.Exec("CREATE TABLE " + name + " (state TEXT, cleanup_required INTEGER DEFAULT 0)"); err != nil {
+				if _, err = memory.Exec("CREATE TABLE " + name + " (state TEXT, cleanup_required INTEGER DEFAULT 0, kind TEXT DEFAULT 'deletion_cleanup')"); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -293,6 +293,47 @@ func TestBackgroundWorkBlocksRestart(t *testing.T) {
 				t.Fatal("gate not reopened after busy check")
 			}
 			leave()
+		})
+	}
+}
+
+func TestRestartAllowsThumbnailCacheAfterImportStops(t *testing.T) {
+	for _, state := range []string{"paused", "cancelled", "completed", "failed"} {
+		t.Run(state, func(t *testing.T) {
+			s, backend, _, _ := setup(t)
+			memory, err := sql.Open("sqlite", ":memory:")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer memory.Close()
+			memory.SetMaxOpenConns(1)
+			for _, table := range []string{"download_queue", "local_import_job", "file_move_job", "file_move_item", "maintenance_task", "media_edit_session", "media_edit_job", "media_edit_page"} {
+				if _, err = memory.Exec("CREATE TABLE " + table + " (state TEXT, cleanup_required INTEGER DEFAULT 0, kind TEXT)"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err = memory.Exec("INSERT INTO maintenance_task(kind,state) VALUES ('preview_generation','pending'),('preview_generation','running'); INSERT INTO local_import_job(state) VALUES (?)", state); err != nil {
+				t.Fatal(err)
+			}
+			s.SetDatabase(memory)
+			if err = appupdate.CheckIdle(t.Context(), memory); err != nil {
+				t.Fatal(err)
+			}
+			// Cancellation must still finish source-file cleanup before restart.
+			if _, err = memory.Exec("UPDATE local_import_job SET cleanup_required=1"); err != nil {
+				t.Fatal(err)
+			}
+			if err = appupdate.CheckIdle(t.Context(), memory); err == nil {
+				t.Fatal("unfinished import cleanup accepted")
+			}
+			if _, err = memory.Exec("UPDATE local_import_job SET cleanup_required=0"); err != nil {
+				t.Fatal(err)
+			}
+			_ = s.Check(t.Context())
+			_ = s.Download(t.Context())
+			if result := s.Restart(t.Context()); !result.OK || backend.restarts != 1 {
+				t.Fatal(result)
+			}
 		})
 	}
 }

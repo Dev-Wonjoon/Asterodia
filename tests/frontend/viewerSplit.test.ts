@@ -78,6 +78,56 @@ it('keeps newly added panes empty across layout changes and targets only the sel
     expect(panes()).toHaveLength(1); expect(viewer!.currentFile?.id).toBe(2); expect(scale()).toBe('125%'); expect(document.activeElement).toBe(surface())
 })
 
+function submitNumber(value: string) {
+    const input = document.querySelector<HTMLInputElement>('.sbv-jump input')!
+    input.focus(); input.value = value; input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.form!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    return input
+}
+it('validates file numbers, protects input keys, and restores repeated shortcuts after a jump', async () => {
+    const { getFile } = setup(); await flush()
+    for (const value of ['', '0', '5', '1.5']) {
+        const input = submitNumber(value); await flush()
+        expect(input.getAttribute('aria-invalid')).toBe('true'); expect(document.activeElement).toBe(input)
+        expect(viewer!.currentFile?.id).toBe(1)
+    }
+    expect(document.querySelector('.sbv-jump-error')!.textContent).toBe('1부터 4까지의 정수를 입력하세요.')
+    setLanguage('en'); expect(document.querySelector('.sbv-jump-error')!.textContent).toBe('Enter a whole number from 1 to 4.')
+    setLanguage('ko')
+    key('ArrowRight'); key('+', {ctrlKey:true}); expect(getFile).toHaveBeenCalledOnce(); expect(scale()).toBe('100%')
+    submitNumber('2'); await flush(); expect(viewer!.currentFile?.id).toBe(2); expect(document.activeElement).toBe(surface())
+    expect(document.querySelector('video')!.paused).toBe(true)
+    key('ArrowRight'); await flush(); expect(viewer!.currentFile?.id).toBe(3)
+    key('+', {ctrlKey:true}); expect(scale()).toBe('125%')
+    const calls = getFile.mock.calls.length
+    submitNumber('3'); await flush(); expect(getFile).toHaveBeenCalledTimes(calls); expect(scale()).toBe('125%')
+})
+
+it('jumps only the selected independent pane and follows the displayed shuffled order', async () => {
+    setup(); await flush(); click(button('2분할')); await flush(); await choose(1, 2)
+    submitNumber('4'); await flush(); expect(viewer!.currentFile?.id).toBe(4)
+    select(0); expect(viewer!.currentFile?.id).toBe(1)
+    const shuffle = document.querySelectorAll<HTMLInputElement>('.sbv-options input')[1]; shuffle.click()
+    key('ArrowRight'); await flush(); const shuffledSecond = viewer!.currentFile?.id
+    submitNumber('1'); await flush(); expect(viewer!.currentFile?.id).toBe(1)
+    submitNumber('2'); await flush(); expect(viewer!.currentFile?.id).toBe(shuffledSecond)
+    select(1); expect(viewer!.currentFile?.id).toBe(4)
+    expect(document.querySelector<HTMLInputElement>('.sbv-jump input')!.value).toBe('4')
+})
+
+it('keeps linked video playback singular on number jumps and ignores a pending jump after close', async () => {
+    const { getFile } = setup(2); await flush(); click(button('2분할')); await flush(); click(button('같은 미디어')); await flush()
+    expect(document.querySelectorAll('video')).toHaveLength(1)
+    expect(document.querySelector('video')!.paused).toBe(false)
+    submitNumber('3'); await flush(); expect(document.querySelectorAll('.sbv-image')).toHaveLength(2)
+    submitNumber('2'); await flush(); expect(document.querySelectorAll('video')).toHaveLength(1)
+    const video = document.querySelector('video')!; video.play(); submitNumber('2'); await flush(); expect(document.querySelector('video')).toBe(video)
+    const pending = deferred<any>(); getFile.mockReturnValueOnce(pending.promise)
+    submitNumber('4'); expect(document.querySelector<HTMLInputElement>('.sbv-jump input')!.disabled).toBe(true)
+    viewer!.destroy(); pending.resolve({ id:4, kind:'video', title:'늦은 응답' }); await flush()
+    expect(document.querySelector('video')).toBeNull(); expect(document.querySelector('.sb-viewer')).toBeNull()
+})
+
 it('preserves playback position, speed, audio state and zoom when changing layout', async () => {
     setup(2); await flush(); select(0); key('+', { ctrlKey: true })
     const old = document.querySelector('video')!; old.currentTime = 67; old.playbackRate = 1.5; old.volume = .35; old.muted = true

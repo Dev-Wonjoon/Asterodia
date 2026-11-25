@@ -32,6 +32,11 @@
 .sbv-pane-toolbar button{padding:3px 6px;min-height:30px;font-size:12px}
 .sbv-pane-toolbar .sbv-zoom{display:grid;place-items:center;width:30px;padding:3px}
 .sbv-scale{min-width:40px;text-align:center;font-size:12px;font-variant-numeric:tabular-nums}
+.sbv-jump{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0}
+.sbv-jump input{box-sizing:border-box;width:84px;min-height:32px;padding:4px 6px;border:1px solid #64748b;border-radius:6px;background:#111827;color:inherit;font:inherit}
+.sbv-jump input[aria-invalid=true]{border-color:#fca5a5}
+.sbv-jump-error{color:#fca5a5;font-size:12px}
+.sbv-jump-error:empty{display:none}
 .sbv-viewport{position:relative;flex:1;min-height:0;min-width:0;overflow:hidden;background:#000;isolation:isolate;outline-offset:-3px}
 .sbv-viewport:focus-visible{outline:2px solid #bfdbfe}
 .sbv-viewport>.sbv-image{position:absolute;max-width:none;max-height:none;object-fit:fill;user-select:none}

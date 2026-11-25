@@ -843,6 +843,41 @@ describe('gallery store', () => {
     })
 })
 
+describe('thumbnail background refresh', () => {
+    it('coalesces reads without loading flags or a detail reload', async () => {
+        const pending = deferred<MediaResult<any>>()
+        let background = false
+        const { store, calls } = fixture({ list: async () => background ? pending.promise : ok({ data: [summary()], total: 1, hasNextPage: false }) })
+        await store.refresh(); await store.openDetail(1)
+        const detailBefore = store.getSnapshot().detail, getCount = calls.get.length
+        const states: boolean[] = []
+        store.subscribe(() => states.push(store.getSnapshot().list.refreshing))
+        background = true
+        const first = store.refresh({ background: true })
+        assert.equal(store.refresh({ background: true }), first)
+        assert.equal(store.getSnapshot().list.refreshing, false)
+        pending.resolve(ok({ data: [summary(1, 5)], total: 1, hasNextPage: false }))
+        assert.equal(await first, true)
+        assert.equal(store.getSnapshot().list.page.data[0].revision, 5)
+        assert.equal(store.getSnapshot().detail, detailBefore)
+        assert.equal(calls.get.length, getCount)
+        assert.deepEqual(states, [false])
+    })
+    it('keeps the usable list after a cache refresh failure and ignores replies after filter changes', async () => {
+        const pending = deferred<MediaResult<any>>()
+        let mode = 0
+        const { store } = fixture({ list: async () => mode === 1 ? fail('INTERNAL_ERROR') : mode === 2 ? pending.promise : ok({ data: [summary(mode === 3 ? 2 : 1)], total: 1, hasNextPage: false }) })
+        await store.refresh(); const before = store.getSnapshot()
+        mode = 1; assert.equal(await store.refresh({ background: true }), false)
+        assert.equal(store.getSnapshot(), before)
+        mode = 2; const old = store.refresh({ background: true })
+        store.setFilter({ keyword: 'new' }); mode = 3; await store.refresh()
+        pending.resolve(ok({ data: [summary(99)], total: 1, hasNextPage: false }))
+        assert.equal(await old, false)
+        assert.equal(store.getSnapshot().list.page.data[0].id, 2)
+    })
+})
+
 describe('favorite feedback', () => {
     it('즐겨찾기는 상태만 바꾸고 일반 성공 문구를 표시하지 않는다', async () => {
         const { store } = fixture()

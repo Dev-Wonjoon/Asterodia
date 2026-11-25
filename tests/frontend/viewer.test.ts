@@ -66,6 +66,18 @@ it('keeps shuffled cycles unique and follows the same history backwards', () => 
     expect(queue.next()).toBe(order[3])
 })
 
+it('jumps within the displayed shuffle cycle and preserves previous-cycle history', () => {
+    const queue = createViewerQueue([1, 2, 3, 4], 2, () => .25)
+    queue.setShuffle(true); queue.setRepeat(true)
+    const first = [queue.current, queue.next(), queue.next(), queue.next()]
+    const second = [queue.next(), queue.next(), queue.next(), queue.next()]
+    expect(queue.jump(1)).toBe(true); expect(queue.current).toBe(second[1]); expect(queue.index).toBe(1)
+    expect(queue.previous()).toBe(second[0]); expect(queue.previous()).toBe(first[3])
+    for (const value of [-1, 4, 1.5, NaN]) expect(queue.jump(value)).toBe(false)
+    expect(queue.current).toBe(first[3])
+    expect(createViewerQueue([], 0).jump(0)).toBe(false)
+})
+
 it.each(['button', 'keyboard'])('wraps from the first video to the last image using the previous %s', async input => {
     const getFile = setup(); await flush()
     expect(option('앨범 반복').checked).toBe(false)

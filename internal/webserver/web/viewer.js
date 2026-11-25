@@ -26,6 +26,17 @@ export function mountMediaViewer({ mediaId, fileId, getSequence, getFile, conten
     const footer = node('footer', 'sbv-footer'), count = node('span', 'sbv-count');
     const previous = button(() => translate('viewer.previous'), () => navigate(-1), footer);
     footer.append(count); const next = button(() => translate('viewer.next'), () => navigate(1), footer);
+    const jumpForm = node('form', 'sbv-jump'), jumpInput = node('input'), jumpError = node('span', 'sbv-jump-error');
+    jumpForm.noValidate = true; jumpInput.type = 'number'; jumpInput.min = '1'; jumpInput.step = '1'; jumpInput.inputMode = 'numeric';
+    bindAttribute(jumpInput, 'aria-label', () => translate('viewer.fileNumber'));
+    bindAttribute(jumpInput, 'placeholder', () => translate('viewer.fileNumber'));
+    jumpError.setAttribute('role', 'status');
+    jumpForm.append(jumpInput); const jumpButton = button(() => translate('viewer.goToFile'), jumpToFile, jumpForm);
+    jumpButton.type = 'submit'; jumpButton.onclick = null;
+    jumpForm.onsubmit = event => { event.preventDefault(); jumpToFile(); };
+    jumpInput.oninput = () => { bindText(jumpError, () => ''); jumpInput.removeAttribute('aria-invalid'); };
+    jumpForm.append(jumpError); footer.append(jumpForm);
+    let jumpResource = null, jumpCurrent = null, jumpIndex = null;
     const options = node('div', 'sbv-options'); footer.append(options);
     function option(label, key) {
         const wrap = node('label'), input = node('input'), text = node('span', '', label); input.type = 'checkbox';
@@ -61,6 +72,13 @@ export function mountMediaViewer({ mediaId, fileId, getSequence, getFile, conten
         auto.disabled = shuffle.disabled = repeat.disabled = !queue?.count || r?.loading;
         auto.checked = Boolean(r?.auto); shuffle.checked = Boolean(r?.shuffle); repeat.checked = Boolean(r?.repeat);
         bindText(count, () => queue?.count ? (queue.index + 1) + ' / ' + queue.count : '0 / 0');
+        jumpInput.disabled = jumpButton.disabled = !queue?.count || Boolean(r?.loading);
+        jumpInput.max = String(queue?.count || 1);
+        if (jumpResource !== r || jumpCurrent !== queue?.current || jumpIndex !== queue?.index) {
+            jumpResource = r; jumpCurrent = queue?.current; jumpIndex = queue?.index;
+            jumpInput.value = queue?.count ? String(queue.index + 1) : '';
+            bindText(jumpError, () => ''); jumpInput.removeAttribute('aria-invalid');
+        }
         bindText(title, () => r?.sequence?.title || translate('viewer.open'));
         bindText(status, r?.message || (() => translate('gallery.loading')));
         layoutButtons.forEach((el, i) => { el.setAttribute('aria-pressed', String(panes.length === [1, 2, 4][i])); el.disabled = expanded; });
@@ -197,6 +215,19 @@ export function mountMediaViewer({ mediaId, fileId, getSequence, getFile, conten
         const playing = Boolean(r.nativeMedia && !r.nativeMedia.paused);
         focusPane(); if (direction < 0) r.queue.previous(); else r.queue.next();
         void show(r, playing);
+    }
+    function jumpToFile() {
+        const r = resource();
+        if (destroyed || picker || !r?.queue?.count || r.loading) return;
+        const number = Number(jumpInput.value);
+        if (!jumpInput.value.trim() || !Number.isInteger(number) || number < 1 || number > r.queue.count) {
+            bindText(jumpError, () => translate('viewer.fileNumberRange', { count: r.queue.count }));
+            jumpInput.setAttribute('aria-invalid', 'true'); jumpInput.focus(); return;
+        }
+        bindText(jumpError, () => ''); jumpInput.removeAttribute('aria-invalid');
+        const current = r.queue.current, playing = Boolean(r.nativeMedia && !r.nativeMedia.paused);
+        r.queue.jump(number - 1); focusPane();
+        if (r.queue.current !== current) void show(r, playing); else controls();
     }
     function openPicker(pane) {
         if (!listMedia || !getAlbum) return;

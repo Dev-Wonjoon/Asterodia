@@ -1222,5 +1222,8 @@
   "security.queueFull": "Up to 20 downloads can wait in the queue.",
   "security.resourceLimit": "The download resource limit was reached. Check job count, size, and free disk space.",
   "security.publicResourceLimit": "Check the number and size of downloads and free disk space on your PC.",
-  "security.integrityFailed": "Engine SHA-256 verification failed. Reinstall it from Settings."
+  "security.integrityFailed": "Engine SHA-256 verification failed. Reinstall it from Settings.",
+  "viewer.fileNumber": "File number",
+  "viewer.goToFile": "Go",
+  "viewer.fileNumberRange": "Enter a whole number from 1 to {count}."
 }

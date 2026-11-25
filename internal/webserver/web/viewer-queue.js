@@ -30,6 +30,11 @@ export function createViewerQueue(values, startId, random = Math.random) {
             if (ids.length > 1) position = position > 0 ? position - 1 : ids.length - 1;
             return timeline[position];
         },
+        jump(index) {
+            if (!Number.isInteger(index) || index < 0 || index >= ids.length) return false;
+            position = position - position % ids.length + index;
+            return true;
+        },
         next() {
             if (position + 1 >= timeline.length && repeat && ids.length) {
                 const cycle = shuffled ? mix(ids) : [...ids];

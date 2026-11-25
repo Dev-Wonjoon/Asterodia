@@ -132,46 +132,55 @@ export const GalleryPage = ({
     }, [])
     useLeaveGuard(draftDirty, state.busy || bulk.busy || moveBusy || albumDropBusy || mergeSelection !== null)
 
-    const thumbnailRefreshPending = useRef(false)
-
-    const refreshThumbnails = useCallback(() => {
-        if (!thumbnailRefreshPending.current) return
-
-        const current = store.getSnapshot()
-
-        if (dirtyRef.current || albumDropBusy || pointerSelection.albumDrag || pointerSelection.dragging || current.busy || current.needsRefresh || current.list.refreshing || current.list.loadingMore) {
-            return
-        }
-
-        thumbnailRefreshPending.current = false
-        void store.refresh()
-    }, [store, albumDropBusy, pointerSelection.albumDrag, pointerSelection.dragging])
-
+    const thumbnailBlocked = useRef(false)
+    thumbnailBlocked.current = Boolean(draftDirty || albumDropBusy || pointerSelection.albumDrag || pointerSelection.dragging || viewer !== null || tagCommand !== null)
+    const flushThumbnails = useRef(() => {})
+    const requestGalleryRefresh = useRef(() => {})
     useEffect(() => {
         let timer: ReturnType<typeof setTimeout> | undefined
-
-        const unsubscribe = getApi().onMediaThumbnailUpdated(() => {
-            thumbnailRefreshPending.current = true
-
-            if (timer !== undefined) clearTimeout(timer)
-
+        let pending = false, foreground = false, running = false, disposed = false
+        const schedule = () => {
+            if (disposed || timer !== undefined || running) return
             timer = setTimeout(() => {
                 timer = undefined
-                refreshThumbnails()
-            }, 100)
+                flush()
+            }, 500)
+        }
+        const flush = () => {
+            if (disposed || !pending || running || timer !== undefined) return
+            const current = store.getSnapshot()
+            if (thumbnailBlocked.current || dirtyRef.current || current.busy || current.needsRefresh || current.list.refreshing || current.list.loadingMore) return
+            pending = false; running = true
+            // Cache notifications must not disable toolbar controls or reload the editor.
+            const refresh = foreground ? store.refresh() : store.refresh({ background: true })
+            foreground = false
+            void Promise.resolve(refresh).finally(() => {
+                running = false
+                if (pending) schedule()
+            })
+        }
+        flushThumbnails.current = flush
+        requestGalleryRefresh.current = () => {
+            pending = foreground = true
+            if (timer !== undefined) { clearTimeout(timer); timer = undefined }
+            flush()
+        }
+        const unsubscribe = getApi().onMediaThumbnailUpdated(() => {
+            pending = true
+            schedule()
         })
-
         return () => {
+            disposed = true
+            flushThumbnails.current = () => {}
+            requestGalleryRefresh.current = () => {}
             unsubscribe()
             if (timer !== undefined) clearTimeout(timer)
         }
-    }, [refreshThumbnails])
+    }, [store])
 
     useEffect(() => {
-        if (!draftDirty && !albumDropBusy && !state.busy && !state.needsRefresh) {
-            refreshThumbnails()
-        }
-    }, [draftDirty, albumDropBusy, state.busy, state.needsRefresh, state.list.refreshing, state.list.loadingMore, refreshThumbnails])
+        flushThumbnails.current()
+    }, [draftDirty, albumDropBusy, pointerSelection.albumDrag, pointerSelection.dragging, viewer, tagCommand, state.busy, state.needsRefresh, state.list.refreshing, state.list.loadingMore])
 
     const [editFocus, setEditFocus] = useState<MediaDetailFocusRequest | null>(null)
     const editSequence = useRef(0)
@@ -549,8 +558,8 @@ export const GalleryPage = ({
                 <AlbumManager selection={selection} fileIds={albumFileIds} disabled={toolbarDisabled} controlRef={albumControls} showSelectionActions={false}
                     onChanged={(id, deleted) => { if (deleted && store.getSnapshot().detail.mediaId === id) store.closeDetail(); void store.refresh() }} onClear={clearSelection} />
 
-                {!favoritesOnly && <LocalImportPanel compact controlRef={importControls} onBusyChange={setImportBusy} onHasResultChange={setHasImportResult} disabled={draftDirty || state.busy || bulk.busy || moveBusy || albumDropBusy} onComplete={() => { thumbnailRefreshPending.current = true; refreshThumbnails() }} />}
-                <FileMovePanel compact controlRef={moveControls} onBusyChange={setMoveBusy} selection={selection} disabled={draftDirty || state.busy || bulk.busy || albumDropBusy || state.needsRefresh} onCreated={clearSelection} onChanged={() => { thumbnailRefreshPending.current = true; refreshThumbnails() }} />
+                {!favoritesOnly && <LocalImportPanel compact controlRef={importControls} onBusyChange={setImportBusy} onHasResultChange={setHasImportResult} disabled={draftDirty || state.busy || bulk.busy || moveBusy || albumDropBusy} onComplete={() => requestGalleryRefresh.current()} />}
+                <FileMovePanel compact controlRef={moveControls} onBusyChange={setMoveBusy} selection={selection} disabled={draftDirty || state.busy || bulk.busy || albumDropBusy || state.needsRefresh} onCreated={clearSelection} onChanged={() => requestGalleryRefresh.current()} />
                 {bulk.progress && <p role="status" className="text-sm">{translate("gallery.processingSelection", { processed: bulk.progress.done, total: bulk.progress.total })}</p>}
                 {bulk.result && <section aria-label={translate("gallery.bulkOperationResults")} className="rounded-lg border border-[var(--border-line)] p-3 text-sm">
                     <p role="status">{translate("gallery.succeededFailed", { succeeded: bulk.result.succeeded.length, failed: bulk.result.failed.length })}</p>
