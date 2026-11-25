@@ -159,6 +159,93 @@ async function pressDelete(options: KeyboardEventInit = {}) {
  await act(async () => document.activeElement!.dispatchEvent(event))
  return event
 }
+async function pressMetadataKey(key: 't' | 'f', options: KeyboardEventInit = {}) {
+ const event = new KeyboardEvent('keydown', { key, code: key === 't' ? 'KeyT' : 'KeyF', bubbles: true, cancelable: true, ...options })
+ await act(async () => document.activeElement!.dispatchEvent(event))
+ return event
+}
+async function startMetadataMarquee(initialFocus = 'body') {
+ const grid = document.querySelector<HTMLElement>('.motion-gallery-grid')!
+ const root = grid.closest<HTMLElement>('[data-keyboard-region]')!
+ const bounds = vi.spyOn(grid, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 260, 640))
+ const animation = vi.spyOn(globalThis, 'requestAnimationFrame').mockReturnValue(0)
+ const input = document.createElement('input'); document.body.append(input)
+ if (initialFocus === 'input') input.focus()
+ else if (initialFocus === 'card') document.querySelector<HTMLElement>('[data-card-focus]')!.focus()
+ else (document.activeElement as HTMLElement)?.blur()
+ const pointer = async (type: string, target: EventTarget, x: number, y: number) => {
+  await act(async () => target.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse', button: 0, clientX: x, clientY: y })))
+ }
+ await pointer('pointerdown', root, 280, 700); await pointer('pointermove', window, 0, 0)
+ return { root, finish: () => pointer('pointerup', window, 0, 0), dispose() { input.remove(); bounds.mockRestore(); animation.mockRestore() } }
+}
+it.each(['body', 'input', 'card'].flatMap(initialFocus => (['t', 'f'] as const).map(key => ({ initialFocus, key }))))('applies $key to marquee-selected cards with initial focus on $initialFocus', async ({ initialFocus, key }) => {
+ setup(); mocks.bulk.mockResolvedValue({ succeeded: [], failed: [] }); await mount(h(GalleryPage))
+ const drag = await startMetadataMarquee(initialFocus)
+ try {
+  expect((await pressMetadataKey(key)).defaultPrevented).toBe(false)
+  expect(document.querySelector('[role=dialog]')).toBeNull(); expect(mocks.bulk).not.toHaveBeenCalled()
+  await drag.finish(); expect(document.activeElement).toBe(drag.root)
+  expect(document.querySelectorAll('[data-selected=true]')).toHaveLength(2)
+  expect((await pressMetadataKey(key)).defaultPrevented).toBe(true)
+  if (key === 't') {
+   const input = document.querySelector('textarea')!; expect(document.activeElement).toBe(input)
+   expect(document.querySelector('[role=dialog]')!.textContent).toContain('2개')
+   await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(input, '검증 태그'); input.dispatchEvent(new Event('input', { bubbles: true })) })
+   await clickButton('적용')
+  }
+  expect(mocks.bulk).toHaveBeenCalledExactlyOnceWith([{ mediaId: 1, revision: 4 }, { mediaId: 2, revision: 4 }], key === 't' ? { kind: 'tags', names: ['검증 태그'], remove: false } : { kind: 'favorite', value: true }, expect.any(Function))
+  expect(store.edit).not.toHaveBeenCalled()
+ } finally { await cleanupReact(); drag.dispose() }
+})
+it.each(['t', 'f'] as const)('applies %s to the selection even when no focused card remains in the loaded list', async key => {
+ setup(); mocks.bulk.mockResolvedValue({ succeeded: [], failed: [] })
+ const { useState } = await import('react'); let refresh = () => {}
+ function Host() { const [version, setVersion] = useState(0); refresh = () => setVersion(value => value + 1); return h(GalleryPage, { title: '갤러리 ' + version }) }
+ await mount(h(Host)); const drag = await startMetadataMarquee()
+ try {
+  await drag.finish(); await act(async () => { mocks.state.list.page.data = []; refresh() })
+  expect(document.querySelector('[data-card-focus]')).toBeNull(); expect(document.activeElement).toBe(drag.root)
+  expect((await pressMetadataKey(key)).defaultPrevented).toBe(true)
+  if (key === 't') { expect(document.querySelector('[role=dialog]')!.textContent).toContain('2개'); await clickButton('취소'); expect(document.activeElement).toBe(drag.root) }
+  else expect(mocks.bulk).toHaveBeenCalledWith([{ mediaId: 1, revision: 4 }, { mediaId: 2, revision: 4 }], { kind: 'favorite', value: true }, expect.any(Function))
+ } finally { await cleanupReact(); drag.dispose() }
+})
+it('protects typing, composition, held keys and another modal after marquee selection', async () => {
+ setup(); await mount(h(GalleryPage)); const drag = await startMetadataMarquee()
+ try {
+  await drag.finish()
+  for (const tag of ['input', 'textarea', 'select', 'div']) {
+   const field = document.createElement(tag); if (tag === 'div') field.contentEditable = 'true'
+   drag.root.append(field); field.focus()
+   for (const key of ['t', 'f'] as const) expect((await pressMetadataKey(key)).defaultPrevented).toBe(false)
+   field.remove()
+  }
+  drag.root.focus()
+  for (const key of ['t', 'f'] as const) { expect((await pressMetadataKey(key, { isComposing: true })).defaultPrevented).toBe(false); expect((await pressMetadataKey(key, { repeat: true })).defaultPrevented).toBe(false) }
+  const modal = document.createElement('dialog'), control = document.createElement('button'); modal.append(control); document.body.append(modal); modal.showModal(); control.focus()
+  for (const key of ['t', 'f'] as const) expect((await pressMetadataKey(key)).defaultPrevented).toBe(false)
+  modal.remove(); expect(mocks.bulk).not.toHaveBeenCalled(); expect(store.edit).not.toHaveBeenCalled()
+  expect(document.querySelector('[role=dialog]')).toBeNull()
+ } finally { await cleanupReact(); drag.dispose() }
+})
+it('does not apply collection metadata shortcuts to a marquee of individual files', async () => {
+ setup(); fileRows(); await mount(h(GalleryPage)); const drag = await startMetadataMarquee()
+ try {
+  await drag.finish(); expect(document.querySelectorAll('[data-selected=true]')).toHaveLength(2)
+  for (const key of ['t', 'f'] as const) expect((await pressMetadataKey(key)).defaultPrevented).toBe(false)
+  expect(document.querySelector('[role=dialog]')).toBeNull(); expect(mocks.bulk).not.toHaveBeenCalled(); expect(store.edit).not.toHaveBeenCalled()
+ } finally { await cleanupReact(); drag.dispose() }
+})
+it('toggles fully favorited marquee selections off and limits mixed selections to collections', async () => {
+ setup(); mocks.state.list.page.data.forEach((item: any) => { item.isFavorite = true }); mocks.bulk.mockResolvedValue({ succeeded: [], failed: [] })
+ const { file } = singleVideo(); Object.assign(mocks.state.list.page.data[1], { galleryFile: { ...file, id: 12, mediaId: 2 } })
+ await mount(h(GalleryPage)); const drag = await startMetadataMarquee()
+ try {
+  await drag.finish(); expect((await pressMetadataKey('f')).defaultPrevented).toBe(true)
+  expect(mocks.bulk).toHaveBeenCalledExactlyOnceWith([{ mediaId: 1, revision: 4 }], { kind: 'favorite', value: false }, expect.any(Function))
+ } finally { await cleanupReact(); drag.dispose() }
+})
 function fileRows() {
  mocks.state.list.page.data = [11, 12].map(id => ({ id: 1, title: '같은 묶음', revision: 4, sourceKind: 'local', fileCount: 3, createdAt: 1,
   managedFileCount: 0, galleryFile: { id, mediaId: 1, fileKey: String(id), title: '파일 ' + id, kind: 'image', storageKind: 'external_reference', detectedFormat: 'png', filepath: 'C:/fixture/' + id + '.png' } }))

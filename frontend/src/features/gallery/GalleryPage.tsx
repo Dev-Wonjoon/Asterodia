@@ -324,6 +324,8 @@ export const GalleryPage = ({
         if (event?.shiftKey) pointerSelection.select(target, { ctrlKey: false, metaKey: false, shiftKey: true })
     }
     const cardEnabled = () => !pageDisabled && !viewer && Boolean(focusedMedia())
+    const metadataActionEnabled = () => !pageDisabled && !viewer && !pointerSelection.dragging && !pointerSelection.albumDrag && !tagCommand
+        && (selection.length > 0 || Boolean(focusedMedia()))
     useShortcutCommands('gallery', {
         'gallery.import': { enabled: () => !favoritesOnly && !toolbarDisabled && !importBusy && !viewer, run: () => importControls.current?.choose() },
         'gallery.refresh': { enabled: () => !toolbarDisabled && !viewer, run: () => { clearSelection(); void store.refresh() } },
@@ -335,11 +337,11 @@ export const GalleryPage = ({
         'gallery.view': { enabled: cardEnabled, run: () => { const item = focusedMedia(); if (item) { if (item.galleryFile) setViewer({ mediaId: item.id, fileId: item.galleryFile.id }); else void openAlbum(item.id) } } },
         'gallery.details': { enabled: cardEnabled, run: () => { const item = focusedMedia(); if (item) void selectDetail(item.id, item.galleryFileOffset) } },
         'gallery.menu': { enabled: cardEnabled, run: () => { const item = focusedMedia(); if (item) [...pointerSelection.gridRef.current?.querySelectorAll<HTMLElement>('[data-selection-key]') ?? []].find(card => card.dataset.selectionKey === gallerySelectionKey(item))?.querySelector<HTMLButtonElement>('[data-card-menu]')?.click() } },
-        'gallery.favorite': { enabled: () => cardEnabled() && (selection.length > 0 || !focusedMedia()?.galleryFile), run: () => {
+        'gallery.favorite': { enabled: () => metadataActionEnabled() && (selection.length > 0 || !focusedMedia()?.galleryFile), run: () => {
             if (selection.length) void bulk.run(selection.some(target => !list.page.data.find(item => item.id === target.mediaId)?.isFavorite) ? 'favorite' : 'unfavorite')
             else { const item = focusedMedia(); if (item && !item.galleryFile) toggleFavorite(item.id) }
         } },
-        'gallery.tags': { enabled: cardEnabled, run: () => { if (selection.length) setTagCommand('addTags'); else { const item = focusedMedia(); if (item) void editDetail(item.id, 'tags') } } },
+        'gallery.tags': { enabled: metadataActionEnabled, run: () => { if (selection.length) setTagCommand('addTags'); else { const item = focusedMedia(); if (item) void editDetail(item.id, 'tags') } } },
         'gallery.createAlbum': { enabled: () => !toolbarDisabled && !viewer, run: () => albumControls.current?.create() },
         'gallery.addToAlbum': { enabled: () => !toolbarDisabled && !viewer && (selection.length + albumFileIds.length > 0 || Boolean(focusedMedia()?.fileCount)), run: () => {
             if (selection.length + albumFileIds.length) albumControls.current?.addSelection()
@@ -362,8 +364,11 @@ export const GalleryPage = ({
             return !(nativeActivation && control && !control.matches('[data-card-focus]'))
         }
         if (target.closest('[data-action-boundary]')) return false
-        if (target === listScrollRef.current && pointerSelection.entries.size > 0
-            && matchShortcut(event, 'gallery')?.id === 'gallery.unregister') return true
+        if (target === listScrollRef.current) {
+            const command = matchShortcut(event, 'gallery')?.id
+            if (command === 'gallery.unregister') return pointerSelection.entries.size > 0
+            if (command === 'gallery.favorite' || command === 'gallery.tags') return selection.length > 0
+        }
         return event.ctrlKey || event.altKey || event.metaKey
     })
     selectionLocked.current = pageDisabled || tagCommand !== null || viewer !== null
