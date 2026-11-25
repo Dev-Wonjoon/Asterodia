@@ -160,7 +160,12 @@ jobs:
           compression-level: 0
   publish:
     name: Publish GitHub Release
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    # Explicit status handling keeps a skipped reusable verification job from
+    # implicitly skipping publication after the package job has succeeded.
+    if: >-
+      ${{ !cancelled() && github.event_name == 'push' &&
+          startsWith(github.ref, 'refs/tags/v') &&
+          needs.version.result == 'success' && needs.package.result == 'success' }}
     needs: [version, package]
     runs-on: windows-2025
     timeout-minutes: 10
