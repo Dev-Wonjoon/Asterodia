@@ -19,7 +19,7 @@ func thumbnailKind(kind, path string) string {
 	if kind == "unknown" {
 		kind = engine.LocalKind(path)
 	}
-	if kind == "image" || kind == "video" {
+	if kind == "image" || kind == "video" || kind == "audio" {
 		return kind
 	}
 	return ""
@@ -48,7 +48,7 @@ func (s *Service) takeScanRequest() bool {
 }
 
 func (s *Service) backfillBatch(ctx context.Context, after int64) (int64, bool, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id,media_id,kind,filepath,thumbnail_path FROM media_file WHERE id>? AND kind IN ('image','video','unknown') ORDER BY id LIMIT 128`, after)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,media_id,kind,filepath,thumbnail_path FROM media_file WHERE id>? AND kind IN ('image','video','audio','unknown') ORDER BY id LIMIT 128`, after)
 	if err != nil {
 		return after, false, err
 	}

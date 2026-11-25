@@ -1,0 +1,169 @@
+Source: dict/builder.go
+// Copyright 2023+ Klaus Post. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: flate/deflate.go, flate/deflate_test.go
+// Copyright 2009 The Go Authors. All rights reserved.
+// Copyright (c) 2015 Klaus Post
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: flate/dict_decoder.go, flate/dict_decoder_test.go, flate/example_test.go, flate/huffman_bit_writer_test.go, gzip/example_test.go
+// Copyright 2016 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: flate/fast_encoder.go
+// Copyright 2011 The Snappy-Go Authors. All rights reserved.
+// Modified for deflate by Klaus Post (c) 2015.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: flate/flate_test.go, flate/huffman_bit_writer.go, flate/huffman_code.go, flate/huffman_sortByFreq.go, flate/huffman_sortByLiteral.go, flate/inflate.go, flate/token.go, gzip/gunzip.go, gzip/gunzip_test.go, zlib/reader.go, zlib/reader_test.go, zlib/writer.go, zlib/writer_test.go
+// Copyright 2009 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: flate/inflate_test.go
+// Copyright 2014 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: flate/matchlen_generic.go, zstd/enc_jobs_test.go, zstd/matchlen_amd64.go, zstd/matchlen_generic.go, zstd/race_enabled_test.go, zstd/zip.go, zstd/zstd_test.go
+// Copyright 2019+ Klaus Post. All rights reserved.
+// License information can be found in the LICENSE file.
+
+Source: flate/reader_test.go, flate/writer_test.go, zip/example_test.go, zlib/example_test.go
+// Copyright 2012 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: fse/bitreader.go, fse/bitwriter.go, fse/bytereader.go, fse/compress.go, fse/fse.go, fse/fse_test.go, huff0/bitreader.go, huff0/bitwriter.go, zstd/bitwriter.go
+// Copyright 2018 Klaus Post. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+// Based on work Copyright (c) 2013, Yann Collet, released under BSD License.
+
+Source: gzhttp/asserts_test.go, gzhttp/examples_test.go, gzhttp/transport.go, gzhttp/transport_test.go
+// Copyright (c) 2021 Klaus Post. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: gzip/gzip.go, gzip/gzip_test.go, zip/reader.go, zip/reader_test.go, zip/register.go, zip/struct.go
+// Copyright 2010 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: internal/fuzz/helpers.go
+// Copyright (c) 2024+ Klaus Post. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: internal/godebug/godebug.go, zip/fuzz_test.go
+// Copyright 2021 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: internal/race/norace.go, internal/race/race.go
+// Copyright 2015 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: internal/snapref/decode.go, internal/snapref/encode.go, internal/snapref/snappy.go, snappy/decode.go, snappy/encode.go, snappy/snappy.go, snappy/snappy_test.go
+// Copyright 2011 The Snappy-Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: internal/snapref/decode_other.go, internal/snapref/encode_other.go
+// Copyright 2016 The Snappy-Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: s2/decode.go, s2/encode.go, s2/s2.go, s2/s2_test.go
+// Copyright 2011 The Snappy-Go Authors. All rights reserved.
+// Copyright (c) 2019 Klaus Post. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: s2/decode_amd64.s
+// Copyright 2016 The Go Authors. All rights reserved.
+// Copyright (c) 2019 Klaus Post. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: s2/decode_arm64.s
+// Copyright 2020 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: s2/decode_asm.go, s2/decode_other.go, s2/encode_all.go, s2/encode_best.go, s2/encode_better.go
+// Copyright 2016 The Snappy-Go Authors. All rights reserved.
+// Copyright (c) 2019 Klaus Post. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: s2/decode_test.go, s2/encode_test.go
+// Copyright (c) 2019 Klaus Post. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: s2/dict.go, s2/index.go
+// Copyright (c) 2022+ Klaus Post. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: s2/dict_test.go, s2/examples_test.go
+// Copyright (c) 2023+ Klaus Post. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: s2/examples_test.go
+	// Create a dictionary.
+	// Assume that files start with "// Copyright (c) 2023".
+	// Search for the longest match for that.
+	// This may save a few bytes.
+
+Source: s2/lz4convert.go, s2/lz4convert_test.go, s2/lz4sconvert.go
+// Copyright (c) 2022 Klaus Post. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: s2/lz4sconvert_test.go
+// Copyright (c) 2023 Klaus Post. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: s2/reader.go, s2/writer.go
+// Copyright 2011 The Snappy-Go Authors. All rights reserved.
+// Copyright (c) 2019+ Klaus Post. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: s2/reader_test.go, s2/writer_test.go
+// Copyright (c) 2019+ Klaus Post. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: zip/internal/obscuretestdata/obscuretestdata.go
+// Copyright 2019 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: zip/writer.go, zip/writer_test.go, zip/zip_test.go
+// Copyright 2011 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: zstd/bitreader.go, zstd/blockdec.go, zstd/blockenc.go, zstd/bytebuf.go, zstd/bytereader.go, zstd/decoder.go, zstd/decoder_options.go, zstd/decoder_test.go, zstd/encoder.go, zstd/encoder_test.go, zstd/enc_best.go, zstd/enc_better.go, zstd/enc_dfast.go, zstd/enc_fast.go, zstd/enc_jobs.go, zstd/framedec.go, zstd/frameenc.go, zstd/fse_decoder.go, zstd/fse_encoder.go, zstd/fse_predefined.go, zstd/hash.go, zstd/history.go, zstd/seqdec.go, zstd/seqenc.go, zstd/snappy.go
+// Copyright 2019+ Klaus Post. All rights reserved.
+// License information can be found in the LICENSE file.
+// Based on work by Yann Collet, released under BSD License.
+
+Source: zstd/decodeheader.go
+// Copyright 2020+ Klaus Post. All rights reserved.
+// License information can be found in the LICENSE file.
+
+Source: zstd/simple_go124.go, zstd/simple_go124_test.go
+// Copyright 2025+ Klaus Post. All rights reserved.
+// License information can be found in the LICENSE file.

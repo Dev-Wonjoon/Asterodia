@@ -21,9 +21,9 @@ export function formatTime(value) {
 }
 
 // Shared by the desktop WebView and the browser. Owns all listeners and timers.
-export function mountVideoPlayer(host, { src, title = translate("media.videoTitle"), poster, onError, keyboardSeek = true } = {}) {
+export function mountVideoPlayer(host, { src, kind = 'video', title = translate("media.videoTitle"), poster, onError, keyboardSeek = true } = {}) {
     const doc = host.ownerDocument, root = doc.createElement('section');
-    root.className = 'sb-player'; bindAttribute(root, 'aria-label', () => title + translate("player.player")); root.tabIndex = 0;
+    root.className = 'sb-player' + (kind === 'audio' ? ' sbp-audio' : ''); bindAttribute(root, 'aria-label', () => title + translate("player.player")); root.tabIndex = 0;
     const node = (tag, className, text) => { const el = doc.createElement(tag); if (className) el.className = className; if (typeof text === 'function') bindText(el, text); else if (text) bindText(el, () => text); return el; };
     const listeners = [];
     const on = (el, event, fn, options) => { el.addEventListener(event, fn, options); listeners.push(() => el.removeEventListener(event, fn, options)); };
@@ -37,11 +37,19 @@ export function mountVideoPlayer(host, { src, title = translate("media.videoTitl
         fullscreen: '<path d="M3 9V3h6m6 0h6v6m0 6v6h-6m-6 0H3v-6"/>',
     };
     const icon = (el, name) => { el.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + icons[name] + '</svg>'; };
-    const screen = node('div', 'sbp-screen'), video = node('video');
+    const screen = node('div', 'sbp-screen'), video = node(kind === 'audio' ? 'audio' : 'video');
+    const surface = kind === 'audio' ? node('div', 'sbp-artwork', '♫') : video;
+    if (kind === 'audio') {
+        bindAttribute(surface, 'aria-label', () => title);
+        if (poster) {
+            const artwork = node('img'); artwork.alt = title; artwork.src = poster;
+            on(artwork, 'error', () => artwork.remove(), { once: true }); surface.append(artwork);
+        }
+    }
     const audioPreference = readAudioPreference();
     video.volume = audioPreference.volume; video.muted = audioPreference.muted;
     video.src = src || ''; video.preload = 'none'; video.playsInline = true; video.setAttribute('aria-label', title);
-    if (poster) video.poster = poster;
+    if (poster && kind !== 'audio') video.poster = poster;
     const feedback = node('div', 'sbp-feedback'); feedback.setAttribute('role', 'status'); feedback.setAttribute('aria-live', 'polite');
     const message = node('p', 'sbp-message'); message.hidden = true;
     const overlay = node('div', 'sbp-overlay'), seek = node('input', 'sbp-timeline');
@@ -121,16 +129,16 @@ export function mountVideoPlayer(host, { src, title = translate("media.videoTitl
         try { localStorage.setItem(audioPreferenceKey, JSON.stringify({ volume: video.volume, muted: video.muted })); } catch {}
         sync();
     }
-    function sideAt(x) { const r = video.getBoundingClientRect(); return x < r.left + r.width / 2 ? -1 : 1; }
-    on(video, 'click', event => {
+    function sideAt(x) { const r = surface.getBoundingClientRect(); return x < r.left + r.width / 2 ? -1 : 1; }
+    on(surface, 'click', event => {
         if (performance.now() - lastTouch < 700 || event.detail > 1) return;
         root.focus({ preventScroll: true });
         clearTimeout(clickTimer); clickTimer = setTimeout(togglePlay, 500);
     });
-    on(video, 'dblclick', event => { event.preventDefault(); if (performance.now() - lastTouch < 700) return; clearTimeout(clickTimer); jump(sideAt(event.clientX) * seconds); });
+    on(surface, 'dblclick', event => { event.preventDefault(); if (performance.now() - lastTouch < 700) return; clearTimeout(clickTimer); jump(sideAt(event.clientX) * seconds); });
     // Pointer gestures avoid synthetic click/dblclick duplication on touch screens.
-    on(video, 'pointerdown', event => { if (event.pointerType === 'touch' && event.isPrimary !== false) { lastTouch = performance.now(); touchStart = { id: event.pointerId, x: event.clientX, y: event.clientY, at: lastTouch }; } });
-    on(video, 'pointerup', event => {
+    on(surface, 'pointerdown', event => { if (event.pointerType === 'touch' && event.isPrimary !== false) { lastTouch = performance.now(); touchStart = { id: event.pointerId, x: event.clientX, y: event.clientY, at: lastTouch }; } });
+    on(surface, 'pointerup', event => {
         if (event.pointerType !== 'touch' || !touchStart || touchStart.id !== event.pointerId) return;
         const now = performance.now(), start = touchStart; touchStart = null; lastTouch = now;
         if (now - start.at > 350 || Math.hypot(event.clientX - start.x, event.clientY - start.y) > 20) { lastTap = null; return; }
@@ -138,7 +146,7 @@ export function mountVideoPlayer(host, { src, title = translate("media.videoTitl
         if (lastTap && now - lastTap.at <= 300 && lastTap.side === side) { clearTimeout(clickTimer); lastTap = null; jump(side * seconds); }
         else { clearTimeout(clickTimer); lastTap = { at: now, side }; clickTimer = setTimeout(() => { lastTap = null; togglePlay(); }, 300); }
     });
-    on(video, 'pointercancel', () => { touchStart = null; lastTap = null; clearTimeout(clickTimer); });
+    on(surface, 'pointercancel', () => { touchStart = null; lastTap = null; clearTimeout(clickTimer); });
     on(seek, 'input', () => { if (Number.isFinite(video.duration)) video.currentTime = clamp(Number(seek.value), 0, video.duration); sync(); });
     on(seek, 'pointermove', event => { const r = seek.getBoundingClientRect(); seek.title = formatTime(clamp((event.clientX - r.left) / Math.max(1, r.width), 0, 1) * Number(seek.max)); });
     for (const event of ['loadedmetadata', 'durationchange', 'timeupdate', 'ratechange', 'ended', 'emptied']) on(video, event, sync);
@@ -163,7 +171,7 @@ export function mountVideoPlayer(host, { src, title = translate("media.videoTitl
         if (id === 'player.mute') { video.muted = !video.muted; audioChanged(); }
         if (id === 'player.fullscreen') fullscreen.click();
     }
-    overlay.append(seek, controls); screen.append(video, feedback, message, overlay, settings); root.append(screen, jumps); host.append(root); sync(); wake();
+    overlay.append(seek, controls); if (surface !== video) screen.append(surface); screen.append(video, feedback, message, overlay, settings); root.append(screen, jumps); host.append(root); sync(); wake();
     const stopLanguage = localizeWidget(root);
     return { video, root, keyboardAction, destroy() { stopLanguage(); destroyed = true; leaveExpanded(); clearTimeout(clickTimer); clearTimeout(hideTimer); clearTimeout(feedbackTimer); listeners.forEach(remove => remove()); if (doc.fullscreenElement === root) doc.exitFullscreen()?.catch(() => {}); video.pause(); video.removeAttribute('src'); video.load(); root.remove(); } };
 }

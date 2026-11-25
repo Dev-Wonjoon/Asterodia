@@ -479,7 +479,7 @@ func TestStartupBackfillsLegacyImagesAndDanglingThumbnail(t *testing.T) {
 	}
 }
 
-func TestExistingThumbnailsAndUnsupportedAudioStayUnchanged(t *testing.T) {
+func TestExistingThumbnailsAndUnsupportedFilesStayUnchanged(t *testing.T) {
 	f := newFixture(t, "")
 	path := filepath.Join(f.root, "healthy.png")
 	writeImage(t, path)
@@ -493,7 +493,10 @@ func TestExistingThumbnailsAndUnsupportedAudioStayUnchanged(t *testing.T) {
 	if ok(t, f.service.Get(t.Context(), req)).(thumbnail.Status).State != "registered" {
 		t.Fatal("기존 썸네일 미유지")
 	}
-	for _, item := range []thumbnail.Request{audio, other} {
+	if ok(t, f.service.Get(t.Context(), audio)).(thumbnail.Status).State == "unsupported" {
+		t.Fatal("오디오 표지 생성을 지원해야 합니다")
+	}
+	for _, item := range []thumbnail.Request{other} {
 		if ok(t, f.service.Get(t.Context(), item)).(thumbnail.Status).State != "unsupported" {
 			t.Fatal(item)
 		}
@@ -502,6 +505,82 @@ func TestExistingThumbnailsAndUnsupportedAudioStayUnchanged(t *testing.T) {
 	must(t, err)
 	if sha256.Sum256(before) != sha256.Sum256(after) {
 		t.Fatal("기존 썸네일 변경")
+	}
+}
+
+func TestAudioArtwork(t *testing.T) {
+	ffmpeg := os.Getenv("STORAGEBUCKET_TEST_FFMPEG_EXE")
+	if !filepath.IsAbs(ffmpeg) {
+		t.Fatal("실제 FFmpeg 절대 경로가 필요합니다")
+	}
+	for _, kind := range []string{"embedded", "cached", "default"} {
+		t.Run(kind, func(t *testing.T) {
+			f := newFixture(t, ffmpeg)
+			run := func(args ...string) {
+				t.Helper()
+				result, err := new(engine.ProcessRunner).Run(t.Context(), engine.ProcessRequest{Executable: ffmpeg, Directory: f.root, Timeout: 30 * time.Second, Arguments: args})
+				if err != nil {
+					t.Fatalf("오디오 소스 생성: %v %s", err, result.Stderr)
+				}
+			}
+			original := filepath.Join(f.root, "song.mp3")
+			run("-nostdin", "-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=0.3", "-c:a", "libmp3lame", original)
+			if kind == "embedded" {
+				cover := filepath.Join(f.root, "cover.png")
+				writeImage(t, cover)
+				withCover := filepath.Join(f.root, "with-cover.mp3")
+				run("-nostdin", "-loglevel", "error", "-i", original, "-i", cover, "-map", "0:a", "-map", "1:v", "-c", "copy", "-id3v2_version", "3", "-disposition:v", "attached_pic", withCover)
+				original = withCover
+			}
+			before, err := os.ReadFile(original)
+			must(t, err)
+			req := seed(t, f.db, original, "audio", nil)
+			var oldCache string
+			if kind == "cached" {
+				url := "https://example.invalid/song"
+				previewJob(t, f, url, "audio-job", req.MediaID)
+				oldCache = cachedPreview(t, f, url)
+			}
+			f.service.ConfigurePreview(func(context.Context, string, string) (json.RawMessage, error) {
+				t.Error("오디오 표지 생성 중 불필요한 웹 조회")
+				return nil, nil
+			})
+			must(t, f.service.Start(t.Context()))
+			wait(t, f, req, "registered")
+			path := thumbnailPath(t, f, req)
+			imageFile, err := os.Open(path)
+			must(t, err)
+			config, err := jpeg.DecodeConfig(imageFile)
+			imageFile.Close()
+			must(t, err)
+			wantWidth, wantHeight := 32, 20
+			if kind == "embedded" {
+				wantWidth, wantHeight = 480, 300
+			}
+			if kind == "default" {
+				wantWidth, wantHeight = 480, 480
+			}
+			if config.Width != wantWidth || config.Height != wantHeight {
+				t.Fatalf("표지 크기: %+v", config)
+			}
+			if oldCache != "" {
+				must(t, os.Remove(oldCache))
+				if path == oldCache {
+					t.Fatal("임시 다운로드 캐시를 그대로 참조했습니다")
+				}
+				thumbnailPath(t, f, req)
+			}
+			after, err := os.ReadFile(original)
+			must(t, err)
+			if sha256.Sum256(before) != sha256.Sum256(after) {
+				t.Fatal("MP3 원본이 변경되었습니다")
+			}
+			var actualKind string
+			must(t, f.db.QueryRow("SELECT kind FROM media_file WHERE id=?", req.FileID).Scan(&actualKind))
+			if actualKind != "audio" {
+				t.Fatal("오디오 파일 종류가 변경되었습니다", actualKind)
+			}
+		})
 	}
 }
 

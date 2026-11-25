@@ -38,6 +38,33 @@ func albumObject(t *testing.T, result api.Result) media.Object {
 }
 func albumTitle(s string) *string { return &s }
 
+func TestGalleryRepresentativeExtensions(t *testing.T) {
+	root := migrationRoot(t)
+	db := latestDB(t, filepath.Join(root, "extensions.db"))
+	catalog := media.NewService(db)
+	addModernMedia(t, db, 1, "https://example.test/video", "영상", filepath.Join(root, "video.MP4"), "video")
+	addModernMedia(t, db, 2, "https://example.test/audio", "노래", filepath.Join(root, "song.mp3"), "audio")
+	execDB(t, db, "UPDATE media_file SET thumbnail_path=?,thumbnail_origin='app_generated',detected_format='mov,mp4,m4a' WHERE id=1", filepath.Join(root, "thumbnail.jpg"))
+	execDB(t, db, "UPDATE media_file SET kind='audio',detected_format=NULL WHERE id=2")
+	video := albumObject(t, catalog.Get(t.Context(), media.GetRequest{MediaID: 1}))
+	if video["extension"] != "MP4" {
+		t.Fatal("썸네일 대신 원본 확장자를 표시해야 합니다", video)
+	}
+	audio := albumObject(t, catalog.Get(t.Context(), media.GetRequest{MediaID: 2}))
+	if audio["extension"] != "MP3" || audio["cover"] != nil {
+		t.Fatal("표지가 없는 오디오의 확장자가 누락됐습니다", audio)
+	}
+	album := albumObject(t, catalog.SaveAlbum(t.Context(), media.AlbumRequest{Title: albumTitle("모음"), AddFileIDs: []int64{1, 2}}))
+	if album["extension"] != "MP4" {
+		t.Fatal(album)
+	}
+	execDB(t, db, "UPDATE user_album SET cover_file_id=2 WHERE media_id=?", album["id"])
+	album = albumObject(t, catalog.Get(t.Context(), media.GetRequest{MediaID: album["id"].(int64)}))
+	if album["extension"] != "MP3" {
+		t.Fatal("사용자 지정 대표 파일 확장자가 아닙니다", album)
+	}
+}
+
 func TestGalleryViewsHideAlbumMembersAndRestoreLastRemovedMembership(t *testing.T) {
 	root := migrationRoot(t)
 	db := latestDB(t, filepath.Join(root, "gallery-visibility.db"))

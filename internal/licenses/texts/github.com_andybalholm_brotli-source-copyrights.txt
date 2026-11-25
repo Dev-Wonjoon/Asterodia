@@ -1,0 +1,64 @@
+Source: backward_references.go, bit_cost.go, bit_reader.go, block_splitter.go, block_splitter_command.go, block_splitter_distance.go, block_splitter_literal.go, cluster.go, cluster_command.go, cluster_distance.go, cluster_literal.go, decode.go, dictionary.go, fast_log.go, huffman.go, platform.go, prefix.go, prefix_dec.go, ringbuffer.go, static_dict.go, static_dict.go, symbol_list.go, utf8_util.go
+/* Copyright 2013 Google Inc. All Rights Reserved.
+
+   Distributed under MIT license.
+   See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
+*/
+
+Source: bitwriter.go, entropy_encode.go, find_match_length.go, h5.go, h6.go, hash_longest_match_quickly.go, write_bits.go
+/* Copyright 2010 Google Inc. All Rights Reserved.
+
+   Distributed under MIT license.
+   See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
+*/
+
+Source: brotli_test.go
+// Copyright 2016 Google Inc. All Rights Reserved.
+//
+// Distributed under MIT license.
+// See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
+
+Source: compress_fragment.go, compress_fragment_two_pass.go, dictionary_hash.go, metablock_command.go, metablock_distance.go, metablock_literal.go, state.go
+/* Copyright 2015 Google Inc. All Rights Reserved.
+
+   Distributed under MIT license.
+   See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
+*/
+
+Source: constants.go, encode.go, h10.go, hash_forgetful_chain.go, memory.go
+/* Copyright 2016 Google Inc. All Rights Reserved.
+
+   Distributed under MIT license.
+   See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
+*/
+
+Source: example_test.go
+// Copyright 2016 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: flate/huffman_bit_writer.go, flate/huffman_code.go, flate/token.go
+// Copyright 2009 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: hash_composite.go, hash_rolling.go
+/* Copyright 2018 Google Inc. All Rights Reserved.
+
+   Distributed under MIT license.
+   See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
+*/
+
+Source: metablock.go
+/* Copyright 2014 Google Inc. All Rights Reserved.
+
+   Distributed under MIT license.
+   See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
+*/
+
+Source: params.go, static_dict_lut.go
+/* Copyright 2017 Google Inc. All Rights Reserved.
+
+   Distributed under MIT license.
+   See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
+*/

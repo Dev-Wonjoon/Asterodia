@@ -11,14 +11,12 @@ export function MediaPlayer({ path, kind, title, poster }: { path: string; kind:
     const host = useRef<HTMLDivElement>(null)
     useEffect(() => {
         setFailed(false)
-        if (kind !== 'video' || !host.current) return
-        const player = mountVideoPlayer(host.current, { src, title, poster: toMediaUrl(poster), onError: () => setFailed(true) })
+        if (!host.current) return
+        const player = mountVideoPlayer(host.current, { src, kind, title, poster: toMediaUrl(poster), onError: () => setFailed(true) })
         return () => player.destroy()
     }, [src, kind, title, poster])
     return <div className="space-y-2">
-        {kind === 'video'
-            ? <div ref={host} />
-            : <audio aria-label={title} className="w-full" src={src} controls preload="none" onError={() => setFailed(true)} />}
+        <div ref={host} />
         {failed && <p role="alert" className="text-xs text-amber-500">{translate("common.thisFileCannotPlayInTheCurrentEnvironmentIt")}</p>}
     </div>
 }

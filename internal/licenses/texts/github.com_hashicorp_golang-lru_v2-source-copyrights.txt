@@ -1,0 +1,8 @@
+Source: 2q.go, 2q_test.go, doc.go, expirable/expirable_lru.go, expirable/expirable_lru_test.go, lru.go, lru_test.go, simplelru/lru.go, simplelru/lru_interface.go, simplelru/lru_test.go, testing_test.go
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
+Source: internal/list.go
+// Copyright 2009 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE_list file.

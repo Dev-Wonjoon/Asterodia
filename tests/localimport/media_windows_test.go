@@ -76,10 +76,10 @@ func TestNativeImageVideoAudioImport(t *testing.T) {
 		t.Fatalf("미디어 등록: %+v %+v", p.Job.Counts, p.Folders)
 	}
 	deadline := time.Now().Add(30 * time.Second)
-	for updates.Load() < int32(want-2) && time.Now().Before(deadline) {
+	for updates.Load() < int32(want) && time.Now().Before(deadline) {
 		time.Sleep(20 * time.Millisecond)
 	}
-	if n := count(t, f, "SELECT count(*) FROM media_file WHERE kind IN ('image','video') AND thumbnail_path IS NOT NULL"); n != int64(want-2) {
+	if n := count(t, f, "SELECT count(*) FROM media_file WHERE kind IN ('image','video','audio') AND thumbnail_path IS NOT NULL"); n != int64(want) {
 		rows, _ := f.db.Query("SELECT last_error FROM maintenance_task WHERE state='failed'")
 		if rows != nil {
 			defer rows.Close()
@@ -89,7 +89,7 @@ func TestNativeImageVideoAudioImport(t *testing.T) {
 				t.Log(err)
 			}
 		}
-		t.Fatalf("표시용 캐시 생성: %d/%d", n, want-2)
+		t.Fatalf("표시용 캐시 생성: %d/%d", n, want)
 	}
 	// Decode failure must not quietly register an extension-only candidate.
 	write(t, filepath.Join(f.source, "broken.mp4"), []byte("not a video"))

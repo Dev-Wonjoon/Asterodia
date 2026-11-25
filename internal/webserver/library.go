@@ -13,6 +13,7 @@ import (
 
 func publicSummary(row map[string]any) map[string]any {
 	result := map[string]any{"id": row["id"], "title": row["title"], "isUserAlbum": row["isUserAlbum"], "fileCount": row["fileCount"], "createdAt": row["createdAt"], "sourceKind": row["sourceKind"], "isFavorite": row["isFavorite"], "revision": row["revision"], "cover": nil}
+	result["extension"] = row["extension"]
 	if cover, ok := row["cover"].(map[string]any); ok {
 		result["cover"] = map[string]any{"fileId": cover["fileId"], "kind": cover["kind"]}
 	}
@@ -26,7 +27,7 @@ func publicSummary(row map[string]any) map[string]any {
 }
 
 func publicFile(file map[string]any) map[string]any {
-	return map[string]any{"id": file["id"], "mediaId": file["mediaId"], "title": file["title"], "kind": file["kind"], "width": file["width"], "height": file["height"], "duration": file["duration"], "detectedFormat": file["detectedFormat"], "filesize": file["filesize"], "createdAt": file["createdAt"]}
+	return map[string]any{"id": file["id"], "mediaId": file["mediaId"], "title": file["title"], "kind": file["kind"], "width": file["width"], "height": file["height"], "duration": file["duration"], "detectedFormat": file["detectedFormat"], "extension": media.FileExtension(file), "filesize": file["filesize"], "createdAt": file["createdAt"]}
 }
 
 func (s *Service) sequence(w http.ResponseWriter, r *http.Request) {

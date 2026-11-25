@@ -4,6 +4,8 @@
 @container sb-player (max-width:440px){.sbp-controls{display:grid;grid-template-columns:26px 26px minmax(0,1fr) 44px 26px 26px;gap:2px}.sb-player .sbp-controls button,.sb-player .sbp-controls select{width:100%;min-width:0;padding:2px 0;font-size:12px}.sbp-time{font-size:10px;letter-spacing:-.2px}.sbp-volume{display:none}.sbp-settings{left:8px;right:8px;font-size:12px}}
 
 .sbp-controls button{display:flex;align-items:center;justify-content:center;flex-shrink:0}.sbp-controls svg{display:block;flex-shrink:0}
+.sbp-audio .sbp-screen>audio{display:none}.sbp-artwork{position:relative;display:grid;place-items:center;width:100%;align-self:stretch;aspect-ratio:16/9;min-height:220px;flex:1;background:linear-gradient(145deg,#243447,#101827);font-size:80px;touch-action:manipulation;cursor:pointer}.sbp-artwork img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding-bottom:80px}.sbp-audio .sbp-overlay{opacity:1;pointer-events:auto}
+.sbv-video .sbp-artwork,.sb-player:fullscreen .sbp-artwork,.sb-player.is-expanded .sbp-artwork{min-height:0;aspect-ratio:auto}
 
 .sb-player{--button-hover-brightness:1.12}
 .sb-player button{transition:filter 120ms ease}

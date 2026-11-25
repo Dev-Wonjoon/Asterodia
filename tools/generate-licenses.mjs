@@ -20,6 +20,12 @@ const inputs = () => Object.fromEntries(inputFiles.map(file => [file, inputHash(
 const noticeNames = /^(?:(?:licen[cs]e|copying|notice|copyright|authors|patents)([._-]|$)|third[_-]?party.*(?:licen[cs]e|notice))/i
 const entryID = name => name.replace(/[^a-zA-Z0-9._-]/g, '_')
 const moduleLicenses = {
+    'github.com/andybalholm/brotli': 'MIT',
+    'github.com/bodgit/plumbing': 'BSD-3-Clause', 'github.com/bodgit/sevenzip': 'BSD-3-Clause', 'github.com/bodgit/windows': 'BSD-3-Clause',
+    'github.com/hashicorp/golang-lru/v2': 'MPL-2.0',
+    'github.com/klauspost/compress': 'BSD-3-Clause; additional source notices', 'github.com/pierrec/lz4/v4': 'BSD-3-Clause',
+    'github.com/spf13/afero': 'Apache-2.0', 'github.com/stangelandcl/ppmd': 'MIT', 'github.com/ulikunitz/xz': 'BSD-3-Clause',
+    'go4.org': 'Apache-2.0; additional source notices',
     'github.com/nlnwa/whatwg-url': 'Apache-2.0', 'github.com/wailsapp/wails/v3': 'MIT; additional MIT/ISC notices',
     'github.com/adrg/xdg': 'MIT', 'github.com/go-ole/go-ole': 'MIT', 'github.com/dustin/go-humanize': 'MIT',
     'github.com/mattn/go-isatty': 'MIT', 'github.com/ncruces/go-strftime': 'MIT',

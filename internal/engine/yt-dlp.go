@@ -136,8 +136,12 @@ func selectYtdlpFormats(
 	var videoOnly, audioOnly, combined *ytdlpDirectFormat
 	for i := range formats {
 		format := &formats[i]
-		if format.Ext == "m4a" {
-			audioOnly = format
+		if format.VideoCodec == "none" {
+			// MP3 extraction can use any supported audio source. Keep MP4
+			// video merges on M4A to preserve their existing codec selection.
+			if audio || format.Ext == "m4a" {
+				audioOnly = format
+			}
 			continue
 		}
 		if !audio && maxHeight > 0 &&
@@ -439,8 +443,11 @@ func buildYtdlpDownloadInfo(raw json.RawMessage, target YtdlpTarget) (string, er
 		format.raw = decodeMetadata(rawFormat)
 		drm := string(candidate.HasDRM)
 		hasVideo := format.Ext == "mp4" && format.VideoCodec != "none"
-		audioOnly := format.Ext == "m4a" && format.VideoCodec == "none" &&
-			format.AudioCodec != "none"
+		audioOnly := false
+		switch format.Ext {
+		case "m4a", "mp4", "webm", "opus", "mp3", "ogg", "oga", "wav", "flac", "aac":
+			audioOnly = format.VideoCodec == "none" && format.AudioCodec != "none"
+		}
 
 		if format.ID == "" || (!hasVideo && !audioOnly) ||
 			(drm != "" && drm != "null" && drm != "false") {

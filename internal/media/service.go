@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -173,7 +174,7 @@ func summary(ctx context.Context, q queryer, id int64) (Object, error) {
 		obj["parentId"] = parent.Int64
 	}
 	obj["childAlbumCount"] = children
-	covers, err := objects(ctx, q, `SELECT f.id AS fileId,coalesce(f.thumbnail_path,f.preview_path,CASE WHEN f.kind='image' THEN f.filepath END) AS path,f.kind FROM media_file f WHERE f.media_id=? OR f.id IN (SELECT file_id FROM user_album_file WHERE album_id=?) ORDER BY CASE WHEN f.id=coalesce((SELECT cover_file_id FROM user_album WHERE media_id=?),(SELECT cover_file_id FROM media WHERE id=?)) THEN 0 ELSE 1 END,CASE WHEN f.thumbnail_path IS NOT NULL OR f.kind='image' THEN 0 ELSE 1 END,coalesce((SELECT position FROM user_album_file WHERE album_id=? AND file_id=f.id),f.position),f.id LIMIT 1`, id, id, id, id, id)
+	covers, err := objects(ctx, q, `SELECT f.id AS fileId,coalesce(f.thumbnail_path,f.preview_path,CASE WHEN f.kind='image' THEN f.filepath END) AS path,f.kind,f.filepath,f.detected_format AS detectedFormat FROM media_file f WHERE f.media_id=? OR f.id IN (SELECT file_id FROM user_album_file WHERE album_id=?) ORDER BY CASE WHEN f.id=coalesce((SELECT cover_file_id FROM user_album WHERE media_id=?),(SELECT cover_file_id FROM media WHERE id=?)) THEN 0 ELSE 1 END,CASE WHEN f.thumbnail_path IS NOT NULL OR f.kind='image' THEN 0 ELSE 1 END,coalesce((SELECT position FROM user_album_file WHERE album_id=? AND file_id=f.id),f.position),f.id LIMIT 1`, id, id, id, id, id)
 	if obj["isUserAlbum"] == true {
 		var cover sql.NullInt64
 		if e := q.QueryRowContext(ctx, "SELECT cover_file_id FROM user_album WHERE media_id=?", id).Scan(&cover); e != nil {
@@ -188,10 +189,27 @@ func summary(ctx context.Context, q queryer, id int64) (Object, error) {
 		return nil, err
 	}
 	obj["cover"] = nil
+	obj["extension"] = ""
+	if len(covers) > 0 {
+		obj["extension"] = FileExtension(covers[0])
+		delete(covers[0], "filepath")
+		delete(covers[0], "detectedFormat")
+	}
 	if len(covers) > 0 && covers[0]["path"] != nil {
 		obj["cover"] = covers[0]
 	}
 	return obj, nil
+}
+
+// FileExtension uses the original file, never its JPEG thumbnail or HTTP route.
+func FileExtension(file Object) string {
+	path, _ := file["filepath"].(string)
+	extension := strings.TrimPrefix(filepath.Ext(path), ".")
+	if extension == "" {
+		format, _ := file["detectedFormat"].(string)
+		extension = strings.TrimPrefix(strings.Split(format, ",")[0], ".")
+	}
+	return strings.ToUpper(extension)
 }
 func pageBounds(limit, offset int) (int, error) {
 	if limit == 0 {

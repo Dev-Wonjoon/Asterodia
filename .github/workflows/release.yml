@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: release-${{ github.ref }}
@@ -38,13 +39,69 @@ jobs:
           }
           "version=$version" >> $env:GITHUB_OUTPUT
           "tag=v$version" >> $env:GITHUB_OUTPUT
+  reuse:
+    name: Find verified CI for tagged commit
+    needs: version
+    runs-on: windows-2025
+    timeout-minutes: 10
+    outputs:
+      run-id: ${{ steps.accept.outputs.run-id }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - id: lookup
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_BRANCH: ${{ github.event.repository.default_branch }}
+        run: ./tools/find-verified-ci.ps1 -Branch $env:CI_BRANCH
+      - id: download
+        if: steps.lookup.outputs.run-id != ''
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: ci-windows-amd64
+          path: .test-data/reused-ci/amd64
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.lookup.outputs.run-id }}
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        if: steps.download.outcome == 'success'
+        with:
+          node-version: '24.22.2'
+      - name: Verify reused amd64 executable and checksum
+        id: validate
+        if: steps.download.outcome == 'success'
+        continue-on-error: true
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ needs.version.outputs.tag }}
+        run: ./tools/verify-release.ps1 -InputDirectory .test-data/reused-ci -OutputDirectory .test-data/reused-ready -Tag $env:RELEASE_TAG -Architectures amd64
+      - id: upload
+        if: steps.validate.outcome == 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          # A separate name lets full CI safely fall back after a failed transfer.
+          name: reused-ci-windows-amd64
+          path: .test-data/reused-ready/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+      - id: accept
+        if: steps.upload.outcome == 'success'
+        shell: pwsh
+        env:
+          VERIFIED_RUN: ${{ steps.lookup.outputs.run-id }}
+        run: '"run-id=$env:VERIFIED_RUN" >> $env:GITHUB_OUTPUT'
   verify:
     name: Verify tagged commit
-    needs: version
+    needs: [version, reuse]
+    if: needs.reuse.outputs.run-id == ''
     uses: ./.github/workflows/ci.yml
   arm64:
     name: Build Windows arm64
-    needs: [version, verify]
+    needs: version
     runs-on: windows-2025
     timeout-minutes: 30
     steps:
@@ -64,7 +121,14 @@ jobs:
           compression-level: 0
   package:
     name: Assemble checked release assets
-    needs: [version, verify, arm64]
+    needs: [version, reuse, verify, arm64]
+    # The verification job is intentionally skipped when successful CI is reused.
+    # Both paths still require successful verification and both architectures.
+    if: >-
+      ${{ !cancelled() && needs.version.result == 'success' &&
+          needs.reuse.result == 'success' && needs.arm64.result == 'success' &&
+          ((needs.reuse.outputs.run-id != '' && needs.verify.result == 'skipped') ||
+           (needs.reuse.outputs.run-id == '' && needs.verify.result == 'success')) }}
     runs-on: windows-2025
     timeout-minutes: 10
     steps:
@@ -76,7 +140,7 @@ jobs:
           node-version: '24.22.2'
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
-          name: ci-windows-amd64
+          name: ${{ needs.reuse.outputs.run-id != '' && 'reused-ci-windows-amd64' || 'ci-windows-amd64' }}
           path: .test-data/release-assets/amd64
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:

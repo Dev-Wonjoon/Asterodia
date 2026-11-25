@@ -2,20 +2,20 @@ package engine
 
 import (
 	"archive/zip"
-
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
 	"io"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
+
+	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
+	"github.com/bodgit/sevenzip"
 )
 
 type Manager struct {
@@ -391,22 +391,86 @@ func extractImageEngine(ctx context.Context, archive, destination, digest string
 	if fmt.Sprintf("%x", hash.Sum(nil)) != digest {
 		return fmt.Errorf("ImageMagick 배포 파일의 SHA-256이 다릅니다")
 	}
+	if err = ctx.Err(); err != nil {
+		return err
+	}
+	// Windows ships different tar versions; some cannot read this 7z archive.
+	// Decode in-process so installation does not depend on OS archive tools.
+	reader, err := sevenzip.OpenReader(archive)
+	if err != nil {
+		return fmt.Errorf("ImageMagick 압축 파일 읽기: %w", err)
+	}
+	defer reader.Close()
+	var total uint64
+	for _, entry := range reader.File {
+		if !filepath.IsLocal(filepath.FromSlash(entry.Name)) || (!entry.FileInfo().IsDir() && !entry.Mode().IsRegular()) {
+			return fmt.Errorf("이미지 엔진 압축 경로가 올바르지 않습니다")
+		}
+		if entry.UncompressedSize > uint64(maxEngineFileSize)-total {
+			return fmt.Errorf("이미지 엔진 압축 해제 크기 제한을 초과했습니다")
+		}
+		total += entry.UncompressedSize
+	}
 	if err = os.MkdirAll(destination, 0700); err != nil {
 		return err
 	}
-	tar := filepath.Join(os.Getenv("SystemRoot"), "System32", "tar.exe")
-	result, err := new(ProcessRunner).Run(ctx, ProcessRequest{Executable: tar, Directory: destination, Timeout: time.Minute, Arguments: []string{"-tf", archive}})
+	root, err := os.OpenRoot(destination)
 	if err != nil {
-		return fmt.Errorf("Windows 압축 도구 확인 실패: %w", err)
+		return err
 	}
-	for _, name := range strings.Split(result.Stdout, "\n") {
-		name = strings.TrimSpace(name)
-		if name != "" && !filepath.IsLocal(filepath.FromSlash(name)) {
-			return fmt.Errorf("이미지 엔진 압축 경로가 올바르지 않습니다")
+	defer root.Close()
+	for _, entry := range reader.File {
+		if err = ctx.Err(); err != nil {
+			return err
+		}
+		name := filepath.FromSlash(entry.Name)
+		if entry.FileInfo().IsDir() {
+			if err = root.MkdirAll(name, 0700); err != nil {
+				return err
+			}
+			continue
+		}
+		if err = root.MkdirAll(filepath.Dir(name), 0700); err != nil {
+			return err
+		}
+		source, err := entry.Open()
+		if err != nil {
+			return fmt.Errorf("ImageMagick 압축 항목 읽기: %w", err)
+		}
+		output, err := root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		if err != nil {
+			source.Close()
+			return err
+		}
+		written, copyErr := io.Copy(output, io.LimitReader(imageArchiveReader{ctx, source}, int64(entry.UncompressedSize)+1))
+		closeErr := output.Close()
+		readErr := source.Close()
+		if copyErr != nil {
+			return fmt.Errorf("ImageMagick 압축 해제: %w", copyErr)
+		}
+		if closeErr != nil {
+			return closeErr
+		}
+		if readErr != nil {
+			return readErr
+		}
+		if uint64(written) != entry.UncompressedSize {
+			return fmt.Errorf("ImageMagick 압축 항목의 크기가 다릅니다")
 		}
 	}
-	_, err = new(ProcessRunner).Run(ctx, ProcessRequest{Executable: tar, Directory: destination, Timeout: time.Minute, Arguments: []string{"-xf", archive, "-C", destination}})
-	return err
+	return ctx.Err()
+}
+
+type imageArchiveReader struct {
+	ctx context.Context
+	io.Reader
+}
+
+func (r imageArchiveReader) Read(p []byte) (int, error) {
+	if err := r.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return r.Reader.Read(p)
 }
 
 func downloadEngineAsset(

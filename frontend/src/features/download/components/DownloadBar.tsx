@@ -25,6 +25,7 @@ export function DownloadBar(): React.JSX.Element {
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [preview, setPreview] = useState<EnginePreview | null>(null)
     const pending = useRef(false)
+    const optionsRef = useRef<HTMLDetailsElement>(null)
     const [options, setOptions] = useState<DownloadJobOptions>({ type: 'video', quality: 'best', playlist: false })
 
     const { startDownload, previewEngine, ready, halted } =
@@ -33,6 +34,29 @@ export function DownloadBar(): React.JSX.Element {
     const currentURL = url.trim()
     const optionsKey = JSON.stringify(options)
     const currentPreview = preview?.url === currentURL && preview.optionsKey === optionsKey ? preview : null
+
+    useEffect(() => {
+        const closeOptions = (): void => {
+            if (optionsRef.current) optionsRef.current.open = false
+        }
+        const handleOutsidePointer = (event: PointerEvent): void => {
+            if (event.target instanceof Node && !optionsRef.current?.contains(event.target)) closeOptions()
+        }
+        const handleKeyDown = (event: KeyboardEvent): void => {
+            if (event.key === 'Escape' && optionsRef.current?.open) {
+                closeOptions()
+                optionsRef.current.querySelector('summary')?.focus()
+            }
+        }
+        document.addEventListener('pointerdown', handleOutsidePointer, true)
+        document.addEventListener('keydown', handleKeyDown)
+        window.addEventListener('blur', closeOptions)
+        return () => {
+            document.removeEventListener('pointerdown', handleOutsidePointer, true)
+            document.removeEventListener('keydown', handleKeyDown)
+            window.removeEventListener('blur', closeOptions)
+        }
+    }, [])
 
     useEffect(() => {
         if (!currentURL) return
@@ -99,8 +123,6 @@ export function DownloadBar(): React.JSX.Element {
 
         event.preventDefault()
         setUrl(text)
-
-        if (ready && !halted) void submit(text)
     }
 
     const previewText = currentURL
@@ -113,9 +135,9 @@ export function DownloadBar(): React.JSX.Element {
             onSubmit={handleSubmit}
             className="relative mx-auto flex w-full max-w-4xl gap-3"
         >
-            <details className="shrink-0">
+            <details ref={optionsRef} className="shrink-0">
                 <summary className="cursor-pointer rounded-xl border border-[var(--border-line)] px-3 py-2.5 text-sm" aria-label={translate("download.downloadOptions")}>{translate("download.options")}</summary>
-                <div className="absolute left-0 top-full z-30 mt-2 w-64 space-y-3 rounded-xl border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-4 shadow-xl">
+                <div className="absolute left-0 top-full z-30 mt-2 max-h-[calc(100dvh-6rem)] w-64 space-y-3 overflow-y-auto rounded-xl border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-4 shadow-xl">
                     <p className="text-xs text-[var(--text-muted)]">{translate("download.instagramSavesPhotosAndVideosTogetherInTheirOriginal")}</p>
                     <label className="block text-sm">{translate("download.type")}<select aria-label={translate("download.downloadType")} value={options.type} onChange={(event) => {
                             const audio = event.target.value === 'audio'

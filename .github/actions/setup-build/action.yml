@@ -42,6 +42,14 @@ runs:
         if ($LASTEXITCODE -ne 0) { throw 'Version synchronization failed.' }
         wails3 generate bindings -ts -i
         if ($LASTEXITCODE -ne 0) { throw 'Wails bindings generation failed.' }
+    - name: Restore media test tool downloads
+      if: inputs.test-tools == 'true'
+      uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with:
+        # Cache archives only; setup-ci-tools still checks every SHA-256 and
+        # extracts fresh tools before use, including on cache hits.
+        path: .test-data/ci-tools/downloads
+        key: media-test-tools-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/ci-tools.json') }}
     - name: Install verified media test tools
       if: inputs.test-tools == 'true'
       shell: pwsh

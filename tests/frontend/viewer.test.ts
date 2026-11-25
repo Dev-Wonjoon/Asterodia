@@ -46,7 +46,7 @@ it('seeks video with J and L, retains arrow file navigation, and protects contro
     const slider = document.querySelector<HTMLInputElement>('.sbp-timeline')!
     send(slider, 'ArrowRight'); await flush(); expect(getFile).toHaveBeenCalledTimes(1)
     send(video, 'ArrowRight'); await flush(); expect(getFile).toHaveBeenLastCalledWith(2)
-    const audio = document.querySelector('audio')!; audio.currentTime = 15
+    const audio = document.querySelector('audio')!; Object.defineProperty(audio, 'duration', { value: 100, configurable: true }); audio.currentTime = 15
     send(audio, 'j'); expect(audio.currentTime).toBe(10)
 })
 it('opens only the current file, navigates video and audio with arrows, and stops on close', async () => {
@@ -78,4 +78,37 @@ it('ignores late file responses after closing and offers retry for a read failur
     await flush(); viewer.destroy(); pending.resolve({ id: 1, kind: 'video' }); await flush(); expect(document.querySelector('video')).toBeNull()
     viewer = mountMediaViewer({ mediaId: 9, getSequence: async () => ({ ids: [1], title: '앨범' }), getFile: vi.fn().mockRejectedValueOnce(new Error('시험 오류')).mockResolvedValue({ id: 1, kind: 'image' }), contentURL: () => '/file', previewURL: () => null, thumbnailURL: () => null })
     await flush(); expect(document.querySelector('.sbv-status')?.textContent).toBe('시험 오류'); button('다시 시도').click(); await flush(); expect(document.querySelector('.sbv-image')).not.toBeNull()
+})
+
+it.each(['video', 'audio'])('starts the first %s immediately on opening, using the custom player', async kind => {
+    viewer = mountMediaViewer({ mediaId: 9, getSequence: async () => ({ ids: [7], title: '앨범' }),
+        getFile: async () => ({ id: 7, title: '노래', kind }),
+        contentURL: () => '/file', previewURL: () => null, thumbnailURL: () => '/cover.jpg' })
+    await flush()
+    const media = document.querySelector<HTMLMediaElement>(kind)!
+    expect(media.play).toHaveBeenCalledOnce()
+    expect(media.controls).toBe(false)
+    expect(document.querySelector('.sb-player .sbp-controls')).not.toBeNull()
+    if (kind === 'audio') {
+        expect(document.querySelector('.sbp-artwork img')?.getAttribute('src')).toBe('/cover.jpg')
+        expect(document.querySelector('video')).toBeNull()
+    }
+})
+
+it('leaves controls available when initial playback is rejected and ignores a late rejection from an old file', async () => {
+    const rejected = deferred<void>()
+    vi.mocked(HTMLMediaElement.prototype.play).mockReturnValueOnce(rejected.promise)
+    setup(); await flush()
+    button('다음 →').click(); await flush()
+    const status = document.querySelector('.sbv-status')!.textContent
+    rejected.reject(new Error('blocked')); await flush()
+    expect(document.querySelector('.sbv-status')!.textContent).toBe(status)
+    expect(document.querySelector('.sbp-controls button[aria-label="재생"]')).not.toBeNull()
+})
+
+it('offers the custom play control if the browser rejects autoplay', async () => {
+    vi.mocked(HTMLMediaElement.prototype.play).mockRejectedValueOnce(new Error('NotAllowedError'))
+    setup(); await flush()
+    expect(document.querySelector('.sbv-status')!.textContent).toBe('재생 버튼을 눌러 시작해 주세요.')
+    expect(document.querySelector('.sbp-controls button[aria-label="재생"]')).not.toBeNull()
 })

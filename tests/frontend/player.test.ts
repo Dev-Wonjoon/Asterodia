@@ -117,3 +117,20 @@ it('keeps volume controls usable when preference storage is unavailable',()=>{
  expect(()=>changeVolume('0.25')).not.toThrow();expect(video.volume).toBe(.25)
  expect(()=>button('음소거').click()).not.toThrow();expect(video.muted).toBe(true)
 })
+
+it('plays audio with artwork and the same seek, speed, volume and keyboard controls', async () => {
+ player=mountVideoPlayer(document.body,{src:'/song.mp3',kind:'audio',title:'노래',poster:'/cover.jpg'})
+ const audio=document.querySelector('audio')!
+ expect(document.querySelector('video')).toBeNull();expect(audio.controls).toBe(false)
+ expect(document.querySelector('.sbp-artwork img')?.getAttribute('src')).toBe('/cover.jpg')
+ Object.defineProperty(audio,'duration',{value:180,configurable:true});audio.dispatchEvent(new Event('loadedmetadata'))
+ button('재생').click();expect(audio.play).toHaveBeenCalledOnce()
+ audio.currentTime=45;button('+10초 이동').click();expect(audio.currentTime).toBe(55)
+ const rate=document.querySelector<HTMLSelectElement>('.sbp-rate')!;rate.value='1.5';rate.dispatchEvent(new Event('change'));expect(audio.playbackRate).toBe(1.5)
+ changeVolume('0.35');expect(audio.volume).toBe(.35)
+ player.root.dispatchEvent(new KeyboardEvent('keydown',{key:'j',bubbles:true}));expect(audio.currentTime).toBe(50)
+ document.querySelector('img')!.dispatchEvent(new Event('error'));expect(document.querySelector('.sbp-artwork')!.textContent).toBe('♫')
+ const surface=document.querySelector('.sbp-artwork')!;surface.dispatchEvent(new MouseEvent('click',{detail:1}));await vi.advanceTimersByTimeAsync(600)
+ expect(audio.play).toHaveBeenCalledTimes(2)
+ player.destroy();player=undefined;expect(audio.getAttribute('src')).toBeNull()
+})

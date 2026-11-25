@@ -35,19 +35,19 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Version resources are inconsistent.' }
           "version=$version" >> $env:GITHUB_OUTPUT
           ./tests/packaging/verify-release.test.ps1
-      - name: Frontend tests and build
+          ./tests/packaging/find-verified-ci.test.ps1
+      - name: Frontend tests
         shell: pwsh
         run: |
           npm --prefix frontend test -- --reporter=dot
           if ($LASTEXITCODE -ne 0) { throw 'Frontend tests failed.' }
-          npm --prefix frontend run build
-          if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
-      - name: Go tests and static analysis
-        shell: pwsh
-        run: ./tests/run-go-tests.ps1
-      - name: Build verified Windows amd64 executable
+      # Wails builds both frontend bundles once, before Go tests embed them.
+      - name: Build Windows amd64 executable and frontend
         shell: pwsh
         run: ./tools/prepare-release.ps1 -Arch amd64
+      - name: Go tests and static analysis
+        shell: pwsh
+        run: ./tests/run-go-tests.ps1 -Jobs 2
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ci-windows-amd64

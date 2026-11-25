@@ -2,7 +2,7 @@ import { getLocale, translate, useLanguage } from '@renderer/shared/i18n'
 import type { DragEvent, MouseEvent, ReactNode } from 'react'
 import type { MediaSummaryDto } from '@contracts/media-v2'
 import { MediaPreview } from '@renderer/shared/components/media/MediaPreview'
-import { Pin } from 'lucide-react'
+import { Music2, Pin } from 'lucide-react'
 
 export const galleryGridClass = 'gallery-grid grid items-start gap-4'
 
@@ -31,6 +31,12 @@ export function GalleryCard({ media, previewPath, resolveUrl, selected, active, 
 }) {
     useLanguage()
     const title = media.galleryFile?.title || media.title
+    const filename = (media.galleryFile?.relativePath || media.galleryFile?.filepath || '').split(/[\\/]/).pop() ?? ''
+    const extensionIndex = filename.lastIndexOf('.')
+    const extension = (media.galleryFile
+        ? media.galleryFile.extension || (extensionIndex > 0 ? filename.slice(extensionIndex + 1) : media.galleryFile.detectedFormat)
+        : media.extension)?.toUpperCase() || '—'
+    const isAudio = media.galleryFile?.kind === 'audio' || (!media.galleryFile && (media.cover?.kind === 'audio' || extension === 'MP3'))
     const draggable = Boolean(onAlbumDragStart) && !viewDisabled && media.fileCount > 0
     function openCardMenu(card: HTMLElement): boolean {
         const trigger = card.querySelector<HTMLButtonElement>('[data-card-menu]')
@@ -77,7 +83,8 @@ export function GalleryCard({ media, previewPath, resolveUrl, selected, active, 
         {media.isPinned && <span title={translate("gallery.pinned")} aria-label={translate("gallery.pinned")} className="pointer-events-none absolute left-2 top-2 z-10 flex size-7 items-center justify-center rounded bg-[var(--bg-sidebar)] text-[var(--color-primary)] shadow-sm"><Pin className="size-4" fill="currentColor" aria-hidden="true" /></span>}
         <button type="button" data-card-select data-card-focus disabled={viewDisabled || (!onSelect && !onOpen && media.fileCount === 0)} aria-label={onOpen ? translate('explorer.openAlbum', { name: title }) : title + (onSelect ? translate("gallery.selectDoubleClickToView") : translate("gallery.view"))} onClick={event => { if (!onSelect || event.detail === 0 && !event.ctrlKey && !event.shiftKey && !event.metaKey) (onOpen ?? onView)(); else if (event.detail < 2) onSelect(event) }}
             className="block w-full overflow-hidden rounded-t-xl text-left disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]">
-            <MediaPreview draggable={false} path={previewPath} resolveUrl={resolveUrl} title={media.title} className="aspect-video w-full bg-[var(--bg-active)] object-cover" />
+            <MediaPreview draggable={false} path={previewPath} resolveUrl={resolveUrl} title={media.title} className="aspect-video w-full bg-[var(--bg-active)] object-cover"
+                fallback={isAudio ? <div className="flex aspect-video w-full items-center justify-center bg-[var(--bg-active)] text-[var(--text-muted)]" aria-label={translate('media.audio')}><Music2 className="size-12" aria-hidden="true" /></div> : undefined} />
         </button>
         <div className="space-y-1 p-3">
             <h2 className="truncate font-medium"><button type="button" data-card-select aria-label={title + translate("gallery.suffix.details")} disabled={onSelect ? viewDisabled : disabled} onClick={event => { if (!onSelect || event.detail === 0 && !event.ctrlKey && !event.shiftKey && !event.metaKey) onDetails(); else if (event.detail < 2) onSelect(event) }}
@@ -87,7 +94,10 @@ export function GalleryCard({ media, previewPath, resolveUrl, selected, active, 
             </span><span className="min-w-0 truncate" title={media.galleryFile ? `${media.title} · ${(media.galleryFileOffset ?? 0) + 1} / ${media.fileCount}` : undefined}>
                 {media.galleryFile ? `${media.title} · ${(media.galleryFileOffset ?? 0) + 1} / ${media.fileCount}` : '· ' + translate("gallery.files.count", { count: media.fileCount })}
             </span></p>
-            <p className="text-xs text-[var(--text-muted)]">{new Date(media.createdAt).toLocaleDateString(getLocale())}</p>
+            <p className="flex min-w-0 items-center justify-between gap-2 text-xs text-[var(--text-muted)]">
+                <span className="min-w-0 truncate">{extension}</span>
+                <span className="shrink-0">{new Date(media.createdAt).toLocaleDateString(getLocale())}</span>
+            </p>
         </div>
         {children}
     </article>

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"image"
+	"image/color"
 	_ "image/gif"
 	"image/jpeg"
 	_ "image/png"
@@ -19,6 +20,8 @@ import (
 
 	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"golang.org/x/image/draw"
+	"golang.org/x/image/vector"
 )
 
 type Request struct {
@@ -160,7 +163,7 @@ func (s *Service) schedule(ctx context.Context, req Request) error {
 
 //wails:ignore
 func (s *Service) ScheduleMedia(mediaID int64) {
-	rows, err := s.db.Query("SELECT id,kind,filepath,thumbnail_path FROM media_file WHERE media_id=? AND kind IN ('image','video','unknown')", mediaID)
+	rows, err := s.db.Query("SELECT id,kind,filepath,thumbnail_path FROM media_file WHERE media_id=? AND kind IN ('image','video','audio','unknown')", mediaID)
 	if err != nil {
 		return
 	}
@@ -365,6 +368,10 @@ func (s *Service) generate(ctx context.Context, req Request) error {
 		if closeErr != nil {
 			return closeErr
 		}
+	case "audio":
+		if err = s.audioArtwork(ctx, req.FileID, path, tmp); err != nil {
+			return err
+		}
 	case "video":
 		_, err = new(engine.ProcessRunner).Run(ctx, engine.ProcessRequest{Executable: s.ffmpeg, Directory: s.cache, Timeout: time.Minute, Arguments: []string{"-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-protocol_whitelist", "file,pipe", "-i", path, "-frames:v", "1", "-vf", "scale=480:480:force_original_aspect_ratio=decrease", "-update", "1", tmp}})
 		if err != nil {
@@ -413,6 +420,91 @@ func (s *Service) generate(ctx context.Context, req Request) error {
 		return fmt.Errorf("등록된 원본 정보가 변경되었습니다")
 	}
 	return nil
+}
+
+func (s *Service) audioArtwork(ctx context.Context, fileID int64, source, destination string) error {
+	// Reuse existing artwork locally; thumbnail generation never rediscovers a URL.
+	if cached, err := s.cachedAudioArtwork(ctx, fileID); err != nil {
+		return err
+	} else if cached != "" {
+		if err = resizeAudioArtwork(cached, destination); err == nil {
+			return nil
+		}
+	}
+	result, err := new(engine.ProcessRunner).Run(ctx, engine.ProcessRequest{Executable: s.ffmpeg, Directory: s.cache, Timeout: time.Minute, Arguments: []string{"-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-protocol_whitelist", "file,pipe", "-i", source, "-map", "0:v:0", "-an", "-frames:v", "1", "-vf", "scale=480:480:force_original_aspect_ratio=decrease", "-update", "1", destination}})
+	if err == nil {
+		return nil
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if !strings.Contains(result.Stderr, "matches no streams") {
+		return err
+	}
+	// A valid audio file without embedded artwork gets a stable local cover.
+	img := image.NewRGBA(image.Rect(0, 0, 480, 480))
+	draw.Draw(img, img.Bounds(), image.NewUniform(color.RGBA{24, 36, 54, 255}), image.Point{}, draw.Src)
+	note := vector.NewRasterizer(480, 480)
+	note.MoveTo(190, 180)
+	note.LineTo(320, 145)
+	note.LineTo(320, 292)
+	note.CubeTo(320, 330, 250, 345, 250, 310)
+	note.CubeTo(250, 285, 288, 275, 304, 282)
+	note.LineTo(304, 183)
+	note.LineTo(206, 210)
+	note.LineTo(206, 322)
+	note.CubeTo(206, 360, 136, 375, 136, 340)
+	note.CubeTo(136, 315, 174, 305, 190, 312)
+	note.ClosePath()
+	note.Draw(img, img.Bounds(), image.NewUniform(color.RGBA{148, 163, 184, 255}), image.Point{})
+	return writeAudioArtwork(img, destination)
+}
+
+func resizeAudioArtwork(source, destination string) error {
+	f, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	config, _, err := image.DecodeConfig(io.LimitReader(f, 16<<20))
+	if err != nil || config.Width < 1 || config.Height < 1 || int64(config.Width)*int64(config.Height) > 40_000_000 {
+		return fmt.Errorf("오디오 표지 크기를 확인할 수 없습니다")
+	}
+	if _, err = f.Seek(0, 0); err != nil {
+		return err
+	}
+	img, _, err := image.Decode(io.LimitReader(f, 16<<20))
+	if err != nil {
+		return err
+	}
+	w, h := config.Width, config.Height
+	if w > 480 || h > 480 {
+		if w >= h {
+			h, w = max(1, h*480/w), 480
+		} else {
+			w, h = max(1, w*480/h), 480
+		}
+	}
+	resized := image.NewRGBA(image.Rect(0, 0, w, h))
+	draw.Draw(resized, resized.Bounds(), image.White, image.Point{}, draw.Src)
+	draw.ApproxBiLinear.Scale(resized, resized.Bounds(), img, img.Bounds(), draw.Over, nil)
+	return writeAudioArtwork(resized, destination)
+}
+
+func writeAudioArtwork(img image.Image, destination string) error {
+	f, err := os.OpenFile(destination, os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		return err
+	}
+	err = jpeg.Encode(f, img, &jpeg.Options{Quality: 85})
+	if err == nil {
+		err = f.Sync()
+	}
+	closeErr := f.Close()
+	if err != nil {
+		return err
+	}
+	return closeErr
 }
 
 func (s *Service) imageInspectorPath() string {

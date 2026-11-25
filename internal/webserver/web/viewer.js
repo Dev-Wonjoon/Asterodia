@@ -33,16 +33,10 @@ export function mountMediaViewer({ mediaId, fileId, getSequence, getFile, conten
             const file = await getFile(queue.current);
             if (destroyed || serial !== own) return;
             currentFile = file; bindText(status, () => file.title || translate("gallery.file", { fileId: file.id }));
-            if (file.kind === 'video') {
+            if (file.kind === 'video' || file.kind === 'audio') {
                 const host = node('div', 'sbv-video'); stage.append(host);
-                player = mountVideoPlayer(host, { src: contentURL(file), title: file.title || title.textContent, poster: thumbnailURL(file), keyboardSeek: false });
+                player = mountVideoPlayer(host, { src: contentURL(file), kind: file.kind, title: file.title || title.textContent, poster: thumbnailURL(file) || previewURL(file), keyboardSeek: false });
                 nativeMedia = player.video;
-            } else if (file.kind === 'audio') {
-                const host = node('div', 'sbv-audio'), artwork = node('div', 'sbv-artwork', '♫');
-                const cover = thumbnailURL(file);
-                if (cover) { const img = node('img'); img.alt = ''; img.src = cover; img.addEventListener('error', () => img.remove(), { once: true }); artwork.append(img); }
-                nativeMedia = node('audio'); nativeMedia.controls = true; nativeMedia.preload = 'metadata'; nativeMedia.src = contentURL(file); bindAttribute(nativeMedia, 'aria-label', () => file.title || translate("media.audio"));
-                host.append(artwork, node('h3', '', () => (file.title || translate("media.audio"))), nativeMedia); stage.append(host);
             } else if (file.kind === 'image') {
                 const img = node('img', 'sbv-image'); img.alt = file.title || ''; img.src = contentURL(file);
                 let fallback = false;
@@ -99,7 +93,7 @@ export function mountMediaViewer({ mediaId, fileId, getSequence, getFile, conten
     function closed() { if (destroyed) return; destroy(); onClose(); }
     close.onclick = () => dialog.close(); dialog.addEventListener('close', closed); dialog.showModal(); close.focus();
     void (async () => {
-        try { const sequence = await getSequence(mediaId); if (destroyed) return; bindText(title, () => sequence.title); queue = createViewerQueue(sequence.ids, fileId); controls(); await show(); }
+        try { const sequence = await getSequence(mediaId); if (destroyed) return; bindText(title, () => sequence.title); queue = createViewerQueue(sequence.ids, fileId); controls(); await show(true); }
         catch (error) { if (!destroyed) { bindText(status, () => error.message || translate("gallery.couldNotLoadTheAlbum")); controls(); } }
     })();
     controls();

@@ -112,6 +112,7 @@ export interface MediaUnregisterFilesRequest extends MediaUnregisterRequest {
 }
 
 export interface MediaSummaryDto {
+	extension?: string | null
 	parentId?: number | null
 	childAlbumCount?: number
     managedFileCount?: number
@@ -167,6 +168,7 @@ export interface AlbumExplorePage extends MediaPage<AlbumEntry> {
 }
 
 export interface MediaFileDto {
+    extension?: string | null
     id: number
     mediaId: number
     fileKey: string

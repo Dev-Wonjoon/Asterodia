@@ -2,29 +2,40 @@
   "schema": 1,
   "target": "windows/amd64 production",
   "inputs": {
-    "go.mod": "45a94875f6898da000fbd5d1e0c47e35805e138b408a786928660d05c74e1eb7",
-    "go.sum": "ab7bf2e7f3594bd8b1f1087cbec4101b7fc81369b94981be10cf349b8af5620f",
+    "go.mod": "203794d5f3c0ca90a138b1008de90a3e3414e1cfaa009127562b6c3914561a4b",
+    "go.sum": "97baf3df15fd24997baaba8ae9faeb7556ad1add70b7e1567b45ca672d7d940c",
     "frontend/package.json": "073182a79aacc5a66364d5bbe701a7c1c09f3a854baab3db4b5e296507b3e938",
     "frontend/package-lock.json": "0000c8b9df59c0ce4af563937d3e25784fc0b4475b147919ee4560b95f7f57cc",
     "frontend/public/Inter-Medium.ttf": "a645f55492d1c8cdace43c72be8cbec08e680b5a86d8b4c2d1c50d6e41e9cc96",
     "frontend/public/bg-desktop.jpg": "4c94788acb1ad9c75feebc0b832cfba2720c6edc12ed32620238ab1c52299e5e",
     "frontend/public/bg-mobile.jpg": "ca4d8da7f4e44cf8d23662fe6e9f3bfe12eb24651b7069cce1df04bb7dc33847",
-    "internal/engine/manager.go": "c3f863657dfef20cf1ab26bf57ef65e79d703a3a5b989dea7bbd58ad386af048",
-    "tools/generate-licenses.mjs": "af4c817983945f133d8483760677399dae22e0c53d80565bda232cbfaa520a76",
+    "internal/engine/manager.go": "5b68ef3bd47e0d395f7eb471fb43eceb0fb1d877e9a287db505adcde7ac00676",
+    "tools/generate-licenses.mjs": "92e6f8681a8856d3e6abc16445234beec7526e8522b8c13401e858a75bee3602",
     "internal/licenses/upstream/provenance.json": "8e77a14e3f880d1be55efd41eded22e5b43a495a4e81636336d58c79def9c5ed",
     "internal/licenses/upstream/engines.json": "e71f9e0d5174f5c393ea1541ac1245d7be36f639893fe6b0caecf88a5834c221"
   },
   "goModules": [
     "github.com/adrg/xdg@v0.5.3",
+    "github.com/andybalholm/brotli@v1.2.2",
     "github.com/bits-and-blooms/bitset@v1.20.0",
+    "github.com/bodgit/plumbing@v1.3.0",
+    "github.com/bodgit/sevenzip@v1.6.5",
+    "github.com/bodgit/windows@v1.0.1",
     "github.com/dustin/go-humanize@v1.0.1",
     "github.com/go-ole/go-ole@v1.3.0",
     "github.com/google/uuid@v1.6.0",
+    "github.com/hashicorp/golang-lru/v2@v2.0.7",
+    "github.com/klauspost/compress@v1.19.0",
     "github.com/mattn/go-isatty@v0.0.24",
     "github.com/ncruces/go-strftime@v1.0.0",
     "github.com/nlnwa/whatwg-url@v0.6.2",
+    "github.com/pierrec/lz4/v4@v4.1.34",
     "github.com/remyoudompheng/bigfft@v0.0.0-20230129092748-24d4a6f8daec",
+    "github.com/spf13/afero@v1.15.0",
+    "github.com/stangelandcl/ppmd@v0.1.1",
+    "github.com/ulikunitz/xz@v0.5.15",
     "github.com/wailsapp/wails/v3@v3.0.0",
+    "go4.org@v0.0.0-20260112195520-a5071408f32f",
     "golang.org/x/image@v0.45.0",
     "golang.org/x/mod@v0.41.0",
     "golang.org/x/net@v0.60.0",
@@ -133,6 +144,36 @@
       ]
     },
     {
+      "id": "github.com_andybalholm_brotli_v1.2.2",
+      "name": "github.com/andybalholm/brotli",
+      "version": "v1.2.2",
+      "license": "MIT",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/github.com/andybalholm/brotli@v1.2.2",
+      "sourceURL": "https://pkg.go.dev/github.com/andybalholm/brotli@v1.2.2",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/github.com_andybalholm_brotli-LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/andybalholm/brotli@v1.2.2",
+          "sha256": "3d180008e36922a4e8daec11c34c7af264fed5962d07924aea928c38e8663c94"
+        },
+        {
+          "title": "flate/LICENSE",
+          "file": "texts/github.com_andybalholm_brotli-flate_LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/andybalholm/brotli@v1.2.2",
+          "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067"
+        },
+        {
+          "title": "Original license and copyright comment blocks retained from source",
+          "file": "texts/github.com_andybalholm_brotli-source-copyrights.txt",
+          "url": "https://pkg.go.dev/github.com/andybalholm/brotli@v1.2.2",
+          "sha256": "1dbd55e207243b096a6a01005d41815508f21ae4b1d0cc583aebb55e65897a19"
+        }
+      ]
+    },
+    {
       "id": "github.com_bits-and-blooms_bitset_v1.20.0",
       "name": "github.com/bits-and-blooms/bitset",
       "version": "v1.20.0",
@@ -153,6 +194,60 @@
           "file": "texts/github.com_bits-and-blooms_bitset-source-copyrights.txt",
           "url": "https://pkg.go.dev/github.com/bits-and-blooms/bitset@v1.20.0",
           "sha256": "bdf828616babffac87d79463cd47c134e1baa814407dd61010743407533ae871"
+        }
+      ]
+    },
+    {
+      "id": "github.com_bodgit_plumbing_v1.3.0",
+      "name": "github.com/bodgit/plumbing",
+      "version": "v1.3.0",
+      "license": "BSD-3-Clause",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/github.com/bodgit/plumbing@v1.3.0",
+      "sourceURL": "https://pkg.go.dev/github.com/bodgit/plumbing@v1.3.0",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/github.com_bodgit_plumbing-LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/bodgit/plumbing@v1.3.0",
+          "sha256": "5c74848524ad9ff97892be1d05418853eab0ea95e7f59545ba44153ef2017425"
+        }
+      ]
+    },
+    {
+      "id": "github.com_bodgit_sevenzip_v1.6.5",
+      "name": "github.com/bodgit/sevenzip",
+      "version": "v1.6.5",
+      "license": "BSD-3-Clause",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/github.com/bodgit/sevenzip@v1.6.5",
+      "sourceURL": "https://pkg.go.dev/github.com/bodgit/sevenzip@v1.6.5",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/github.com_bodgit_sevenzip-LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/bodgit/sevenzip@v1.6.5",
+          "sha256": "4135898ee98985c6084e6d8304930b010dec1b395083074ae455ae20ca207d9a"
+        }
+      ]
+    },
+    {
+      "id": "github.com_bodgit_windows_v1.0.1",
+      "name": "github.com/bodgit/windows",
+      "version": "v1.0.1",
+      "license": "BSD-3-Clause",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/github.com/bodgit/windows@v1.0.1",
+      "sourceURL": "https://pkg.go.dev/github.com/bodgit/windows@v1.0.1",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/github.com_bodgit_windows-LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/bodgit/windows@v1.0.1",
+          "sha256": "8e937a4f1e8d29fb77b8433044b21906774513e307153a53c68bd638c87a1b09"
         }
       ]
     },
@@ -223,6 +318,108 @@
       ]
     },
     {
+      "id": "github.com_hashicorp_golang-lru_v2_v2.0.7",
+      "name": "github.com/hashicorp/golang-lru/v2",
+      "version": "v2.0.7",
+      "license": "MPL-2.0",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/github.com/hashicorp/golang-lru/v2@v2.0.7",
+      "sourceURL": "https://pkg.go.dev/github.com/hashicorp/golang-lru/v2@v2.0.7",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/github.com_hashicorp_golang-lru_v2-LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/hashicorp/golang-lru/v2@v2.0.7",
+          "sha256": "6c7088eb877b5d7e6e0e9d27e822ea25fcda2e83f9eba59bb5f1418a656796e0"
+        },
+        {
+          "title": "simplelru/LICENSE_list",
+          "file": "texts/github.com_hashicorp_golang-lru_v2-simplelru_LICENSE_list.txt",
+          "url": "https://pkg.go.dev/github.com/hashicorp/golang-lru/v2@v2.0.7",
+          "sha256": "6d462371baa8649492b06f51f154dba9b25d2ac9548369b8b4fdbbbb85f2f75d"
+        },
+        {
+          "title": "Original license and copyright comment blocks retained from source",
+          "file": "texts/github.com_hashicorp_golang-lru_v2-source-copyrights.txt",
+          "url": "https://pkg.go.dev/github.com/hashicorp/golang-lru/v2@v2.0.7",
+          "sha256": "84fae3a9714efc81d893ab0ba7c40880a2073a8c93eac58be6743cf132f3a0a2"
+        }
+      ]
+    },
+    {
+      "id": "github.com_klauspost_compress_v1.19.0",
+      "name": "github.com/klauspost/compress",
+      "version": "v1.19.0",
+      "license": "BSD-3-Clause; additional source notices",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/github.com/klauspost/compress@v1.19.0",
+      "sourceURL": "https://pkg.go.dev/github.com/klauspost/compress@v1.19.0",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/github.com_klauspost_compress-LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/klauspost/compress@v1.19.0",
+          "sha256": "0d9e582ee4bff57bf1189c9e514e6da7ce277f9cd3bc2d488b22fbb39a6d87cf"
+        },
+        {
+          "title": "gzhttp/LICENSE",
+          "file": "texts/github.com_klauspost_compress-gzhttp_LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/klauspost/compress@v1.19.0",
+          "sha256": "2252a5b1e2b1d3663b53ea77051b8ed065cb9270a3d1174d5d6ead8a2de051b6"
+        },
+        {
+          "title": "internal/lz4ref/LICENSE",
+          "file": "texts/github.com_klauspost_compress-internal_lz4ref_LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/klauspost/compress@v1.19.0",
+          "sha256": "6a358d2540ca14048f02d366f23787c0a480157e58f058113f0e27168dd4e447"
+        },
+        {
+          "title": "internal/snapref/LICENSE",
+          "file": "texts/github.com_klauspost_compress-internal_snapref_LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/klauspost/compress@v1.19.0",
+          "sha256": "f69f157b0be75da373605dbc8bbf142e8924ee82d8f44f11bcaf351335bf98cf"
+        },
+        {
+          "title": "s2/LICENSE",
+          "file": "texts/github.com_klauspost_compress-s2_LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/klauspost/compress@v1.19.0",
+          "sha256": "08683b14bda8ae3538abf19e1879e853a39e3b8276a8d673363b529d15a61c1a"
+        },
+        {
+          "title": "snappy/AUTHORS",
+          "file": "texts/github.com_klauspost_compress-snappy_AUTHORS.txt",
+          "url": "https://pkg.go.dev/github.com/klauspost/compress@v1.19.0",
+          "sha256": "f6f3821e64460346c1ed1a15fb32b94ad241617276b60726c1350ca315309463"
+        },
+        {
+          "title": "snappy/LICENSE",
+          "file": "texts/github.com_klauspost_compress-snappy_LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/klauspost/compress@v1.19.0",
+          "sha256": "f69f157b0be75da373605dbc8bbf142e8924ee82d8f44f11bcaf351335bf98cf"
+        },
+        {
+          "title": "snappy/xerial/LICENSE",
+          "file": "texts/github.com_klauspost_compress-snappy_xerial_LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/klauspost/compress@v1.19.0",
+          "sha256": "d4ff111fa30ac75e28dca3868de957a3b73ff50b76bc4b8fe5c3a1f008d26703"
+        },
+        {
+          "title": "zstd/internal/xxhash/LICENSE.txt",
+          "file": "texts/github.com_klauspost_compress-zstd_internal_xxhash_LICENSE.txt.txt",
+          "url": "https://pkg.go.dev/github.com/klauspost/compress@v1.19.0",
+          "sha256": "f566a9f97bacdaf00d9f21dd991e81dc11201c4e016c86b470799429a1c9a79c"
+        },
+        {
+          "title": "Original license and copyright comment blocks retained from source",
+          "file": "texts/github.com_klauspost_compress-source-copyrights.txt",
+          "url": "https://pkg.go.dev/github.com/klauspost/compress@v1.19.0",
+          "sha256": "082679ace93495b298ac745160386f8277a3e7cfe1f3bfc1a7185bac48084bfe"
+        }
+      ]
+    },
+    {
       "id": "github.com_mattn_go-isatty_v0.0.24",
       "name": "github.com/mattn/go-isatty",
       "version": "v0.0.24",
@@ -283,6 +480,24 @@
       ]
     },
     {
+      "id": "github.com_pierrec_lz4_v4_v4.1.34",
+      "name": "github.com/pierrec/lz4/v4",
+      "version": "v4.1.34",
+      "license": "BSD-3-Clause",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/github.com/pierrec/lz4/v4@v4.1.34",
+      "sourceURL": "https://pkg.go.dev/github.com/pierrec/lz4/v4@v4.1.34",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/github.com_pierrec_lz4_v4-LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/pierrec/lz4/v4@v4.1.34",
+          "sha256": "6a358d2540ca14048f02d366f23787c0a480157e58f058113f0e27168dd4e447"
+        }
+      ]
+    },
+    {
       "id": "github.com_remyoudompheng_bigfft_v0.0.0-20230129092748-24d4a6f8daec",
       "name": "github.com/remyoudompheng/bigfft",
       "version": "v0.0.0-20230129092748-24d4a6f8daec",
@@ -303,6 +518,72 @@
           "file": "texts/github.com_remyoudompheng_bigfft-source-copyrights.txt",
           "url": "https://pkg.go.dev/github.com/remyoudompheng/bigfft@v0.0.0-20230129092748-24d4a6f8daec",
           "sha256": "5feec05cb7978ee66dfbed646636bb75e0789c02b996db57c2169e9d2745666d"
+        }
+      ]
+    },
+    {
+      "id": "github.com_spf13_afero_v1.15.0",
+      "name": "github.com/spf13/afero",
+      "version": "v1.15.0",
+      "license": "Apache-2.0",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/github.com/spf13/afero@v1.15.0",
+      "sourceURL": "https://pkg.go.dev/github.com/spf13/afero@v1.15.0",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE.txt",
+          "file": "texts/github.com_spf13_afero-LICENSE.txt.txt",
+          "url": "https://pkg.go.dev/github.com/spf13/afero@v1.15.0",
+          "sha256": "5e3400b93bbb099e83e52bab885e7441750673c21f97988ca3f1240639b63283"
+        },
+        {
+          "title": "Original license and copyright comment blocks retained from source",
+          "file": "texts/github.com_spf13_afero-source-copyrights.txt",
+          "url": "https://pkg.go.dev/github.com/spf13/afero@v1.15.0",
+          "sha256": "1df40d69ce1adb6347bb132b1f4a72d446669a6dbc485f31ac09580d516116ab"
+        }
+      ]
+    },
+    {
+      "id": "github.com_stangelandcl_ppmd_v0.1.1",
+      "name": "github.com/stangelandcl/ppmd",
+      "version": "v0.1.1",
+      "license": "MIT",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/github.com/stangelandcl/ppmd@v0.1.1",
+      "sourceURL": "https://pkg.go.dev/github.com/stangelandcl/ppmd@v0.1.1",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/github.com_stangelandcl_ppmd-LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/stangelandcl/ppmd@v0.1.1",
+          "sha256": "9bdaf6c691adeb560c86a43c26b9dd4f8a52c8d9965229e356e545e5894c3ab1"
+        }
+      ]
+    },
+    {
+      "id": "github.com_ulikunitz_xz_v0.5.15",
+      "name": "github.com/ulikunitz/xz",
+      "version": "v0.5.15",
+      "license": "BSD-3-Clause",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/github.com/ulikunitz/xz@v0.5.15",
+      "sourceURL": "https://pkg.go.dev/github.com/ulikunitz/xz@v0.5.15",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "LICENSE",
+          "file": "texts/github.com_ulikunitz_xz-LICENSE.txt",
+          "url": "https://pkg.go.dev/github.com/ulikunitz/xz@v0.5.15",
+          "sha256": "701cbcc144a7c865b072f27547e66ddbf17ac44a3bd21f71149ace02518f107c"
+        },
+        {
+          "title": "Original license and copyright comment blocks retained from source",
+          "file": "texts/github.com_ulikunitz_xz-source-copyrights.txt",
+          "url": "https://pkg.go.dev/github.com/ulikunitz/xz@v0.5.15",
+          "sha256": "7904acf9ca5518f2e4ab58c6211fc302385c677483378a937066399f69d9a6ff"
         }
       ]
     },
@@ -345,6 +626,36 @@
           "file": "texts/github.com_wailsapp_wails_v3-source-copyrights.txt",
           "url": "https://pkg.go.dev/github.com/wailsapp/wails/v3@v3.0.0",
           "sha256": "ccf6b29a702324600df86d6736581fa55ca23907c1932a259db75a9719000606"
+        }
+      ]
+    },
+    {
+      "id": "go4.org_v0.0.0-20260112195520-a5071408f32f",
+      "name": "go4.org",
+      "version": "v0.0.0-20260112195520-a5071408f32f",
+      "license": "Apache-2.0; additional source notices",
+      "scope": "bundled",
+      "url": "https://pkg.go.dev/go4.org@v0.0.0-20260112195520-a5071408f32f",
+      "sourceURL": "https://pkg.go.dev/go4.org@v0.0.0-20260112195520-a5071408f32f",
+      "notice": "Windows production EXE에 포함되는 Go 모듈. 모듈에 동봉된 추가 고지와 저작권도 함께 보존합니다.",
+      "documents": [
+        {
+          "title": "AUTHORS",
+          "file": "texts/go4.org-AUTHORS.txt",
+          "url": "https://pkg.go.dev/go4.org@v0.0.0-20260112195520-a5071408f32f",
+          "sha256": "c63f99c63839b2821456c6f675ca638fa55c2f87486a336afa76b3105c89962c"
+        },
+        {
+          "title": "LICENSE",
+          "file": "texts/go4.org-LICENSE.txt",
+          "url": "https://pkg.go.dev/go4.org@v0.0.0-20260112195520-a5071408f32f",
+          "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08"
+        },
+        {
+          "title": "Original license and copyright comment blocks retained from source",
+          "file": "texts/go4.org-source-copyrights.txt",
+          "url": "https://pkg.go.dev/go4.org@v0.0.0-20260112195520-a5071408f32f",
+          "sha256": "e6cd76780fcfd5021a474f99e34c441c8cc6cadcd754c117720cde7f815d37b4"
         }
       ]
     },

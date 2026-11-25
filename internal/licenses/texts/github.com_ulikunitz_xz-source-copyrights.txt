@@ -1,0 +1,9 @@
+Source: bits.go, bits_test.go, crc.go, example.go, example_test.go, format.go, format_test.go, internal/gflag/flag.go, internal/gflag/flag_test.go, internal/hash/cyclic_poly.go, internal/hash/cyclic_poly_test.go, internal/hash/doc.go, internal/hash/rabin_karp.go, internal/hash/rabin_karp_test.go, internal/hash/roller.go, internal/randtxt/englm3.go, internal/randtxt/groupreader.go, internal/randtxt/probs.go, internal/randtxt/probs_test.go, internal/term/ioctl_bsd.go, internal/term/ioctl_linux.go, internal/term/isterminal.go, internal/term/isterminal_windows.go, internal/xlog/xlog.go, lzma/bintree.go, lzma/bintree_test.go, lzma/bitops.go, lzma/breader.go, lzma/buffer.go, lzma/buffer_test.go, lzma/bytewriter.go, lzma/decoder.go, lzma/decoderdict.go, lzma/decoderdict_test.go, lzma/decoder_test.go, lzma/directcodec.go, lzma/distcodec.go, lzma/encoder.go, lzma/encoderdict.go, lzma/encoder_test.go, lzma/hashtable.go, lzma/hashtable_test.go, lzma/header.go, lzma/header2.go, lzma/header2_test.go, lzma/header_test.go, lzma/lengthcodec.go, lzma/literalcodec.go, lzma/matchalgorithm.go, lzma/operation.go, lzma/prob.go, lzma/properties.go, lzma/rangecodec.go, lzma/reader.go, lzma/reader2.go, lzma/reader_test.go, lzma/state.go, lzma/treecodecs.go, lzma/writer.go, lzma/writer2.go, lzma/writer2_test.go, lzma/writer_test.go, lzmafilter.go, none-check.go, none-check_test.go, reader.go, reader_test.go, writer.go, writer_test.go, xz_test.go
+// Copyright 2014-2022 Ulrich Kunitz. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+Source: xio/write_closer_stack.go, xio/write_closer_stack_test.go
+// Copyright 2014-2025 Ulrich Kunitz. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.

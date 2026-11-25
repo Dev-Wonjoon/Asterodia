@@ -144,6 +144,27 @@ func (s *Service) downloadPreviewPath(rawURL string) string {
 	return filepath.Join(filepath.Dir(s.cache), "previews", fmt.Sprintf("%x.jpg", sha256.Sum256([]byte(rawURL))))
 }
 
+func (s *Service) cachedAudioArtwork(ctx context.Context, fileID int64) (string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT source_url FROM media_file WHERE id=? AND source_url IS NOT NULL
+        UNION ALL SELECT u.url FROM media_file f JOIN media m ON m.id=f.media_id JOIN download_urls u ON u.id=m.request_url_id WHERE f.id=?
+        UNION ALL SELECT q.original_url FROM download_queue q JOIN media_file f ON f.media_id=q.target_media_id WHERE f.id=? LIMIT 32`, fileID, fileID, fileID)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var address string
+		if err = rows.Scan(&address); err != nil {
+			return "", err
+		}
+		path := s.downloadPreviewPath(address)
+		if thumbnailExists(&path) {
+			return path, nil
+		}
+	}
+	return "", rows.Err()
+}
+
 // CachedDownloadPreview is used when returning download jobs. It only reads
 // registered local files and disk cache; it never waits for or invokes the web.
 //
