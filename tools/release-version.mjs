@@ -6,17 +6,18 @@ const repository = fileURLToPath(new URL('../', import.meta.url))
 
 export function parseVersion(value) {
     const version = value.trim()
-    const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\.([1-9]\d*)|([a-z]))?$/.exec(version)
-    if (!match || match.slice(1, 4).some(part => Number(part) > 65535) || Number(match[4] || 0) > Math.floor(65535 / 27)) {
-        throw new Error('VERSION must be major.minor.patch, major.minor.patch[a-z], or major.minor.patch.revision (components 0–65535; revision 1–2427).')
+    const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\.([1-9]\d*))?([a-z])?$/.exec(version)
+    const revision = match ? Number(match[4] || 0) * 27 + (match[5] ? match[5].charCodeAt(0) - 96 : 0) : 0
+    if (!match || match.slice(1, 4).some(part => Number(part) > 65535) || revision > 65535) {
+        throw new Error('VERSION must be major.minor.patch[letter] or major.minor.patch.revision[letter], with components 0–65535 and revision*27+letter <= 65535.')
     }
     return version
 }
 
 export function windowsVersion(value) {
     const version = parseVersion(value)
-    const match = /^(\d+)\.(\d+)\.(\d+)(?:\.(\d+)|([a-z]))?$/.exec(version)
-    const revision = match[4] ? Number(match[4]) * 27 : match[5] ? match[5].charCodeAt(0) - 96 : 0
+    const match = /^(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?([a-z])?$/.exec(version)
+    const revision = Number(match[4] || 0) * 27 + (match[5] ? match[5].charCodeAt(0) - 96 : 0)
     return `${match[1]}.${match[2]}.${match[3]}.${revision}`
 }
 

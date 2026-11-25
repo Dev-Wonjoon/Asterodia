@@ -57,7 +57,7 @@ try {
         $hash = (Get-FileHash -LiteralPath (Join-Path $output $name) -Algorithm SHA256).Hash.ToLowerInvariant()
         if ($lines -cnotcontains "$hash  $name") { throw "Incorrect final checksum: $arch" }
     }
-    foreach ($extendedVersion in @('2.2.6a', '2.2.6.1')) {
+    foreach ($extendedVersion in @('2.2.6a', '2.2.6.1', '2.2.6.1a')) {
         $extendedRoot = Join-Path $caseRoot $extendedVersion
         New-Item -ItemType Directory -Force -Path $extendedRoot | Out-Null
         Copy-Item -LiteralPath (Join-Path $caseRoot 'main.go') -Destination (Join-Path $extendedRoot 'main.go')

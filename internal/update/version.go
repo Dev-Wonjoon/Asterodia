@@ -11,10 +11,11 @@ var Version = "dev"
 
 const Repository = "Dev-Wonjoon/StorageBucket"
 
-var stableVersion = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:\.([1-9][0-9]*)|([a-z]))?$`)
+var stableVersion = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:\.([1-9][0-9]*))?([a-z])?$`)
 
 // Letters are post-release fixes, not prereleases. The final numeric component
-// reserves 1..26 for a..z; numbered fixes use 27*n (n <= 2427).
+// reserves 1..26 for a..z; numbered fixes use 27*n, plus a letter offset.
+// The combined value must fit the Windows 16-bit version component.
 func versionParts(value string) ([4]uint64, error) {
 	var parts [4]uint64
 	match := stableVersion.FindStringSubmatch(value)
@@ -34,8 +35,12 @@ func versionParts(value string) ([4]uint64, error) {
 			return parts, fmt.Errorf("invalid release revision: %q", value)
 		}
 		parts[3] = revision * 27
-	} else if match[5] != "" {
-		parts[3] = uint64(match[5][0]-'a') + 1
+	}
+	if match[5] != "" {
+		parts[3] += uint64(match[5][0]-'a') + 1
+	}
+	if parts[3] > 65535 {
+		return parts, fmt.Errorf("invalid release revision: %q", value)
 	}
 	return parts, nil
 }

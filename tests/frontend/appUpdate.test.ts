@@ -25,6 +25,64 @@ beforeEach(() => { vi.resetAllMocks(); api.status.mockResolvedValue(ok(state()))
 afterEach(async () => { await cleanupReact(); vi.useRealTimers() })
 
 describe('app updates', () => {
+    it('shows a notice before the first status response and detects a release within 250ms after idle', async () => {
+        vi.useFakeTimers()
+        const initial = deferred<UpdateResult>()
+        api.status.mockReturnValueOnce(initial.promise)
+        await mount(screen())
+        expect([...document.querySelectorAll('[role="status"]')].some(node => node.textContent === '새 버전 확인 중…')).toBe(true)
+        expect(dialog()).toBeNull()
+        await act(async () => { initial.resolve(ok(state())) })
+        api.status.mockResolvedValue(ok(available()))
+        await act(async () => { await vi.advanceTimersByTimeAsync(249) })
+        expect(dialog()).toBeNull()
+        await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+        expect(dialog()?.textContent).toContain('새 버전 업데이트')
+        expect([...document.querySelectorAll('[role="status"]')].some(node => node.textContent === '새 버전 확인 중…')).toBe(false)
+        expect(api.check).not.toHaveBeenCalled()
+        expect(api.download).not.toHaveBeenCalled()
+    })
+
+    it.each(['up-to-date', 'error', 'unsupported'] as const)('clears the startup notice quietly after %s', async terminal => {
+        vi.useFakeTimers()
+        api.status.mockResolvedValue(ok(state({ state: 'checking' })))
+        await mount(screen())
+        expect([...document.querySelectorAll('[role="status"]')].filter(node => node.textContent === '새 버전 확인 중…')).toHaveLength(2)
+        api.status.mockResolvedValue(ok(state({ state: terminal, supported: terminal !== 'unsupported' })))
+        await act(async () => { await vi.advanceTimersByTimeAsync(250) })
+        expect([...document.querySelectorAll('[role="status"]')].some(node => node.textContent === '새 버전 확인 중…')).toBe(false)
+        expect(dialog()).toBeNull()
+        const reads = api.status.mock.calls.length
+        await act(async () => { await vi.advanceTimersByTimeAsync(4999) })
+        expect(api.status).toHaveBeenCalledTimes(reads)
+        await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+        expect(api.status).toHaveBeenCalledTimes(reads + 1)
+    })
+
+    it('bounds fast startup polling and removes an idle notice after 25 seconds', async () => {
+        vi.useFakeTimers()
+        await mount(screen())
+        await act(async () => { await vi.advanceTimersByTimeAsync(25000) })
+        expect([...document.querySelectorAll('[role="status"]')].some(node => node.textContent === '새 버전 확인 중…')).toBe(false)
+        const reads = api.status.mock.calls.length
+        await act(async () => { await vi.advanceTimersByTimeAsync(4999) })
+        expect(api.status).toHaveBeenCalledTimes(reads)
+        await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+        expect(api.status).toHaveBeenCalledTimes(reads + 1)
+    })
+
+    it('clears the notice on a status transport failure and recovers on the next poll', async () => {
+        vi.useFakeTimers()
+        api.status.mockRejectedValueOnce(new Error('offline'))
+        await mount(screen())
+        expect([...document.querySelectorAll('[role="status"]')].some(node => node.textContent === '새 버전 확인 중…')).toBe(false)
+        expect(dialog()).toBeNull()
+        api.status.mockResolvedValue(ok(available()))
+        await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+        expect(dialog()?.textContent).toContain('새 버전 업데이트')
+        expect(document.querySelector('[role="alert"]')).toBeNull()
+    })
+
     it('offers an update once at startup, keeps the banner after deferral and allows a manual prompt', async () => {
         vi.useFakeTimers()
         const open = vi.fn(); await mount(screen(open))

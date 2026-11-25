@@ -150,12 +150,19 @@ one lowercase fix letter (`2.2.6a` through `2.2.6z`), or a numeric fix (`2.2.6.1
 Letters represent stable fixes, not prereleases. The order is
 `2.2.6 < 2.2.6a < ... < 2.2.6z < 2.2.6.1 < 2.2.6.2 < 2.2.7`.
 Each base component is 0–65535; numeric fixes are 1–2427, without leading zeros.
+Starting with 2.2.7.2a, a numeric fix may also carry one lowercase letter:
+`2.2.7.2 < 2.2.7.2a < ... < 2.2.7.2z < 2.2.7.3`.
 
 Windows numeric metadata uses a fourth component of 0 for the base release,
 1–26 for a–z, and `27 * fix` for numeric fixes. For example, `2.2.6a` maps to
 `2.2.6.1`, and release `2.2.6.1` maps to `2.2.6.27`. Displayed versions and Git tags
 retain the original spelling. All release assets and checksums must use the same tag.
 Install or update to 2.2.6 before using automatic updates for these extended formats.
+Combined numeric and letter fixes add the letter offset to `27 * fix`, so
+`2.2.7.2a` maps to `2.2.7.55`. The final component must not exceed 65535
+(fix 2427 supports only a–f). Versions through 2.2.7.2 cannot recognize this
+combined format; download and replace the executable manually once to install
+2.2.7.2a and enable future combined-format updates.
 
 ## Responsible Use
 

@@ -10,7 +10,7 @@
   <Identity 
     Name="com.example.wails"
     Publisher="CN=My Company"
-    Version="2.2.7.54"
+    Version="2.2.7.55"
     ProcessorArchitecture="x64" />
   
   <Properties>

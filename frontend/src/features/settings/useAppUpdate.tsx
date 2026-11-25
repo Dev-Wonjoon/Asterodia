@@ -33,6 +33,7 @@ function promptOptions(prompt: Prompt): ConfirmOptions {
 
 interface UpdateView {
     status: UpdateStatus | null
+    checking: boolean
     pending: Action | null
     error: string
     act(action: Action): Promise<void>
@@ -45,6 +46,7 @@ export function AppUpdateProvider({ children, blocked = false, leaveGuard }: { c
     const [status, setStatus] = useState<UpdateStatus | null>(null)
     const [pending, setPending] = useState<Action | null>(null)
     const [error, setError] = useState('')
+    const [initialCheckPending, setInitialCheckPending] = useState(true)
     const [prompts, setPrompts] = useState<Prompt[]>([])
     const { confirm, isOpen } = useConfirm()
     const contextGuard = useContext(LeaveGuardContext)
@@ -67,6 +69,7 @@ export function AppUpdateProvider({ children, blocked = false, leaveGuard }: { c
         alive.current = true
         let stopped = false
         let timer: ReturnType<typeof setTimeout> | undefined
+        const startupDeadline = Date.now() + 25_000
         async function poll() {
             const own = generation.current
             let delay = 5000
@@ -75,10 +78,16 @@ export function AppUpdateProvider({ children, blocked = false, leaveGuard }: { c
                 if (stopped || own !== generation.current) return
                 if (result.ok) {
                     setStatus(result.data)
+                    setError(result.data.error)
                     if (['checking', 'downloading', 'verifying', 'installing', 'restarting'].includes(result.data.state)) delay = 750
-                } else setError(translateError(result.error))
+                    if (result.data.supported && ['idle', 'unconfigured', 'checking'].includes(result.data.state) && Date.now() < startupDeadline && !startupHandled.current) delay = 250
+                    else setInitialCheckPending(false)
+                } else { setError(translateError(result.error)); setInitialCheckPending(false) }
             } catch {
-                if (!stopped && own === generation.current) setError(translate("settings.couldNotCheckUpdateStatus"))
+                if (!stopped && own === generation.current) {
+                    setError(translate("settings.couldNotCheckUpdateStatus"))
+                    setInitialCheckPending(false)
+                }
             } finally {
                 if (!stopped) timer = setTimeout(() => void poll(), delay)
             }
@@ -125,6 +134,7 @@ export function AppUpdateProvider({ children, blocked = false, leaveGuard }: { c
 
     const act = useCallback(async (action: Action) => {
         startupHandled.current = true
+        setInitialCheckPending(false)
         if (action === 'restart') {
             if (status?.state === 'ready' && !prompting.current && prompts.length === 0) enqueue({ kind: 'ready', status })
         } else await run(action)
@@ -164,5 +174,6 @@ export function AppUpdateProvider({ children, blocked = false, leaveGuard }: { c
         })()
     }, [prompts, blocked, isOpen, guard, confirm, run, enqueue])
 
-    return <UpdateContext.Provider value={{ status, pending, error, act }}>{children}</UpdateContext.Provider>
+    const checking = !error && (initialCheckPending || status?.state === 'checking' || pending === 'check')
+    return <UpdateContext.Provider value={{ status, checking, pending, error, act }}>{children}</UpdateContext.Provider>
 }

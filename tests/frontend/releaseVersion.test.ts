@@ -10,11 +10,13 @@ it('accepts stable versions and rejects invalid or unrepresentable Windows versi
     expect(parseVersion('2.1.0\r\n')).toBe('2.1.0')
     expect(parseVersion('2.2.6a')).toBe('2.2.6a')
     expect(parseVersion('2.2.6.1')).toBe('2.2.6.1')
-    for (const version of ['v2.1.0', '2.1', '02.1.0', '2.1.0-beta.1', '2.1.0\n2.2.0', '65536.1.0', '2.2.6.0', '2.2.6.01', '2.2.6.2428', '2.2.6aa', '2.2.6A', '2.2.6.1a', '2.2.6+build.1', '']) expect(() => parseVersion(version)).toThrow()
+    expect(parseVersion('2.2.7.2a')).toBe('2.2.7.2a')
+    expect(parseVersion('2.2.6.2427f')).toBe('2.2.6.2427f')
+    for (const version of ['v2.1.0', '2.1', '02.1.0', '2.1.0-beta.1', '2.1.0\n2.2.0', '65536.1.0', '2.2.6.0', '2.2.6.01', '2.2.6.2428', '2.2.6.2427g', '2.2.6aa', '2.2.6A', '2.2.6.1aa', '2.2.6.0a', '2.2.6.01a', '2.2.6+build.1', '']) expect(() => parseVersion(version)).toThrow()
     expect(() => validateTag('v2.1.0', '2.1.0')).not.toThrow()
     for (const tag of ['2.1.0', 'v2.1.1', 'v2.1.0-beta']) expect(() => validateTag(tag, '2.1.0')).toThrow()
 })
-it.each(['7.12.34', '2.2.6a', '2.2.6.1'])('updates version resources from %s and detects stale metadata without changing it', version => {
+it.each(['7.12.34', '2.2.6a', '2.2.6.1', '2.2.6.1a'])('updates version resources from %s and detects stale metadata without changing it', version => {
     const base = path.join(repository, '.test-data', 'version-tests'); mkdirSync(base, { recursive: true })
     const root = mkdtempSync(path.join(base, 'version-')); roots.push(root)
     writeFileSync(path.join(root, 'VERSION'), readVersion(repository))
@@ -45,6 +47,6 @@ it.each(['7.12.34', '2.2.6a', '2.2.6.1'])('updates version resources from %s and
     expect(read('build/ios/Info.dev.plist')).toContain(`<string>${version}-dev</string>`)
 })
 it('maps hotfix versions to unique ordered numeric Windows versions', () => {
-    const versions = ['2.2.6', '2.2.6a', '2.2.6b', '2.2.6z', '2.2.6.1', '2.2.6.2', '2.2.6.10', '2.2.6.2427']
-    expect(versions.map(windowsVersion)).toEqual([0, 1, 2, 26, 27, 54, 270, 65529].map(revision => `2.2.6.${revision}`))
+    const versions = ['2.2.6', '2.2.6a', '2.2.6b', '2.2.6z', '2.2.6.1', '2.2.6.1a', '2.2.6.1z', '2.2.6.2', '2.2.6.2a', '2.2.6.10', '2.2.6.2427', '2.2.6.2427f']
+    expect(versions.map(windowsVersion)).toEqual([0, 1, 2, 26, 27, 28, 53, 54, 55, 270, 65529, 65535].map(revision => `2.2.6.${revision}`))
 })

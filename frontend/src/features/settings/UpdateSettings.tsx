@@ -45,6 +45,9 @@ export function UpdateNotice({ onOpen }: { onOpen(): void }) {
     useLanguage()
     const vm = useAppUpdate()
     const status = vm?.status
+    if (vm?.checking) return <div role="status" className="flex flex-none items-center gap-3 border-b border-[var(--border-line)] bg-[var(--bg-sidebar)] px-4 py-2 text-sm">
+        <span>{translate("settings.checkingForUpdates")}</span>
+    </div>
     if (!status || (status.state !== 'available' && status.state !== 'ready')) return null
     return <div role="status" className="flex flex-none items-center justify-between gap-3 border-b border-[var(--border-line)] bg-[var(--bg-sidebar)] px-4 py-2 text-sm">
         <span>StorageBucket {status.version} {status.state === 'ready' ? translate("settings.readyToApplyUpdate") : translate("settings.aNewVersionIsAvailable")}</span>

@@ -80,7 +80,7 @@ func TestExtendedReleaseUpdates(t *testing.T) {
 	payload := []byte("hotfix executable")
 	digest := sha256.Sum256(payload)
 	sums := hex.EncodeToString(digest[:]) + "  StorageBucket-windows-amd64.exe\n"
-	for _, pair := range [][2]string{{"2.2.5", "2.2.6"}, {"2.2.6", "2.2.6a"}, {"2.2.6a", "2.2.6b"}, {"2.2.6z", "2.2.6.1"}, {"2.2.6", "2.2.6.1"}, {"2.2.6.2", "2.2.6.10"}, {"2.2.6.2427", "2.2.7"}} {
+	for _, pair := range [][2]string{{"2.2.5", "2.2.6"}, {"2.2.6", "2.2.6a"}, {"2.2.6a", "2.2.6b"}, {"2.2.6z", "2.2.6.1"}, {"2.2.6", "2.2.6.1"}, {"2.2.6.2", "2.2.6.10"}, {"2.2.6.2427", "2.2.7"}, {"2.2.7.2", "2.2.7.2a"}, {"2.2.7.2a", "2.2.7.2b"}, {"2.2.7.2z", "2.2.7.3"}} {
 		provider := fixtureProvider(t, "v"+pair[1], sums, payload)
 		release, err := provider.Check(t.Context(), updater.CheckRequest{CurrentVersion: pair[0], Platform: "windows", Arch: "amd64"})
 		if err != nil || release == nil || release.Version != pair[1] || !bytes.Equal(release.Verification.Digest, digest[:]) {
@@ -91,7 +91,7 @@ func TestExtendedReleaseUpdates(t *testing.T) {
 			t.Fatalf("download %s: %v", pair[1], err)
 		}
 	}
-	for _, pair := range [][2]string{{"2.2.6a", "2.2.6"}, {"2.2.6a", "2.2.6a"}, {"2.2.6.2", "2.2.6.1"}, {"2.2.7", "2.2.6.2427"}} {
+	for _, pair := range [][2]string{{"2.2.6a", "2.2.6"}, {"2.2.6a", "2.2.6a"}, {"2.2.6.2", "2.2.6.1"}, {"2.2.7", "2.2.6.2427"}, {"2.2.7.2a", "2.2.7.2"}, {"2.2.7.2a", "2.2.7.2a"}, {"2.2.7.3", "2.2.7.2z"}} {
 		provider := fixtureProvider(t, "v"+pair[1], "missing", payload)
 		if release, err := provider.Check(t.Context(), updater.CheckRequest{CurrentVersion: pair[0], Platform: "windows", Arch: "amd64"}); err != nil || release != nil {
 			t.Fatalf("downgrade/equal %s -> %s: %v %v", pair[0], pair[1], release, err)
