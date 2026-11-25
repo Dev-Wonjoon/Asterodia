@@ -3,9 +3,11 @@ import { translate } from '@renderer/shared/i18n'
 import { isComposing } from '../../../../internal/webserver/web/shortcuts.js'
 import type { MoveSelection } from '@contracts/file-move-api'
 import type { MediaSummaryDto } from '@contracts/media-v2'
+import type { GalleryGeometry } from './useVirtualGallery'
 
 export const gallerySelectionKey = (item: MediaSummaryDto) => item.galleryFile ? `file:${item.galleryFile.id}` : `media:${item.id}`
-const displayKey = (item: MediaSummaryDto) => `${item.id}:${gallerySelectionKey(item)}`
+export const galleryDisplayKey = (item: MediaSummaryDto) => `${item.id}:${gallerySelectionKey(item)}`
+const displayKey = galleryDisplayKey
 const target = (item: MediaSummaryDto): MoveSelection => ({ mediaId: item.id, revision: item.revision, ...(item.galleryFile ? { fileIds: [item.galleryFile.id] } : {}) })
 export const albumDragType = 'application/x-storagebucket-album-selection'
 export type AlbumDragSelection = { fileIds: number[]; mediaIds: number[] }
@@ -13,7 +15,7 @@ type Modifiers = Pick<MouseEvent, 'ctrlKey' | 'metaKey' | 'shiftKey'>
 type Rectangle = { left: number; top: number; width: number; height: number }
 type Gesture = { id: number; x: number; y: number; clientX: number; clientY: number; base: Map<string, MoveSelection>; additive: boolean; active: boolean; fromCard: boolean }
 
-export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject<boolean>, scrollRef: RefObject<HTMLDivElement | null>, resetKey: unknown) {
+export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject<boolean>, scrollRef: RefObject<HTMLDivElement | null>, resetKey: unknown, geometry?: RefObject<GalleryGeometry | null>) {
     const [entries, setEntries] = useState(new Map<string, MoveSelection>())
     const selected = useRef(entries)
     const gridRef = useRef<HTMLDivElement>(null)
@@ -97,10 +99,14 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
         const startX = own.x - root.scrollLeft, startY = own.y - root.scrollTop
         const box = { left: Math.min(startX, own.clientX), top: Math.min(startY, own.clientY), width: Math.abs(startX - own.clientX), height: Math.abs(startY - own.clientY) }
         setRectangle(box)
-        const rows = new Map(latest.current.items.map(item => [gallerySelectionKey(item), item]))
         const next = own.additive ? new Map(own.base) : new Map<string, MoveSelection>()
-        for (const card of grid.querySelectorAll<HTMLElement>('[data-selection-key]')) {
-            const bounds = card.getBoundingClientRect(), item = rows.get(card.dataset.selectionKey!)
+        const origin = grid.getBoundingClientRect()
+        const rows = geometry?.current ? null : new Map(latest.current.items.map(item => [gallerySelectionKey(item), item]))
+        const candidates = geometry?.current
+            ? latest.current.items.map(item => ({ item, bounds: geometry.current!.bounds(displayKey(item), origin) }))
+            : [...grid.querySelectorAll<HTMLElement>('[data-selection-key]')].map(card => ({ item: rows!.get(card.dataset.selectionKey!), bounds: card.getBoundingClientRect() }))
+        for (const { item, bounds } of candidates) {
+            if (!bounds) continue
             if (item && bounds.width > 0 && bounds.height > 0 && bounds.left < box.left + box.width && bounds.right > box.left && bounds.top < box.top + box.height && bounds.bottom > box.top) next.set(gallerySelectionKey(item), target(item))
         }
         anchor.current = null; replace(next)

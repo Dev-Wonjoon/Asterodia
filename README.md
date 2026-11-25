@@ -101,6 +101,21 @@ from a mobile device.
 The server starts disabled each time the app launches and stops when
 the app closes.
 
+Enter the eight-digit connection code shown in the PC's Network Settings to
+connect a browser. Codes expire after five minutes and change after each use.
+Sessions last up to eight hours. Restarting the server or choosing
+**Disconnect all devices and renew code** revokes existing sessions.
+
+Downloads use public HTTP/HTTPS destinations on ports 80/443. Local/private
+network destinations and unsupported transfer paths are rejected. Up to 20
+downloads may wait in addition to three running jobs. Each job is monitored
+against a 20 GiB staging limit and a 5 GiB free-space reserve; engine process
+groups have a 2 GiB memory limit. Jobs stop when resource checks fail.
+
+Engine versions and SHA-256 digests are pinned to the app release and verified
+before execution. If an existing engine fails integrity verification, reinstall
+it from Settings → Engine Management.
+
 ## Development
 
 StorageBucket 2.0 uses Wails v3 and Go for the desktop backend,

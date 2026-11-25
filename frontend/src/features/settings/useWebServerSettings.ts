@@ -90,13 +90,13 @@ export function useWebServerSettings() {
             }
         }
     }
-    const togglePermission = async (kind: 'editing' | 'downloading') => {
+    const togglePermission = async (kind: 'editing' | 'downloading' | 'access') => {
         if (!mounted.current || locked.current || !status) return
         const own = ++revision.current
         locked.current = true; reading.current?.cancel(); reading.current = null
         setLoading(false); setBusy(true); setError(null)
         try {
-            const result = await (kind === 'editing' ? getApi().webServer.setEditing(!status.editing) : getApi().webServer.setDownloading(!status.downloading))
+            const result = await (kind === 'access' ? getApi().webServer.revokeAccess() : kind === 'editing' ? getApi().webServer.setEditing(!status.editing) : getApi().webServer.setDownloading(!status.downloading))
             if (!mounted.current || own !== revision.current) return
             if (result.ok) setStatus(result.data)
             else setError(translateError(result.error))
@@ -106,5 +106,5 @@ export function useWebServerSettings() {
             if (own === revision.current) { locked.current = false; if (mounted.current) setBusy(false) }
         }
     }
-    return { status, loading, busy, error, refresh, toggle, toggleEditing: () => togglePermission('editing'), toggleDownloading: () => togglePermission('downloading') }
+    return { status, loading, busy, error, refresh, toggle, revokeAccess: () => togglePermission('access'), toggleEditing: () => togglePermission('editing'), toggleDownloading: () => togglePermission('downloading') }
 }

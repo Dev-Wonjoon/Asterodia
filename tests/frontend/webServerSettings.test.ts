@@ -5,7 +5,7 @@ import type { WebServerStatus, WebServerResult } from '@contracts/webserver-api'
 import { WebServerSettings } from '@renderer/features/settings/WebServerSettings'
 import { cleanupReact, clickButton, deferred, mount } from './reactHarness'
 
-const api = vi.hoisted(() => ({ status: vi.fn(), start: vi.fn(), stop: vi.fn(), setEditing: vi.fn(), setDownloading: vi.fn() }))
+const api = vi.hoisted(() => ({ status: vi.fn(), start: vi.fn(), stop: vi.fn(), setEditing: vi.fn(), setDownloading: vi.fn(), revokeAccess: vi.fn() }))
 vi.mock('@renderer/shared/api', () => ({ getApi: () => ({ webServer: api }) }))
 const state = (running = false, error: string | null = null): WebServerStatus => ({ running, url: 'http://127.0.0.1:9246', error })
 const ok = (data: WebServerStatus): WebServerResult<WebServerStatus> => ({ ok: true, data })
@@ -15,6 +15,16 @@ beforeEach(() => { vi.resetAllMocks(); api.status.mockResolvedValue(ok(state()))
 afterEach(async () => { await cleanupReact(); vi.useRealTimers() })
 
 describe('localhost web server controls', () => {
+    it('shows the desktop-only pairing code and revokes connected devices', async () => {
+        api.status.mockResolvedValue(ok({ ...state(true), pairCode: '12345678', connected: 2 }))
+        api.revokeAccess.mockResolvedValue(ok({ ...state(true), pairCode: '87654321', connected: 0 }))
+        await mount(h(WebServerSettings))
+        expect(document.querySelector('code')?.textContent).toBe('12345678')
+        await clickButton('모든 연결 해제 및 코드 재발급')
+        expect(api.revokeAccess).toHaveBeenCalledExactlyOnceWith()
+        expect(document.querySelector('code')?.textContent).toBe('87654321')
+    })
+
     it('toggles download permission independently of editing', async () => {
         api.status.mockResolvedValue(ok({ ...state(true), editing: false, downloading: false }))
         api.setDownloading.mockResolvedValue(ok({ ...state(true), editing: false, downloading: true }))

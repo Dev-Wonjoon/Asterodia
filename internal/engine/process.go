@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -29,6 +31,9 @@ func (r *ProcessRunner) ReadVersion(
 		return "", fmt.Errorf("실행 파일은 절대 경로여야 합니다")
 	}
 
+	if err := verifyManagedExecutable(executable); err != nil {
+		return "", err
+	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -48,6 +53,10 @@ func (r *ProcessRunner) ReadVersion(
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() != nil {
 			return "", fmt.Errorf("%s 버전 조회: %w", name, ctx.Err())
+		}
+		var exitError *exec.ExitError
+		if name == "imagemagick" && errors.As(err, &exitError) && uint32(exitError.ExitCode()) == 0xc0000135 {
+			return "", fmt.Errorf("ImageMagick 실행 검증 실패: 필수 DLL을 불러오지 못했습니다. 설정에서 엔진을 다시 설치하세요: %w", err)
 		}
 
 		return "", fmt.Errorf("%s 버전 조회: %w", name, err)
@@ -121,6 +130,12 @@ func (r *ProcessRunner) Run(
 		return ProcessResult{ExitCode: -1}, err
 	}
 
+	if err := verifyManagedExecutable(request.Executable); err != nil {
+		return ProcessResult{ExitCode: -1}, err
+	}
+	if proxy, ok := ctx.Value(networkKey{}).(string); ok && proxy != "" {
+		request.Environment = secureEnvironment(os.Environ(), proxy)
+	}
 	if request.Timeout <= 0 && !request.Unbounded {
 		return ProcessResult{ExitCode: -1},
 			fmt.Errorf("프로세스 실행 제한 시간은 양수여야 합니다")

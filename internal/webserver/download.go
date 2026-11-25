@@ -31,23 +31,9 @@ func (s *Service) downloadRoutes(mux *http.ServeMux) {
 func (s *Service) downloadAPI(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	enabled, service, csrf := s.downloading, s.downloader, s.csrf
-	limited := false
-	if r.Method == http.MethodPost {
-		elapsed := time.Since(s.editLast).Seconds()
-		s.editLast = time.Now()
-		s.editTokens = min(8, s.editTokens+elapsed)
-		limited = s.editTokens < 1
-		if !limited {
-			s.editTokens--
-		}
-	}
 	s.mu.Unlock()
 	if !enabled || service == nil {
 		http.Error(w, "PC에서 모바일 다운로드를 허용하세요", 403)
-		return
-	}
-	if limited {
-		http.Error(w, "잠시 후 다시 요청하세요", 429)
 		return
 	}
 	var result api.Result
@@ -71,6 +57,19 @@ func (s *Service) downloadAPI(w http.ResponseWriter, r *http.Request) {
 		contentType, _, ce := mime.ParseMediaType(r.Header.Get("Content-Type"))
 		if err != nil || origin.Host != r.Host || (origin.Scheme != "http" && origin.Scheme != "https") || ce != nil || contentType != "application/json" || csrf == "" || subtle.ConstantTimeCompare([]byte(csrf), []byte(r.Header.Get("X-StorageBucket-CSRF"))) != 1 {
 			http.Error(w, "요청 출처와 다운로드 권한을 확인하세요", 403)
+			return
+		}
+		s.mu.Lock()
+		now := time.Now()
+		s.editTokens = min(8, s.editTokens+now.Sub(s.editLast).Seconds())
+		s.editLast = now
+		limited := s.editTokens < 1
+		if !limited {
+			s.editTokens--
+		}
+		s.mu.Unlock()
+		if limited {
+			http.Error(w, "잠시 후 다시 요청하세요", 429)
 			return
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, 32<<10)
@@ -173,7 +172,26 @@ func (s *Service) launchDownload(service *download.Service, job download.Job, tr
 }
 
 func publicDownloadResult(result api.Result) api.Result {
-	clean := func(job download.Job) download.Job { job.ThumbnailPath = nil; return job }
+	if !result.OK {
+		code := "DOWNLOAD_ENGINE_FAILED"
+		if result.Error != nil {
+			code = result.Error.Code
+		}
+		// Discard raw errors and any incidental data; desktop diagnostics stay local.
+		return api.Result{Error: publicDownloadError(code)}
+	}
+	clean := func(job download.Job) download.Job {
+		job.ThumbnailPath = nil
+		if job.ErrorCode != nil || job.ErrorMessage != nil {
+			code := "DOWNLOAD_ENGINE_FAILED"
+			if job.ErrorCode != nil {
+				code = *job.ErrorCode
+			}
+			err := publicDownloadError(code)
+			job.ErrorCode, job.ErrorMessage = &err.Code, &err.Message
+		}
+		return job
+	}
 	switch data := result.Data.(type) {
 	case download.Job:
 		result.Data = clean(data)
@@ -194,4 +212,43 @@ func publicDownloadResult(result api.Result) api.Result {
 		result.Data = copyData
 	}
 	return result
+}
+
+func publicDownloadError(code string) *api.Error {
+	// A whitelist also keeps unexpected error codes from carrying private text.
+	messages := map[string]string{
+		"QUEUE_FULL":                       "대기 다운로드는 최대 20건입니다",
+		"RESOURCE_LIMIT":                   "다운로드 작업 수·용량과 PC의 여유 공간을 확인하세요",
+		"NOT_READY":                        "다운로드 서비스를 사용할 수 없습니다",
+		"IMPORTED_HISTORY":                 "가져온 이력은 새 URL로 등록하세요",
+		"INVALID_ARGUMENT":                 "다운로드 URL과 옵션을 확인하세요",
+		"UNSUPPORTED_INSTAGRAM_URL":        "Instagram 게시물 또는 릴스 링크를 입력하세요",
+		"UNSUPPORTED_INSTAGRAM_OPTIONS":    "Instagram 다운로드 옵션을 확인하세요",
+		"AUTHENTICATION_REQUIRED":          "PC에서 로그인 상태와 쿠키 설정을 확인하세요",
+		"PUBLIC_MEDIA_EXTRACTION_FAILED":   "공개 게시물에서 미디어를 추출하지 못했습니다",
+		"ACCESS_DENIED":                    "게시물 접근 권한을 확인하세요",
+		"MEDIA_UNAVAILABLE":                "게시물을 찾을 수 없습니다",
+		"RATE_LIMITED":                     "잠시 후 다시 요청하세요",
+		"NOT_FOUND":                        "다운로드 작업을 찾을 수 없습니다",
+		"ALREADY_PROCESSING":               "이미 실행 중인 다운로드입니다",
+		"REDOWNLOAD_CONFIRMATION_REQUIRED": "PC에서 기존 다운로드의 교체 여부를 확인하세요",
+		"REVISION_CONFLICT":                "묶음 정보가 변경되었습니다. 새로고침 후 다시 확인하세요",
+		"CLEANUP_REQUIRED":                 "PC에서 이전 다운로드의 임시 파일을 정리하세요",
+		"CANNOT_DELETE_REQUEST":            "정리가 완료된 실패 또는 취소 작업만 삭제할 수 있습니다",
+		"CANNOT_CANCEL_COMMITTING":         "저장 중인 작업은 취소할 수 없습니다",
+		"DATABASE_ERROR":                   "다운로드 기록을 처리하지 못했습니다. PC에서 상태를 확인하세요",
+		"UNSUPPORTED_TARGET_DISCOVERY":     "지원하지 않는 URL 또는 다운로드 옵션입니다",
+		"UNSUPPORTED_MEDIA_FORMAT":         "요청한 형식의 미디어를 다운로드할 수 없습니다",
+		"DOWNLOAD_ENGINE_FAILED":           "다운로드를 완료하지 못했습니다. PC에서 작업 상태와 로그를 확인하세요",
+		"ENGINE_STOP_UNCONFIRMED":          "PC에서 엔진 종료 상태를 확인한 뒤 다시 시도하세요",
+		"UPDATE_RESTARTING":                api.UpdateBlocked,
+		"CANCELLED":                        "사용자가 다운로드를 취소했습니다",
+		"INTERRUPTED":                      "다운로드가 중단되었습니다. PC에서 작업 상태를 확인하세요",
+	}
+	message, ok := messages[code]
+	if !ok {
+		code = "DOWNLOAD_ENGINE_FAILED"
+		message = messages[code]
+	}
+	return &api.Error{Code: code, Message: message, Context: map[string]int64{}}
 }

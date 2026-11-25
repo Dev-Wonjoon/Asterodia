@@ -156,6 +156,8 @@ export interface DownloadServicePort {
 
 export function downloadFailure(code: string): DownloadResponse<never> {
     const messages: Record<string, string> = {
+        QUEUE_FULL: translate("security.queueFull"),
+        RESOURCE_LIMIT: translate("security.resourceLimit"),
         NOT_READY: translate("common.downloadsAreNotReadyYet"),
         IMPORTED_HISTORY: translate("common.thisIsImportedOrMigratedHistoryAddTheUrl"),
         INVALID_ARGUMENT: translate("common.checkTheDownloadUrlAndOptions"),

@@ -59,9 +59,12 @@ func TestPauseResumeWithinOneFolderPreservesEdits(t *testing.T) {
 	encodedTitle, _ := json.Marshal(title)
 	ok(t, media.NewService(f.db).Edit(t.Context(), media.EditRequest{MediaID: id, ExpectedRevision: revision, CustomTitle: encodedTitle}))
 	f.inspect = original
+	// Parallel inspection may finish an uncommitted later file before pause.
+	// Resume repeats only pending work, while preserving the first checkpoint.
+	callsBeforeResume := f.calls.Load()
 	ok(t, f.service.Resume(t.Context(), localimport.Request{JobID: p.Job.ID}))
 	p = wait(t, f.service, p.Job.ID, "completed")
-	if p.Job.Counts.Added != 3 || p.Job.Counts.Processed != 3 || p.Job.Counts.ProcessedBytes != p.Job.Counts.TotalBytes || f.calls.Load() != 3 {
+	if p.Job.Counts.Added != 3 || p.Job.Counts.Processed != 3 || p.Job.Counts.ProcessedBytes != p.Job.Counts.TotalBytes || f.calls.Load() != callsBeforeResume+2 {
 		t.Fatalf("이어하기 중복 검사/집계: %+v calls=%d", p.Job.Counts, f.calls.Load())
 	}
 	if count(t, f, "SELECT count(*) FROM media WHERE id=? AND custom_title=?", id, title) != 1 || count(t, f, "SELECT count(*) FROM media_file WHERE id=?", fileID) != 1 {

@@ -52,6 +52,8 @@ func (g *GalleryDL) Download(ctx context.Context, originalURL string, expected G
 		defer os.Remove(filepath.Join(stageDir, "cookies.txt"))
 	}
 	args := g.arguments()
+	args = append(args, networkArguments(ctx)...)
+	args = append(args, "-o", "extractor.proxy-env=false", "-o", "extractor.ytdl.enabled=false")
 	if filter != "" {
 		args = append(args, "--filter", filter)
 	}

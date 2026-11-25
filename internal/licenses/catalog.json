@@ -9,10 +9,12 @@
     "frontend/public/Inter-Medium.ttf": "a645f55492d1c8cdace43c72be8cbec08e680b5a86d8b4c2d1c50d6e41e9cc96",
     "frontend/public/bg-desktop.jpg": "4c94788acb1ad9c75feebc0b832cfba2720c6edc12ed32620238ab1c52299e5e",
     "frontend/public/bg-mobile.jpg": "ca4d8da7f4e44cf8d23662fe6e9f3bfe12eb24651b7069cce1df04bb7dc33847",
-    "internal/engine/manager.go": "5b68ef3bd47e0d395f7eb471fb43eceb0fb1d877e9a287db505adcde7ac00676",
-    "tools/generate-licenses.mjs": "92e6f8681a8856d3e6abc16445234beec7526e8522b8c13401e858a75bee3602",
-    "internal/licenses/upstream/provenance.json": "8e77a14e3f880d1be55efd41eded22e5b43a495a4e81636336d58c79def9c5ed",
-    "internal/licenses/upstream/engines.json": "e71f9e0d5174f5c393ea1541ac1245d7be36f639893fe6b0caecf88a5834c221"
+    "internal/engine/manager.go": "2b30e99e4ab99eb3b69c1e8854afac823b7238a1dcad4ae5b7728a696ee7342d",
+    "internal/engine/integrity.go": "308f2487bf2ce0c63ea767c33bcf7e8ddce1b39462da924ec327bd7494f4513a",
+    "internal/engine/imagemagick_runtime.go": "5bd769951a9f33228ce8ee9fdd713682e4b3ac3f71f1b8abdbeb8859383852fb",
+    "tools/generate-licenses.mjs": "8dc0486dafd11b4a48697adf2cc1f1e9c4f56f0cc54695ede05b2f29cc4338fe",
+    "internal/licenses/upstream/provenance.json": "3977193a4e31b8b47d5f53f44f65872e4775825f75552c9514ada72a9501de01",
+    "internal/licenses/upstream/engines.json": "1a9f1753b64a382f19d58990bcc71cd180a7cd933fd91a37e32fa06ddec73438"
   },
   "goModules": [
     "github.com/adrg/xdg@v0.5.3",
@@ -2736,6 +2738,24 @@
       ]
     },
     {
+      "id": "Microsoft_Visual_C___OpenMP_Runtime_14.44.35211.0__x64__app-local_",
+      "name": "Microsoft Visual C++ OpenMP Runtime",
+      "version": "14.44.35211.0 (x64, app-local)",
+      "license": "Microsoft Visual C++ Runtime 2015-2022 License",
+      "scope": "external",
+      "url": "https://visualstudio.microsoft.com/license-terms/vs2022-cruntime/",
+      "sourceURL": "https://learn.microsoft.com/en-us/visualstudio/releases/2022/redistribution",
+      "notice": "ImageMagick 실행에 필요한 정식 x64 vcomp140.dll만 Microsoft 공식 CRT Redist VSIX에서 추출하여 엔진 폴더에 배치합니다. 패키지와 DLL의 고정 SHA-256을 검증하며 설치 프로그램과 debug_nonredist 파일은 사용하지 않습니다. 시스템 런타임은 설치하거나 변경하지 않습니다. Microsoft 재배포 사용 조건이 적용됩니다.",
+      "documents": [
+        {
+          "title": "Microsoft-VC-Runtime-LICENSE",
+          "file": "texts/external-Microsoft-VC-Runtime-LICENSE.txt",
+          "url": "https://visualstudio.microsoft.com/wp-content/uploads/2021/09/Visual-C-Runtime-2015-2022-License-1.docx#word/document.xml",
+          "sha256": "d839d7e636d46d12a6ae8bc7b471d2088d79bea3f1b21dda6bc40dab11a9a63e"
+        }
+      ]
+    },
+    {
       "id": "yt-dlp_2026.10.26_Windows_executable",
       "name": "yt-dlp",
       "version": "2026.10.26 Windows executable",
@@ -2838,14 +2858,14 @@
       ]
     },
     {
-      "id": "FFmpeg___ffprobe__BtbN_GPL_build__Rolling_latest__inspect_installed_-version___-L",
+      "id": "FFmpeg___ffprobe__BtbN_GPL_build__autobuild-2026-11-24-12-41__N-129267-g9ec5cf1aac___win64-gpl",
       "name": "FFmpeg / ffprobe (BtbN GPL build)",
-      "version": "Rolling latest; inspect installed -version / -L",
+      "version": "autobuild-2026-11-24-12-41 (N-129267-g9ec5cf1aac), win64-gpl",
       "license": "GPL; exact build configuration governs",
       "scope": "external",
       "url": "https://ffmpeg.org/legal.html",
-      "sourceURL": "https://github.com/BtbN/FFmpeg-Builds",
-      "notice": "BtbN의 win64-gpl 빌드를 내려받습니다. GPL 버전과 추가 구성 요소는 설치한 실행 파일의 -L·-version 결과와 bin/licenses에 보존한 배포본 고지를 확인하세요. 아래 GPL/LGPL 원문은 빌드별 조건 확인용 참고 자료입니다. BtbN 빌드 스크립트의 MIT와 FFmpeg 바이너리의 GPL은 별도입니다.",
+      "sourceURL": "https://github.com/FFmpeg-Builds/FFmpeg-Builds/tree/autobuild-2026-11-24-12-41",
+      "notice": "고정된 FFmpeg-Builds win64-gpl 배포본의 SHA-256을 검증합니다. GPL 버전·추가 구성 요소와 설치 디렉터리의 bin/licenses 고지는 해당 고정 배포본을 기준으로 확인하세요.",
       "documents": [
         {
           "title": "ffmpeg-LICENSE.md",

@@ -1,4 +1,4 @@
-package engine_test
+package engine
 
 import (
 	"archive/zip"
@@ -13,8 +13,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
 )
 
 type noticeTransport func(*http.Request) (*http.Response, error)
@@ -22,7 +20,7 @@ type noticeTransport func(*http.Request) (*http.Response, error)
 func (f noticeTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func TestEngineNoticesInstallAndFailures(t *testing.T) {
-	root := engineTestRoot(t, "engine-notices")
+	root := t.TempDir()
 	source := filepath.Join(root, "fixture.go")
 	executable := filepath.Join(root, "fixture.exe")
 	if err := os.WriteFile(source, []byte(`package main
@@ -78,13 +76,26 @@ func main() { name := "ffmpeg"; if strings.Contains(os.Args[0], "ffprobe") { nam
 	})
 	original := "Copyright Example\r\nOriginal license terms\r\n"
 	payload = makeArchive(archiveEntry{name: "bundle/LICENSE.txt", text: original}, archiveEntry{name: "bundle/licenses/component.txt", text: "Additional original notice"})
+	// Only this test binary trusts the isolated fixture. Production pins remain
+	// fixed; HTTP mocks must not bypass archive or executable verification.
+	previousFFmpeg, previousFFprobe := enginePins["ffmpeg"], enginePins["ffprobe"]
+	t.Cleanup(func() { enginePins["ffmpeg"], enginePins["ffprobe"] = previousFFmpeg, previousFFprobe })
+	pinFixture := func() {
+		for _, name := range []string{"ffmpeg", "ffprobe"} {
+			pin := enginePins[name]
+			pin.ArchiveSHA = fmt.Sprintf("%x", sha256.Sum256(payload))
+			pin.BinarySHA = fmt.Sprintf("%x", sha256.Sum256(binary))
+			enginePins[name] = pin
+		}
+	}
+	pinFixture()
 	for _, name := range []string{"ffmpeg", "ffprobe"} {
 		t.Run(name, func(t *testing.T) {
 			bin, err := os.MkdirTemp(root, "success-")
 			if err != nil {
 				t.Fatal(err)
 			}
-			manager, err := engine.NewManager(bin, nil)
+			manager, err := NewManager(bin, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -135,6 +146,7 @@ func main() { name := "ffmpeg"; if strings.Contains(os.Args[0], "ffprobe") { nam
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			payload = makeArchive(scenario.entries...)
+			pinFixture()
 			bin, err := os.MkdirTemp(root, "failure-")
 			if err != nil {
 				t.Fatal(err)
@@ -143,7 +155,7 @@ func main() { name := "ffmpeg"; if strings.Contains(os.Args[0], "ffprobe") { nam
 			if err := os.WriteFile(filepath.Join(bin, "ffmpeg.exe"), old, 0600); err != nil {
 				t.Fatal(err)
 			}
-			manager, err := engine.NewManager(bin, nil)
+			manager, err := NewManager(bin, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

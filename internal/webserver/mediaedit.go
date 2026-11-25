@@ -32,24 +32,13 @@ func (s *Service) editRoutes(mux *http.ServeMux) {
 			http.Error(w, "모바일 편집이 꺼져 있습니다", 403)
 			return
 		}
-		editor.Assets().ServeHTTP(streamWriter{w}, r)
+		editor.Assets().ServeHTTP(streamWriter{w, r.Context()}, r)
 	})
 }
 
 func (s *Service) editAPI(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	enabled, editor, csrf := s.editing, s.editor, s.csrf
-	if r.Method == "POST" && r.URL.Path != "/api/edit/resources" {
-		elapsed := time.Since(s.editLast).Seconds()
-		s.editLast = time.Now()
-		s.editTokens = min(8, s.editTokens+elapsed)
-		if s.editTokens < 1 {
-			s.mu.Unlock()
-			http.Error(w, "잠시 후 다시 요청하세요", 429)
-			return
-		}
-		s.editTokens--
-	}
 	s.mu.Unlock()
 	if !enabled || editor == nil {
 		http.Error(w, "PC에서 모바일 편집을 허용하세요", 403)
@@ -96,6 +85,21 @@ func (s *Service) editAPI(w http.ResponseWriter, r *http.Request) {
 		if e != nil || origin.Host != r.Host || (origin.Scheme != "https" && origin.Scheme != "http") || ce != nil || contentType != "application/json" || csrf == "" || subtle.ConstantTimeCompare([]byte(csrf), []byte(r.Header.Get("X-StorageBucket-CSRF"))) != 1 {
 			http.Error(w, "요청 출처와 편집 권한을 확인하세요", 403)
 			return
+		}
+		if r.URL.Path != "/api/edit/resources" {
+			s.mu.Lock()
+			now := time.Now()
+			s.editTokens = min(8, s.editTokens+now.Sub(s.editLast).Seconds())
+			s.editLast = now
+			limited := s.editTokens < 1
+			if !limited {
+				s.editTokens--
+			}
+			s.mu.Unlock()
+			if limited {
+				http.Error(w, "잠시 후 다시 요청하세요", 429)
+				return
+			}
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, 32<<10)
 		defer r.Body.Close()

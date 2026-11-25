@@ -5,6 +5,10 @@ import { formatBytes } from '@renderer/shared/utils/formatBytes'
 
 const event = (patch: Partial<EngineInstallProgress> = {}): EngineInstallProgress => ({ installId: 'request', engine: 'ffmpeg', phase: 'downloading', downloaded: 25, total: 100, ...patch })
 describe('engine download progress decisions', () => {
+    it('shows runtime preparation separately from the completed archive download', () => {
+        const progress = mergeInstallProgress(event({ downloaded: 100 }), event({ phase: 'dependencies', downloaded: 0, total: null }))
+        expect(installProgressView(progress)).toEqual({ label: '필수 런타임 준비 중', percent: undefined, detail: '' })
+    })
     it('starts a fresh attempt and resets a retried installation', () => {
         expect(mergeInstallProgress(undefined, event())).toEqual(event())
         expect(mergeInstallProgress(event(), event({ installId: 'retry', downloaded: 0, total: null }))).toEqual(event({ installId: 'retry', downloaded: 0, total: null }))

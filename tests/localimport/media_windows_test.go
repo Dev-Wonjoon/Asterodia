@@ -56,7 +56,7 @@ func TestNativeImageVideoAudioImport(t *testing.T) {
 			t.Fatalf("미디어 생성: %v %s", err, result.Stderr)
 		}
 	}
-	inspector := engine.LocalInspector{FFmpeg: ffmpeg, FFprobe: probe, ImageMagick: magick, Cache: filepath.Join(f.root, "cache")}
+	inspector := engine.LocalInspector{FFmpeg: ffmpeg, FFprobe: probe, ImageMagick: magick, Cache: filepath.Join(f.root, "cache"), InspectionThreads: 1}
 	var updates atomic.Int32
 	thumbs := thumbnail.NewService(f.db, filepath.Join(f.root, "cache", "thumbnails"), ffmpeg, func(int64) { updates.Add(1) })
 	thumbs.ConfigureImages(inspector)

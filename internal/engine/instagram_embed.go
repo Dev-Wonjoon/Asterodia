@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/Dev-Wonjoon/StorageBucket/internal/netguard"
 	"html"
 	"io"
 	"net/http"
@@ -75,7 +76,9 @@ func (g *GalleryDL) instagramGETWithAgent(ctx context.Context, address string, m
 	if !media {
 		request.Header.Set("Accept", "text/html")
 	}
-	client := http.Client{}
+	client := *netguard.NewClient()
+	client.Timeout = 0
+	defer client.CloseIdleConnections()
 	if g.HTTPClient != nil {
 		client = *g.HTTPClient
 	}

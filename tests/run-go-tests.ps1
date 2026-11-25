@@ -13,7 +13,7 @@ if ($Race) { $testFlags += '-race' }
 $testGroups = @(
     @{ Category = 'update'; Package = './tests/update' }
     @{ Category = 'licenses'; Package = './tests/licenses' }
-    @{ Category = 'engine-notices'; Package = './tests/engine'; Pattern = '^TestEngineNotices' }
+    @{ Category = 'engine-notices'; Package = './internal/engine'; Pattern = '^TestEngineNotices' }
     @{ Category = 'database-open'; Package = './tests/database' }
     @{ Category = 'mediaedit'; Package = './tests/mediaedit' }
     @{ Category = 'local-import'; Package = './tests/localimport' }

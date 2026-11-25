@@ -19,6 +19,9 @@ import (
 const DefaultAddress = "127.0.0.1:9246"
 
 type Status struct {
+	PairCode    string  `json:"pairCode,omitempty"`
+	CodeExpires int64   `json:"codeExpires,omitempty"`
+	Connected   int     `json:"connected"`
 	Running     bool    `json:"running"`
 	URL         string  `json:"url"`
 	Error       *string `json:"error"`
@@ -27,6 +30,13 @@ type Status struct {
 }
 
 type Service struct {
+	pairCode    string
+	pairExpires time.Time
+	sessions    map[[32]byte]accessSession
+	loginLast   time.Time
+	loginTokens float64
+	// Serialize starts and stops separately from state reads by active handlers.
+	lifecycle          sync.Mutex
 	mu                 sync.Mutex
 	library            *media.Service
 	saveContentFilters func(media.ContentFilters) (media.ContentFilters, error)
@@ -60,7 +70,20 @@ func NewService(library *media.Service, address string) *Service {
 }
 
 func (s *Service) snapshot() Status {
-	return Status{Running: s.server != nil, URL: s.url, Error: s.lastError, Editing: s.editing, Downloading: s.downloading}
+	if s.server != nil && time.Now().After(s.pairExpires) {
+		_ = s.rotateCodeLocked()
+	}
+	for key, session := range s.sessions {
+		if time.Now().After(session.expires) {
+			session.cancel()
+			delete(s.sessions, key)
+		}
+	}
+	expires := int64(0)
+	if s.pairCode != "" {
+		expires = s.pairExpires.UnixMilli()
+	}
+	return Status{PairCode: s.pairCode, CodeExpires: expires, Connected: len(s.sessions), Running: s.server != nil, URL: s.url, Error: s.lastError, Editing: s.editing, Downloading: s.downloading}
 }
 
 //wails:ignore
@@ -100,6 +123,8 @@ func (s *Service) Status() api.Result {
 }
 
 func (s *Service) Start() api.Result {
+	s.lifecycle.Lock()
+	defer s.lifecycle.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
@@ -121,6 +146,13 @@ func (s *Service) Start() api.Result {
 		s.lastError = &message
 		return api.Failure("SERVER_START_FAILED", message)
 	}
+	if s.rotateCodeLocked() != nil {
+		listener.Close()
+		return api.Failure("NOT_READY", "연결 코드를 생성하지 못했습니다")
+	}
+	s.clearSessionsLocked()
+	s.loginTokens = 10
+	s.loginLast = time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 	s.url = "http://" + listener.Addr().String()
@@ -149,21 +181,31 @@ func (s *Service) Start() api.Result {
 }
 
 func (s *Service) Stop() api.Result {
+	s.lifecycle.Lock()
+	defer s.lifecycle.Unlock()
 	s.mu.Lock()
 	server := s.server
 	s.server = nil
 	s.editing = false
+	s.clearSessionsLocked()
+	s.sessions = nil
+	s.pairCode = ""
+	s.pairExpires = time.Time{}
 	s.downloading = false
 	s.generation++
-	if s.cancel != nil {
-		s.cancel()
-		s.cancel = nil
+	cancel := s.cancel
+	s.cancel = nil
+	s.mu.Unlock()
+	// No new requests can register while server is nil. Keep Start serialized
+	// until they finish, but let existing handlers acquire mu during shutdown.
+	if cancel != nil {
+		cancel()
 	}
-	// Keep the lifecycle lock until requests finish so another Start cannot race Wait.
 	if server != nil {
 		_ = server.Close()
 	}
 	s.requests.Wait()
+	s.mu.Lock()
 	status := s.snapshot()
 	s.mu.Unlock()
 	return api.Success(status)

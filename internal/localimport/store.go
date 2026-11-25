@@ -5,11 +5,11 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -35,6 +35,7 @@ func (e *fileFailure) Error() string { return e.err.Error() }
 func fileError(err error) error      { return &fileFailure{err} }
 
 func (s *Service) run(ctx context.Context, job string) {
+	workers := importWorkerCount(runtime.NumCPU())
 	var root string
 	if err := s.db.QueryRowContext(ctx, "SELECT root_path FROM local_import_job WHERE id=?", job).Scan(&root); err != nil {
 		s.stopWork(ctx, job, err)
@@ -59,74 +60,13 @@ func (s *Service) run(ctx context.Context, job string) {
 			s.stopWork(ctx, job, err)
 			return
 		}
-		var lastMedia int64
-		lastNotify := time.Time{}
-		lastPathUpdate := time.Time{}
-		for {
-			if err = ctx.Err(); err != nil {
-				s.stopWork(ctx, job, err)
-				return
-			}
-			t := target{folder: folder, attempt: attempt, path: path, key: key}
-			var raw, name string
-			var refresh bool
-			err = s.db.QueryRowContext(ctx, "SELECT id,relative_path,expected_stat_json,refresh_requested FROM local_import_target WHERE attempt_id=? AND state='pending' ORDER BY sort_key,id LIMIT 1", attempt).Scan(&t.id, &name, &raw, &refresh)
-			if err == sql.ErrNoRows {
-				break
-			}
-			if err != nil {
-				s.stopWork(ctx, job, err)
-				return
-			}
-			if err = json.Unmarshal([]byte(raw), &t.state); err != nil {
-				s.stopWork(ctx, job, err)
-				return
-			}
-			t.expectedSize = t.state.Size
-			s.setCurrentPath(job, filepath.Join(path, name))
-			if time.Since(lastPathUpdate) >= 200*time.Millisecond {
-				if _, err = s.db.ExecContext(ctx, "UPDATE local_import_job SET current_path=?,updated_at=?,revision=revision+1 WHERE id=?", filepath.Join(path, name), time.Now().UnixMilli(), job); err != nil {
-					s.stopWork(ctx, job, err)
-					return
-				}
-				lastPathUpdate = time.Now()
-			}
-			if filepath.Base(name) != name || name == "." || !filepath.IsLocal(name) || t.state.Path != filepath.Join(path, name) {
-				err = fileError(fmt.Errorf("파일의 탐색 경로가 일치하지 않습니다"))
-			} else {
-				err = s.inspectTarget(ctx, root, &t, refresh)
-			}
-			if err == nil {
-				err = s.commitTarget(ctx, job, root, &t)
-			}
-			if err != nil {
-				if ctx.Err() != nil {
-					s.stopWork(ctx, job, err)
-					return
-				}
-				var failure *fileFailure
-				if !errors.As(err, &failure) {
-					s.stopWork(ctx, job, err)
-					return
-				}
-				if err = s.recordFailure(ctx, job, t.id, t.expectedSize, err); err != nil {
-					s.stopWork(ctx, job, err)
-					return
-				}
-			} else if t.mediaID > 0 && s.notify != nil {
-				if lastMedia != t.mediaID || time.Since(lastNotify) >= 500*time.Millisecond {
-					s.notify(t.mediaID)
-					lastNotify = time.Now()
-				}
-				lastMedia = t.mediaID
-			}
+		if err = s.runFolder(ctx, job, root, target{folder: folder, attempt: attempt, path: path, key: key}, workers); err != nil {
+			s.stopWork(ctx, job, err)
+			return
 		}
 		if err = s.completeFolder(ctx, job, folder, attempt); err != nil {
 			s.stopWork(ctx, job, err)
 			return
-		}
-		if lastMedia > 0 && s.notify != nil {
-			s.notify(lastMedia)
 		}
 	}
 }
@@ -155,7 +95,9 @@ func hashFile(ctx context.Context, path string) (string, error) {
 	}
 	return fmt.Sprintf("%x", hash.Sum(nil)), nil
 }
-func (s *Service) inspectTarget(ctx context.Context, root string, t *target, refresh bool) error {
+
+// Database lookups and group guards run only on the coordinator.
+func (s *Service) prepareTarget(ctx context.Context, root string, t *target, refresh bool) error {
 	if err := checkDirectory(root, t.path, t.key); err != nil {
 		return fileError(err)
 	}
@@ -194,6 +136,26 @@ func (s *Service) inspectTarget(ctx context.Context, root string, t *target, ref
 		t.unchanged = true
 		t.hash = t.oldHash
 		return nil
+	}
+	return nil
+}
+
+// Workers own their target and perform no database reads or writes.
+func (s *Service) inspectTarget(ctx context.Context, root string, t *target) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if t.foreign || t.unchanged {
+		return nil
+	}
+	// Preparation can precede execution by a full queue window. Revalidate the
+	// source immediately before opening it for hashing/decoding as well.
+	if err := checkDirectory(root, t.path, t.key); err != nil {
+		return fileError(err)
+	}
+	before, err := snapshot(root, t.state.Path)
+	if err != nil || before != t.state {
+		return fileError(fmt.Errorf("검사 대기 중 원본 파일이 변경되었습니다"))
 	}
 	t.hash, err = hashFile(ctx, t.state.Path)
 	if err != nil {

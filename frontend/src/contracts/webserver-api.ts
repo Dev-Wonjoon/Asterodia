@@ -1,6 +1,9 @@
 export type WebServerResult<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } }
 
 export interface WebServerStatus {
+    pairCode?: string
+    codeExpires?: number
+    connected?: number
     running: boolean
     url: string
     error: string | null
@@ -9,6 +12,7 @@ export interface WebServerStatus {
 }
 
 export interface WebServerApi {
+    revokeAccess(): Promise<WebServerResult<WebServerStatus>>
     setEditing(enabled: boolean): Promise<WebServerResult<WebServerStatus>>
     setDownloading(enabled: boolean): Promise<WebServerResult<WebServerStatus>>
     status(): Promise<WebServerResult<WebServerStatus>>

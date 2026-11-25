@@ -1054,6 +1054,7 @@
   "settings.overallInstallationProgress": "Overall installation progress",
   "settings.pleaseTryAgain": "Please try again.",
   "settings.preparingInstallation": "Preparing installation",
+  "settings.preparingRequiredRuntime": "Preparing required runtime",
   "settings.preparingToApplyUpdate": "Preparing to apply update…",
   "settings.preparingUpdate": "Preparing update…",
   "settings.preservedJobHistoryEntriesImportedJobsDoNotRun": "Preserved {count} job history entries. Imported jobs do not run automatically.",
@@ -1189,5 +1190,19 @@
   "editor.editAnimation": "Edit GIF or WebP",
   "web.download.retryableOnly": "Only failed or interrupted downloads can be retried.",
   "web.download.alreadyRunning": "This download is already running.",
-  "web.download.serviceUnavailable": "The download service is unavailable."
+  "web.download.serviceUnavailable": "The download service is unavailable.",
+  "security.connectHelp": "Enter the connection code shown in Settings → Network Settings on your PC.",
+  "security.code": "Connection code",
+  "security.codeHelp": "The code expires after 5 minutes and changes after each connection. Sessions last up to 8 hours and end when the server restarts.",
+  "security.connected": "Connected devices: {count}",
+  "security.revoke": "Disconnect all devices and renew code",
+  "security.connect": "Connect",
+  "security.logout": "Disconnect",
+  "security.invalidCode": "The connection code is incorrect or expired. Check the new code on your PC.",
+  "security.rateLimited": "Too many requests. Please try again shortly.",
+  "security.connectionError": "Could not connect to the server. Check its status on your PC.",
+  "security.queueFull": "Up to 20 downloads can wait in the queue.",
+  "security.resourceLimit": "The download resource limit was reached. Check job count, size, and free disk space.",
+  "security.publicResourceLimit": "Check the number and size of downloads and free disk space on your PC.",
+  "security.integrityFailed": "Engine SHA-256 verification failed. Reinstall it from Settings."
 }

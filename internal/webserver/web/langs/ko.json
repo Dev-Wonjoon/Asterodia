@@ -1054,6 +1054,7 @@
   "settings.overallInstallationProgress": "전체 설치 진행률",
   "settings.pleaseTryAgain": "다시 시도해 주세요.",
   "settings.preparingInstallation": "설치 준비 중",
+  "settings.preparingRequiredRuntime": "필수 런타임 준비 중",
   "settings.preparingToApplyUpdate": "업데이트 적용 준비 중…",
   "settings.preparingUpdate": "업데이트 준비 중…",
   "settings.preservedJobHistoryEntriesImportedJobsDoNotRun": "작업 이력 {count}개를 보존했습니다. 가져온 작업은 자동 실행하지 않습니다.",
@@ -1189,5 +1190,19 @@
   "editor.editAnimation": "GIF·WebP 편집",
   "web.download.retryableOnly": "실패하거나 중단된 다운로드만 다시 실행할 수 있습니다",
   "web.download.alreadyRunning": "이미 실행 중인 다운로드입니다",
-  "web.download.serviceUnavailable": "다운로드 서비스를 사용할 수 없습니다"
+  "web.download.serviceUnavailable": "다운로드 서비스를 사용할 수 없습니다",
+  "security.connectHelp": "PC의 설정 → 네트워크 설정에서 연결 코드를 확인하고 입력하세요.",
+  "security.code": "연결 코드",
+  "security.codeHelp": "코드는 5분 동안 유효하며 연결할 때마다 바뀝니다. 연결은 최대 8시간 유지되며 서버를 다시 시작하면 해제됩니다.",
+  "security.connected": "연결된 기기: {count}대",
+  "security.revoke": "모든 연결 해제 및 코드 재발급",
+  "security.connect": "연결",
+  "security.logout": "연결 해제",
+  "security.invalidCode": "연결 코드가 잘못되었거나 만료됐습니다. PC에서 새 코드를 확인하세요.",
+  "security.rateLimited": "요청이 많습니다. 잠시 후 다시 시도하세요.",
+  "security.connectionError": "서버에 연결하지 못했습니다. PC에서 서버 상태를 확인하세요.",
+  "security.queueFull": "대기 다운로드는 최대 20건입니다",
+  "security.resourceLimit": "다운로드 자원 제한을 초과했습니다. 작업 수·용량과 저장 공간을 확인하세요",
+  "security.publicResourceLimit": "다운로드 작업 수·용량과 PC의 여유 공간을 확인하세요",
+  "security.integrityFailed": "엔진 SHA-256 검증에 실패했습니다. 설정에서 다시 설치하세요"
 }

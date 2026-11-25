@@ -21,9 +21,10 @@ type GalleryDLDiscoverer interface {
 }
 
 type Runner struct {
-	Storage   Storage
-	Ytdlp     YtdlpEngine
-	GalleryDL GalleryDLDiscoverer
+	SecureNetwork bool
+	Storage       Storage
+	Ytdlp         YtdlpEngine
+	GalleryDL     GalleryDLDiscoverer
 }
 
 type AttemptDiscovery struct {

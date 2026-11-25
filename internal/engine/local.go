@@ -23,7 +23,12 @@ type LocalMetadata struct {
 	Height     *int     `json:"height"`
 	Duration   *float64 `json:"duration"`
 }
-type LocalInspector struct{ FFprobe, FFmpeg, ImageMagick, Cache string }
+type LocalInspector struct {
+	FFprobe, FFmpeg, ImageMagick, Cache string
+	// InspectionThreads bounds each decoder when multiple files are inspected.
+	// Zero preserves the normal preview/inspection defaults.
+	InspectionThreads int
+}
 
 func LocalKind(path string) string {
 	switch strings.ToLower(filepath.Ext(path)) {
@@ -79,6 +84,9 @@ func (i LocalInspector) image(ctx context.Context, path string, extra []string) 
 	}
 	defer f.Close()
 	args := append(imageArguments(work), imageCoder(path)+":-[0]")
+	if i.InspectionThreads > 0 {
+		args = append(imageArguments(work), "-limit", "thread", strconv.Itoa(i.InspectionThreads), imageCoder(path)+":-[0]")
+	}
 	args = append(args, extra...)
 	result, err := new(ProcessRunner).Run(ctx, ProcessRequest{Executable: i.ImageMagick, Directory: work, Timeout: 45 * time.Second, Arguments: args, Input: f})
 	if err != nil {
@@ -138,6 +146,9 @@ func (i LocalInspector) Inspect(ctx context.Context, path, kind string) (LocalMe
 		return metadata, fmt.Errorf("지원하지 않는 파일 형식입니다")
 	}
 	input := []string{"-protocol_whitelist", "file,pipe", "-f", demuxer, "-i", path}
+	if i.InspectionThreads > 0 {
+		input = append([]string{"-threads", strconv.Itoa(i.InspectionThreads)}, input...)
+	}
 	args := []string{"-hide_banner", "-v", "error", "-show_entries", "format=format_name,duration:stream=codec_type,codec_name,width,height,duration:stream_disposition=attached_pic", "-of", "json"}
 	args = append(args, input...)
 	result, err := new(ProcessRunner).Run(ctx, ProcessRequest{Executable: i.FFprobe, Directory: filepath.Dir(path), Timeout: 30 * time.Second, Arguments: args})
@@ -187,8 +198,16 @@ func (i LocalInspector) Inspect(ctx context.Context, path, kind string) (LocalMe
 		stream = "0:a:0"
 	}
 	args = []string{"-nostdin", "-hide_banner", "-loglevel", "error", "-xerror"}
+	if i.InspectionThreads > 0 {
+		threads := strconv.Itoa(i.InspectionThreads)
+		args = append(args, "-filter_threads", threads, "-filter_complex_threads", threads)
+	}
 	args = append(args, input...)
-	args = append(args, "-map", stream, "-t", "0.1", "-f", "null", "-")
+	args = append(args, "-map", stream)
+	if i.InspectionThreads > 0 {
+		args = append(args, "-threads", strconv.Itoa(i.InspectionThreads))
+	}
+	args = append(args, "-t", "0.1", "-f", "null", "-")
 	result, err = new(ProcessRunner).Run(ctx, ProcessRequest{Executable: i.FFmpeg, Directory: filepath.Dir(path), Timeout: 45 * time.Second, Arguments: args})
 	if err != nil {
 		return metadata, fmt.Errorf("미디어 디코딩 검증 실패: %w %s", err, result.Stderr)

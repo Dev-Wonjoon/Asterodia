@@ -10,7 +10,7 @@ type Pending = {
     loading: boolean
 }
 
-const cards = (grid: HTMLElement) => [...grid.querySelectorAll<HTMLElement>(':scope > [data-album-id]')]
+const cards = (grid: HTMLElement) => [...grid.querySelectorAll<HTMLElement>('[data-album-id]')]
 const key = (card: HTMLElement) => `${card.dataset.albumId}:${card.dataset.selectionKey ?? 'group'}`
 
 // Only explicit expand/collapse actions capture a layout. Polling, selection,

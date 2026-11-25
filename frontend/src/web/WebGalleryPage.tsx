@@ -6,6 +6,8 @@ import type { MediaFileDto, MediaFilter, MediaSummaryDto } from '@contracts/medi
 import { createGalleryStore } from '../features/gallery/galleryStore'
 import { GalleryCard, galleryGridClass } from '../features/gallery/GalleryCard'
 import { useGalleryExpansionMotion } from '../features/gallery/useGalleryExpansionMotion'
+import { useVirtualGallery } from '../features/gallery/useVirtualGallery'
+import { galleryDisplayKey } from '../features/gallery/useGallerySelection'
 import { GalleryCardActions } from '../features/gallery/GalleryCardActions'
 import { GalleryActionMenu } from '../features/gallery/GalleryToolbar'
 import { MediaViewer } from '../features/gallery/MediaViewer'
@@ -38,6 +40,8 @@ export function WebGalleryPage({ title, filter, emptyMessage, onExplorerChange }
         if (galleryPosition.current.focus?.isConnected) galleryPosition.current.focus.focus({ preventScroll: true })
     }, [explorerId])
     const grid = useRef<HTMLDivElement>(null)
+    const galleryKeys = useMemo(() => list.page.data.map(galleryDisplayKey), [list.page.data])
+    const virtual = useVirtualGallery(grid, root, galleryKeys)
     const editor = useRef<MediaEditControls>(null), serial = useRef(0)
     const [editEnabled, setEditEnabled] = useState(false), [editBusy, setEditBusy] = useState(false), [error, setError] = useState('')
     const [viewer, setViewer] = useState<{ mediaId: number; fileId?: number } | null>(null)
@@ -120,8 +124,10 @@ export function WebGalleryPage({ title, filter, emptyMessage, onExplorerChange }
                 {(list.status === 'loading' || editBusy) && <p role="status" className="text-sm text-[var(--text-muted)]">{editBusy ? translate("gallery.loadingVideo") : translate("common.loadingCollections")}</p>}
                 {(error || list.error) && <p role="alert">{translateMessage(error) || translateError(list.error)}</p>}
                 {list.status === 'ready' && !list.page.total && <p className="py-16 text-center text-[var(--text-muted)]">{emptyMessage}</p>}
-                <div ref={grid} className={galleryGridClass + ' motion-gallery-grid'} aria-label={translate("common.mediaList")} aria-busy={busy}>
-                    {list.page.data.map(media => <GalleryCard key={media.galleryFile ? `${media.id}:${media.galleryFile.id}` : media.id}
+                <div ref={grid} className={galleryGridClass + ' motion-gallery-grid'} style={virtual.style} aria-label={translate("common.mediaList")} aria-busy={busy}>
+                    {virtual.indices.map(index => {
+                        const media = list.page.data[index]
+                        return <div key={galleryDisplayKey(media)} data-gallery-key={galleryDisplayKey(media)} style={virtual.slotStyle(index)}><GalleryCard
                         media={media} active={detail.mediaId === media.id} disabled={busy} viewDisabled={busy}
                         selectionKey={media.galleryFile ? `file:${media.galleryFile.id}` : `media:${media.id}`}
                         selected={selectedKey === (media.galleryFile ? `file:${media.galleryFile.id}` : `media:${media.id}`)}
@@ -142,7 +148,7 @@ export function WebGalleryPage({ title, filter, emptyMessage, onExplorerChange }
                             onToggleFiles={media.fileCount > 1 || media.galleryFile ? event => toggle(media, event.currentTarget) : undefined}
                             filesLabel={`${media.isUserAlbum ? translate("gallery.album") : translate("media.file")} ${media.galleryFile ? translate("gallery.collapse") : translate("gallery.expand")}`} filesExpanded={!!media.galleryFile}
                             editorDisabled={editBusy} onCreateAnimation={editEnabled && (media.galleryFile ? canEditMedia(media.galleryFile) : media.fileCount === 1 && media.cover?.kind === 'video') ? () => void openEditor(media) : undefined} />
-                    </GalleryCard>)}
+                    </GalleryCard></div>})}
                 </div>
                 <div ref={sentinel} className="h-px" aria-hidden="true" />
                 {list.loadingMore && <p role="status" className="text-center text-sm">{translate("gallery.loading")}</p>}

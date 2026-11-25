@@ -66,7 +66,9 @@ func newFixture(t *testing.T) *fixture {
 	t.Cleanup(server.Close)
 	transport := &http.Transport{Proxy: nil}
 	t.Cleanup(transport.CloseIdleConnections)
-	return &fixture{db: db, root: root, server: server, client: &http.Client{Transport: transport, Timeout: 3 * time.Second}}
+	f := &fixture{db: db, root: root, server: server}
+	f.client = &http.Client{Transport: &connectedTransport{base: transport, server: func() *webserver.Service { return f.server }}, Timeout: 3 * time.Second}
+	return f
 }
 
 func status(t *testing.T, result api.Result) webserver.Status {

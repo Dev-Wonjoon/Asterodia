@@ -37,6 +37,34 @@ it('navigates cards without changing selection and selects a range with Shift', 
  await press('Escape'); expect(document.querySelector('[aria-label="선택 항목 작업"]')).toBeNull()
  await press(' '); expect(document.querySelector('[aria-label="선택 항목 작업"]')?.textContent).toContain('1개 선택')
 })
+it('navigates and extends selection beyond the mounted window, including Home and End', async () => {
+ setup()
+ const first = mocks.state.list.page.data[0]
+ mocks.state.list.page.data = Array.from({length:1000},(_,index)=>({...first,id:index+1,title:'게시글 '+(index+1)}))
+ mocks.state.list.page.total = 1000
+ const size = vi.spyOn(HTMLElement.prototype,'clientHeight','get').mockImplementation(function(){return this.classList.contains('overflow-y-auto')?600:0})
+ const bounds = vi.spyOn(HTMLElement.prototype,'getBoundingClientRect').mockImplementation(function(){
+  const scroll=this.closest<HTMLElement>('.overflow-y-auto')?.scrollTop??0
+  if(this.classList.contains('overflow-y-auto'))return new DOMRect(0,0,700,600)
+  if(this.classList.contains('motion-gallery-grid'))return new DOMRect(0,100-scroll,700,Number.parseFloat(this.style.height))
+  if(this.hasAttribute('data-gallery-key'))return new DOMRect(Number.parseFloat(this.style.left),100-scroll+Number.parseFloat(this.style.top),320,200)
+  return new DOMRect()
+ })
+ try {
+  await mount(h(GalleryPage))
+  const press=async(key:string,shiftKey=false)=>act(async()=>{document.activeElement!.dispatchEvent(new KeyboardEvent('keydown',{key,shiftKey,bubbles:true,cancelable:true}))})
+  await act(async()=>document.querySelector<HTMLButtonElement>('[data-card-focus]')!.focus())
+  await press('End',true)
+  expect(document.activeElement?.closest('article')?.getAttribute('data-album-id')).toBe('1000')
+  expect(document.querySelector('[aria-label="선택 항목 작업"]')?.textContent).toContain('1000개 선택')
+  expect(document.querySelectorAll('article').length).toBeLessThan(20)
+  await press('Home')
+  expect(document.activeElement?.closest('article')?.getAttribute('data-album-id')).toBe('1')
+  for(let step=0;step<15;step++)await press('ArrowDown')
+  expect(document.activeElement?.closest('article')?.getAttribute('data-album-id')).toBe('31')
+  expect(document.querySelectorAll('article').length).toBeLessThan(20)
+ } finally { await cleanupReact(); bounds.mockRestore(); size.mockRestore() }
+})
 it('opens card actions with the keyboard and protects typing and underlying selection under a menu', async () => {
  setup(); await mount(h(GalleryPage))
  const card = document.querySelector<HTMLButtonElement>('[data-card-focus]')!; card.focus()

@@ -29,6 +29,7 @@ func TestMobileOutputOptionsAndJobsKeepPhysicalPathsPrivate(t *testing.T) {
 		t.Fatal("editing not enabled")
 	}
 	client := &http.Client{Transport: &http.Transport{Proxy: nil}}
+	connectMobileClient(t, client, server)
 	csrf := ""
 	request := func(method, path, body string) (int, []byte) {
 		t.Helper()

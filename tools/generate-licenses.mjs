@@ -15,7 +15,7 @@ const run = (command, args, env = {}) => {
     if (result.status !== 0) throw new Error(`${command} ${args.join(' ')}: ${result.stderr}`)
     return result.stdout.trim()
 }
-const inputFiles = ['go.mod', 'go.sum', 'frontend/package.json', 'frontend/package-lock.json', 'frontend/public/Inter-Medium.ttf', 'frontend/public/bg-desktop.jpg', 'frontend/public/bg-mobile.jpg', 'internal/engine/manager.go', 'tools/generate-licenses.mjs', 'internal/licenses/upstream/provenance.json', 'internal/licenses/upstream/engines.json']
+const inputFiles = ['go.mod', 'go.sum', 'frontend/package.json', 'frontend/package-lock.json', 'frontend/public/Inter-Medium.ttf', 'frontend/public/bg-desktop.jpg', 'frontend/public/bg-mobile.jpg', 'internal/engine/manager.go', 'internal/engine/integrity.go', 'internal/engine/imagemagick_runtime.go', 'tools/generate-licenses.mjs', 'internal/licenses/upstream/provenance.json', 'internal/licenses/upstream/engines.json']
 const inputs = () => Object.fromEntries(inputFiles.map(file => [file, inputHash(file, read(path.join(root, file)))]))
 const noticeNames = /^(?:(?:licen[cs]e|copying|notice|copyright|authors|patents)([._-]|$)|third[_-]?party.*(?:licen[cs]e|notice))/i
 const entryID = name => name.replace(/[^a-zA-Z0-9._-]/g, '_')

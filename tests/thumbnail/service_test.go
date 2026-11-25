@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -178,13 +179,15 @@ func queryCount(t *testing.T, db *sql.DB, query string) int {
 	return count
 }
 
-func TestDownloadPreviewFetchesOnlyWhenLocalFilesAreMissing(t *testing.T) {
+func TestDownloadPreviewRejectsInternalThumbnailWhenLocalFilesAreMissing(t *testing.T) {
 	f := newFixture(t, "")
 	imagePath := filepath.Join(f.root, "remote.png")
 	writeImage(t, imagePath)
 	payload, err := os.ReadFile(imagePath)
 	must(t, err)
+	var hits atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
 		w.Write(payload)
 	}))
 	defer server.Close()
@@ -199,17 +202,12 @@ func TestDownloadPreviewFetchesOnlyWhenLocalFilesAreMissing(t *testing.T) {
 	for range 2 {
 		got, err := f.service.GetDownloadPreview(t.Context(), url)
 		must(t, err)
-		if got == nil {
-			t.Fatal("미리보기 누락")
+		if got != nil {
+			t.Fatal("내부망 미리보기가 저장됐습니다", *got)
 		}
-		file, err := os.Open(*got)
-		must(t, err)
-		_, err = jpeg.DecodeConfig(file)
-		file.Close()
-		must(t, err)
 	}
-	if calls != 1 {
-		t.Fatal("중복 웹 조회", calls)
+	if calls != 2 || hits.Load() != 0 {
+		t.Fatal("내부망 HTTP 요청이 차단되지 않았습니다", calls, hits.Load())
 	}
 	for _, invalid := range []string{"file:///source", "https://user:pass@example.invalid/a", "https://example.invalid/no-history"} {
 		got, err := f.service.GetDownloadPreview(t.Context(), invalid)
@@ -218,7 +216,7 @@ func TestDownloadPreviewFetchesOnlyWhenLocalFilesAreMissing(t *testing.T) {
 			t.Fatal(got)
 		}
 	}
-	if calls != 1 {
+	if calls != 2 {
 		t.Fatal("삭제되거나 잘못된 요청의 웹 조회", calls)
 	}
 }

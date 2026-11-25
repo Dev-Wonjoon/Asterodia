@@ -248,6 +248,7 @@ func (g *GalleryDL) discoverGalleryDL(ctx context.Context, originalURL, workDir 
 		defer os.Remove(filepath.Join(workDir, "cookies.txt"))
 	}
 	args := append(g.arguments(), "--warning")
+	args = append(args, networkArguments(ctx)...)
 	args = append(args, auth...)
 	args = append(args, "-J", "--", originalURL)
 	result, err := g.runner.Run(ctx, ProcessRequest{

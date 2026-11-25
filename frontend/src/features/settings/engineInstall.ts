@@ -3,6 +3,7 @@ import type { EngineInstallProgress } from '@contracts/types'
 import { formatBytes } from '@renderer/shared/utils/formatBytes'
 
 const labels: Record<string, string> = {
+    get dependencies() { return translate("settings.preparingRequiredRuntime") },
     get preparing() { return translate("settings.preparingInstallation") }, get downloading() { return translate("download.downloading") }, get extracting() { return translate("settings.extracting") },
     get verifying() { return translate("settings.checkingExecutables") }, get committing() { return translate("settings.applyingInstallationFiles") }, get completed() { return translate("settings.installationCompleted") }, get failed() { return translate("settings.installationFailed") },
 }
@@ -32,6 +33,7 @@ export function mergeInstallProgress(previous: EngineInstallProgress | undefined
     }
 }
 export function installProgressView(progress: EngineInstallProgress) {
+    if (progress.phase === 'dependencies') return { label: labels.dependencies, percent: undefined, detail: '' }
     const downloaded = Number.isFinite(progress.downloaded) ? Math.max(0, progress.downloaded) : 0
     const total = progress.total !== null && Number.isFinite(progress.total) && progress.total > 0 ? progress.total : null
     const percent = progress.phase === 'completed' ? 100 : total === null ? undefined : Math.min(100, downloaded / total * 100)

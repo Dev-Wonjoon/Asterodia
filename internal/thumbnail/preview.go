@@ -21,6 +21,10 @@ func (s *Service) ConfigurePreview(discover func(context.Context, string, string
 	s.preview = discover
 }
 func (s *Service) GetDownloadPreview(ctx context.Context, rawURL string) (*string, error) {
+	return s.getDownloadPreview(ctx, rawURL, newPreviewHTTPClient)
+}
+
+func (s *Service) getDownloadPreview(ctx context.Context, rawURL string, newClient func() *http.Client) (*string, error) {
 	parsed, err := url.Parse(rawURL)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Hostname() == "" || parsed.User != nil {
 		return nil, nil
@@ -84,19 +88,15 @@ func (s *Service) GetDownloadPreview(ctx context.Context, rawURL string) (*strin
 		_ = json.Unmarshal(data.Entries[0], &data)
 	}
 	target, e := url.Parse(data.Thumbnail)
-	if e != nil || target.Hostname() == "" || target.User != nil || (target.Scheme != "http" && target.Scheme != "https") {
+	if e != nil || !validPreviewURL(target) {
 		return nil, nil
 	}
 	req, e := http.NewRequestWithContext(ctx, "GET", target.String(), nil)
 	if e != nil {
 		return nil, nil
 	}
-	client := &http.Client{Timeout: 20 * time.Second, CheckRedirect: func(req *http.Request, via []*http.Request) error {
-		if len(via) > 5 || (req.URL.Scheme != "http" && req.URL.Scheme != "https") {
-			return fmt.Errorf("미리보기 리다이렉트 제한")
-		}
-		return nil
-	}}
+	client := newClient()
+	defer client.CloseIdleConnections()
 	res, e := client.Do(req)
 	if e != nil {
 		return nil, nil

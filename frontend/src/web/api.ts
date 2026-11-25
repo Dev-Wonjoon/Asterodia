@@ -6,6 +6,7 @@ import type { AlbumExplorePage } from '@contracts/media-v2'
 
 export async function request<T>(path: string, options?: RequestInit): Promise<T> {
     const response = await fetch(path, { credentials: 'same-origin', ...options })
+    if (response.status === 401) window.dispatchEvent(new Event('storagebucket:access-expired'))
     if (!response.ok) throw new Error(response.status === 403 ? translate("common.checkMobileEditingPermissionInThePcApp") : translate("common.couldNotConnectToTheServerTryAgainShortly"))
     return response.json()
 }

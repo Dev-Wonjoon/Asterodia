@@ -63,6 +63,23 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if strings.HasPrefix(r.URL.Path, "/api/access/") {
+		s.accessAPI(w, r)
+		return
+	}
+	if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/edit-assets/") {
+		sessionCtx, allowed := s.sessionContext(r)
+		if !allowed {
+			http.Error(w, "PC의 연결 코드로 인증하세요", http.StatusUnauthorized)
+			return
+		}
+		ctx, cancel := context.WithCancel(r.Context())
+		stop := context.AfterFunc(sessionCtx, cancel)
+		defer stop()
+		defer cancel()
+		r = r.WithContext(ctx)
+	}
+
 	editPost := r.Method == http.MethodPost && (r.URL.Path == "/api/albums" || r.URL.Path == "/api/content-filters" || strings.HasPrefix(r.URL.Path, "/api/edit/") || strings.HasPrefix(r.URL.Path, "/api/download/"))
 	if r.Method != http.MethodGet && r.Method != http.MethodHead && !editPost {
 		w.Header().Set("Allow", "GET, HEAD")
@@ -115,6 +132,9 @@ func (s *Service) routes() http.Handler {
 }
 
 func respond(w http.ResponseWriter, r *http.Request, value any) {
+	if r.Context().Err() != nil {
+		return
+	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(10 * time.Second))
 	if r.Method != "HEAD" {
@@ -142,9 +162,15 @@ func (f contextFile) Read(p []byte) (int, error) {
 	return f.ReadSeeker.Read(p)
 }
 
-type streamWriter struct{ http.ResponseWriter }
+type streamWriter struct {
+	http.ResponseWriter
+	ctx context.Context
+}
 
 func (w streamWriter) Write(p []byte) (int, error) {
+	if err := w.ctx.Err(); err != nil {
+		return 0, err
+	}
 	_ = http.NewResponseController(w.ResponseWriter).SetWriteDeadline(time.Now().Add(30 * time.Second))
 	return w.ResponseWriter.Write(p)
 }
@@ -172,7 +198,7 @@ func (s *Service) content(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Disposition", "inline")
 	w.Header().Set("ETag", fmt.Sprintf(`"%x-%x"`, file.Info.Size(), file.Info.ModTime().UnixNano()))
-	http.ServeContent(streamWriter{w}, r, file.Info.Name(), file.Info.ModTime(), contextFile{file.File, r.Context()})
+	http.ServeContent(streamWriter{w, r.Context()}, r, file.Info.Name(), file.Info.ModTime(), contextFile{file.File, r.Context()})
 }
 
 var contentTypes = map[string]string{".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".gif": "image/gif", ".webp": "image/webp", ".avif": "image/avif", ".bmp": "image/bmp", ".tif": "image/tiff", ".tiff": "image/tiff", ".heic": "image/heic", ".heif": "image/heif", ".mp4": "video/mp4", ".webm": "video/webm", ".mov": "video/quicktime", ".mkv": "video/x-matroska", ".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".aac": "audio/aac", ".flac": "audio/flac", ".wav": "audio/wav", ".ogg": "audio/ogg", ".opus": "audio/ogg"}

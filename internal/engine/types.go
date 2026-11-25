@@ -48,12 +48,13 @@ var ErrStopUnconfirmed = errors.New(
 var ErrOutputLimit = errors.New("엔진 출력 크기 제한을 초과했습니다")
 
 type ProcessRequest struct {
-	Executable string
-	Arguments  []string
-	Directory  string
-	Timeout    time.Duration
-	Stdin      string
-	Input      io.Reader
+	Executable  string
+	Arguments   []string
+	Environment []string
+	Directory   string
+	Timeout     time.Duration
+	Stdin       string
+	Input       io.Reader
 	// Binary output bypasses line scanning and retention.
 	Output    io.Writer
 	OnMemory  func(ProcessMemory)

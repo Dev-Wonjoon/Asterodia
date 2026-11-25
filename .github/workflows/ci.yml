@@ -47,7 +47,11 @@ jobs:
         run: ./tools/prepare-release.ps1 -Arch amd64
       - name: Go tests and static analysis
         shell: pwsh
-        run: ./tests/run-go-tests.ps1 -Jobs 2
+        run: |
+          ./tests/run-go-tests.ps1 -Jobs 2
+          if ($LASTEXITCODE -ne 0) { throw 'Go regression tests failed.' }
+          go test ./internal/... -count=1
+          if ($LASTEXITCODE -ne 0) { throw 'Internal Go tests failed.' }
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ci-windows-amd64

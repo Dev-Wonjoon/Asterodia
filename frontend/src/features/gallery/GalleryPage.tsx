@@ -1,6 +1,7 @@
 import { canEditMedia } from '../mediaedit/canEditMedia'
 import { translateError, translateMessage, translate, useLanguage } from '@renderer/shared/i18n'
-import { useGallerySelection, gallerySelectionKey, albumDragType } from './useGallerySelection'
+import { useGallerySelection, gallerySelectionKey, galleryDisplayKey, albumDragType } from './useGallerySelection'
+import { useVirtualGallery, type GalleryGeometry } from './useVirtualGallery'
 import { useGalleryExpansionMotion } from './useGalleryExpansionMotion'
 import { FolderMergeDialog } from './FolderMergeDialog'
 import { AlbumManager, type AlbumControls } from './AlbumManager'
@@ -10,7 +11,7 @@ import { useConfirm } from '@renderer/shared/hooks/useConfirm'
 import { MediaEditLauncher, type MediaEditControls } from '../mediaedit/MediaEditLauncher'
 import { FileMovePanel, type FileMoveControls } from "./FileMovePanel"
 import type { MoveSelection } from "@contracts/file-move-api"
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { useInfiniteScroll } from '@renderer/shared/hooks/useInfiniteScroll'
 import { ListDetailLayout } from '@renderer/shared/components/layout/ListDetailLayout'
 import { useLeaveGuard } from '@renderer/shared/hooks/useLeaveGuard'
@@ -65,7 +66,7 @@ export const GalleryPage = ({
     const [galleryView, setGalleryView] = useState<GalleryView>('all')
     const [showAlbumFiles, setShowAlbumFiles] = useState(false)
     const { store, snapshot: state, openInFolder, downloads, contentVisibility } = useGalleryViewModel(favoritesOnly, filter, galleryView, showAlbumFiles)
-    const activeJobs = !favoritesOnly && !filter && galleryView === 'all' ? downloads.activeJobs : []
+    const activeJobs = useMemo(() => !favoritesOnly && !filter && galleryView === 'all' ? downloads.activeJobs : [], [favoritesOnly, filter, galleryView, downloads.activeJobs])
     const [downloadDetailId, setDownloadDetailId] = useState<string | null>(null)
     useEffect(() => () => downloads.closeDetail(), [downloads.closeDetail])
     useEffect(() => {
@@ -87,8 +88,18 @@ export const GalleryPage = ({
         if (galleryPosition.current.focus?.isConnected) galleryPosition.current.focus.focus({ preventScroll: true })
     }, [explorerId])
     const selectionLocked = useRef(false)
-    const pointerSelection = useGallerySelection(state.list.page.data, selectionLocked, listScrollRef, JSON.stringify([filter ?? {}, favoritesOnly, galleryView, showAlbumFiles, contentVisibility?.key, contentVisibility?.showHidden]))
-    const keyboardFocus = useGalleryKeyboardFocus(pointerSelection.gridRef, state.list.page.data)
+    const galleryGeometry = useRef<GalleryGeometry | null>(null)
+    const pointerSelection = useGallerySelection(state.list.page.data, selectionLocked, listScrollRef, JSON.stringify([filter ?? {}, favoritesOnly, galleryView, showAlbumFiles, contentVisibility?.key, contentVisibility?.showHidden]), galleryGeometry)
+    const galleryItems = useMemo(() => {
+        const rows = state.list.page.data
+        const firstUnpinnedIndex = rows.findIndex(media => !media.galleryPinned && !media.isPinned)
+        const items: ({ kind: 'media'; media: MediaSummaryDto } | { kind: 'download'; job: typeof activeJobs[number] })[] = rows.map(media => ({ kind: 'media', media }))
+        items.splice(firstUnpinnedIndex < 0 ? items.length : firstUnpinnedIndex, 0, ...activeJobs.map(job => ({ kind: 'download' as const, job })))
+        return items
+    }, [state.list.page.data, activeJobs])
+    const galleryKeys = useMemo(() => galleryItems.map(item => item.kind === 'media' ? galleryDisplayKey(item.media) : 'download:' + item.job.id), [galleryItems])
+    const virtual = useVirtualGallery(pointerSelection.gridRef, listScrollRef, galleryKeys, galleryGeometry)
+    const keyboardFocus = useGalleryKeyboardFocus(pointerSelection.gridRef, state.list.page.data, virtual.indices.join(','))
     const selection = pointerSelection.groups
     const albumFileIds = pointerSelection.fileIds
     const albumControls = useRef<AlbumControls>(null)
@@ -284,34 +295,32 @@ export const GalleryPage = ({
         return list.page.data.find(item => gallerySelectionKey(item) === key)
     }
     function focusCard(direction: string, event?: KeyboardEvent) {
-        const grid = pointerSelection.gridRef.current
-        const buttons = [...grid?.querySelectorAll<HTMLButtonElement>('[data-card-focus]:not(:disabled)') ?? []]
-        if (!buttons.length) return false
-        const index = buttons.findIndex(button => button === document.activeElement)
+        const rows = list.page.data
+        if (!rows.length) return false
+        const original = focusedMedia()
+        const index = original ? rows.indexOf(original) : -1
         let next = index < 0 ? 0 : index
         if (direction === 'first') next = 0
-        else if (direction === 'last') next = buttons.length - 1
+        else if (direction === 'last') next = rows.length - 1
         else if (direction === 'left' || direction === 'right') next += direction === 'left' ? -1 : 1
         else if (index >= 0) {
-            const box = buttons[index].getBoundingClientRect(), sign = direction === 'up' ? -1 : 1
-            const candidates = buttons.map((button, i) => ({ i, box: button.getBoundingClientRect() }))
-                .filter(value => sign * (value.box.top - box.top) > 2)
-                .sort((a, b) => Math.abs(a.box.top - box.top) - Math.abs(b.box.top - box.top) || Math.abs(a.box.left - box.left) - Math.abs(b.box.left - box.left))
-            if (candidates.length) {
-                const top = candidates[0].box.top
-                next = candidates.filter(value => Math.abs(value.box.top - top) < 2).sort((a, b) => Math.abs(a.box.left - box.left) - Math.abs(b.box.left - box.left))[0].i
+            const sign = direction === 'up' ? -1 : 1
+            const position = galleryItems.findIndex(item => item.kind === 'media' && item.media === original)
+            const column = position % virtual.columns
+            for (let row = Math.floor(position / virtual.columns) + sign; row >= 0 && row * virtual.columns < galleryItems.length; row += sign) {
+                const candidates = galleryItems.slice(row * virtual.columns, (row + 1) * virtual.columns)
+                    .map((item, column) => ({ item, column })).filter(value => value.item.kind === 'media')
+                    .sort((a, b) => Math.abs(a.column - column) - Math.abs(b.column - column))
+                const target = candidates[0]?.item
+                if (target?.kind === 'media') { next = rows.indexOf(target.media); break }
             }
         }
-        const target = buttons[Math.max(0, Math.min(buttons.length - 1, next))]
+        const target = rows[Math.max(0, Math.min(rows.length - 1, next))]
         if (event?.shiftKey) {
-            const original = focusedMedia()
             if (original && !pointerSelection.entries.size) pointerSelection.select(original, { ctrlKey: false, metaKey: false, shiftKey: false })
         }
-        target.focus(); target.scrollIntoView?.({ block: 'nearest' })
-        if (event?.shiftKey) {
-            const item = focusedMedia()
-            if (item) pointerSelection.select(item, { ctrlKey: false, metaKey: false, shiftKey: true })
-        }
+        virtual.focus(galleryDisplayKey(target))
+        if (event?.shiftKey) pointerSelection.select(target, { ctrlKey: false, metaKey: false, shiftKey: true })
     }
     const cardEnabled = () => !pageDisabled && !viewer && Boolean(focusedMedia())
     useShortcutCommands('gallery', {
@@ -348,8 +357,6 @@ export const GalleryPage = ({
         const isCard = Boolean(target.closest('[data-card-focus]'))
         return isCard || event.ctrlKey || event.altKey || event.metaKey
     })
-    const firstUnpinnedIndex = list.page.data.findIndex(media => !media.galleryPinned && !media.isPinned)
-    const downloadCards = activeJobs.map(job => <GalleryDownloadCard key={'download:' + job.id} job={job} selected={downloadDetailId === job.id} disabled={disabled || moveBusy || tagCommand !== null} cancelling={downloads.cancellingIds.includes(job.id)} onOpen={() => { void openDownload(job.id) }} onCancel={() => downloads.cancelDownload(job.id)} />)
     selectionLocked.current = pageDisabled || tagCommand !== null || viewer !== null
     useEffect(() => { if (!pointerSelection.albumDrag || pageDisabled) setHoveredAlbumId(null) }, [pointerSelection.albumDrag, pageDisabled])
     async function openAnimationEditor(media: MediaSummaryDto) {
@@ -572,11 +579,19 @@ export const GalleryPage = ({
                 )}
 
                 {pointerSelection.rectangle && <div aria-hidden="true" className="pointer-events-none fixed z-50 border border-[var(--color-primary)] bg-[var(--color-primary)]/15" style={pointerSelection.rectangle} />}
-                <div ref={pointerSelection.gridRef} className={galleryGridClass + ' motion-gallery-grid min-h-32'}
+                <div ref={pointerSelection.gridRef} className={galleryGridClass + ' motion-gallery-grid min-h-32'} style={virtual.style}
                     onDragOver={event => { if (!event.defaultPrevented) event.dataTransfer.dropEffect = 'none' }}
                     onDrop={event => event.preventDefault()}>
-                    {list.page.data.flatMap((media, index) => [
-                        ...(index === firstUnpinnedIndex ? downloadCards : []),
+                    {virtual.indices.map(index => {
+                        const item = galleryItems[index]
+                        if (item.kind === 'download') {
+                            const { job } = item
+                            return <div key={'download:' + job.id} data-gallery-key={'download:' + job.id} style={virtual.slotStyle(index)}>
+                                <GalleryDownloadCard job={job} selected={downloadDetailId === job.id} disabled={disabled || moveBusy || tagCommand !== null} cancelling={downloads.cancellingIds.includes(job.id)} onOpen={() => { void openDownload(job.id) }} onCancel={() => downloads.cancelDownload(job.id)} />
+                            </div>
+                        }
+                        const { media } = item
+                        return <div key={galleryDisplayKey(media)} data-gallery-key={galleryDisplayKey(media)} style={virtual.slotStyle(index)}>
                         <GalleryCard
                             key={media.galleryFile ? `album:${media.id}:file:${media.galleryFile.id}` : `album:${media.id}`}
                             media={media}
@@ -647,8 +662,8 @@ export const GalleryPage = ({
                                 removalLabel={removalLabel(removalCounts(media))}
                             />
                         </GalleryCard>
-                    ])}
-                    {firstUnpinnedIndex === -1 && downloadCards}
+                        </div>
+                    })}
                 </div>
 
                 {list.page.total > 0 && (

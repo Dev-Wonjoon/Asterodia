@@ -8,9 +8,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
+	"unicode/utf16"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -46,7 +49,8 @@ func newWindowsJob() (*windowsJob, error) {
 
 	var limits windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION
 	limits.BasicLimitInformation.LimitFlags =
-		windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+		windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | windows.JOB_OBJECT_LIMIT_JOB_MEMORY
+	limits.JobMemoryLimit = uintptr(2 << 30)
 
 	_, err = windows.SetInformationJobObject(
 		handle,
@@ -153,6 +157,7 @@ func createSuspendedProcess(
 	stdin windows.Handle,
 	stdout windows.Handle,
 	stderr windows.Handle,
+	environment []string,
 ) (*windows.ProcessInformation, error) {
 	if !filepath.IsAbs(executable) ||
 		!filepath.IsAbs(directory) {
@@ -250,6 +255,19 @@ func createSuspendedProcess(
 	)
 
 	process := new(windows.ProcessInformation)
+	var environmentBlock []uint16
+	var environmentPointer *uint16
+	if environment != nil {
+		values := append([]string{}, environment...)
+		for _, value := range values {
+			if strings.ContainsRune(value, 0) {
+				return nil, fmt.Errorf("실행 환경에 NUL 문자가 있습니다")
+			}
+		}
+		sort.Slice(values, func(i, j int) bool { return strings.ToUpper(values[i]) < strings.ToUpper(values[j]) })
+		environmentBlock = utf16.Encode([]rune(strings.Join(values, "\x00") + "\x00\x00"))
+		environmentPointer = &environmentBlock[0]
+	}
 
 	err = windows.CreateProcess(
 		executablePtr,
@@ -258,11 +276,12 @@ func createSuspendedProcess(
 		nil,
 		true,
 		flags,
-		nil,
+		environmentPointer,
 		directoryPtr,
 		&startup.StartupInfo,
 		process,
 	)
+	runtime.KeepAlive(environmentBlock)
 	if err != nil {
 		return nil, fmt.Errorf("엔진 프로세스 생성: %w", err)
 	}
@@ -443,6 +462,7 @@ func runWindowsProcess(
 		windows.Handle(stdin.Fd()),
 		windows.Handle(stdoutWriter.Fd()),
 		windows.Handle(stderrWriter.Fd()),
+		request.Environment,
 	)
 	if err != nil {
 		return result, err

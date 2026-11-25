@@ -59,6 +59,7 @@ const api: AppApi = {
   retry: request => response(FileMoveService.Retry(wire(request))),
  },
     webServer: {
+        revokeAccess: () => response(WebServerService.RevokeAccess()),
         setEditing: enabled => response(WebServerService.SetEditing(enabled)),
         setDownloading: enabled => response(WebServerService.SetDownloading(enabled)),
         status: () => response(WebServerService.Status()),

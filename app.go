@@ -32,6 +32,7 @@ func applicationServices(
 	updates *update.Service,
 	updateGate *api.UpdateGate,
 ) ([]application.Service, func(http.Handler) http.Handler, func(), error) {
+	engine.ConfigureIntegrityRoot(paths.Bin)
 	if err := os.MkdirAll(paths.Data, 0700); err != nil {
 		return nil, nil, nil, err
 	}
@@ -73,7 +74,9 @@ func applicationServices(
 	})
 	inspector := engine.LocalInspector{FFprobe: filepath.Join(paths.Bin, "ffprobe.exe"), FFmpeg: filepath.Join(paths.Bin, "ffmpeg.exe"), ImageMagick: filepath.Join(paths.Bin, "imagemagick", "magick.exe"), Cache: paths.Cache}
 	thumb.ConfigureImages(inspector)
-	localImporter := localimport.NewService(db, inspector, func() (string, error) {
+	importInspector := inspector
+	importInspector.InspectionThreads = 1
+	localImporter := localimport.NewService(db, importInspector, func() (string, error) {
 		return application.Get().Dialog.OpenFile().CanChooseFiles(false).CanChooseDirectories(true).SetTitle("라이브러리에 가져올 폴더 선택").PromptForSingleSelection()
 	}, func(id int64) {
 		thumb.ScheduleMedia(id)
@@ -82,6 +85,11 @@ func applicationServices(
 		}
 	})
 	thumb.ConfigurePreview(func(ctx context.Context, url, dir string) (json.RawMessage, error) {
+		ctx, closeNetwork, err := engine.SecureContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		defer closeNetwork()
 		snapshot := config.Snapshot()
 		kind, err := engine.Select(url, engine.Options{})
 		if err != nil || kind != engine.KindYtdlp {
@@ -96,7 +104,7 @@ func applicationServices(
 		if node, err := exec.LookPath("node"); err == nil {
 			jsRuntime = "node:" + node
 		}
-		return download.Runner{Storage: download.Storage{Root: root}, Ytdlp: &engine.Ytdlp{Executable: filepath.Join(paths.Bin, "yt-dlp.exe"), JSRuntime: jsRuntime, FFmpegLocation: filepath.Join(paths.Bin, "ffmpeg.exe"), CookieBrowser: snapshot.CookieBrowser, CookieFile: snapshot.CookieFilePath, NoPlaylist: options.Playlist == nil || !*options.Playlist}, GalleryDL: &engine.GalleryDL{Executable: filepath.Join(paths.Bin, "gallery-dl.exe"), CookieBrowser: snapshot.CookieBrowser, CookieFile: snapshot.CookieFilePath}}
+		return download.Runner{SecureNetwork: true, Storage: download.Storage{Root: root}, Ytdlp: &engine.Ytdlp{Executable: filepath.Join(paths.Bin, "yt-dlp.exe"), JSRuntime: jsRuntime, FFmpegLocation: filepath.Join(paths.Bin, "ffmpeg.exe"), CookieBrowser: snapshot.CookieBrowser, CookieFile: snapshot.CookieFilePath, NoPlaylist: options.Playlist == nil || !*options.Playlist}, GalleryDL: &engine.GalleryDL{Executable: filepath.Join(paths.Bin, "gallery-dl.exe"), CookieBrowser: snapshot.CookieBrowser, CookieFile: snapshot.CookieFilePath}}
 	}, thumb.ScheduleMedia)
 	downloader.ConfigureImages(inspector)
 	web.ConfigureDownloader(downloader)

@@ -24,6 +24,7 @@ func TestMobileWriteBoundaryAndSharedJobs(t *testing.T) {
 	t.Cleanup(server.Close)
 	state := success[webserver.Status](t, server.Start())
 	client := &http.Client{Transport: &http.Transport{Proxy: nil}}
+	connectMobileClient(t, client, server)
 	request := func(method, path, body, csrf, origin string) (int, []byte, http.Header) {
 		t.Helper()
 		req, e := http.NewRequest(method, state.URL+path, strings.NewReader(body))
@@ -138,6 +139,7 @@ func TestMobileGIFInputMetadata(t *testing.T) {
 	t.Cleanup(server.Close)
 	state := success[webserver.Status](t, server.Start())
 	client := &http.Client{Transport: &http.Transport{Proxy: nil}}
+	connectMobileClient(t, client, server)
 	var mediaID int64
 	if e := f.db.QueryRow("SELECT media_id FROM media_file WHERE id=?", f.fileID).Scan(&mediaID); e != nil {
 		t.Fatal(e)

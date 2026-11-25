@@ -38,34 +38,19 @@ type binaryDefinition struct {
 }
 
 func binaryDefinitions() []binaryDefinition {
-	return []binaryDefinition{
-		{name: "ffprobe", filename: "ffprobe.exe", versionArgs: []string{"-version"}, downloadURL: "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip", archive: true},
-		{name: "imagemagick", filename: "imagemagick/magick.exe", versionArgs: []string{"-version"}, downloadURL: "https://github.com/ImageMagick/ImageMagick/releases/download/7.1.2-34/ImageMagick-7.1.2-34-portable-Q16-x64.7z", archive: true, sevenZip: true, sha256: "52cc6a441c7884f5ff4274b410c9b90c4b7d54245dcdf4d32988bb4e4df4e5d1"},
-		{
-			name:            "yt-dlp",
-			filename:        "yt-dlp.exe",
-			expectedVersion: "2026.10.26",
-			versionArgs:     []string{"--ignore-config", "--version"},
-			downloadURL: "https://github.com/yt-dlp/yt-dlp/" +
-				"releases/download/2026.10.26/yt-dlp.exe",
-		},
-		{
-			name:            "gallery-dl",
-			filename:        "gallery-dl.exe",
-			expectedVersion: "1.32.20",
-			versionArgs:     []string{"--config-ignore", "--version"},
-			downloadURL: "https://codeberg.org/mikf/gallery-dl/" +
-				"releases/download/v1.32.20/gallery-dl.exe",
-		},
-		{
-			name:        "ffmpeg",
-			filename:    "ffmpeg.exe",
-			versionArgs: []string{"-version"},
-			downloadURL: "https://github.com/BtbN/FFmpeg-Builds/" +
-				"releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
-			archive: true,
-		},
+	definitions := []binaryDefinition{
+		{name: "ffprobe", filename: "ffprobe.exe", versionArgs: []string{"-version"}, archive: true},
+		{name: "imagemagick", filename: "imagemagick/magick.exe", versionArgs: []string{"-version"}, archive: true, sevenZip: true},
+		{name: "yt-dlp", filename: "yt-dlp.exe", expectedVersion: "2026.10.26", versionArgs: []string{"--ignore-config", "--version"}},
+		{name: "gallery-dl", filename: "gallery-dl.exe", expectedVersion: "1.32.20", versionArgs: []string{"--config-ignore", "--version"}},
+		{name: "ffmpeg", filename: "ffmpeg.exe", versionArgs: []string{"-version"}, archive: true},
 	}
+	for i := range definitions {
+		pin := enginePins[definitions[i].name]
+		definitions[i].downloadURL = pin.URL
+		definitions[i].sha256 = pin.ArchiveSHA
+	}
+	return definitions
 }
 
 func lookupBinary(name string) (binaryDefinition, error) {
@@ -154,6 +139,18 @@ func (m *Manager) Status(
 			if !binary.Present {
 				status.Error = "엔진 실행 파일이 없거나 올바른 파일이 아닙니다."
 			} else {
+				if err := verifyEngineDigest(binary.Path, enginePins[name].BinarySHA); err != nil {
+					status.Error = err.Error()
+					results <- probeResult{name: name, status: status}
+					return
+				}
+				if name == "imagemagick" {
+					if err := verifyImageRuntime(filepath.Dir(binary.Path)); err != nil {
+						status.Error = err.Error()
+						results <- probeResult{name: name, status: status}
+						return
+					}
+				}
 				version, err := m.runner.ReadVersion(
 					ctx,
 					name,
@@ -270,10 +267,11 @@ func (m *Manager) Install(
 		}
 
 		report("verifying", 0, nil, "")
-		if _, err := m.runner.ReadVersion(
-			ctx, name, destination,
-		); err == nil {
-			return true, nil
+		if verifyEngineDigest(destination, enginePins[name].BinarySHA) == nil &&
+			(name != "imagemagick" || verifyImageRuntime(filepath.Dir(destination)) == nil) {
+			if _, err := m.runner.ReadVersion(ctx, name, destination); err == nil {
+				return true, nil
+			}
 		}
 
 	case !os.IsNotExist(err):
@@ -314,6 +312,9 @@ func (m *Manager) Install(
 		return false, fmt.Errorf("%s 다운로드: %w", name, err)
 	}
 
+	if err := verifyEngineDigest(downloadPath, definition.sha256); err != nil {
+		return false, err
+	}
 	if definition.archive {
 		report("extracting", 0, nil, "")
 		if definition.sevenZip {
@@ -329,16 +330,30 @@ func (m *Manager) Install(
 		}
 	}
 
+	if name == "imagemagick" {
+		report("dependencies", 0, nil, "")
+		if err := prepareImageRuntime(ctx, filepath.Dir(stagedBinary), staging); err != nil {
+			return false, err
+		}
+	}
 	report("verifying", 0, nil, "")
 	if err := validateEngineBinary(stagedBinary); err != nil {
 		return false, fmt.Errorf("%s 파일 검증: %w", name, err)
 	}
 
+	if err := verifyEngineDigest(stagedBinary, enginePins[name].BinarySHA); err != nil {
+		return false, err
+	}
 	version, err := m.runner.ReadVersion(
 		ctx, name, stagedBinary,
 	)
 	if err != nil {
 		return false, err
+	}
+	if name == "imagemagick" {
+		if err := validateImageConversion(ctx, stagedBinary, staging); err != nil {
+			return false, err
+		}
 	}
 
 	if err := ctx.Err(); err != nil {

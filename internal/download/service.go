@@ -9,6 +9,7 @@ import (
 	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 )
@@ -134,6 +135,8 @@ func fail(err error) api.Result {
 		code = "REVISION_CONFLICT"
 	case errors.Is(err, engine.ErrInvalidURL):
 		code = "INVALID_ARGUMENT"
+	case errors.Is(err, ErrResourceLimit):
+		code = "RESOURCE_LIMIT"
 	case errors.Is(err, engine.ErrInstagramURL):
 		code = "UNSUPPORTED_INSTAGRAM_URL"
 	case errors.Is(err, engine.ErrInstagramOptions):
@@ -197,6 +200,16 @@ func (s *Service) Enqueue(ctx context.Context, req EnqueueRequest) api.Result {
 	defer s.mu.Unlock()
 	if s.closed {
 		return api.Failure("NOT_READY", "앱을 종료하고 있습니다")
+	}
+	full, queueErr := s.downloadQueueFull(ctx)
+	if queueErr != nil {
+		return fail(queueErr)
+	}
+	if full {
+		return api.Failure("QUEUE_FULL", "대기 다운로드는 최대 20건입니다")
+	}
+	if err := checkDownloadResources(root, ""); err != nil {
+		return fail(err)
 	}
 	record, err := NewStore(s.db).CreateInitialAttempt(ctx, InitialAttemptInput{OriginalURL: req.URL, StorageRoot: root, Options: req.Options, ReplaceMediaID: req.MediaID, ExpectedRevision: req.ExpectedRevision})
 	if err != nil {
@@ -303,7 +316,20 @@ func (s *Service) Run(ctx context.Context, req RunRequest) api.Result {
 		s.mu.Unlock()
 		return api.Failure("IMPORTED_HISTORY", "가져오거나 이관한 작업은 보존된 이력입니다. 다시 다운로드하려면 URL을 새로 등록하세요")
 	}
+	if len(s.active) >= MaxQueuedDownloads+maxConcurrentDownloads {
+		s.mu.Unlock()
+		return api.Failure("QUEUE_FULL", "대기 다운로드는 최대 20건입니다")
+	}
 	if req.Trigger != "manual_initial" {
+		full, queueErr := s.downloadQueueFull(ctx)
+		if queueErr != nil {
+			s.mu.Unlock()
+			return fail(queueErr)
+		}
+		if full {
+			s.mu.Unlock()
+			return api.Failure("QUEUE_FULL", "대기 다운로드는 최대 20건입니다")
+		}
 		if err := s.retry(ctx, req.JobID, req.Trigger); err != nil {
 			s.mu.Unlock()
 			return fail(err)
@@ -352,11 +378,25 @@ func (s *Service) Run(ctx context.Context, req RunRequest) api.Result {
 		} else {
 			journal.note("다운로드 대상 조회 시작")
 			runner := s.factory(root, opts)
-			discovery, e := runner.DiscoverAttempt(workCtx, req.JobID, attempt, url, opts)
-			err = e
+			stopWatch := watchDownloadResources(workCtx, cancel, root, filepath.Join(root, ".storagebucket", "staging", stageOwner(req.JobID, attempt)))
+			closeNetwork := func() {}
+			if runner.SecureNetwork {
+				workCtx, closeNetwork, err = engine.SecureContext(workCtx)
+			}
+			var discovery AttemptDiscovery
+			if err == nil {
+				discovery, err = runner.DiscoverAttempt(workCtx, req.JobID, attempt, url, opts)
+			}
 			if err == nil {
 				journal.note("대상 확정 · 파일 다운로드 시작")
 				_, err = runner.FreezeAndStageAttempt(workCtx, NewStore(s.db), discovery)
+			}
+			closeNetwork()
+			if limitErr := stopWatch(); limitErr != nil {
+				err = limitErr
+			}
+			if err == nil {
+				err = checkDownloadResources(root, filepath.Join(root, ".storagebucket", "staging", stageOwner(req.JobID, attempt)))
 			}
 		}
 	case <-workCtx.Done():
@@ -390,6 +430,10 @@ func (s *Service) Run(ctx context.Context, req RunRequest) api.Result {
 		}
 		if errors.Is(err, ErrRevisionConflict) {
 			code = "REVISION_CONFLICT"
+		}
+		if errors.Is(err, ErrResourceLimit) {
+			code = "RESOURCE_LIMIT"
+			outcome = "failed"
 		}
 		if errors.Is(err, engine.ErrStopUnconfirmed) {
 			code = "ENGINE_STOP_UNCONFIRMED"

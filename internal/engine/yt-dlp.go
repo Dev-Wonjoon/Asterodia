@@ -75,6 +75,7 @@ func (y *Ytdlp) Discover(
 		"--dump-single-json",
 		"--no-quiet",
 	}
+	args = append(args, networkArguments(ctx)...)
 
 	if y.JSRuntime != "" {
 		args = append(args, "--js-runtimes", y.JSRuntime)
@@ -271,7 +272,18 @@ func (y *Ytdlp) DownloadSingle(
 		},
 	}
 
+	request.Arguments = append(request.Arguments, networkArguments(ctx)...)
+	if len(networkArguments(ctx)) > 0 {
+		request.Arguments = append(request.Arguments, "--downloader-args", "ffmpeg_i:-protocol_whitelist file,pipe")
+	}
+	request.Arguments = append(request.Arguments, "--downloader", "dash,m3u8:native", "--max-filesize", "20G")
 	if audio || merge || streaming {
+		if err := verifyManagedExecutable(y.FFmpegLocation); err != nil {
+			return "", err
+		}
+		if err := verifyManagedExecutable(filepath.Join(filepath.Dir(y.FFmpegLocation), "ffprobe.exe")); err != nil {
+			return "", err
+		}
 		request.Arguments = append(request.Arguments,
 			"--ffmpeg-location", y.FFmpegLocation,
 		)
