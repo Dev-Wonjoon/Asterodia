@@ -126,6 +126,43 @@ func TestCheckDownloadRestart(t *testing.T) {
 	gate.Thaw()
 }
 
+func TestReleaseNotesDisplayWithoutOuterMarkdownFence(t *testing.T) {
+	s, b, _, _ := setup(t)
+	for _, tc := range []struct {
+		name, notes, want string
+	}{
+		{"markdown", "```markdown\n## 한국어\n- 썸네일 개선\n\n## English\n- Improve thumbnails\n```", "## 한국어\n- 썸네일 개선\n\n## English\n- Improve thumbnails"},
+		{"md", "```md\n- Changes\n```", "- Changes"},
+		{"unlabeled", "```\n- Changes\n```", "- Changes"},
+		{"windows-newlines", "\r\n```Markdown\r\n## 한국어\r\n- 변경 사항\r\n```\r\n", "## 한국어\r\n- 변경 사항"},
+		{"code-example", "````markdown\n## Example\n```go\nfmt.Println(1)\n```\n````", "## Example\n```go\nfmt.Println(1)\n```"},
+		{"plain", "  ## Changes\n- Keep `inline code`\n", "  ## Changes\n- Keep `inline code`\n"},
+		{"embedded-example", "## Example\n```markdown\n# Sample\n```", "## Example\n```markdown\n# Sample\n```"},
+		{"other-language", "```go\nfmt.Println(1)\n```", "```go\nfmt.Println(1)\n```"},
+		{"multiple-blocks", "```markdown\nFirst\n```\nSecond\n```markdown\nThird\n```", "```markdown\nFirst\n```\nSecond\n```markdown\nThird\n```"},
+		{"unclosed", "```markdown\n- Changes", "```markdown\n- Changes"},
+		{"empty-wrapper", "```markdown\n```", ""},
+		{"empty", "", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			b.release.Notes = tc.notes
+			result := s.Check(t.Context())
+			if !result.OK {
+				t.Fatal(result.Error)
+			}
+			if status := result.Data.(appupdate.Status); status.Notes != tc.want || status.Version != "2.0.2" {
+				t.Fatalf("display notes = %q, want %q", status.Notes, tc.want)
+			}
+			if got := s.Status().Data.(appupdate.Status).Notes; got != tc.want {
+				t.Fatalf("polled notes = %q, want %q", got, tc.want)
+			}
+			if b.release.Notes != tc.notes {
+				t.Fatal("original release notes were modified")
+			}
+		})
+	}
+}
+
 func TestFailedRestartReopensWorkGate(t *testing.T) {
 	s, b, gate, _ := setup(t)
 	_ = s.Check(t.Context())
@@ -184,14 +221,14 @@ func TestCheckFailureCanBeRetried(t *testing.T) {
 func TestChecksAutomaticallyWithoutDownloading(t *testing.T) {
 	s, b, _, _ := setup(t)
 	s.Start()
-	deadline := time.NewTimer(12 * time.Second)
+	deadline := time.NewTimer(2 * time.Second)
 	defer deadline.Stop()
 	poll := time.NewTicker(20 * time.Millisecond)
 	defer poll.Stop()
 	for {
 		select {
 		case <-deadline.C:
-			t.Fatal("startup update check never ran")
+			t.Fatal("startup update check was not performed promptly")
 		case <-poll.C:
 			if s.Status().Data.(appupdate.Status).State == "available" {
 				s.Close()

@@ -131,13 +131,13 @@ func TestSearchV9CompatibilityMigration(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if countDB(t, db, "PRAGMA user_version") != 12 || textDB(t, db, "SELECT custom_title FROM media WHERE id=7") != "사용자 제목" || countDB(t, db, "SELECT revision FROM media WHERE id=7") != 12 || textDB(t, db, "SELECT file_uuid FROM media_file WHERE media_id=7") != uuid || countDB(t, db, "SELECT count(*) FROM favorite WHERE media_id=7") != 1 || countDB(t, db, "SELECT count(*) FROM media_tag WHERE media_id=7") != 1 || countDB(t, db, "SELECT count(*) FROM migration_run WHERE id='old-v9'") != 1 || countDB(t, db, "SELECT count(*) FROM search_term") != terms || countDB(t, db, "SELECT count(*) FROM search_dirty WHERE media_id=7") != 1 {
+				if countDB(t, db, "PRAGMA user_version") != 13 || textDB(t, db, "SELECT custom_title FROM media WHERE id=7") != "사용자 제목" || countDB(t, db, "SELECT revision FROM media WHERE id=7") != 12 || textDB(t, db, "SELECT file_uuid FROM media_file WHERE media_id=7") != uuid || countDB(t, db, "SELECT count(*) FROM favorite WHERE media_id=7") != 1 || countDB(t, db, "SELECT count(*) FROM media_tag WHERE media_id=7") != 1 || countDB(t, db, "SELECT count(*) FROM migration_run WHERE id='old-v9'") != 1 || countDB(t, db, "SELECT count(*) FROM search_term") != terms || countDB(t, db, "SELECT count(*) FROM search_dirty WHERE media_id=7") != 1 {
 					t.Fatal("v9 자료 또는 검색 색인을 보존하지 못했습니다")
 				}
 				if !strings.Contains(textDB(t, db, "SELECT sql FROM sqlite_master WHERE name='search_profile_update'"), "SELECT DISTINCT candidate.media_id") {
 					t.Fatal("트리거 전환 누락")
 				}
-				backupPath := textDB(t, db, "SELECT backup_path FROM migration_run WHERE target_version=12")
+				backupPath := textDB(t, db, "SELECT backup_path FROM migration_run WHERE target_version=13")
 				backup := rawDB(t, backupPath)
 				if countDB(t, backup, "PRAGMA user_version") != 9 || textDB(t, backup, "SELECT sql FROM sqlite_master WHERE name='search_profile_update'") != triggerBefore || textDB(t, backup, "SELECT custom_title FROM media WHERE id=7") != "사용자 제목" {
 					t.Fatal("v9 백업 원문 유실")
@@ -150,7 +150,7 @@ func TestSearchV9CompatibilityMigration(t *testing.T) {
 					t.Fatal(err)
 				}
 				defer reopened.Close()
-				if countDB(t, reopened, "SELECT count(*) FROM migration_run WHERE target_version=12") != 1 {
+				if countDB(t, reopened, "SELECT count(*) FROM migration_run WHERE target_version=13") != 1 {
 					t.Fatal("중복 전환")
 				}
 			})

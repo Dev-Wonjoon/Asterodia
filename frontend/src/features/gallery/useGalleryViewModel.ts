@@ -5,20 +5,22 @@ import { getApi } from '@renderer/shared/api'
 import { useToast } from '@renderer/shared/hooks/useToast'
 import { useDownloadViewModel } from '@renderer/features/download/useDownloadViewModel'
 import { createGalleryStore } from './galleryStore'
+import { useContentVisibility } from '@renderer/shared/hooks/useContentVisibility'
 
 export function useGalleryViewModel(favoritesOnly = false, filter?: MediaFilter, galleryView: GalleryView = 'all', showAlbumFiles = false) {
     const { showToast } = useToast()
+    const contentVisibility = useContentVisibility()
 
     const store = useMemo(
-        () => createGalleryStore(getApi().media, { favoritesOnly, expandAlbums: true, galleryView, showAlbumFiles }),
-        [favoritesOnly, galleryView, showAlbumFiles]
+        () => createGalleryStore(getApi().media, { favoritesOnly, expandAlbums: true, albumCards: true, galleryView, showAlbumFiles }),
+        [favoritesOnly, galleryView, showAlbumFiles, contentVisibility.key, contentVisibility.showHidden]
     )
 
     const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
 
     const downloads = useDownloadViewModel()
     const { mediaRevision } = downloads
-    const filterKey = JSON.stringify(filter ?? {})
+    const filterKey = JSON.stringify({ ...filter, ...(contentVisibility.showHidden ? { showHidden: true } : {}) })
 
     useEffect(() => () => store.cancelReads(), [store])
 
@@ -57,6 +59,7 @@ export function useGalleryViewModel(favoritesOnly = false, filter?: MediaFilter,
     )
 
     return {
+        contentVisibility,
         store,
         snapshot,
         downloads,

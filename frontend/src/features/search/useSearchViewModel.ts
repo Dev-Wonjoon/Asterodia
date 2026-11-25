@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { MediaFilter, MediaSuggestionRequest } from '@contracts/media-v2'
 import { getApi } from '@renderer/shared/api'
 import { useSuggestions } from '@renderer/shared/hooks/useSuggestions'
+import { useContentVisibility } from '@renderer/shared/hooks/useContentVisibility'
 
 async function suggest(kind: MediaSuggestionRequest['kind'], text: string): Promise<string[]> {
     const result = await getApi().media.suggest({
@@ -23,19 +24,20 @@ const fetchPlatforms = (text: string) => suggest('platform', text)
 
 const fetchAuthors = (text: string) => suggest('author', text)
 
-export function useSearchViewModel() {
-    const [keyword, setKeyword] = useState('')
+export function useSearchViewModel(initial: MediaFilter = {}) {
+    const visibility = useContentVisibility()
+    const [keyword, setKeyword] = useState(initial.keyword ?? '')
     const [composing, setSearchComposing] = useState(false)
 
-    const [debouncedKeyword, setDebouncedKeyword] = useState('')
+    const [debouncedKeyword, setDebouncedKeyword] = useState(initial.keyword ?? '')
 
-    const [selectedTags, setSelectedTags] = useState<string[]>([])
+    const [selectedTags, setSelectedTags] = useState<string[]>(initial.tags ?? [])
 
-    const [tagMode, setTagMode] = useState<'and' | 'or'>('and')
+    const [tagMode, setTagMode] = useState<'and' | 'or'>(initial.tagMode ?? 'and')
 
-    const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
+    const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(initial.platforms ?? [])
 
-    const [selectedAuthors, setSelectedAuthors] = useState<string[]>([])
+    const [selectedAuthors, setSelectedAuthors] = useState<string[]>(initial.authors ?? [])
 
     const tags = useSuggestions(fetchTags, selectedTags)
 
@@ -53,12 +55,13 @@ export function useSearchViewModel() {
     const filter = useMemo<MediaFilter>(
         () => ({
             keyword: debouncedKeyword,
+            ...(visibility.showHidden ? { showHidden: true } : {}),
             tags: selectedTags,
             tagMode,
             platforms: selectedPlatforms,
             authors: selectedAuthors
         }),
-        [debouncedKeyword, selectedTags, tagMode, selectedPlatforms, selectedAuthors]
+        [debouncedKeyword, selectedTags, tagMode, selectedPlatforms, selectedAuthors, visibility.showHidden]
     )
 
     const add = (

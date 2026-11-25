@@ -1,30 +1,73 @@
 import { translate, useLanguage } from '@renderer/shared/i18n'
-import { useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { toMediaUrl } from '@renderer/shared/utils/media'
 
-export function MediaPreview({
-    path,
-    fallbackPath = null,
-    resolveUrl = toMediaUrl,
-    title,
-    draggable,
-    className = ''
-}: {
+interface MediaPreviewProps {
     path: string | null
     fallbackPath?: string | null
     resolveUrl?: typeof toMediaUrl
     title: string
     draggable?: boolean
     className?: string
-}) {
+    fallback?: ReactNode
+    identity?: string
+    retryKey?: number
+}
+
+export function MediaPreview({ identity, retryKey = 0, ...props }: MediaPreviewProps) {
+    return <PreviewImage key={JSON.stringify([identity, retryKey])} {...props} />
+}
+
+function PreviewImage({
+    path,
+    fallbackPath = null,
+    resolveUrl = toMediaUrl,
+    title,
+    draggable,
+    className = '',
+    fallback
+}: MediaPreviewProps) {
     useLanguage()
     const candidates = [resolveUrl(path), resolveUrl(fallbackPath)]
-    const sourceKey = JSON.stringify(candidates)
-    const [failure, setFailure] = useState<{ sourceKey: string; urls: string[] } | null>(null)
-    const failedUrls = failure?.sourceKey === sourceKey ? failure.urls : []
+    const [failedUrls, setFailedUrls] = useState<string[]>([])
+    const [loadedUrl, setLoadedUrl] = useState<string | null>(null)
     const url = candidates.find(candidate => candidate && !failedUrls.includes(candidate))
+    const hasCandidates = candidates.some(Boolean)
 
-    if (!url) {
+    useEffect(() => {
+        if (!hasCandidates) {
+            setLoadedUrl(null)
+            return
+        }
+        if (!loadedUrl || !url || loadedUrl === url) return
+
+        // Keep the already displayed image until its replacement is decoded.
+        // Initial images still use native lazy loading.
+        let active = true
+        const image = new Image()
+        image.onload = async () => {
+            try {
+                await image.decode()
+                if (active) setLoadedUrl(url)
+            } catch {
+                if (active) setFailedUrls(previous => [...previous, url])
+            }
+        }
+        image.onerror = () => {
+            if (active) setFailedUrls(previous => [...previous, url])
+        }
+        image.src = url
+        return () => {
+            active = false
+            image.onload = null
+            image.onerror = null
+        }
+    }, [hasCandidates, loadedUrl, url])
+
+    const displayedUrl = hasCandidates ? loadedUrl ?? url : null
+
+    if (!displayedUrl) {
+        if (fallback !== undefined) return <>{fallback}</>
         return (
             <div
                 className={
@@ -37,14 +80,15 @@ export function MediaPreview({
     return (
         <img
             draggable={draggable}
-            src={url}
+            src={displayedUrl}
             alt={title}
             loading="lazy"
             className={className}
-            onError={() => setFailure(previous => ({
-                sourceKey,
-                urls: [...(previous?.sourceKey === sourceKey ? previous.urls : []), url]
-            }))}
+            onLoad={() => setLoadedUrl(displayedUrl)}
+            onError={() => {
+                setFailedUrls(previous => [...previous, displayedUrl])
+                setLoadedUrl(previous => previous === displayedUrl ? null : previous)
+            }}
         />
     )
 }

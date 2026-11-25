@@ -27,7 +27,7 @@ export function DownloadDetailPane(): React.JSX.Element | null {
     const failure = job.errorCode ? downloadFailure(job.errorCode) : null
     return (
         <section className="space-y-5" aria-label={translate("download.selectedDownloadJob")}>
-            <DownloadThumbnail url={job.url} title={job.title || translate("download.downloadThumbnail")} />
+            <DownloadThumbnail url={job.url} localPath={job.thumbnailPath} completed={job.state === 'completed'} title={job.title || translate("download.downloadThumbnail")} />
             <div className="space-y-2">
                 <h3 className="break-words text-lg font-semibold">
                     {job.title || translate("download.downloadJob")}

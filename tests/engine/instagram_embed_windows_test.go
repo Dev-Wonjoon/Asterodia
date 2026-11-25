@@ -93,6 +93,12 @@ func instagramCarousel() map[string]any {
 func instagramFixtureClient(t *testing.T, html []byte, media func(*http.Request) (*http.Response, error)) *http.Client {
 	t.Helper()
 	return &http.Client{Transport: instagramRoundTripper(func(request *http.Request) (*http.Response, error) {
+		if request.URL.Hostname() == "www.instagram.com" && request.URL.Path == "/p/Fixture_123/" {
+			if !strings.HasPrefix(request.Header.Get("User-Agent"), "facebookexternalhit/1.1") || request.Header.Get("Cookie") != "" || request.Header.Get("Authorization") != "" {
+				t.Error("공개 HTML 조회에 잘못된 헤더가 사용되었습니다")
+			}
+			return instagramResponse(request, http.StatusNotFound, nil), nil
+		}
 		if request.Header.Get("User-Agent") != "Mozilla/5.0" {
 			t.Error("실제로 검증한 임베드 User-Agent와 다릅니다")
 		}
@@ -292,7 +298,11 @@ func TestInstagramEmbedHTTPFailures(t *testing.T) {
 			})}}
 			_, err := g.Discover(t.Context(), embedOriginalURL, "")
 			want := map[int]error{401: engine.ErrAuthenticationRequired, 403: engine.ErrAccessDenied, 404: engine.ErrMediaUnavailable, 429: engine.ErrRateLimited}[status]
-			if !errors.Is(err, want) || calls != 1 {
+			wantCalls := 2
+			if status == 429 {
+				wantCalls = 1
+			}
+			if !errors.Is(err, want) || calls != wantCalls {
 				t.Fatalf("상태 %d 분류 실패: calls=%d error=%v", status, calls, err)
 			}
 		})
@@ -306,7 +316,7 @@ func TestInstagramEmbedHTTPFailures(t *testing.T) {
 			return response, nil
 		})}}
 		_, err := g.Discover(t.Context(), embedOriginalURL, "")
-		if !errors.Is(err, engine.ErrAuthenticationRequired) || calls != 1 {
+		if !errors.Is(err, engine.ErrAuthenticationRequired) || calls != 2 {
 			t.Fatal("로그인 리다이렉트 분류 실패", calls, err)
 		}
 	})

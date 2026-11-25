@@ -27,7 +27,8 @@ var schemaV8SQL = schemaV8()
 var schemaV9SQL = schemaV8SQL + searchV9DDL()
 var schemaV10SQL = schemaV9SQL
 var schemaV11SQL = schemaV10SQL + albumDDL + albumSearchDDL()
-var schemaSQL = schemaV11SQL + galleryPinDDL
+var schemaV12SQL = schemaV11SQL + galleryPinDDL
+var schemaSQL = schemaV12SQL + albumHierarchyDDL
 
 func Open(ctx context.Context, filename string) (*sql.DB, error) {
 	return OpenWithOptions(ctx, filename, MigrationOptions{BackupDirectory: filepath.Join(filepath.Dir(filename), "backups")})

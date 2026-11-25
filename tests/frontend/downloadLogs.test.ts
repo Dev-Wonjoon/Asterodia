@@ -74,6 +74,14 @@ describe('actual engine log viewer', () => {
 })
 
 describe('download page engine requirements and original errors', () => {
+    it('shows the completed job thumbnail in details without another preview lookup and listens for generation updates', async () => {
+        const job: DownloadJobDto = { id: 'job', url: 'https://example.invalid/file', thumbnailPath: '/generated.jpg', title: '완료된 다운로드', state: 'completed', phase: 'finished', progress: 100, options: {}, cleanupRequired: false, currentAttemptId: 'a', errorCode: null }
+        view.value.detail = { jobId: 'job', data: job, loading: false, error: null }
+        await mount(h(DownloadDetailPane))
+        expect(document.querySelector('img')?.getAttribute('src')).toBe('/media?path=%2Fgenerated.jpg')
+        expect(api.getDownloadPreview).not.toHaveBeenCalled()
+        expect(api.onMediaThumbnailUpdated).toHaveBeenCalledTimes(1)
+    })
     it('offers X only for clean failed/cancelled requests and wires the bulk action', async () => {
         const base: DownloadJobDto = { id: 'base', url: 'https://example.invalid/file', title: null, state: 'failed', phase: 'finished', progress: 0, options: {}, cleanupRequired: false, currentAttemptId: 'a', errorCode: null }
         view.value.queue = [base, { ...base, id: 'cancelled', state: 'cancelled' }, { ...base, id: 'completed', state: 'completed' }, { ...base, id: 'cleanup', cleanupRequired: true }, { ...base, id: 'running', state: 'running' }]

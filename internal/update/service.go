@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -77,7 +78,8 @@ func (s *Service) Start() {
 	s.mu.Unlock()
 	go func() {
 		defer close(done)
-		timer := time.NewTimer(8 * time.Second)
+		// Check immediately in the background after updater initialization.
+		timer := time.NewTimer(0)
 		defer timer.Stop()
 		for {
 			select {
@@ -145,10 +147,38 @@ func (s *Service) Check(ctx context.Context) api.Result {
 	if release == nil {
 		s.status.Version, s.status.Notes, s.status.Size, s.status.Written = "", "", 0, 0
 	} else {
-		s.status.Version, s.status.Notes, s.status.Size, s.status.Written = release.Version, release.Notes, release.Artifact.Size, 0
+		s.status.Version, s.status.Notes, s.status.Size, s.status.Written = release.Version, displayReleaseNotes(release.Notes), release.Artifact.Size, 0
 	}
 	s.mu.Unlock()
 	return s.Status()
+}
+
+func displayReleaseNotes(notes string) string {
+	lines := strings.Split(strings.TrimSpace(notes), "\n")
+	if len(lines) < 2 {
+		return notes
+	}
+	opening := strings.TrimSpace(lines[0])
+	width := len(opening) - len(strings.TrimLeft(opening, "`"))
+	if width < 3 {
+		return notes
+	}
+	language := strings.TrimSpace(opening[width:])
+	if language != "" && !strings.EqualFold(language, "markdown") && !strings.EqualFold(language, "md") {
+		return notes
+	}
+	// Unwrap only a Markdown fence surrounding the entire release note.
+	// Longer outer fences may contain shorter fences used by code examples.
+	for index, line := range lines[1:] {
+		closing := strings.TrimSpace(line)
+		if len(closing) >= width && strings.Trim(closing, "`") == "" {
+			if index+1 == len(lines)-1 {
+				return strings.TrimSuffix(strings.Join(lines[1:len(lines)-1], "\n"), "\r")
+			}
+			break
+		}
+	}
+	return notes
 }
 
 func (s *Service) Download(ctx context.Context) api.Result {

@@ -8,7 +8,7 @@ import { albumDragType } from '@renderer/features/gallery/useGallerySelection'
 import { useInfiniteScroll } from '@renderer/shared/hooks/useInfiniteScroll'
 import { useGalleryViewModel } from '@renderer/features/gallery/useGalleryViewModel'
 const mocks = vi.hoisted(() => ({ realConfirm: false, bulk: vi.fn(), unregister: vi.fn(), confirm: vi.fn(async () => true), refresh: vi.fn(), getSnapshot: vi.fn(), get: vi.fn(), create: vi.fn(), run: vi.fn(), directories: vi.fn(), on: vi.fn(), mediaGet: vi.fn(), mountEditor: vi.fn(), destroyEditor: vi.fn(), state: null as any }))
-const api = {fileMove:{get:mocks.get,create:mocks.create,run:mocks.run},media:{directories:mocks.directories,albums:vi.fn(),saveAlbum:vi.fn(),mergeAlbum:vi.fn(),get:mocks.mediaGet},onMediaThumbnailUpdated:mocks.on,showItemInFolder:vi.fn()}
+const api = {fileMove:{get:mocks.get,create:mocks.create,run:mocks.run},media:{exploreAlbum:vi.fn(),directories:mocks.directories,albums:vi.fn(),saveAlbum:vi.fn(),mergeAlbum:vi.fn(),get:mocks.mediaGet},onMediaThumbnailUpdated:mocks.on,showItemInFolder:vi.fn()}
 vi.mock('../../internal/webserver/web/editor.js',()=>({mountMediaEditor:mocks.mountEditor}))
 vi.mock('@renderer/shared/hooks/useConfirm', async importOriginal => {
  const actual = await importOriginal<typeof import('@renderer/shared/hooks/useConfirm')>()
@@ -159,6 +159,7 @@ function setup(){
  })
  api.media.albums.mockReset().mockResolvedValue({ok:true,data:{data:[{id:9,title:'여행',revision:3,fileCount:0,isUserAlbum:true}],hasNextPage:false}})
  api.media.saveAlbum.mockReset().mockResolvedValue({ok:true,data:{id:9,revision:4}})
+ api.media.exploreAlbum.mockReset().mockImplementation(async request => ({ok:true,data:{album:mocks.state.list.page.data.find((item:any)=>item.id===request.mediaId),breadcrumbs:[{id:request.mediaId,title:'게시글 '+request.mediaId}],data:[],total:0,hasNextPage:false}}))
  downloads.activeJobs=[]; downloads.openDetail.mockClear(); downloads.closeDetail.mockClear(); downloads.cancelDownload.mockClear()
  mocks.confirm.mockReset().mockResolvedValue(true);mocks.unregister.mockReset().mockResolvedValue(true)
  mocks.bulk.mockReset().mockResolvedValue({succeeded:[1],failed:[{mediaId:2,message:'시험 오류'}]})
@@ -440,9 +441,9 @@ it('opens an expanded file at its own offset and retains infinite scrolling with
  expect(document.body.textContent).not.toContain('개 항목')
 })
 
-it('opens playback from the thumbnail and details from the title or named menu',async()=>{
+it('opens playback from the named menu and details from the title',async()=>{
  setup();store.openDetail.mockClear();await mount(h(GalleryPage))
- await clickButton('게시글 1 선택 · 두 번 클릭하여 감상')
+ await clickButton('게시글 1 더보기');await clickButton('감상하기')
  expect(document.querySelector('[aria-label="감상 1 "]')).not.toBeNull()
  expect(store.openDetail).not.toHaveBeenCalled()
  await clickButton('감상 닫기');await clickButton('게시글 1 상세보기')
@@ -486,7 +487,7 @@ it('moves a mixed selection with per-file scope and clears every kind of selecti
 })
 
 
-it('connects Explorer mouse selection and double-click playback to gallery cards', async () => {
+it('connects Explorer mouse selection and double-click album navigation to gallery cards', async () => {
  setup(); await mount(h(GalleryPage))
  const first = document.querySelector<HTMLButtonElement>('article[data-album-id="1"] [data-card-select]')!
  const second = document.querySelector<HTMLButtonElement>('article[data-album-id="2"] [data-card-select]')!
@@ -500,7 +501,8 @@ it('connects Explorer mouse selection and double-click playback to gallery cards
  expect(document.querySelector('[aria-label="선택 항목 작업"]')).toBeNull()
  await act(async () => second.dispatchEvent(new MouseEvent('click', { bubbles:true, detail:1 })))
  await act(async () => second.dispatchEvent(new MouseEvent('dblclick', { bubbles:true, detail:2 })))
- expect(document.querySelector('[aria-label="감상 2 "]')).not.toBeNull()
+ expect(document.querySelector('[aria-label="앨범 탐색기"]')).not.toBeNull()
+ expect(api.media.exploreAlbum).toHaveBeenLastCalledWith(expect.objectContaining({mediaId:2}))
 })
 
 it('freezes selected groups in the merge dialog and creates one combined job', async () => {

@@ -11,6 +11,11 @@ import (
 // Page the weighted album list first, then read only each intersecting file slice.
 // Even a very large expanded album never loads all of its file objects into Go.
 func listGallery(ctx context.Context, q queryer, req ListRequest, where string, args []any, limit int) api.Result {
+	// Search and favorites can still find nested albums directly. The ordinary
+	// gallery displays roots, with children reached through the album explorer.
+	if !req.FavoritesOnly && req.Filter.Keyword == "" && len(req.Filter.Tags) == 0 && len(req.Filter.Platforms) == 0 && len(req.Filter.Authors) == 0 && req.Filter.CreatedFrom == nil && req.Filter.CreatedTo == nil {
+		where += " AND NOT EXISTS(SELECT 1 FROM album_parent WHERE album_id=m.id)"
+	}
 	if len(req.ExpandedMediaIDs) > 10000 || req.AnchorMediaID < 0 || (req.GalleryView != "" && req.GalleryView != "all" && req.GalleryView != "albums" && req.GalleryView != "files") {
 		return failure(domainError("INVALID_ARGUMENT"))
 	}
@@ -48,14 +53,20 @@ func listGallery(ctx context.Context, q queryer, req ListRequest, where string, 
 		viewWhere, forceFiles = "userAlbum=0 AND visibleFiles>0", "1"
 	}
 	if pinFiles {
-		viewWhere += " AND (userAlbum=1 OR totalFiles=0 OR visibleFiles>0 OR pinnedAt IS NOT NULL)"
+		viewWhere += " AND (userAlbum=1 OR hasChildren=1 OR totalFiles=0 OR visibleFiles>0 OR pinnedAt IS NOT NULL)"
 	}
-	// A partially hidden source group is rendered as its remaining file cards, so
-	// its cover and group-level actions cannot expose or select hidden files.
-	forced := "userAlbum=0 AND visibleFiles>0 AND (" + forceFiles + " OR (visibleFiles<totalFiles AND pinnedAt IS NULL))"
+	// Legacy inline views render a partially collected source as its remaining
+	// file cards. Explorer entry views keep the source grouped until the user
+	// explicitly expands it or selects the file-only view.
+	automaticExpansion := "hasChildren=0 AND visibleFiles<totalFiles AND pinnedAt IS NULL"
+	if req.AlbumCards {
+		automaticExpansion = "0"
+	}
+	forced := "userAlbum=0 AND visibleFiles>0 AND (" + forceFiles + " OR (" + automaticExpansion + "))"
 	cte := fmt.Sprintf(`WITH candidates AS (
         SELECT m.id,m.created_at,(SELECT created_at FROM gallery_pin WHERE media_id=m.id) AS pinnedAt,
           EXISTS(SELECT 1 FROM user_album WHERE media_id=m.id) AS userAlbum,
+          EXISTS(SELECT 1 FROM album_parent WHERE parent_id=m.id) AS hasChildren,
           m.id IN (SELECT value FROM json_each(?)) AS requestedExpanded,
           ((SELECT count(*) FROM media_file WHERE media_id=m.id)+(SELECT count(*) FROM user_album_file WHERE album_id=m.id)) AS totalFiles,
           (SELECT count(*) FROM media_file f WHERE f.media_id=m.id%s%s) AS visibleFiles,

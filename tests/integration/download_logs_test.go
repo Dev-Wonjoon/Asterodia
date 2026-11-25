@@ -3,6 +3,7 @@ package integration_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -52,6 +53,37 @@ func logs(t *testing.T, f *fixture, job string, req download.LogRequest) downloa
 	req.JobID = job
 	return success(t, f.service.Logs(t.Context(), req)).(download.LogPage)
 }
+
+func TestDiscoveryFallbackTracePersistsAfterSuccess(t *testing.T) {
+	f := newFixture(t)
+	original := f.gallery
+	f.gallery = func(ctx context.Context, url, dir string) (engine.GalleryDLDiscovery, error) {
+		chain := engine.RunDiscoveryChain(ctx,
+			engine.DiscoveryHandler[engine.GalleryDLDiscovery]{Name: "fixture-first", Handle: func(context.Context) engine.DiscoveryStepResult[engine.GalleryDLDiscovery] {
+				return engine.DiscoveryStepResult[engine.GalleryDLDiscovery]{Decision: engine.DiscoveryNext, Err: errors.New("https://example.invalid/?signature=private-discovery-value")}
+			}},
+			engine.DiscoveryHandler[engine.GalleryDLDiscovery]{Name: "fixture-second", Handle: func(ctx context.Context) engine.DiscoveryStepResult[engine.GalleryDLDiscovery] {
+				value, err := original(ctx, url, dir)
+				return engine.DiscoveryStepResult[engine.GalleryDLDiscovery]{Decision: engine.DiscoveryHandled, Value: value, Err: err}
+			}},
+		)
+		return chain.Value, chain.Err
+	}
+	job := f.enqueue(t)
+	f.run(t, job)
+	page := logs(t, f, job.ID, download.LogRequest{Limit: 200})
+	var text strings.Builder
+	for _, entry := range page.Entries {
+		text.WriteString(entry.Text)
+		text.WriteByte('\n')
+	}
+	got := text.String()
+	failed, succeeded := strings.Index(got, "fixture-first · 조회 실패"), strings.Index(got, "fixture-second · 조회 성공")
+	if failed < 0 || succeeded <= failed || strings.Contains(got, "private-discovery-value") {
+		t.Fatal("성공한 작업의 조회 이력이 유실되거나 비공개 주소가 기록됐습니다", got)
+	}
+}
+
 func TestDownloadOutputLogsPersistAndSeparateAttempts(t *testing.T) {
 	f := newFixture(t)
 	original := f.gallery

@@ -63,7 +63,7 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	editPost := r.Method == http.MethodPost && (strings.HasPrefix(r.URL.Path, "/api/edit/") || strings.HasPrefix(r.URL.Path, "/api/download/"))
+	editPost := r.Method == http.MethodPost && (r.URL.Path == "/api/albums" || r.URL.Path == "/api/content-filters" || strings.HasPrefix(r.URL.Path, "/api/edit/") || strings.HasPrefix(r.URL.Path, "/api/download/"))
 	if r.Method != http.MethodGet && r.Method != http.MethodHead && !editPost {
 		w.Header().Set("Allow", "GET, HEAD")
 		http.Error(w, "읽기 전용 서버입니다", 405)
@@ -79,6 +79,8 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Service) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/library", s.list)
+	s.contentFilterRoutes(mux)
+	s.albumRoutes(mux)
 	mux.HandleFunc("GET /api/search-suggestions", s.searchSuggestions)
 	mux.HandleFunc("GET /api/suggestions", s.filterSuggestions)
 	mux.HandleFunc("GET /api/library/{id}", s.detail)

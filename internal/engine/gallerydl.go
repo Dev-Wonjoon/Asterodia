@@ -32,7 +32,7 @@ type GalleryDLFile struct {
 type GalleryDLDiscovery struct {
 	Directories []json.RawMessage
 	Files       []GalleryDLFile
-	// Embed results must be transferred directly instead of re-extracted by CLI.
+	// Anonymous Instagram HTML results transfer directly instead of CLI re-extraction.
 	InstagramEmbed bool `json:"instagramEmbed,omitempty"`
 }
 
@@ -43,12 +43,13 @@ var (
 )
 
 var (
-	ErrInstagramURL           = errors.New("Instagram 게시물 또는 릴스 링크를 입력하세요")
-	ErrInstagramOptions       = errors.New("Instagram은 원본 사진·영상을 함께 저장합니다. 종류는 영상, 화질은 최고 화질, 형식은 자동으로 설정하세요")
-	ErrAuthenticationRequired = errors.New("로그인이 필요하거나 쿠키가 만료됐습니다. 설정에서 로그인된 브라우저 또는 쿠키 파일을 지정하세요")
-	ErrAccessDenied           = errors.New("게시물 접근이 제한됐습니다. 계정의 열람 권한이나 사이트의 추가 인증을 확인하세요")
-	ErrMediaUnavailable       = errors.New("게시물이 삭제되었거나 현재 계정으로 찾을 수 없습니다")
-	ErrRateLimited            = errors.New("사이트 요청이 일시적으로 제한됐습니다. 잠시 후 다시 시도하세요")
+	ErrInstagramURL              = errors.New("Instagram 게시물 또는 릴스 링크를 입력하세요")
+	ErrInstagramOptions          = errors.New("Instagram은 원본 사진·영상을 함께 저장합니다. 종류는 영상, 화질은 최고 화질, 형식은 자동으로 설정하세요")
+	ErrAuthenticationRequired    = errors.New("로그인이 필요하거나 쿠키가 만료됐습니다. 설정에서 로그인된 브라우저 또는 쿠키 파일을 지정하세요")
+	ErrInstagramPublicExtraction = errors.New("Instagram 공개 게시물 정보는 확인했지만 원본 미디어 주소를 추출하지 못했습니다")
+	ErrAccessDenied              = errors.New("게시물 접근이 제한됐습니다. 계정의 열람 권한이나 사이트의 추가 인증을 확인하세요")
+	ErrMediaUnavailable          = errors.New("게시물이 삭제되었거나 현재 계정으로 찾을 수 없습니다")
+	ErrRateLimited               = errors.New("사이트 요청이 일시적으로 제한됐습니다. 잠시 후 다시 시도하세요")
 )
 
 func instagramShortcode(rawURL string) (string, error) {
@@ -200,26 +201,42 @@ func (g *GalleryDL) Discover(
 	originalURL string,
 	workDir string,
 ) (GalleryDLDiscovery, error) {
+	cli := g.instagramDiscoveryHandler("gallery-dl", func(ctx context.Context) (GalleryDLDiscovery, error) {
+		return g.discoverGalleryDL(ctx, originalURL, workDir)
+	}, true)
+	handlers := []DiscoveryHandler[GalleryDLDiscovery]{cli}
 	if g.CookieBrowser == "" && g.CookieFile == "" {
 		if shortcode, err := instagramShortcode(originalURL); err == nil {
-			discovery, embedErr := g.discoverInstagramEmbed(ctx, shortcode)
-			if embedErr == nil {
-				return discovery, nil
+			handlers = []DiscoveryHandler[GalleryDLDiscovery]{
+				g.instagramDiscoveryHandler("Instagram 임베드", func(ctx context.Context) (GalleryDLDiscovery, error) {
+					return g.discoverInstagramEmbed(ctx, shortcode)
+				}, false),
+				g.instagramDiscoveryHandler("Instagram 공개 HTML", func(ctx context.Context) (GalleryDLDiscovery, error) {
+					return g.discoverInstagramPublic(ctx, shortcode)
+				}, false),
+				cli,
 			}
-			if err := ctx.Err(); err != nil {
-				return GalleryDLDiscovery{}, err
-			}
-			if errors.Is(embedErr, ErrRateLimited) {
-				return GalleryDLDiscovery{}, embedErr
-			}
-			discovery, fallbackErr := g.discoverGalleryDL(ctx, originalURL, workDir)
-			if fallbackErr != nil {
-				return GalleryDLDiscovery{}, fmt.Errorf("Instagram 임베드 조회 실패: %w; gallery-dl 조회 실패: %w", embedErr, fallbackErr)
-			}
-			return discovery, nil
 		}
 	}
-	return g.discoverGalleryDL(ctx, originalURL, workDir)
+	result := RunDiscoveryChain(ctx, handlers...)
+	return result.Value, result.Err
+}
+
+func (g *GalleryDL) instagramDiscoveryHandler(name string, resolve func(context.Context) (GalleryDLDiscovery, error), final bool) DiscoveryHandler[GalleryDLDiscovery] {
+	return DiscoveryHandler[GalleryDLDiscovery]{Name: name, Handle: func(ctx context.Context) DiscoveryStepResult[GalleryDLDiscovery] {
+		value, err := resolve(ctx)
+		decision := DiscoveryHandled
+		if err != nil {
+			decision = DiscoveryNext
+			// A public HTTP strategy may time out independently of the request.
+			// The final CLI's process timeout must stop the entire attempt.
+			if errors.Is(err, ErrRateLimited) || errors.Is(err, ErrOutputLimit) || errors.Is(err, ErrStopUnconfirmed) ||
+				(final && (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded))) {
+				decision = DiscoveryStop
+			}
+		}
+		return DiscoveryStepResult[GalleryDLDiscovery]{Decision: decision, Value: value, Err: err}
+	}}
 }
 
 func (g *GalleryDL) discoverGalleryDL(ctx context.Context, originalURL, workDir string) (GalleryDLDiscovery, error) {

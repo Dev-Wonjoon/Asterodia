@@ -204,7 +204,7 @@ func TestV11PinMigrationRollsBackAndPreservesAlbumData(t *testing.T) {
 	db := latestDB(t, path)
 	addModernMedia(t, db, 1, "https://example.test/v11", "keep", filepath.Join(root, "keep.mp4"), "keep")
 	albumObject(t, media.NewService(db).SaveAlbum(t.Context(), media.AlbumRequest{Title: albumTitle("keep album"), AddFileIDs: []int64{1}}))
-	execDB(t, db, "DROP TABLE gallery_pin;PRAGMA user_version=11")
+	execDB(t, db, "DROP TABLE album_parent;DROP TABLE gallery_pin;PRAGMA user_version=11")
 	db.Close()
 	opts := database.MigrationOptions{BackupDirectory: filepath.Join(root, "backups"), Checkpoint: func(step string) error {
 		if step == "before_commit" {
@@ -227,7 +227,7 @@ func TestV11PinMigrationRollsBackAndPreservesAlbumData(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer upgraded.Close()
-	if countDB(t, upgraded, "PRAGMA user_version") != 12 || countDB(t, upgraded, "SELECT count(*) FROM user_album_file WHERE file_id=1") != 1 || countDB(t, upgraded, "SELECT count(*) FROM gallery_pin") != 0 {
+	if countDB(t, upgraded, "PRAGMA user_version") != 13 || countDB(t, upgraded, "SELECT count(*) FROM user_album_file WHERE file_id=1") != 1 || countDB(t, upgraded, "SELECT count(*) FROM gallery_pin") != 0 {
 		t.Fatal("migration lost existing data")
 	}
 	assertHealthyDB(t, upgraded)

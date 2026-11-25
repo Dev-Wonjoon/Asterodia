@@ -14,7 +14,7 @@ import (
 // Existing historical fixtures are reconstructed from current DDL. Strip the
 // complete v11 additions before applying their own older-version differences.
 func beforeAlbumSchema(name, table, ddl string) (string, bool) {
-	if name == "gallery_pin" || table == "gallery_pin" {
+	if name == "gallery_pin" || table == "gallery_pin" || name == "album_parent" || table == "album_parent" || strings.HasPrefix(name, "v13_") {
 		return "", false
 	}
 	if strings.HasPrefix(name, "user_album") || strings.HasPrefix(table, "user_album") || strings.HasPrefix(name, "idx_album_") || strings.HasPrefix(name, "search_album_") || strings.HasPrefix(name, "v11_") {
@@ -66,6 +66,33 @@ func TestGalleryViewsHideAlbumMembersAndRestoreLastRemovedMembership(t *testing.
 		}
 	}
 	files := read("files")
+	// Explorer entry cards must not be implicitly flattened when only part of a
+	// source collection has already been gathered into a user album.
+	grouped := albumObject(t, catalog.List(t.Context(), media.ListRequest{Gallery: true, AlbumCards: true, ShowAlbumFiles: &show, Limit: 24}))
+	foundGroupedSource := false
+	for _, row := range grouped["data"].([]media.Object) {
+		if row["galleryFile"] != nil {
+			t.Fatal("explorer entry album was automatically expanded", row)
+		}
+		if row["id"] == int64(1) {
+			foundGroupedSource = true
+		}
+	}
+	if !foundGroupedSource {
+		t.Fatal("partially collected source lost its album card", grouped)
+	}
+	explicitFiles := albumObject(t, catalog.List(t.Context(), media.ListRequest{Gallery: true, AlbumCards: true, GalleryView: "files", ShowAlbumFiles: &show, Limit: 24}))
+	if explicitFiles["total"] != files["total"] {
+		t.Fatal("explicit file view stopped working", explicitFiles)
+	}
+	for _, row := range explicitFiles["data"].([]media.Object) {
+		if row["galleryFile"] == nil {
+			t.Fatal("explicit file view contains an album card", row)
+		}
+	}
+	if countDB(t, db, "SELECT count(*) FROM user_album_file") != 3 || countDB(t, db, "SELECT count(*) FROM media_file") != 4 {
+		t.Fatal("presentation change altered album membership")
+	}
 	if files["total"] != int64(2) {
 		t.Fatal(files)
 	}
@@ -381,10 +408,10 @@ func TestV10AlbumMigrationPreservesFilesAndBackup(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer upgraded.Close()
-	if countDB(t, upgraded, "PRAGMA user_version") != 12 || textDB(t, upgraded, "SELECT file_uuid FROM media_file WHERE id=7") != identity {
+	if countDB(t, upgraded, "PRAGMA user_version") != 13 || textDB(t, upgraded, "SELECT file_uuid FROM media_file WHERE id=7") != identity {
 		t.Fatal("migration lost identity")
 	}
-	backup := rawDB(t, textDB(t, upgraded, "SELECT backup_path FROM migration_run WHERE target_version=12"))
+	backup := rawDB(t, textDB(t, upgraded, "SELECT backup_path FROM migration_run WHERE target_version=13"))
 	if countDB(t, backup, "PRAGMA user_version") != 10 {
 		t.Fatal("backup not preserved")
 	}

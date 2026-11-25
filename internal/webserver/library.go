@@ -20,11 +20,13 @@ func publicSummary(row map[string]any) map[string]any {
 		result["galleryFile"] = publicFile(file)
 		result["galleryFileOffset"] = row["galleryFileOffset"]
 	}
+	result["parentId"] = row["parentId"]
+	result["childAlbumCount"] = row["childAlbumCount"]
 	return result
 }
 
 func publicFile(file map[string]any) map[string]any {
-	return map[string]any{"id": file["id"], "title": file["title"], "kind": file["kind"], "width": file["width"], "height": file["height"], "duration": file["duration"], "detectedFormat": file["detectedFormat"]}
+	return map[string]any{"id": file["id"], "mediaId": file["mediaId"], "title": file["title"], "kind": file["kind"], "width": file["width"], "height": file["height"], "duration": file["duration"], "detectedFormat": file["detectedFormat"], "filesize": file["filesize"], "createdAt": file["createdAt"]}
 }
 
 func (s *Service) sequence(w http.ResponseWriter, r *http.Request) {
@@ -105,7 +107,7 @@ func (s *Service) list(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "앨범을 확인하세요", 400)
 		return
 	}
-	result := s.library.List(ctx, media.ListRequest{Limit: limit, Offset: offset, Filter: filter, Gallery: r.URL.Query().Get("gallery") == "1", ExpandedMediaIDs: expanded, AnchorMediaID: int64(anchor)})
+	result := s.library.List(ctx, media.ListRequest{Limit: limit, Offset: offset, Filter: filter, Gallery: r.URL.Query().Get("gallery") == "1", AlbumCards: r.URL.Query().Get("albumCards") == "1", ExpandedMediaIDs: expanded, AnchorMediaID: int64(anchor)})
 	if apiError(w, r, result) {
 		return
 	}
@@ -123,7 +125,7 @@ func mobileSearchFilter(r *http.Request) media.Filter {
 	if mode == "" {
 		mode = "and"
 	}
-	return media.Filter{Tags: query["tag"], Authors: query["author"], Platforms: query["platform"], TagMode: mode}
+	return media.Filter{Tags: query["tag"], Authors: query["author"], Platforms: query["platform"], TagMode: mode, ShowHidden: query.Get("showHidden") == "1"}
 }
 
 func (s *Service) filterSuggestions(w http.ResponseWriter, r *http.Request) {

@@ -58,6 +58,10 @@ type instagramEmbedMedia struct {
 // Every request is anonymous, including when a caller supplies a client with a
 // cookie jar. Redirects stay within Instagram or its media CDN, respectively.
 func (g *GalleryDL) instagramGET(ctx context.Context, address string, media bool) (*http.Response, error) {
+	return g.instagramGETWithAgent(ctx, address, media, instagramEmbedUserAgent)
+}
+
+func (g *GalleryDL) instagramGETWithAgent(ctx context.Context, address string, media bool, agent string) (*http.Response, error) {
 	parsed, err := url.Parse(address)
 	if err != nil || !instagramEmbedURLAllowed(parsed, media) {
 		return nil, fmt.Errorf("Instagram 응답에 허용되지 않은 주소가 있습니다")
@@ -66,7 +70,7 @@ func (g *GalleryDL) instagramGET(ctx context.Context, address string, media bool
 	if err != nil {
 		return nil, err
 	}
-	request.Header.Set("User-Agent", instagramEmbedUserAgent)
+	request.Header.Set("User-Agent", agent)
 	request.Header.Set("Accept", "*/*")
 	if !media {
 		request.Header.Set("Accept", "text/html")
@@ -169,7 +173,11 @@ func (g *GalleryDL) discoverInstagramEmbed(ctx context.Context, shortcode string
 			post = contextData.GQL.XDT
 		}
 		if post != nil {
-			return post.discovery(shortcode)
+			discovery, err := post.discovery(shortcode)
+			if err != nil && post.Shortcode == shortcode && galleryDLNumericID.MatchString(galleryDLIdentifier(post.ID)) {
+				return GalleryDLDiscovery{}, fmt.Errorf("%w: %v", ErrInstagramPublicExtraction, err)
+			}
+			return discovery, err
 		}
 	}
 	if simple {

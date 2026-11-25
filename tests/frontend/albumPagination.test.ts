@@ -33,6 +33,22 @@ function fixture() {
     const store = createGalleryStore({ list, get } as unknown as MediaApi, { expandAlbums: true })
     return { store, list, get }
 }
+it('starts explorer entry cards grouped despite saved inline expansions and still permits explicit expansion', async () => {
+    localStorage.setItem('storagebucket:expanded-albums:v1', JSON.stringify([1, 2]))
+    const { list, get } = fixture()
+    const api = { list, get } as unknown as MediaApi
+    const store = createGalleryStore(api, { expandAlbums: true, albumCards: true })
+    await store.refresh()
+    expect(list.mock.lastCall![0]).toMatchObject({ gallery: true, albumCards: true, expandedMediaIds: [] })
+    expect(store.getSnapshot().list.page.data).toHaveLength(3)
+    expect(store.getSnapshot().list.page.data.every(row => !row.galleryFile)).toBe(true)
+    await store.toggleAlbum(1)
+    expect(store.getSnapshot().list.page.data.some(row => row.galleryFile)).toBe(true)
+    expect(readExpandedAlbums()).toEqual([1, 2])
+    const reopened = createGalleryStore(api, { expandAlbums: true, albumCards: true })
+    await reopened.refresh()
+    expect(reopened.getSnapshot().list.page.data.every(row => !row.galleryFile)).toBe(true)
+})
 it('appends expanded files and other albums to one infinite list, then collapses without skipping the prefix', async () => {
     const { store, list, get } = fixture()
     await store.refresh(); await store.toggleAlbum(1)

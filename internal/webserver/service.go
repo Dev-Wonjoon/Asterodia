@@ -27,26 +27,27 @@ type Status struct {
 }
 
 type Service struct {
-	mu           sync.Mutex
-	library      *media.Service
-	address      string
-	server       *http.Server
-	handler      http.Handler
-	url          string
-	lastError    *string
-	closed       bool
-	generation   uint64
-	requests     sync.WaitGroup
-	capacity     chan struct{}
-	cancel       context.CancelFunc
-	editor       *mediaedit.Service
-	editing      bool
-	csrf         string
-	editLast     time.Time
-	editTokens   float64
-	downloader   *download.Service
-	downloading  bool
-	downloadRuns sync.Map
+	mu                 sync.Mutex
+	library            *media.Service
+	saveContentFilters func(media.ContentFilters) (media.ContentFilters, error)
+	address            string
+	server             *http.Server
+	handler            http.Handler
+	url                string
+	lastError          *string
+	closed             bool
+	generation         uint64
+	requests           sync.WaitGroup
+	capacity           chan struct{}
+	cancel             context.CancelFunc
+	editor             *mediaedit.Service
+	editing            bool
+	csrf               string
+	editLast           time.Time
+	editTokens         float64
+	downloader         *download.Service
+	downloading        bool
+	downloadRuns       sync.Map
 }
 
 func NewService(library *media.Service, address string) *Service {

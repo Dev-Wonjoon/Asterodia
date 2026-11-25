@@ -522,7 +522,7 @@ func openStoreTestDB(t *testing.T) *sql.DB {
 	err = db.QueryRow(`
 		SELECT foreign_keys, user_version FROM pragma_foreign_keys(), pragma_user_version()
 	`).Scan(&fk, &version)
-	if err != nil || fk != 1 || version != 12 {
+	if err != nil || fk != 1 || version != 13 {
 		t.Fatalf("테스트 DB: foreign_keys=%d, user_version=%d, 오류=%v", fk, version, err)
 	}
 	return db

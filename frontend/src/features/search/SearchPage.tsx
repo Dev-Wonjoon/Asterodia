@@ -4,9 +4,8 @@ import type { MediaFilter } from '@contracts/media-v2'
 import { useSearchViewModel } from '@renderer/features/search/useSearchViewModel'
 import { SearchSuggestions } from './SearchSuggestions'
 
-export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string; filter: MediaFilter; emptyMessage: string }> }): React.JSX.Element => {
+export const SearchControls = ({ vm }: { vm: ReturnType<typeof useSearchViewModel> }): React.JSX.Element => {
     useLanguage()
-    const vm = useSearchViewModel()
     const [tagInput, setTagInput] = useState('')
     const [platformInput, setPlatformInput] = useState('')
     const [authorInput, setAuthorInput] = useState('')
@@ -51,7 +50,7 @@ export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string
     }
 
     return (
-        <div className="flex h-full min-h-0 min-w-0 flex-col">
+        <>
             {/* 검색 영역 */}
             <div data-keyboard-region tabIndex={-1} className="shrink-0 p-4 border-b border-[var(--border-line)] space-y-3">
                 {/* 키워드 검색 */}
@@ -249,13 +248,18 @@ export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string
                 </p>
             )}
 
-            <div className="flex-1 min-h-0 overflow-hidden">
-                <Gallery
-                    title={translate("search.searchResults")}
-                    filter={vm.filter}
-                    emptyMessage={translate("shortcuts.noSearchResults")}
-                />
-            </div>
-        </div>
+        </>
     )
+}
+
+export const SearchPage = ({ Gallery }: { Gallery: ComponentType<{ title: string; filter: MediaFilter; emptyMessage: string; onExplorerChange?: (open: boolean) => void }> }): React.JSX.Element => {
+    useLanguage()
+    const vm = useSearchViewModel()
+    const [exploring, setExploring] = useState(false)
+    return <div className="flex h-full min-h-0 min-w-0 flex-col">
+        {!exploring && <SearchControls vm={vm} />}
+        <div className="flex-1 min-h-0 overflow-hidden">
+            <Gallery title={translate('search.searchResults')} filter={vm.filter} emptyMessage={translate('shortcuts.noSearchResults')} onExplorerChange={setExploring} />
+        </div>
+    </div>
 }

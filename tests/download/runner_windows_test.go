@@ -510,6 +510,12 @@ func TestRunnerEngineFallback(t *testing.T) {
 		{"denied", engine.ErrAccessDenied, true, false},
 		{"rate-limit", engine.ErrRateLimited, true, false},
 		{"cancelled", context.Canceled, true, false},
+		{"deadline", context.DeadlineExceeded, true, false},
+		{"stop-unconfirmed", engine.ErrStopUnconfirmed, true, false},
+		{"output-limit", engine.ErrOutputLimit, true, false},
+		{"unsupported-with-rate-limit", errors.Join(engine.ErrUnsupportedURL, engine.ErrRateLimited), true, false},
+		{"unsupported-with-stop-unconfirmed", errors.Join(engine.ErrUnsupportedURL, engine.ErrStopUnconfirmed), true, false},
+		{"unsupported-with-cancel", errors.Join(engine.ErrUnsupportedURL, context.Canceled), true, false},
 		{"network", errors.New("network failure"), true, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -542,7 +548,7 @@ func TestRunnerEngineFallback(t *testing.T) {
 					t.Error("원본 URL 변경")
 				}
 				if tc.galleryFirst {
-					return engine.GalleryDLDiscovery{}, tc.primaryError
+					return engine.GalleryDLDiscovery{Files: []engine.GalleryDLFile{{URL: "https://cdn.invalid/partial-plan.png"}}}, tc.primaryError
 				}
 				return engine.ParseGalleryDLDiscovery([]byte(`[[2,{"category":"future","post_id":"123"}],[3,"https://cdn.invalid/file.png",{"filename":"file","extension":"png"}]]`))
 			})}
@@ -554,9 +560,22 @@ func TestRunnerEngineFallback(t *testing.T) {
 				if (attempt.Engine == engine.KindYtdlp) != tc.galleryFirst {
 					t.Fatal("실제 선택 엔진 미반영", attempt.Engine)
 				}
+				if tc.galleryFirst && len(attempt.GalleryResult.Files) != 0 {
+					t.Fatal("실패한 조회의 일부 대상이 다른 엔진의 계획에 섞였습니다")
+				}
 			} else if !errors.Is(err, tc.primaryError) || ytCalls != 0 || galleryCalls != 1 {
 				t.Fatal("지원하지 않음 이외의 실패에 폴백", err, ytCalls, galleryCalls)
 			}
 		})
+	}
+}
+
+func TestRunnerUnavailableEnginesKeepDiscoveryHistory(t *testing.T) {
+	runner := download.Runner{Storage: download.Storage{Root: downloadTestRoot(t)}}
+	_, err := runner.DiscoverAttempt(t.Context(), "missing-engines", "attempt", "https://x.com/user/status/123", engine.Options{})
+	var exhausted *engine.DiscoveryChainError
+	if !errors.Is(err, engine.ErrUnsupportedURL) || !errors.As(err, &exhausted) || len(exhausted.Failures) != 2 ||
+		exhausted.Failures[0].Handler != string(engine.KindGalleryDL) || exhausted.Failures[1].Handler != string(engine.KindYtdlp) {
+		t.Fatal("사용 가능한 엔진이 없을 때 조회 이력이 유실됐습니다", err)
 	}
 }

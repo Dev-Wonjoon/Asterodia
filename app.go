@@ -60,10 +60,12 @@ func applicationServices(
 	}
 	databaseImporter := database.NewImporter(db, databasePath, filepath.Join(paths.Root, "backups"))
 	catalog := media.NewService(db)
+	catalog.ConfigureContentFilters(config.GetContentFilters)
 	catalog.UpdateGate = updateGate
 	updates.SetDatabase(db)
 	catalog.StartSearchIndex()
 	web := webserver.NewService(catalog, webserver.DefaultAddress)
+	web.ConfigureContentFilters(config.SetContentFilters)
 	thumb := thumbnail.NewService(db, filepath.Join(paths.Cache, "thumbnails"), filepath.Join(paths.Bin, "ffmpeg.exe"), func(id int64) {
 		if app := application.Get(); app != nil {
 			app.Event.Emit("media:thumbnail-updated", id)

@@ -31,6 +31,7 @@ export type MediaResult<T> =
       }
 
 export interface MediaFilter {
+    showHidden?: boolean
     keyword?: string
     tags?: string[]
     tagMode?: 'and' | 'or'
@@ -39,6 +40,8 @@ export interface MediaFilter {
     createdFrom?: number
     createdTo?: number
 }
+
+export interface ContentFilters { hiddenPlatforms: string[]; hiddenTags: string[] }
 
 export interface MediaSuggestionRequest {
     kind: 'tag' | 'platform' | 'author'
@@ -69,6 +72,7 @@ export interface MediaListRequest {
     favoritesOnly?: boolean
     filter?: MediaFilter
     gallery?: boolean
+    albumCards?: boolean
     galleryView?: GalleryView
     showAlbumFiles?: boolean
     expandedMediaIds?: number[]
@@ -108,6 +112,8 @@ export interface MediaUnregisterFilesRequest extends MediaUnregisterRequest {
 }
 
 export interface MediaSummaryDto {
+	parentId?: number | null
+	childAlbumCount?: number
     managedFileCount?: number
     isPinned?: boolean
     isUserAlbum?: boolean
@@ -135,6 +141,7 @@ export interface MediaSummaryDto {
 }
 
 export interface AlbumRequest {
+	parentId?: number
     albumId?: number
     expectedRevision?: number
     title?: string
@@ -146,6 +153,18 @@ export interface AlbumRequest {
     delete?: boolean
 }
 export interface MediaSequence { ids: number[]; title: string; revision: number }
+
+export type AlbumExplorerSort = 'name' | 'date' | 'size' | 'kind' | 'duration'
+export interface AlbumExploreRequest {
+    mediaId: number; limit?: number; offset?: number; filter?: MediaFilter
+    recursive?: boolean; sort?: AlbumExplorerSort; descending?: boolean
+}
+export type AlbumEntry = { kind: 'album'; album: MediaSummaryDto } | { kind: 'file'; file: MediaFileDto; albumId: number; title: string }
+export interface AlbumExplorePage extends MediaPage<AlbumEntry> {
+    revisionToken?: string
+    album: MediaSummaryDto
+    breadcrumbs: { id: number; title: string }[]
+}
 
 export interface MediaFileDto {
     id: number

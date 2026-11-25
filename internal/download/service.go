@@ -397,6 +397,8 @@ func (s *Service) Run(ctx context.Context, req RunRequest) api.Result {
 		switch {
 		case errors.Is(err, engine.ErrUnsupportedMediaFormat):
 			code = "UNSUPPORTED_MEDIA_FORMAT"
+		case errors.Is(err, engine.ErrInstagramPublicExtraction):
+			code = "PUBLIC_MEDIA_EXTRACTION_FAILED"
 		case errors.Is(err, engine.ErrAuthenticationRequired):
 			code = "AUTHENTICATION_REQUIRED"
 		case errors.Is(err, engine.ErrAccessDenied):

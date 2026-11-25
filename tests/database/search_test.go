@@ -68,7 +68,7 @@ func TestSearchMigrationV8(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer db.Close()
-			if countDB(t, db, "PRAGMA user_version") != 12 || textDB(t, db, "SELECT custom_title FROM media WHERE id=7") != "사용자 제목" || countDB(t, db, "SELECT count(*) FROM search_dirty") != 1 {
+			if countDB(t, db, "PRAGMA user_version") != 13 || textDB(t, db, "SELECT custom_title FROM media WHERE id=7") != "사용자 제목" || countDB(t, db, "SELECT count(*) FROM search_dirty") != 1 {
 				t.Fatal("검색 마이그레이션에서 자료/큐 누락")
 			}
 			catalog := media.NewService(db)
@@ -86,7 +86,7 @@ func TestSearchMigrationV8(t *testing.T) {
 				}
 			}
 			assertHealthyDB(t, db)
-			backup := rawDB(t, textDB(t, db, "SELECT backup_path FROM migration_run WHERE target_version=12"))
+			backup := rawDB(t, textDB(t, db, "SELECT backup_path FROM migration_run WHERE target_version=13"))
 			defer backup.Close()
 			if countDB(t, backup, "PRAGMA user_version") != 8 || textDB(t, backup, "SELECT custom_title FROM media WHERE id=7") != "사용자 제목" {
 				t.Fatal("백업 변경")

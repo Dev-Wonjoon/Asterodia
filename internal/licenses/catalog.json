@@ -2,7 +2,7 @@
   "schema": 1,
   "target": "windows/amd64 production",
   "inputs": {
-    "go.mod": "49eed32f0ee6855e14143dfd123084836c4d64f641f88d42a865dd0a33e1f6cc",
+    "go.mod": "45a94875f6898da000fbd5d1e0c47e35805e138b408a786928660d05c74e1eb7",
     "go.sum": "ab7bf2e7f3594bd8b1f1087cbec4101b7fc81369b94981be10cf349b8af5620f",
     "frontend/package.json": "073182a79aacc5a66364d5bbe701a7c1c09f3a854baab3db4b5e296507b3e938",
     "frontend/package-lock.json": "0000c8b9df59c0ce4af563937d3e25784fc0b4475b147919ee4560b95f7f57cc",

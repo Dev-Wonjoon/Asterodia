@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DownloadThumbnail } from '@renderer/features/download/components/DownloadThumbnail'
 import { cleanupReact, clickButton, deferred, mount } from './reactHarness'
+import { mockImageLoading } from './imageHarness'
 
 const api = vi.hoisted(() => ({ getDownloadPreview: vi.fn(), onMediaThumbnailUpdated: vi.fn() }))
 vi.mock('@renderer/shared/api', () => ({ getApi: () => api }))
@@ -14,10 +15,77 @@ beforeEach(() => {
     api.getDownloadPreview.mockResolvedValue(null)
     api.onMediaThumbnailUpdated.mockImplementation((listener) => { updated = listener; return unsubscribe })
 })
-afterEach(cleanupReact)
+afterEach(async () => { await cleanupReact(); vi.unstubAllGlobals() })
 const src = () => document.querySelector('img')?.getAttribute('src')
 
 describe('download local thumbnails', () => {
+    it('keeps a decoded image and its DOM node during empty refresh responses and polling gaps', async () => {
+        const host = document.createElement('div'); document.body.append(host)
+        const root = createRoot(host)
+        try {
+            const props = { url: 'https://example.invalid/a', completed: true, localPath: '/local.jpg' }
+            await act(async () => root.render(h(DownloadThumbnail, props)))
+            const image = document.querySelector('img')!
+            await act(async () => image.dispatchEvent(new Event('load')))
+            await act(async () => updated(1))
+            expect(src()).toBe('/media?path=%2Flocal.jpg')
+            expect(document.querySelector('img')).toBe(image)
+            await act(async () => root.render(h(DownloadThumbnail, { ...props, localPath: null })))
+            expect(src()).toBe('/media?path=%2Flocal.jpg')
+            expect(document.querySelector('img')).toBe(image)
+            expect(document.body.textContent).not.toContain('썸네일 없음')
+        } finally { await act(async () => root.unmount()); host.remove() }
+    })
+
+    it('loads the generated thumbnail before replacing the cached image and retains it on later refreshes', async () => {
+        const requests = mockImageLoading()
+        await mount(h(DownloadThumbnail, { url: 'https://example.invalid/a', completed: true, localPath: '/cached.jpg' }))
+        const image = document.querySelector('img')!
+        await act(async () => image.dispatchEvent(new Event('load')))
+        api.getDownloadPreview.mockResolvedValue('/generated.jpg')
+        await act(async () => updated(1))
+        expect(src()).toBe('/media?path=%2Fcached.jpg')
+        expect(requests).toHaveLength(1)
+        await act(async () => { await requests[0].onload?.() })
+        expect(src()).toBe('/media?path=%2Fgenerated.jpg')
+        expect(document.querySelector('img')).toBe(image)
+        api.getDownloadPreview.mockResolvedValue(null)
+        await act(async () => updated(2))
+        expect(src()).toBe('/media?path=%2Fgenerated.jpg')
+        expect(requests).toHaveLength(1)
+    })
+
+    it('does not repeatedly retry a broken image on unrelated updates but allows an explicit retry', async () => {
+        await mount(h(DownloadThumbnail, { url: 'https://example.invalid/a', completed: true, localPath: '/broken.jpg' }))
+        await act(async () => document.querySelector('img')!.dispatchEvent(new Event('error')))
+        api.getDownloadPreview.mockResolvedValue('/broken.jpg')
+        for (let id = 1; id <= 3; id++) {
+            await act(async () => updated(id))
+            expect(src()).toBeUndefined()
+            expect(document.body.textContent).toContain('썸네일 없음')
+        }
+        const pending = deferred<string | null>()
+        api.getDownloadPreview.mockReturnValueOnce(pending.promise)
+        await clickButton('썸네일 다시 불러오기')
+        expect(src()).toBeUndefined()
+        await act(async () => pending.resolve('/broken.jpg'))
+        expect(src()).toBe('/media?path=%2Fbroken.jpg')
+    })
+
+    it('does not show a loaded image from another URL while the new preview is pending', async () => {
+        const host = document.createElement('div'); document.body.append(host)
+        const root = createRoot(host)
+        try {
+            await act(async () => root.render(h(DownloadThumbnail, { url: 'https://example.invalid/old', localPath: '/old.jpg' })))
+            await act(async () => document.querySelector('img')!.dispatchEvent(new Event('load')))
+            const pending = deferred<string | null>(); api.getDownloadPreview.mockReturnValueOnce(pending.promise)
+            await act(async () => root.render(h(DownloadThumbnail, { url: 'https://example.invalid/new' })))
+            expect(src()).toBeUndefined()
+            await act(async () => pending.resolve('/new.jpg'))
+            expect(src()).toBe('/media?path=%2Fnew.jpg')
+        } finally { await act(async () => root.unmount()); host.remove() }
+    })
+
     it('renders an initial local path immediately and reuses it on screen re-entry without a preview request', async () => {
         const pending = deferred<string | null>(); api.getDownloadPreview.mockReturnValue(pending.promise)
         const props = { url: 'https://example.invalid/a', completed: true, localPath: '/local.jpg' }

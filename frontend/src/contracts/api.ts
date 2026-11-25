@@ -11,8 +11,11 @@ import type { UpdateApi } from "./update-api";
 export type Unsubscribe = () => void;
 
 import type { FileMoveApi } from "./file-move-api";
+import type { ContentFilters } from './media-v2';
 
 export interface AppApi {
+    getContentFilters(): Promise<ContentFilters>;
+    setContentFilters(value: ContentFilters): Promise<ContentFilters>;
     updates: UpdateApi;
     mediaEdit: MediaEditApi;
     fileMove: FileMoveApi;

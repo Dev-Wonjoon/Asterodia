@@ -162,6 +162,7 @@ export function downloadFailure(code: string): DownloadResponse<never> {
         UNSUPPORTED_INSTAGRAM_URL: translate("common.enterAnInstagramPostOrReelLink"),
         UNSUPPORTED_INSTAGRAM_OPTIONS: translate("common.forInstagramSelectVideoBestQualityAndAutoFormat"),
         AUTHENTICATION_REQUIRED: translate("common.loginIsRequiredOrYourCookiesHaveExpiredSelect"),
+        PUBLIC_MEDIA_EXTRACTION_FAILED: translate("common.publicInstagramMediaCouldNotBeExtracted"),
         ACCESS_DENIED: translate("common.accessToThisPostIsRestrictedCheckYourAccount"),
         MEDIA_UNAVAILABLE: translate("common.thePostWasDeletedOrCannotBeFoundWith"),
         RATE_LIMITED: translate("common.requestsAreTemporarilyLimitedTryAgainLater"),

@@ -3,6 +3,7 @@ package integration_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,6 +15,28 @@ import (
 	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
 	"github.com/Dev-Wonjoon/StorageBucket/internal/thumbnail"
 )
+
+func TestInstagramPublicExtractionAndAuthenticationFailuresRemainDistinct(t *testing.T) {
+	for _, test := range []struct {
+		name, code string
+		err        error
+	}{
+		{"public metadata without original URL", "PUBLIC_MEDIA_EXTRACTION_FAILED", errors.Join(engine.ErrInstagramPublicExtraction, engine.ErrAuthenticationRequired)},
+		{"authentication required", "AUTHENTICATION_REQUIRED", engine.ErrAuthenticationRequired},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			f := newFixture(t)
+			f.gallery = func(context.Context, string, string) (engine.GalleryDLDiscovery, error) {
+				return engine.GalleryDLDiscovery{}, test.err
+			}
+			job := f.enqueue(t)
+			errorCode(t, f.service.Run(t.Context(), download.RunRequest{JobID: job.ID, Trigger: "manual_initial"}), test.code)
+			if queryInt(t, f.db, "SELECT count(*) FROM media") != 0 || queryInt(t, f.db, "SELECT count(*) FROM download_target") != 0 {
+				t.Fatal("실패한 조회가 라이브러리에 등록되었습니다")
+			}
+		})
+	}
+}
 
 func TestReplacementCommitFailureKeepsOldLibrary(t *testing.T) {
 	for _, mode := range []string{"db-insert-failure", "revision-conflict"} {

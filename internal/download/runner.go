@@ -68,8 +68,18 @@ func (r Runner) DiscoverAttempt(
 	if kind == engine.KindGalleryDL {
 		other = engine.KindYtdlp
 	}
-	for _, candidate := range []engine.Kind{kind, other} {
+	chain := engine.RunDiscoveryChain(ctx, r.discoveryHandler(kind, result), r.discoveryHandler(other, result))
+	return chain.Value, chain.Err
+}
+
+func (r Runner) discoveryHandler(candidate engine.Kind, base AttemptDiscovery) engine.DiscoveryHandler[AttemptDiscovery] {
+	return engine.DiscoveryHandler[AttemptDiscovery]{Name: string(candidate), Handle: func(ctx context.Context) engine.DiscoveryStepResult[AttemptDiscovery] {
+		// Every handler starts from the request, never from a failed strategy's
+		// partial targets or transfer plan.
+		result := base
 		result.Engine = candidate
+		originalURL, stageDir, options := base.OriginalURL, base.stageDir, base.Options
+		var err error
 		switch candidate {
 		case engine.KindYtdlp:
 			if r.Ytdlp == nil {
@@ -90,18 +100,21 @@ func (r Runner) DiscoverAttempt(
 			if err == nil {
 				result.galleryVideos, err = r.resolvePinterestVideos(ctx, result.GalleryResult, originalURL, stageDir, options)
 				if err != nil {
-					return result, err
+					return engine.DiscoveryStepResult[AttemptDiscovery]{Decision: engine.DiscoveryStop, Value: result, Err: err}
 				}
 			}
 		}
-		if err == nil {
-			return result, nil
+		decision := engine.DiscoveryHandled
+		if err != nil {
+			decision = engine.DiscoveryStop
+			if errors.Is(err, engine.ErrUnsupportedURL) && !errors.Is(err, engine.ErrRateLimited) &&
+				!errors.Is(err, engine.ErrOutputLimit) && !errors.Is(err, engine.ErrStopUnconfirmed) &&
+				!errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+				decision = engine.DiscoveryNext
+			}
 		}
-		if !errors.Is(err, engine.ErrUnsupportedURL) {
-			return result, err
-		}
-	}
-	return result, err
+		return engine.DiscoveryStepResult[AttemptDiscovery]{Decision: decision, Value: result, Err: err}
+	}}
 }
 
 func (a AttemptDiscovery) StageDir() string {

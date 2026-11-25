@@ -27,6 +27,8 @@ async function response<T>(pending: Promise<Result>): Promise<T> {
 }
 
 const api: AppApi = {
+    getContentFilters: async () => { const value = await SettingsService.GetContentFilters(); return { hiddenPlatforms: value.hiddenPlatforms ?? [], hiddenTags: value.hiddenTags ?? [] } },
+    setContentFilters: async request => { const value = await SettingsService.SetContentFilters(wire(request)); return { hiddenPlatforms: value.hiddenPlatforms ?? [], hiddenTags: value.hiddenTags ?? [] } },
     updates: {
         status: () => response(UpdateService.Status()),
         check: () => response(UpdateService.Check()),
@@ -77,6 +79,7 @@ const api: AppApi = {
     },
     database: { import: () => response(DesktopService.ImportDatabase()) },
     media: {
+        exploreAlbum: request => response(MediaService.ExploreAlbum(wire(request))),
         albums: (request = {}) => response(MediaService.Albums(wire(request))),
         saveAlbum: request => response(MediaService.SaveAlbum(wire(request))),
         mergeAlbum: request => response(MediaService.MergeAlbum(wire(request))),

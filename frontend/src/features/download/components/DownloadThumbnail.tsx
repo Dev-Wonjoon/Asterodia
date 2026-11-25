@@ -2,7 +2,7 @@ import { translate, useLanguage } from '@renderer/shared/i18n'
 import { Download } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { getApi } from '@renderer/shared/api'
-import { toMediaUrl } from '@renderer/shared/utils/media'
+import { MediaPreview } from '@renderer/shared/components/media/MediaPreview'
 
 export function DownloadThumbnail({
     url,
@@ -23,15 +23,17 @@ export function DownloadThumbnail({
         hint: string | null | undefined
         path: string | null
         loading: boolean
+        imageRetry: number
     }>({
         url,
         hint: localPath,
         path: localPath ?? null,
-        loading: !localPath
+        loading: !localPath,
+        imageRetry: 0
     })
 
-    const [failedSrc, setFailedSrc] = useState<string | null>(null)
     const [reload, setReload] = useState(0)
+    const [retry, setRetry] = useState(0)
 
     useEffect(() => {
         if (!completed) return
@@ -41,14 +43,16 @@ export function DownloadThumbnail({
     useEffect(() => {
         let disposed = false
 
-        setFailedSrc(null)
-        if (localPath && reload === 0) {
-            setResult({ url, hint: localPath, path: localPath, loading: false })
+        if (localPath && reload === 0 && retry === 0) {
+            setResult({ url, hint: localPath, path: localPath, loading: false, imageRetry: 0 })
             return
         }
         setResult((previous) => ({
             url, hint: localPath,
-            path: localPath ?? (previous.url === url ? previous.path : null), loading: true
+            path: previous.url !== url ? localPath ?? null
+                : localPath && localPath !== previous.hint ? localPath : previous.path ?? localPath ?? null,
+            loading: true,
+            imageRetry: previous.url === url ? previous.imageRetry : 0
         }))
 
         void (async () => {
@@ -56,13 +60,18 @@ export function DownloadThumbnail({
                 const path = await getApi().getDownloadPreview(url)
 
                 if (!disposed) {
-                    setResult({ url, hint: localPath, path, loading: false })
+                    setResult(previous => ({
+                        url, hint: localPath,
+                        path: path ?? (previous.url === url ? previous.path : localPath ?? null),
+                        loading: false,
+                        imageRetry: path ? retry : previous.url === url ? previous.imageRetry : 0
+                    }))
                 }
             } catch {
                 if (!disposed) {
                     setResult((previous) => {
                         const path = previous.url === url ? previous.path : (localPath ?? null)
-                        return { url, hint: localPath, path: toMediaUrl(path) === failedSrc ? null : path, loading: false }
+                        return { url, hint: localPath, path, loading: false, imageRetry: previous.url === url ? previous.imageRetry : 0 }
                     })
                 }
             }
@@ -71,25 +80,23 @@ export function DownloadThumbnail({
         return () => {
             disposed = true
         }
-    }, [url, reload, completed, localPath])
+    }, [url, reload, completed, localPath, retry])
 
-    const current = result.url === url && result.hint === localPath ? result : null
-    const src = toMediaUrl(current ? current.path : localPath)
+    const current = result.url === url ? result : null
+    const path = current
+        ? localPath && localPath !== current.hint ? localPath : current.path
+        : localPath ?? null
     const loading = current ? current.loading : !localPath
 
     return (
         <div className={'flex aspect-video shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--bg-hover)] text-[var(--text-muted)] ' + (fullWidth ? 'w-full' : 'w-28 sm:w-36')}>
-            {src && src !== failedSrc ? (
-                <img
-                    key={src}
-                    src={src}
-                    alt={title}
-                    loading="lazy"
-                    className="h-full w-full object-contain"
-                    onError={() => setFailedSrc(src)}
-                />
-            ) : (
-                <div className="flex flex-col items-center gap-0.5">
+            <MediaPreview
+                identity={url}
+                retryKey={current?.imageRetry ?? 0}
+                path={path}
+                title={title}
+                className="h-full w-full object-contain"
+                fallback={<div className="flex flex-col items-center gap-0.5">
                     <Download className="size-6" aria-hidden="true" />
 
                     <span className="text-xs">{loading ? translate("download.preparingPreview") : translate("download.noThumbnail")}</span>
@@ -102,12 +109,12 @@ export function DownloadThumbnail({
                             className="text-[11px] leading-4 underline"
                             onClick={(event) => {
                                 event.stopPropagation()
-                                setReload((value) => value + 1)
+                                setRetry((value) => value + 1)
                             }}
                         >{translate("common.retry")}</button>
                     )}
-                </div>
-            )}
+                </div>}
+            />
         </div>
     )
 }

@@ -1,4 +1,6 @@
 import type {
+	AlbumExploreRequest,
+	AlbumExplorePage,
     AlbumRequest,
     MediaSequence,
     MediaFileDto,
@@ -21,6 +23,7 @@ import type {
 import type { MoveSelection } from './file-move-api'
 
 export interface MediaApi {
+	exploreAlbum(request: AlbumExploreRequest): Promise<MediaResult<AlbumExplorePage>>
     mergeAlbum(request: { title: string; selection: MoveSelection[] }): Promise<MediaResult<MediaSummaryDto>>
     albums(request?: MediaDirectoryListRequest): Promise<MediaResult<MediaPage<MediaSummaryDto>>>
     saveAlbum(request: AlbumRequest): Promise<MediaResult<MediaSummaryDto>>

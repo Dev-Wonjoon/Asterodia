@@ -1,7 +1,8 @@
 import { translate } from '@renderer/shared/i18n'
 import type { MediaApi } from '@contracts/media-api'
 import type { MediaEditApi } from '@contracts/media-edit-api'
-import type { MediaFileDto, MediaFilter, MediaSummaryDto, MediaDetailDto, MediaResult, MediaPage } from '@contracts/media-v2'
+import type { MediaFileDto, MediaFilter, MediaSummaryDto, MediaDetailDto, MediaResult, MediaPage, ContentFilters } from '@contracts/media-v2'
+import type { AlbumExplorePage } from '@contracts/media-v2'
 
 export async function request<T>(path: string, options?: RequestInit): Promise<T> {
     const response = await fetch(path, { credentials: 'same-origin', ...options })
@@ -10,6 +11,7 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
 }
 export function filterParameters(filter: MediaFilter = {}) {
     const query = new URLSearchParams({ q: filter.keyword ?? '', tagMode: filter.tagMode ?? 'and' })
+    if (filter.showHidden) query.set('showHidden', '1')
     for (const [key, values] of [['tag', filter.tags], ['platform', filter.platforms], ['author', filter.authors]] as const)
         for (const value of values ?? []) query.append(key, value)
     return query
@@ -27,10 +29,23 @@ function summary(row: MediaSummaryDto): MediaSummaryDto {
     return { ...row, cover: row.cover ? { ...row.cover, path: `/api/files/${row.cover.fileId}/thumbnail` } : null, galleryFile: row.galleryFile ? fileDTO(row.galleryFile) : undefined }
 }
 const media: MediaApi = {
+    exploreAlbum: value => result(async () => {
+        const query = filterParameters(value.filter)
+        query.set('limit', String(value.limit ?? 100)); query.set('offset', String(value.offset ?? 0))
+        query.set('recursive', value.recursive ? '1' : '0'); query.set('sort', value.sort ?? 'name'); query.set('descending', value.descending ? '1' : '0')
+        const page = await request<AlbumExplorePage>(`/api/albums/${value.mediaId}/contents?` + query)
+        return { ...page, album: summary(page.album), data: page.data.map(entry => entry.kind === 'album' ? { ...entry, album: summary(entry.album) } : { ...entry, file: fileDTO(entry.file) }) }
+    }),
+    saveAlbum: async value => {
+        const access = await request<{ csrf: string }>('/api/albums/access')
+        const response = await request<MediaResult<MediaSummaryDto>>('/api/albums', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-StorageBucket-CSRF': access.csrf }, body: JSON.stringify(value) })
+        return response.ok ? { ok: true, data: summary(response.data) } : response
+    },
     list: (value = {}) => result(async () => {
         const query = filterParameters(value.filter)
         query.set('limit', String(value.limit ?? 24)); query.set('offset', String(value.offset ?? 0))
         query.set('gallery', value.gallery ? '1' : '0'); query.set('expanded', (value.expandedMediaIds ?? []).join(','))
+        if (value.albumCards) query.set('albumCards', '1')
         if (value.anchorMediaId) query.set('anchor', String(value.anchorMediaId))
         const page = await request<MediaPage<MediaSummaryDto>>('/api/library?' + query)
         return { ...page, data: page.data.map(summary) }
@@ -48,7 +63,7 @@ const media: MediaApi = {
     suggest: value => result(() => request('/api/suggestions?' + new URLSearchParams({ kind: value.kind, q: value.text, limit: String(value.limit ?? 10) }))),
     sequence: value => result(() => request(`/api/library/${value.mediaId}/sequence`)),
     readFile: value => result(async () => fileDTO(await request(`/api/files/${value.fileId}/info`))),
-    albums: unavailable, saveAlbum: unavailable, mergeAlbum: unavailable, directories: unavailable, edit: unavailable, unregisterFiles: unavailable, unregisterMedia: unavailable,
+    albums: unavailable, mergeAlbum: unavailable, directories: unavailable, edit: unavailable, unregisterFiles: unavailable, unregisterMedia: unavailable,
 }
 export interface EditAccess { enabled: boolean; csrf: string }
 let access: EditAccess = { enabled: false, csrf: '' }
@@ -68,5 +83,26 @@ const mediaEdit: MediaEditApi = {
     list: () => editRequest('list', undefined, true), cancel: value => editRequest('cancel', value), release: value => editRequest('release', value),
     resultPath: async () => ({ ok: false, error: { code: 'NOT_READY', message: translate("common.youCanViewTheResultInTheGallery") } }),
 }
-const api = { media, mediaEdit, showItemInFolder: async () => {} }
+async function readContentFilters() {
+    return request<ContentFilters & { csrf?: string }>('/api/content-filters')
+}
+const api = {
+    media, mediaEdit, showItemInFolder: async () => {},
+    getContentFilters: async (): Promise<ContentFilters> => {
+        const value = await readContentFilters()
+        return { hiddenPlatforms: value.hiddenPlatforms, hiddenTags: value.hiddenTags }
+    },
+    setContentFilters: async (value: ContentFilters): Promise<ContentFilters> => {
+        // Read a fresh token so saving also works after the PC restarts the web server.
+        const access = await readContentFilters()
+        if (!access.csrf) throw new Error(translate('contentFilters.saveError'))
+        const response = await fetch('/api/content-filters', {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-StorageBucket-CSRF': access.csrf },
+            body: JSON.stringify({ hiddenPlatforms: value.hiddenPlatforms, hiddenTags: value.hiddenTags }),
+        })
+        if (!response.ok) throw new Error(translate('contentFilters.saveError'))
+        return response.json()
+    },
+}
 export function getApi() { return api }

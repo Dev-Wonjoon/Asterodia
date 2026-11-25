@@ -60,7 +60,7 @@ try {
     Invoke-TestGroup 'gallerydl-download' './tests/engine' '^TestGalleryDL(SaveImages|DownloadResults)$'
     Invoke-TestGroup 'gallerydl-discovery' './tests/engine' '^TestGalleryDLDiscoverBluesky$'
     Invoke-TestGroup 'ytdlp-download' './tests/engine' '^TestYtdlpDownload'
-    Invoke-TestGroup 'engine-parsers' './tests/engine' '^Test(ParseGalleryDLDiscovery|GalleryDLInstagramTargetKey|GalleryDLCommonTargets|YtdlpTargetKeyCompatibility)$'
+    Invoke-TestGroup 'engine-parsers' './tests/engine' '^Test(ParseGalleryDLDiscovery|GalleryDLInstagramTargetKey|GalleryDLCommonTargets|YtdlpTargetKeyCompatibility|Instagram.*|DiscoveryChain.*)$'
     Invoke-TestGroup 'integration' './tests/integration'
     Invoke-TestGroup 'thumbnail' './tests/thumbnail'
     Invoke-TestGroup 'webserver' './tests/webserver'

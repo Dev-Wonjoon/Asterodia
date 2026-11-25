@@ -397,6 +397,27 @@ func (m *merge) run() error {
 			return e
 		}
 	}
+	// All albums exist before hierarchy links are restored. Re-imports preserve
+	// the user's current placement of already known albums.
+	for _, r := range m.data["album_parent"] {
+		old, e := integer(r["album_id"])
+		if e != nil {
+			return e
+		}
+		if !m.newMedia[m.maps["media"][old]] {
+			continue
+		}
+		row := clone(r)
+		if e = m.remap(row, "album_id", "media"); e != nil {
+			return e
+		}
+		if e = m.remap(row, "parent_id", "media"); e != nil {
+			return e
+		}
+		if _, e = insert(m.ctx, m.q, "album_parent", row); e != nil {
+			return e
+		}
+	}
 	for _, r := range m.data["gallery_pin"] {
 		row := clone(r)
 		if err := m.remap(row, "media_id", "media"); err != nil {

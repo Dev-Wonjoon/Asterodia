@@ -87,6 +87,7 @@ export function createGalleryStore(
     options: {
         favoritesOnly?: boolean
         expandAlbums?: boolean
+        albumCards?: boolean
         galleryView?: GalleryView
         showAlbumFiles?: boolean
     } = {}
@@ -95,7 +96,9 @@ export function createGalleryStore(
     const expandAlbums = options.expandAlbums ?? false
     let filter: MediaFilter = {}
     let snapshot: GallerySnapshot = {
-        expandedMediaIds: expandAlbums ? readExpandedAlbums() : [],
+        // Explorer entry cards start grouped; old inline expansion preferences
+        // remain available to legacy views without changing album membership.
+        expandedMediaIds: expandAlbums && !options.albumCards ? readExpandedAlbums() : [],
         list: emptyList(),
         detail: {
             mediaId: null,
@@ -236,6 +239,7 @@ export function createGalleryStore(
                     favoritesOnly,
                     filter: requestedFilter,
                     ...(expandAlbums ? { gallery: true, expandedMediaIds: requestedExpanded,
+                        ...(options.albumCards ? { albumCards: true } : {}),
                         ...(options.galleryView !== undefined ? { galleryView: options.galleryView } : {}),
                         ...(options.showAlbumFiles !== undefined ? { showAlbumFiles: options.showAlbumFiles } : {}) } : {})
                 })
@@ -275,7 +279,7 @@ export function createGalleryStore(
 
         if (expandAlbums) {
             expandedAlbums = requestedExpanded
-            saveExpandedAlbums(requestedExpanded)
+            if (!options.albumCards) saveExpandedAlbums(requestedExpanded)
         }
 
         publish({

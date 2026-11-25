@@ -158,6 +158,9 @@ func validateSchema(ctx context.Context, q connection, version int) error {
 		ddl = schemaV11SQL
 	}
 	if version == 12 {
+		ddl = schemaV12SQL
+	}
+	if version == 13 {
 		ddl = schemaSQL
 	}
 	if _, err = expected.ExecContext(ctx, ddl); err != nil {

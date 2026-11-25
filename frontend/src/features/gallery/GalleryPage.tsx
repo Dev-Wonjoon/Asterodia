@@ -4,6 +4,7 @@ import { useGallerySelection, gallerySelectionKey, albumDragType } from './useGa
 import { useGalleryExpansionMotion } from './useGalleryExpansionMotion'
 import { FolderMergeDialog } from './FolderMergeDialog'
 import { AlbumManager, type AlbumControls } from './AlbumManager'
+import { AlbumExplorer } from './AlbumExplorer'
 import { MediaViewer } from './MediaViewer'
 import { useConfirm } from '@renderer/shared/hooks/useConfirm'
 import { MediaEditLauncher, type MediaEditControls } from '../mediaedit/MediaEditLauncher'
@@ -31,6 +32,7 @@ import { ActionButton } from '@renderer/shared/components/ui/ActionButton'
 import { Play, ChevronDown, ChevronUp, Square, SquareCheck } from 'lucide-react'
 import { useShortcutCommands } from '@renderer/shared/hooks/useShortcutCommands'
 import { useGalleryKeyboardFocus } from './useGalleryKeyboardFocus'
+import { ContentFilterNotice } from '@renderer/shared/components/ui/ContentFilterNotice'
 import { prepareRemoval, removalConfirmation, removalCounts, removalLabel, selectedRemovalCounts } from './galleryRemoval'
 
 function CardSelectionIcon({ selected }: { selected: boolean }) {
@@ -46,6 +48,7 @@ export const GalleryPage = ({
     filter,
     importRequest = 0,
     onImportHandled,
+    onExplorerChange,
     emptyMessage = translate("gallery.noCollectionsRegistered")
 }: {
     favoritesOnly?: boolean
@@ -53,6 +56,7 @@ export const GalleryPage = ({
     filter?: MediaFilter
     importRequest?: number
     onImportHandled?: () => void
+    onExplorerChange?: (open: boolean) => void
     emptyMessage?: string
 } = {}): React.JSX.Element => {
     useLanguage()
@@ -60,7 +64,7 @@ export const GalleryPage = ({
     const generation = useRef(0)
     const [galleryView, setGalleryView] = useState<GalleryView>('all')
     const [showAlbumFiles, setShowAlbumFiles] = useState(false)
-    const { store, snapshot: state, openInFolder, downloads } = useGalleryViewModel(favoritesOnly, filter, galleryView, showAlbumFiles)
+    const { store, snapshot: state, openInFolder, downloads, contentVisibility } = useGalleryViewModel(favoritesOnly, filter, galleryView, showAlbumFiles)
     const activeJobs = !favoritesOnly && !filter && galleryView === 'all' ? downloads.activeJobs : []
     const [downloadDetailId, setDownloadDetailId] = useState<string | null>(null)
     useEffect(() => () => downloads.closeDetail(), [downloads.closeDetail])
@@ -73,8 +77,17 @@ export const GalleryPage = ({
 
     useEffect(() => { ++generation.current; return () => { ++generation.current } }, [store])
     const listScrollRef = useRef<HTMLDivElement>(null)
+    const [explorerId, setExplorerId] = useState<number | null>(null)
+    const galleryPosition = useRef<{ scroll: number; focus: HTMLElement | null }>({ scroll: 0, focus: null })
+    useEffect(() => { onExplorerChange?.(explorerId !== null) }, [explorerId, onExplorerChange])
+    useEffect(() => () => onExplorerChange?.(false), [onExplorerChange])
+    useLayoutEffect(() => {
+        if (explorerId !== null) return
+        if (listScrollRef.current) listScrollRef.current.scrollTop = galleryPosition.current.scroll
+        if (galleryPosition.current.focus?.isConnected) galleryPosition.current.focus.focus({ preventScroll: true })
+    }, [explorerId])
     const selectionLocked = useRef(false)
-    const pointerSelection = useGallerySelection(state.list.page.data, selectionLocked, listScrollRef, JSON.stringify([filter ?? {}, favoritesOnly, galleryView, showAlbumFiles]))
+    const pointerSelection = useGallerySelection(state.list.page.data, selectionLocked, listScrollRef, JSON.stringify([filter ?? {}, favoritesOnly, galleryView, showAlbumFiles, contentVisibility?.key, contentVisibility?.showHidden]))
     const keyboardFocus = useGalleryKeyboardFocus(pointerSelection.gridRef, state.list.page.data)
     const selection = pointerSelection.groups
     const albumFileIds = pointerSelection.fileIds
@@ -84,6 +97,7 @@ export const GalleryPage = ({
     const [mediaEditLoading, setMediaEditLoading] = useState(false), [mediaEditError, setMediaEditError] = useState('')
     const [viewer, setViewer] = useState<{ mediaId: number; fileId?: number } | null>(null)
     const closeViewer = useCallback(() => setViewer(null), [])
+    useLayoutEffect(() => setViewer(null), [contentVisibility?.key, contentVisibility?.showHidden])
 
     const [tagCommand, setTagCommand] = useState<'addTags' | 'removeTags' | null>(null)
     const importControls = useRef<LocalImportControls>(null)
@@ -257,7 +271,7 @@ export const GalleryPage = ({
     }
 
     const disabled = state.busy || bulk.busy || albumDropBusy || list.status !== 'ready'
-    const toolbarDisabled = disabled || moveBusy || draftDirty || state.needsRefresh || mergeSelection !== null
+    const toolbarDisabled = disabled || moveBusy || draftDirty || state.needsRefresh || mergeSelection !== null || explorerId !== null
     const pageDisabled = toolbarDisabled || list.refreshing
     const importedRequest = useRef(0)
     useEffect(() => {
@@ -308,7 +322,7 @@ export const GalleryPage = ({
         ...Object.fromEntries(['left', 'right', 'up', 'down', 'first', 'last'].map(direction => ['gallery.' + direction, { enabled: () => !pageDisabled && !viewer, run: (event?: KeyboardEvent) => focusCard(direction, event) }])),
         'gallery.select': { enabled: cardEnabled, run: () => { const item = focusedMedia(); if (item) pointerSelection.select(item, { ctrlKey: false, metaKey: false, shiftKey: false }, true) } },
         'gallery.all': { enabled: () => !pageDisabled && !viewer, run: pointerSelection.all },
-        'gallery.view': { enabled: () => cardEnabled() && Boolean(focusedMedia()?.fileCount), run: () => { const item = focusedMedia(); if (item) setViewer({ mediaId: item.id, fileId: item.galleryFile?.id }) } },
+        'gallery.view': { enabled: cardEnabled, run: () => { const item = focusedMedia(); if (item) { if (item.galleryFile) setViewer({ mediaId: item.id, fileId: item.galleryFile.id }); else void openAlbum(item.id) } } },
         'gallery.details': { enabled: cardEnabled, run: () => { const item = focusedMedia(); if (item) void selectDetail(item.id, item.galleryFileOffset) } },
         'gallery.menu': { enabled: cardEnabled, run: () => { const item = focusedMedia(); if (item) [...pointerSelection.gridRef.current?.querySelectorAll<HTMLElement>('[data-selection-key]') ?? []].find(card => card.dataset.selectionKey === gallerySelectionKey(item))?.querySelector<HTMLButtonElement>('[data-card-menu]')?.click() } },
         'gallery.favorite': { enabled: () => cardEnabled() && (selection.length > 0 || !focusedMedia()?.galleryFile), run: () => {
@@ -454,8 +468,16 @@ export const GalleryPage = ({
         void downloads.openDetail(jobId)
     }
 
+    async function openAlbum(id: number) {
+        if (pageDisabled || !await closeDetail()) return
+        galleryPosition.current = { scroll: listScrollRef.current?.scrollTop ?? 0, focus: document.activeElement instanceof HTMLElement ? document.activeElement : null }
+        setExplorerId(id)
+    }
+
     return (
         <>
+        {explorerId !== null && <AlbumExplorer mediaId={explorerId} onClose={() => setExplorerId(null)} onChanged={() => { void store.refresh() }} />}
+        <div hidden={explorerId !== null} inert={explorerId !== null} className="h-full">
         {viewer && <MediaViewer mediaId={viewer.mediaId} fileId={viewer.fileId} onClose={closeViewer} />}
         {mergeSelection && <FolderMergeDialog selection={mergeSelection} onClose={() => setMergeSelection(null)} onChanged={() => { clearSelection(); void store.refresh() }} onStarted={(jobId, error) => moveControls.current?.track(jobId, error)} />}
         <ListDetailLayout
@@ -498,6 +520,7 @@ export const GalleryPage = ({
                         onSelectAll={pointerSelection.all}
                         onClear={clearSelection} onRefresh={() => { clearSelection(); void store.refresh() }} /></div>
                 </header>
+                {contentVisibility && <ContentFilterNotice visibility={contentVisibility} disabled={pageDisabled || draftDirty || viewer !== null} />}
                 {mediaEditLoading && <p role="status" className="text-sm text-[var(--text-muted)]">{translate("gallery.loadingVideo")}</p>}
                 {mediaEditError && <p role="alert" className="text-sm text-red-500">{translateMessage(mediaEditError)}</p>}
                 {cardError && <p role="alert" className="text-sm text-red-500">{translateMessage(cardError)}</p>}
@@ -575,6 +598,7 @@ export const GalleryPage = ({
                             disabled={disabled} viewDisabled={pageDisabled}
                             previewPath={media.galleryFile ? media.galleryFile.thumbnailPath ?? media.galleryFile.previewPath ?? (media.galleryFile.kind === 'image' ? media.galleryFile.filepath : null) : media.cover?.path ?? null}
                             onView={() => setViewer({ mediaId: media.id, fileId: media.galleryFile?.id })}
+                            onOpen={!media.galleryFile ? () => { void openAlbum(media.id) } : undefined}
                             onDetails={() => { void selectDetail(media.id, media.galleryFileOffset) }}
                             selection={!media.galleryFile && <label className="absolute right-2 top-2 z-10 flex size-7 items-center justify-center rounded-lg bg-[var(--bg-sidebar)] shadow-sm hover:bg-[var(--bg-hover)]" onClick={event => event.stopPropagation()}>
                                 <input type="checkbox" data-gallery-select className="peer absolute inset-0 m-0 size-full cursor-pointer opacity-0 disabled:cursor-default" aria-label={media.title + translate("gallery.suffix.select")} checked={pointerSelection.entries.has(gallerySelectionKey(media))} disabled={toolbarDisabled} onChange={() => {}} onClick={event => pointerSelection.select(media, event, true)} />
@@ -637,6 +661,7 @@ export const GalleryPage = ({
                 )}
             </div>
         </ListDetailLayout>
+        </div>
         </>
     )
 }

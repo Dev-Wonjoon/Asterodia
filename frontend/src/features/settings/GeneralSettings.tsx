@@ -6,6 +6,7 @@ import { SettingRow } from '@renderer/shared/components/ui/SettingRow'
 import { UpdateSettings } from './UpdateSettings'
 import { LanguageSelect } from '@renderer/shared/i18n/LanguageSelect'
 import { WorkingDirectorySettings } from './WorkingDirectorySettings'
+import { ContentFiltersSettings } from './ContentFiltersSettings'
 
 export const GeneralSettings = (): React.JSX.Element => {
     useLanguage()
@@ -48,6 +49,6 @@ export const GeneralSettings = (): React.JSX.Element => {
                     <p className="break-all">{translate("settings.backupBeforeMerge", { path: importResult.backupPath })}</p>
                 </div>
             )}
-        </SettingSection></div>
+        </SettingSection><ContentFiltersSettings disabled={importing} /></div>
     )
 }

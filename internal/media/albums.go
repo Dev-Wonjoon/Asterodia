@@ -130,6 +130,8 @@ func (s *Service) MergeAlbum(ctx context.Context, req MergeAlbumRequest) api.Res
 }
 
 type AlbumRequest struct {
+	// Omitted preserves the current parent; zero moves an album to the root.
+	ParentID         *int64  `json:"parentId"`
 	AlbumID          int64   `json:"albumId"`
 	ExpectedRevision int64   `json:"expectedRevision"`
 	Title            *string `json:"title"`
@@ -178,7 +180,7 @@ func (s *Service) SaveAlbum(ctx context.Context, req AlbumRequest) api.Result {
 		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
 	}
 	defer leave()
-	if req.AlbumID < 0 || req.ExpectedRevision < 0 || len(req.AddFileIDs) > 20000 || len(req.AddMediaIDs) > 500 || len(req.RemoveFileIDs) > 20000 || req.MoveFileID < 0 || req.BeforeFileID < 0 {
+	if req.AlbumID < 0 || req.ExpectedRevision < 0 || (req.ParentID != nil && *req.ParentID < 0) || len(req.AddFileIDs) > 20000 || len(req.AddMediaIDs) > 500 || len(req.RemoveFileIDs) > 20000 || req.MoveFileID < 0 || req.BeforeFileID < 0 {
 		return failure(domainError("INVALID_ARGUMENT"))
 	}
 	var title string
@@ -237,6 +239,11 @@ func (s *Service) SaveAlbum(ctx context.Context, req AlbumRequest) api.Result {
 	}
 	if req.Title != nil {
 		if _, err = tx.ExecContext(ctx, "UPDATE media SET custom_title=? WHERE id=?", title, id); err != nil {
+			return failure(err)
+		}
+	}
+	if req.ParentID != nil {
+		if err = setAlbumParent(ctx, tx, id, *req.ParentID); err != nil {
 			return failure(err)
 		}
 	}

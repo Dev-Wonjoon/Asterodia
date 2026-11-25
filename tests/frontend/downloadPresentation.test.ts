@@ -60,7 +60,7 @@ describe('download presentation', () => {
         }
     })
     it('Instagram 인증·접근 제한·요청 제한의 안내를 구분한다', () => {
-        for (const [code, text] of [['AUTHENTICATION_REQUIRED','쿠키'],['ACCESS_DENIED','열람 권한'],['MEDIA_UNAVAILABLE','삭제'],['RATE_LIMITED','잠시 후'],['UNSUPPORTED_INSTAGRAM_OPTIONS','최고 화질'],['UNSUPPORTED_INSTAGRAM_URL','릴스']]) {
+        for (const [code, text] of [['AUTHENTICATION_REQUIRED','쿠키'],['PUBLIC_MEDIA_EXTRACTION_FAILED','공개 게시물 정보는 확인'],['ACCESS_DENIED','열람 권한'],['MEDIA_UNAVAILABLE','삭제'],['RATE_LIMITED','잠시 후'],['UNSUPPORTED_INSTAGRAM_OPTIONS','최고 화질'],['UNSUPPORTED_INSTAGRAM_URL','릴스']]) {
             const result = downloadFailure(code)
             expect(result.ok).toBe(false)
             if (!result.ok) expect(result.error.message).toContain(text)

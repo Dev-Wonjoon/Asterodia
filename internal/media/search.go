@@ -36,6 +36,7 @@ func (s *Service) SearchSuggest(ctx context.Context, req SearchSuggestRequest) a
 	}
 	// The typed keyword is the suggestion query, not an additional gallery constraint.
 	req.Filter.Keyword = ""
+	req.Filter = s.visibleFilter(req.Filter)
 	where, filterArgs, err := filterSQL(ListRequest{Filter: req.Filter, FavoritesOnly: req.FavoritesOnly})
 	if err != nil {
 		return failure(err)

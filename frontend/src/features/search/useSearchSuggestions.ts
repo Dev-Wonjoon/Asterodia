@@ -2,11 +2,13 @@ import { translateError, translate } from '@renderer/shared/i18n'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MediaFilter, SearchSuggestion, SearchSuggestionPage } from '@contracts/media-v2'
 import { getApi } from '@renderer/shared/api'
+import { useContentVisibility } from '@renderer/shared/hooks/useContentVisibility'
 
 export const SEARCH_SUGGEST_DELAY = 50
 const PAGE_SIZE = 10
 
 export function useSearchSuggestions(text: string, filter: MediaFilter, enabled: boolean, composing: boolean) {
+    const visibility = useContentVisibility()
     const [page, setPage] = useState<SearchSuggestionPage>({ data: [], offset: 0, hasNextPage: false, revision: 0, indexed: false })
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -15,7 +17,7 @@ export function useSearchSuggestions(text: string, filter: MediaFilter, enabled:
     const wasComposing = useRef(false)
     const cache = useRef(new Map<string, { page: SearchSuggestionPage; at: number }>())
     const filterKey = JSON.stringify({ ...filter, keyword: undefined })
-    const key = JSON.stringify([text, filterKey])
+    const key = JSON.stringify([text, filterKey, visibility.key])
     const current = useRef(key)
     current.current = key
     const pageRef = useRef(page)

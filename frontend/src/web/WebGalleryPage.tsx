@@ -15,22 +15,36 @@ import { ActionButton } from '../shared/components/ui/ActionButton'
 import { useInfiniteScroll } from '../shared/hooks/useInfiniteScroll'
 import { getApi, refreshAccess } from './api'
 import { toMediaUrl } from './media'
+import { useContentVisibility } from '../shared/hooks/useContentVisibility'
+import { WebContentFilters } from './WebContentFilters'
+import { AlbumExplorer } from '../features/gallery/AlbumExplorer'
 
 const button = 'rounded-lg border border-[var(--border-line)] px-3 py-2 text-sm disabled:opacity-40'
 const noop = () => {}
-export function WebGalleryPage({ title, filter, emptyMessage }: { title: string; filter: MediaFilter; emptyMessage: string }) {
+export function WebGalleryPage({ title, filter, emptyMessage, onExplorerChange }: { title: string; filter: MediaFilter; emptyMessage: string; onExplorerChange?: (open: boolean) => void }) {
     useLanguage()
-    const store = useMemo(() => createGalleryStore(getApi().media, { expandAlbums: true }), [])
+    const visibility = useContentVisibility()
+    const store = useMemo(() => createGalleryStore(getApi().media, { expandAlbums: true, albumCards: true }), [visibility.key, visibility.showHidden])
     const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
     const { list, detail } = state
     const root = useRef<HTMLDivElement>(null), sentinel = useRef<HTMLDivElement>(null)
+    const [explorerId, setExplorerId] = useState<number | null>(null), [selectedKey, setSelectedKey] = useState<string | null>(null)
+    const galleryPosition = useRef<{ scroll: number; focus: HTMLElement | null }>({ scroll: 0, focus: null })
+    useEffect(() => { onExplorerChange?.(explorerId !== null) }, [explorerId, onExplorerChange])
+    useEffect(() => () => onExplorerChange?.(false), [onExplorerChange])
+    useLayoutEffect(() => {
+        if (explorerId !== null) return
+        if (root.current) root.current.scrollTop = galleryPosition.current.scroll
+        if (galleryPosition.current.focus?.isConnected) galleryPosition.current.focus.focus({ preventScroll: true })
+    }, [explorerId])
     const grid = useRef<HTMLDivElement>(null)
     const editor = useRef<MediaEditControls>(null), serial = useRef(0)
     const [editEnabled, setEditEnabled] = useState(false), [editBusy, setEditBusy] = useState(false), [error, setError] = useState('')
     const [viewer, setViewer] = useState<{ mediaId: number; fileId?: number } | null>(null)
     const closeViewer = useCallback(() => setViewer(null), [])
     const [anchor, setAnchor] = useState<{ id: number; top: number } | null>(null)
-    const filterKey = JSON.stringify(filter)
+    const filterKey = JSON.stringify({ ...filter, ...(visibility.showHidden ? { showHidden: true } : {}) })
+    useLayoutEffect(() => setViewer(null), [visibility.key, visibility.showHidden])
     useEffect(() => {
         store.setFilter(JSON.parse(filterKey)); void store.refresh()
         root.current?.scrollTo({ top: 0 }); ++serial.current; setError(''); setEditBusy(false)
@@ -42,7 +56,7 @@ export function WebGalleryPage({ title, filter, emptyMessage }: { title: string;
         void check(); const timer = setInterval(check, 5000)
         return () => { alive = false; clearInterval(timer) }
     }, [])
-    useInfiniteScroll({ rootRef: root, targetRef: sentinel, enabled: list.status === 'ready' && list.page.hasNextPage && !list.refreshing && !list.loadingMore && !list.moreError && !list.error && !detail.mediaId && !viewer, onLoadMore: store.loadMore })
+    useInfiniteScroll({ rootRef: root, targetRef: sentinel, enabled: explorerId === null && list.status === 'ready' && list.page.hasNextPage && !list.refreshing && !list.loadingMore && !list.moreError && !list.error && !detail.mediaId && !viewer, onLoadMore: store.loadMore })
     useLayoutEffect(() => {
         if (!anchor || list.refreshing) return
         const card = root.current?.querySelector(`[data-album-id="${anchor.id}"]`)
@@ -76,6 +90,8 @@ export function WebGalleryPage({ title, filter, emptyMessage }: { title: string;
         void Promise.resolve(store.toggleAlbum(media.id)).then(changed => { if (changed === false) cancelMotion() }, cancelMotion)
     }
     return <>
+        {explorerId !== null && <AlbumExplorer mediaId={explorerId} onClose={() => setExplorerId(null)} onChanged={() => { void store.refresh() }} />}
+        <div hidden={explorerId !== null} inert={explorerId !== null} className="h-full">
         <MediaEditLauncher compact controlRef={editor} allowReveal={false} disabled={!editEnabled} />
         {viewer && <MediaViewer {...viewer} onClose={closeViewer} />}
         <ListDetailLayout listRef={root} detailKey={detail.mediaId} detailLabel={translate("gallery.mediaDetails")} onClose={store.closeDetail}
@@ -100,6 +116,7 @@ export function WebGalleryPage({ title, filter, emptyMessage }: { title: string;
                         {editEnabled && <GalleryActionMenu label={translate("gallery.menu")}><button type="button" role="menuitem" disabled={editBusy} onClick={() => void openEditor()} className="w-full rounded px-3 py-2 text-left text-sm hover:bg-[var(--bg-hover)]">{translate("gallery.editor.createAnimation")}</button></GalleryActionMenu>}
                     </div>
                 </header>
+                <WebContentFilters visibility={visibility} disabled={busy || viewer !== null} />
                 {(list.status === 'loading' || editBusy) && <p role="status" className="text-sm text-[var(--text-muted)]">{editBusy ? translate("gallery.loadingVideo") : translate("common.loadingCollections")}</p>}
                 {(error || list.error) && <p role="alert">{translateMessage(error) || translateError(list.error)}</p>}
                 {list.status === 'ready' && !list.page.total && <p className="py-16 text-center text-[var(--text-muted)]">{emptyMessage}</p>}
@@ -107,8 +124,13 @@ export function WebGalleryPage({ title, filter, emptyMessage }: { title: string;
                     {list.page.data.map(media => <GalleryCard key={media.galleryFile ? `${media.id}:${media.galleryFile.id}` : media.id}
                         media={media} active={detail.mediaId === media.id} disabled={busy} viewDisabled={busy}
                         selectionKey={media.galleryFile ? `file:${media.galleryFile.id}` : `media:${media.id}`}
+                        selected={selectedKey === (media.galleryFile ? `file:${media.galleryFile.id}` : `media:${media.id}`)}
+                        onSelect={() => setSelectedKey(media.galleryFile ? `file:${media.galleryFile.id}` : `media:${media.id}`)}
                         previewPath={media.galleryFile?.thumbnailPath ?? media.cover?.path ?? null} resolveUrl={toMediaUrl}
-                        onView={() => openViewer(media)} onDetails={() => void store.openDetail(media.id, media.galleryFileOffset)}>
+                        onView={() => openViewer(media)} onOpen={!media.galleryFile ? () => {
+                            galleryPosition.current = { scroll: root.current?.scrollTop ?? 0, focus: document.activeElement instanceof HTMLElement ? document.activeElement : null }
+                            store.closeDetail(); setExplorerId(media.id)
+                        } : undefined} onDetails={() => void store.openDetail(media.id, media.galleryFileOffset)}>
                         <GalleryCardActions
                             primaryActions={<>
                                 <ActionButton className="gallery-card-action" icon={<Play />} label={translate("viewer.open")} disabled={busy || !media.fileCount} onClick={() => openViewer(media)} />
@@ -128,5 +150,6 @@ export function WebGalleryPage({ title, filter, emptyMessage }: { title: string;
                 {list.page.hasNextPage && <div className="text-center"><button type="button" className={button} disabled={busy || list.loadingMore} onClick={() => void store.loadMore()}>{list.moreError ? translate("common.retry") : translate("gallery.loadMore")}</button></div>}
             </div>
         </ListDetailLayout>
+        </div>
     </>
 }

@@ -15,23 +15,27 @@ import (
 )
 
 type Service struct {
-	UpdateGate   *api.UpdateGate
-	db           *sql.DB
-	searchMu     sync.Mutex
-	searchCancel context.CancelFunc
-	searchWG     sync.WaitGroup
+	contentFilters func() ContentFilters
+	UpdateGate     *api.UpdateGate
+	db             *sql.DB
+	searchMu       sync.Mutex
+	searchCancel   context.CancelFunc
+	searchWG       sync.WaitGroup
 }
 
 func NewService(db *sql.DB) *Service { return &Service{db: db} }
 
 type Filter struct {
-	Keyword     string   `json:"keyword"`
-	Tags        []string `json:"tags"`
-	TagMode     string   `json:"tagMode"`
-	Platforms   []string `json:"platforms"`
-	Authors     []string `json:"authors"`
-	CreatedFrom *int64   `json:"createdFrom"`
-	CreatedTo   *int64   `json:"createdTo"`
+	ShowHidden      bool `json:"showHidden"`
+	hiddenPlatforms []string
+	hiddenTags      []string
+	Keyword         string   `json:"keyword"`
+	Tags            []string `json:"tags"`
+	TagMode         string   `json:"tagMode"`
+	Platforms       []string `json:"platforms"`
+	Authors         []string `json:"authors"`
+	CreatedFrom     *int64   `json:"createdFrom"`
+	CreatedTo       *int64   `json:"createdTo"`
 }
 type ListRequest struct {
 	Limit            int     `json:"limit"`
@@ -39,6 +43,7 @@ type ListRequest struct {
 	FavoritesOnly    bool    `json:"favoritesOnly"`
 	Filter           Filter  `json:"filter"`
 	Gallery          bool    `json:"gallery"`
+	AlbumCards       bool    `json:"albumCards"`
 	GalleryView      string  `json:"galleryView"`
 	ShowAlbumFiles   *bool   `json:"showAlbumFiles"`
 	ExpandedMediaIDs []int64 `json:"expandedMediaIds"`
@@ -158,6 +163,16 @@ func summary(ctx context.Context, q queryer, id int64) (Object, error) {
 	}
 	obj["isPinned"] = pinned
 	obj["isUserAlbum"] = obj["isUserAlbum"] == int64(1)
+	var parent sql.NullInt64
+	var children int64
+	if err = q.QueryRowContext(ctx, "SELECT (SELECT parent_id FROM album_parent WHERE album_id=?),(SELECT count(*) FROM album_parent WHERE parent_id=?)", id, id).Scan(&parent, &children); err != nil {
+		return nil, err
+	}
+	obj["parentId"] = nil
+	if parent.Valid {
+		obj["parentId"] = parent.Int64
+	}
+	obj["childAlbumCount"] = children
 	covers, err := objects(ctx, q, `SELECT f.id AS fileId,coalesce(f.thumbnail_path,f.preview_path,CASE WHEN f.kind='image' THEN f.filepath END) AS path,f.kind FROM media_file f WHERE f.media_id=? OR f.id IN (SELECT file_id FROM user_album_file WHERE album_id=?) ORDER BY CASE WHEN f.id=coalesce((SELECT cover_file_id FROM user_album WHERE media_id=?),(SELECT cover_file_id FROM media WHERE id=?)) THEN 0 ELSE 1 END,CASE WHEN f.thumbnail_path IS NOT NULL OR f.kind='image' THEN 0 ELSE 1 END,coalesce((SELECT position FROM user_album_file WHERE album_id=? AND file_id=f.id),f.position),f.id LIMIT 1`, id, id, id, id, id)
 	if obj["isUserAlbum"] == true {
 		var cover sql.NullInt64
@@ -210,6 +225,18 @@ func filterSQL(req ListRequest) (string, []any, error) {
 		where = append(where, "m.created_at<=?")
 		args = append(args, *f.CreatedTo)
 	}
+	if len(f.hiddenTags) > 0 {
+		where = append(where, "NOT EXISTS(SELECT 1 FROM media_tag mt JOIN tag t ON t.id=mt.tag_id WHERE (mt.media_id IN "+visibilityAncestors+" OR mt.media_id IN (SELECT f.media_id FROM user_album_file a JOIN media_file f ON f.id=a.file_id WHERE a.album_id IN "+visibilityAncestors+")) AND t.name IN ("+placeholders(len(f.hiddenTags))+"))")
+		for _, value := range f.hiddenTags {
+			args = append(args, value)
+		}
+	}
+	if len(f.hiddenPlatforms) > 0 {
+		where = append(where, "NOT EXISTS(SELECT 1 FROM media_file f JOIN platform p ON p.id=f.platform_id WHERE (f.media_id IN "+visibilityAncestors+" OR f.id IN (SELECT file_id FROM user_album_file WHERE album_id IN "+visibilityAncestors+")) AND p.name IN ("+placeholders(len(f.hiddenPlatforms))+"))")
+		for _, value := range f.hiddenPlatforms {
+			args = append(args, value)
+		}
+	}
 	if len(f.Tags) > 0 {
 		if f.TagMode == "or" {
 			where = append(where, "EXISTS(SELECT 1 FROM media_tag mt JOIN tag t ON t.id=mt.tag_id WHERE mt.media_id=m.id AND t.name IN ("+placeholders(len(f.Tags))+"))")
@@ -237,6 +264,7 @@ func filterSQL(req ListRequest) (string, []any, error) {
 	return strings.Join(where, " AND "), args, nil
 }
 func (s *Service) List(ctx context.Context, req ListRequest) api.Result {
+	req.Filter = s.visibleFilter(req.Filter)
 	limit, err := pageBounds(req.Limit, req.Offset)
 	if err != nil {
 		return failure(err)

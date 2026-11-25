@@ -28,15 +28,24 @@ beforeEach(() => {
 afterEach(async () => { await cleanupReact(); vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals() })
 const flush = async () => { for (let i = 0; i < 25; i++) await Promise.resolve() }
 async function setup(enabled = false) {
-    const fetcher = vi.fn(async (path: string): Promise<any> => {
+    let hidden = { hiddenPlatforms: [] as string[], hiddenTags: [] as string[] }
+    const fetcher = vi.fn(async (path: string, options?: RequestInit): Promise<any> => {
         const url = new URL(path, 'http://localhost'), q = url.searchParams
         const json = (data: any) => ({ ok: true, json: async () => data })
         if (url.pathname === '/api/edit/status') return json({ enabled, csrf: 'test-csrf' })
+        if (url.pathname === '/api/content-filters') {
+            if (options?.method === 'POST') hidden = JSON.parse(String(options.body))
+            return json({ ...hidden, csrf: 'content-csrf' })
+        }
         if (url.pathname === '/api/suggestions') return json([q.get('kind') === 'platform' ? 'YouTube' : q.get('kind') === 'author' ? '작가' : '여행'])
         if (url.pathname === '/api/search-suggestions') return json({ data: [{ kind: 'platform', value: 'YouTube' }], hasNextPage: false, offset: 0, revision: 1 })
+        if (url.pathname.startsWith('/api/albums/') && url.pathname.endsWith('/contents')) {
+            const id = Number(url.pathname.split('/')[3])
+            return json({ album: { id, title: id === 1 ? '영상' : '하위 앨범', revision: 4, fileCount: 1, isUserAlbum: id !== 1, sourceKind: 'local', createdAt: 1 }, breadcrumbs: [{ id: 1, title: '영상' }, ...(id === 1 ? [] : [{ id, title: '하위 앨범' }])], data: id === 1 ? [{ kind: 'album', album: { id: 40, title: '하위 앨범', fileCount: 1, isUserAlbum: true, revision: 4, createdAt: 1 } }] : [{ kind: 'file', albumId: id, title: '내부 사진', file: { id: 41, kind: 'image', title: '내부 사진', filesize: 100, createdAt: 1 } }], total: 1, hasNextPage: false, offset: 0 })
+        }
         if (url.pathname === '/api/library/1') return json({ id: 1, revision: 4, title: '영상', fileCount: 1, files: { data: [{ id: 11, title: '영상', kind: 'video', duration: 2.5 }], hasNextPage: false, total: 1 } })
         const expanded = q.get('expanded') === '2'
-        const rows = [
+        const rows = (hidden.hiddenPlatforms.includes('YouTube') || hidden.hiddenTags.includes('여행')) && q.get('showHidden') !== '1' ? [] : [
             { id: 1, title: '영상', revision: 4, fileCount: 1, sourceKind: 'download', createdAt: 1, cover: { fileId: 11, kind: 'video' } },
             ...(expanded ? Array.from({ length: 53 }, (_, i) => ({ id: 2, title: '묶음', revision: 4, sourceKind: 'local', createdAt: 1, fileCount: 53, galleryFileOffset: i, galleryFile: { id: 20 + i, title: '사진 ' + i, kind: 'image' } })) : [{ id: 2, title: '묶음', fileCount: 53, sourceKind: 'local', createdAt: 1 }]),
             ...Array.from({ length: 28 }, (_, i) => ({ id: i + 3, title: '사진 ' + i, fileCount: 1, createdAt: 1 }))
@@ -60,6 +69,50 @@ function listQuery(fetcher: Awaited<ReturnType<typeof setup>>) {
     return new URL(fetcher.mock.calls.filter(([path]) => path.startsWith('/api/library?')).at(-1)![0], 'http://localhost').searchParams
 }
 async function intersect() { await act(async () => { observers.findLast(item => item.active)!.callback([{ isIntersecting: true }]); await flush() }) }
+it('opens the shared album explorer over HTTP and keeps album searches separate from the original gallery search', async () => {
+    localStorage.setItem('storagebucket:expanded-albums:v1', JSON.stringify([1, 2]))
+    const fetcher = await setup()
+    expect(listQuery(fetcher).get('albumCards')).toBe('1')
+    expect(listQuery(fetcher).get('expanded')).toBe('')
+    await input('미디어 검색', '기존 검색'); await act(async () => vi.advanceTimersByTimeAsync(310))
+    const card = document.querySelector<HTMLElement>('article[data-album-id="1"]')!
+    await act(async () => card.querySelector('[data-card-focus]')!.dispatchEvent(new MouseEvent('dblclick', { detail: 2, bubbles: true })))
+    expect(document.querySelector('[aria-label="앨범 탐색기"]')).not.toBeNull()
+    await input('미디어 검색', '앨범 검색'); await act(async () => vi.advanceTimersByTimeAsync(310))
+    const query = new URL(fetcher.mock.calls.filter(([path]) => path.startsWith('/api/albums/1/contents?')).at(-1)![0], 'http://localhost').searchParams
+    expect(query.get('q')).toBe('앨범 검색'); expect(listQuery(fetcher).get('q')).toBe('기존 검색')
+    await act(async () => document.querySelector('[data-explorer-key="album:40"]')!.dispatchEvent(new MouseEvent('dblclick', { detail: 2, bubbles: true })))
+    expect(document.querySelector('[data-explorer-key="file:41"] img')?.getAttribute('src')).toBe('/api/files/41/thumbnail')
+    await clickButton('갤러리')
+    expect(document.querySelector('[aria-label="앨범 탐색기"]')).toBeNull()
+    expect(document.querySelector<HTMLInputElement>('[aria-label="미디어 검색"]')!.value).toBe('기존 검색')
+})
+it('manages shared hidden sites and tags from an empty list and refreshes the web gallery after saving', async () => {
+    const fetcher = await setup()
+    await clickButton('숨김 관리')
+    expect(document.querySelector('[aria-label="숨길 사이트"]')).not.toBeNull()
+    async function add(label: string, value: string) {
+        await input(label, value)
+        await act(async () => { document.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!.form!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); await flush() })
+    }
+    await add('숨길 사이트', 'YouTube')
+    const post = fetcher.mock.calls.find(([, options]) => options?.method === 'POST')!
+    expect(post[1]?.headers).toEqual({ 'Content-Type': 'application/json', 'X-StorageBucket-CSRF': 'content-csrf' })
+    expect(JSON.parse(String(post[1]?.body))).toEqual({ hiddenPlatforms: ['YouTube'], hiddenTags: [] })
+    expect(document.querySelector('[aria-label="YouTube 숨김 해제"]')).not.toBeNull()
+    expect(document.querySelectorAll('article')).toHaveLength(0)
+    await act(async () => { document.querySelector<HTMLInputElement>('input[type=checkbox]')!.click(); await flush() })
+    expect(listQuery(fetcher).get('showHidden')).toBe('1')
+    expect(document.querySelectorAll('article')).toHaveLength(24)
+    await act(async () => { document.querySelector<HTMLInputElement>('input[type=checkbox]')!.click(); await flush() })
+    await add('숨길 태그', '여행')
+    await clickButton('YouTube ×'); await act(flush)
+    expect(document.querySelectorAll('article')).toHaveLength(0)
+    await clickButton('여행 ×'); await act(flush)
+    expect(document.querySelectorAll('article')).toHaveLength(24)
+    await clickButton('숨김 관리')
+    expect(document.querySelector('[aria-label="숨길 사이트"]')).toBeNull()
+})
 it('renders the shared desktop search fields and compact card structure with HTTP media URLs', async () => {
     await setup()
     expect(document.querySelectorAll('input')).toHaveLength(4)
@@ -69,7 +122,7 @@ it('renders the shared desktop search fields and compact card structure with HTT
     expect(card.textContent).toContain('다운로드 묶음'); expect(card.textContent).toContain('파일 1개')
     expect(card.querySelector('[aria-label="영상 더보기"]')!.textContent).toBe('')
     expect(document.body.textContent).not.toContain('모든 항목을 불러왔습니다.')
-    await clickButton('영상 감상하기'); expect(document.querySelector('[aria-label="감상 1 "]')).not.toBeNull()
+    await clickButton('감상하기'); expect(document.querySelector('[aria-label="감상 1 "]')).not.toBeNull()
     await clickButton('감상 닫기'); await clickButton('영상 상세보기')
     expect(document.querySelector('[aria-label="파일 페이지"]')).not.toBeNull()
 })
