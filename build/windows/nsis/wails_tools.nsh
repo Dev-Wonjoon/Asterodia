@@ -14,10 +14,10 @@
     !define INFO_PRODUCTNAME "StorageBucket"
 !endif
 !ifndef INFO_PRODUCTVERSION
-    !define INFO_PRODUCTVERSION "2.2.7.2a"
+    !define INFO_PRODUCTVERSION "2.2.7.3"
 !endif
 !ifndef INFO_NUMERICVERSION
-    !define INFO_NUMERICVERSION "2.2.7.55"
+    !define INFO_NUMERICVERSION "2.2.7.81"
 !endif
 !ifndef INFO_COPYRIGHT
     !define INFO_COPYRIGHT "(c) 2025, My Company"
