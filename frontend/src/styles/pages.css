@@ -1,0 +1,18 @@
+@import 'tailwindcss' source(none);
+@import './theme.css';
+@source '../../../docs/index.html';
+
+@layer base {
+    a, button, summary {
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    a:focus-visible, button:focus-visible, summary:focus-visible {
+        outline: 3px solid var(--color-primary);
+        outline-offset: 5px;
+    }
+
+    [id] {
+        scroll-margin-top: 6rem;
+    }
+}

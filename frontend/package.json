@@ -10,6 +10,7 @@
     "build:dev": "tsc && vite build --minify false --mode development && npm run build:web",
     "build": "tsc && vite build --mode production && npm run build:web",
     "build:web": "vite build --config vite.web.config.ts",
+    "build:pages": "vite build --config vite.pages.config.ts",
     "preview": "vite preview"
   },
   "dependencies": {

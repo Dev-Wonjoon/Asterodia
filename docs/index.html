@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ko" class="scroll-smooth motion-reduce:scroll-auto">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="StorageBucket — 미디어 다운로드부터 정리와 편집까지, 한곳에서. 이미지·영상·오디오를 관리하는 데스크톱 앱입니다.">
+  <meta name="theme-color" content="#4f46e5">
+  <title>StorageBucket — 미디어를 한곳에</title>
+  <link rel="stylesheet" href="./assets/tailwind.css">
+</head>
+<body class="min-w-0">
+  <a href="#main" class="sr-only fixed left-4 top-4 z-50 rounded-lg bg-white px-5 py-3 font-semibold focus:not-sr-only" data-i18n="skip">본문으로 건너뛰기</a>
+
+  <header class="border-b border-(--border-line) bg-(--bg-sidebar)">
+    <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-6 gap-y-4 px-5 py-5 sm:px-8 lg:px-12">
+      <a href="./" class="flex items-center gap-3 text-lg font-bold tracking-tight" aria-label="StorageBucket">
+        <span class="flex size-10 items-center justify-center rounded-xl bg-(--color-primary) text-white" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" class="size-6" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="m4 6 2 14h12l2-14M4 6h16M8 10c0 5 8 5 8 0"/><path d="M7 3h10" stroke-linecap="round"/></svg>
+        </span>
+        StorageBucket
+      </a>
+      <nav aria-label="주 메뉴" data-i18n-aria="nav" class="flex flex-wrap items-center gap-5 text-sm font-medium text-(--text-muted) sm:gap-7">
+        <a href="#features" class="hover:text-(--color-primary)" data-i18n="navFeatures">주요 기능</a>
+        <a href="#start" class="hover:text-(--color-primary)" data-i18n="navStart">시작하기</a>
+        <a href="https://github.com/Dev-Wonjoon/StorageBucket" class="hover:text-(--color-primary)">GitHub</a>
+        <button id="language" type="button" hidden class="cursor-pointer rounded-lg border border-(--border-line) bg-(--bg-sidebar) px-3 py-2 text-(--text-main) hover:bg-(--bg-hover)" aria-label="Switch to English">English</button>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="overflow-hidden border-b border-(--border-line)">
+      <div class="mx-auto grid max-w-7xl items-center gap-12 px-5 py-16 sm:px-8 sm:py-24 lg:grid-cols-[0.85fr_1.15fr] lg:gap-14 lg:px-12 lg:py-28">
+        <div>
+          <p class="mb-5 text-sm font-semibold tracking-wider text-(--color-primary)" data-i18n="eyebrow">나만의 미디어 라이브러리</p>
+          <h1 class="text-4xl leading-tight font-bold tracking-tight text-balance sm:text-5xl lg:text-[3.4rem]">
+            <span class="block" data-i18n="heroLine1">모으고, 정리하고.</span>
+            <span class="mt-2 block text-(--color-primary)" data-i18n="heroLine2">좋아하는 순간을 한곳에.</span>
+          </h1>
+          <p class="mt-6 max-w-lg text-lg leading-relaxed text-pretty text-(--text-muted)" data-i18n="heroDescription">이미지, 영상, 오디오를 다운로드하고 태그와 앨범으로 정리하세요. GIF·WebP 편집까지 StorageBucket에서 이어집니다.</p>
+          <div class="mt-8 flex flex-wrap items-center gap-3">
+            <a href="https://github.com/Dev-Wonjoon/StorageBucket/releases/latest" class="inline-flex items-center gap-2 rounded-xl bg-(--color-primary) px-6 py-3.5 font-semibold text-white hover:brightness-110">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="size-5" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span data-i18n="download">최신 버전 다운로드</span>
+            </a>
+            <a href="#screenshots" class="rounded-xl border border-(--border-line) bg-(--bg-sidebar) px-6 py-3.5 font-semibold hover:bg-(--bg-hover)" data-i18n="seeApp">화면 둘러보기</a>
+          </div>
+          <p class="mt-5 text-sm text-(--text-muted)" data-i18n="heroNote">데스크톱 앱 · 오픈 소스 · MIT 라이선스</p>
+        </div>
+        <figure class="min-w-0 rounded-2xl bg-indigo-100/70 p-3 ring-1 ring-indigo-200/70 sm:p-5 lg:-mr-20 lg:p-6">
+          <a href="./images/img1.png" class="block rounded-xl" aria-label="갤러리 화면 크게 보기" data-i18n-aria="galleryOpen">
+            <img src="./images/img1.png" alt="StorageBucket의 갤러리와 다운로드 진행 상황" data-i18n-alt="galleryAlt" width="986" height="611" fetchpriority="high" class="h-auto w-full rounded-lg shadow-xl ring-1 ring-slate-950/10">
+          </a>
+          <figcaption class="mt-4 px-1 text-sm leading-relaxed text-indigo-950/75" data-i18n="galleryCaption">다운로드 진행 상황과 모아 둔 미디어를 한눈에.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section id="features" class="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-24 lg:px-12">
+      <p class="text-sm font-semibold text-(--color-primary)" data-i18n="featuresEyebrow">다운로드 다음까지 생각한 도구</p>
+      <h2 class="mt-3 text-3xl leading-tight font-bold tracking-tight sm:text-4xl" data-i18n="featuresTitle">흩어진 미디어에, 나만의 질서를.</h2>
+      <div class="mt-10 grid gap-8 md:grid-cols-3 md:gap-10">
+        <article class="border-t border-(--border-line) pt-6">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mb-5 size-7 text-(--color-primary)" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <h3 class="text-xl font-semibold" data-i18n="downloadTitle">링크에서 라이브러리로</h3>
+          <p class="mt-3 leading-relaxed text-(--text-muted)" data-i18n="downloadDescription">yt-dlp와 gallery-dl로 지원되는 URL의 미디어를 다운로드하세요. 진행 상황과 로그를 확인하고 실패한 작업을 다시 시도할 수 있습니다.</p>
+          <p class="mt-4 text-sm leading-relaxed text-(--text-muted)" data-i18n="downloadNote">지원 사이트와 형식은 외부 엔진에 따라 달라집니다.</p>
+        </article>
+        <article class="border-t border-(--border-line) pt-6">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mb-5 size-7 text-(--color-primary)" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+          <h3 class="text-xl font-semibold" data-i18n="organizeTitle">찾기 쉬운 나만의 분류</h3>
+          <p class="mt-3 leading-relaxed text-(--text-muted)" data-i18n="organizeDescription">PC에 있는 폴더도 가져오세요. 태그, 즐겨찾기, 사용자 앨범으로 묶고 제목·작성자·플랫폼으로 원하는 미디어를 찾을 수 있습니다.</p>
+          <p class="mt-4 text-sm leading-relaxed text-(--text-muted)" data-i18n="organizeNote">폴더 가져오기는 파일을 원래 위치에 그대로 둡니다.</p>
+        </article>
+        <article class="border-t border-(--border-line) pt-6">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mb-5 size-7 text-(--color-primary)" aria-hidden="true"><path d="M5 3v13a3 3 0 0 0 3 3h13M3 5h13a3 3 0 0 1 3 3v13M3 21l18-18" stroke-linecap="round"/></svg>
+          <h3 class="text-xl font-semibold" data-i18n="editTitle">마음에 드는 장면만 편집</h3>
+          <p class="mt-3 leading-relaxed text-(--text-muted)" data-i18n="editDescription">영상에서 GIF와 애니메이션 WebP를 만들고, 구간 자르기와 크롭으로 장면을 다듬으세요. 출력 화질도 미리 확인할 수 있습니다.</p>
+          <p class="mt-4 text-sm leading-relaxed text-(--text-muted)" data-i18n="editNote">원본을 보존하면서 편집 결과를 저장합니다.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="screenshots" class="border-y border-(--border-line) bg-(--bg-sidebar)">
+      <div class="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-24 lg:px-12">
+        <h2 class="text-3xl leading-tight font-bold tracking-tight sm:text-4xl" data-i18n="screenshotsTitle">모아 둔 순간을 더 즐겁게.</h2>
+        <div class="mt-12 grid items-center gap-8 lg:grid-cols-[1.35fr_0.65fr] lg:gap-14">
+          <figure class="min-w-0">
+            <a href="./images/img2.png" class="block rounded-xl" aria-label="WebP 편집 화면 크게 보기" data-i18n-aria="editorOpen">
+              <img src="./images/img2.png" alt="구간과 크롭 영역을 지정하는 StorageBucket WebP 편집기" data-i18n-alt="editorAlt" width="986" height="611" loading="lazy" decoding="async" class="h-auto w-full rounded-xl border border-(--border-line) shadow-lg">
+            </a>
+          </figure>
+          <div>
+            <p class="text-sm font-semibold text-(--color-primary)" data-i18n="editorEyebrow">GIF · WEBP</p>
+            <h3 class="mt-3 text-2xl leading-snug font-bold tracking-tight sm:text-3xl" data-i18n="editorTitle">짧게 남기고 싶은 장면이 있다면.</h3>
+            <p class="mt-5 leading-relaxed text-(--text-muted)" data-i18n="editorDescription">원하는 구간을 고르고, 화면을 자르고, 불필요한 프레임을 제외하세요. 미리보기로 결과를 확인한 뒤 저장할 수 있습니다.</p>
+          </div>
+        </div>
+        <div class="mt-16 grid items-center gap-8 lg:mt-24 lg:grid-cols-[0.65fr_1.35fr] lg:gap-14">
+          <div class="order-2 lg:order-1">
+            <p class="text-sm font-semibold text-(--color-primary)" data-i18n="playerEyebrow">앨범 · 미디어 감상</p>
+            <h3 class="mt-3 text-2xl leading-snug font-bold tracking-tight sm:text-3xl" data-i18n="playerTitle">다시 보고 싶을 때, 바로.</h3>
+            <p class="mt-5 leading-relaxed text-(--text-muted)" data-i18n="playerDescription">이미지는 뷰어로, 영상과 오디오는 플레이어로 감상하세요. 사용자 앨범에서는 이전·다음 탐색과 셔플, 앨범 반복을 사용할 수 있습니다.</p>
+          </div>
+          <figure class="order-1 min-w-0 lg:order-2">
+            <a href="./images/img3.png" class="block rounded-xl" aria-label="영상 재생 화면 크게 보기" data-i18n-aria="playerOpen">
+              <img src="./images/img3.png" alt="StorageBucket의 동영상 플레이어" data-i18n-alt="playerAlt" width="986" height="611" loading="lazy" decoding="async" class="h-auto w-full rounded-xl border border-(--border-line) shadow-lg">
+            </a>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section id="start" class="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-8 sm:py-24 lg:grid-cols-2 lg:gap-20 lg:px-12">
+      <div>
+        <p class="text-sm font-semibold text-(--color-primary)" data-i18n="startEyebrow">시작하기</p>
+        <h2 class="mt-3 text-3xl leading-tight font-bold tracking-tight sm:text-4xl" data-i18n="startTitle">첫 라이브러리를 만들어 보세요.</h2>
+        <p class="mt-5 max-w-md leading-relaxed text-(--text-muted)" data-i18n="startDescription">최신 릴리스에서 배포 파일과 릴리스 노트를 확인할 수 있습니다. 필요한 외부 도구는 앱 안에서 설치하고 관리하세요.</p>
+        <a href="https://github.com/Dev-Wonjoon/StorageBucket/releases/latest" class="mt-7 inline-flex rounded-xl bg-(--color-primary) px-6 py-3.5 font-semibold text-white hover:brightness-110" data-i18n="download">최신 버전 다운로드</a>
+      </div>
+      <ol class="list-decimal space-y-6 pl-6 marker:font-semibold marker:text-(--color-primary)">
+        <li class="pl-2"><h3 class="text-lg font-semibold" data-i18n="step1Title">다운로드하고 실행</h3><p class="mt-2 leading-relaxed text-(--text-muted)" data-i18n="step1Description">최신 릴리스에서 사용 환경에 맞는 배포 파일을 다운로드하고 StorageBucket을 실행하세요.</p></li>
+        <li class="pl-2"><h3 class="text-lg font-semibold" data-i18n="step2Title">외부 도구 설치</h3><p class="mt-2 leading-relaxed text-(--text-muted)" data-i18n="step2Description">첫 실행의 엔진 설정 안내를 따르세요. 설정의 엔진 관리에서도 설치와 업데이트가 가능합니다.</p></li>
+        <li class="pl-2"><h3 class="text-lg font-semibold" data-i18n="step3Title">다운로드 폴더 지정</h3><p class="mt-2 leading-relaxed text-(--text-muted)" data-i18n="step3Description">설정에서 다운로드할 미디어를 저장할 폴더를 선택하세요.</p></li>
+        <li class="pl-2"><h3 class="text-lg font-semibold" data-i18n="step4Title">링크 추가 또는 폴더 가져오기</h3><p class="mt-2 leading-relaxed text-(--text-muted)" data-i18n="step4Description">미디어 URL을 붙여 넣거나 기존 로컬 폴더를 등록해 라이브러리를 채워 보세요.</p></li>
+      </ol>
+    </section>
+
+    <section class="border-t border-(--border-line) bg-(--bg-sidebar)">
+      <div class="mx-auto max-w-4xl px-5 py-16 sm:px-8 sm:py-20">
+        <h2 class="mb-8 text-2xl font-bold tracking-tight sm:text-3xl" data-i18n="faqTitle">궁금한 점이 있나요?</h2>
+        <details class="group border-t border-(--border-line) py-5">
+          <summary class="cursor-pointer text-lg font-semibold" data-i18n="faq1Title">이 웹사이트에서 앱을 사용할 수 있나요?</summary>
+          <p class="mt-4 leading-relaxed text-(--text-muted)" data-i18n="faq1Description">이곳은 StorageBucket 소개와 다운로드를 위한 페이지입니다. 미디어 다운로드와 라이브러리 관리는 설치한 데스크톱 앱에서 이용할 수 있습니다.</p>
+        </details>
+        <details class="border-t border-(--border-line) py-5">
+          <summary class="cursor-pointer text-lg font-semibold" data-i18n="faq2Title">모바일에서도 라이브러리를 볼 수 있나요?</summary>
+          <p class="mt-4 leading-relaxed text-(--text-muted)" data-i18n="faq2Description">앱의 로컬 웹 서버와 별도로 설정한 Tailscale 연결로 접근할 수 있습니다. 이용 중에는 PC에서 앱이 실행 중이어야 하며, 재생 가능한 형식은 브라우저에 따라 다릅니다.</p>
+        </details>
+        <details class="border-y border-(--border-line) py-5">
+          <summary class="cursor-pointer text-lg font-semibold" data-i18n="faq3Title">어떤 외부 도구를 사용하나요?</summary>
+          <p class="mt-4 leading-relaxed text-(--text-muted)" data-i18n="faq3Description">다운로드에는 yt-dlp와 gallery-dl을, 미디어 처리에는 FFmpeg·FFprobe·ImageMagick을 사용합니다. 도구를 설치하거나 업데이트하려면 인터넷 연결이 필요합니다.</p>
+        </details>
+        <a id="readme" href="https://github.com/Dev-Wonjoon/StorageBucket/blob/main/README.ko.md" class="mt-7 inline-block font-semibold text-(--color-primary) underline decoration-indigo-200 underline-offset-4 hover:decoration-current" data-i18n="readGuide">자세한 사용 안내 읽기</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-(--border-line)">
+    <div class="mx-auto flex max-w-7xl flex-col justify-between gap-6 px-5 py-8 text-sm text-(--text-muted) sm:flex-row sm:items-center sm:px-8 lg:px-12">
+      <p>StorageBucket <span aria-hidden="true">·</span> <span data-i18n="footerLicense">MIT 라이선스의 오픈 소스 프로젝트</span></p>
+      <nav aria-label="프로젝트 링크" data-i18n-aria="footerNav" class="flex flex-wrap gap-x-6 gap-y-3">
+        <a href="https://github.com/Dev-Wonjoon/StorageBucket" class="hover:text-(--color-primary)">GitHub</a>
+        <a href="https://github.com/Dev-Wonjoon/StorageBucket/releases" class="hover:text-(--color-primary)" data-i18n="releases">릴리스</a>
+        <a href="https://github.com/Dev-Wonjoon/StorageBucket/issues" class="hover:text-(--color-primary)" data-i18n="issues">문제 신고</a>
+        <a href="https://github.com/Dev-Wonjoon/StorageBucket/blob/main/LICENSE" class="hover:text-(--color-primary)" data-i18n="license">라이선스</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script>
+    (() => {
+      const english = {
+        skip: 'Skip to content', nav: 'Main navigation', navFeatures: 'Features', navStart: 'Get started',
+        eyebrow: 'YOUR PERSONAL MEDIA LIBRARY', heroLine1: 'Collect. Organize.', heroLine2: 'Keep your favorite moments together.',
+        heroDescription: 'Download images, videos, and audio. Organize them with tags and albums, then create GIFs and animated WebP images — all in StorageBucket.',
+        download: 'Download latest release', seeApp: 'Explore the app', heroNote: 'Desktop app · Open source · MIT license',
+        galleryOpen: 'View full-size gallery screenshot', galleryAlt: 'StorageBucket gallery and download progress', galleryCaption: 'Your downloads and media library, at a glance.',
+        featuresEyebrow: 'BEYOND THE DOWNLOAD', featuresTitle: 'Give your media a place of its own.',
+        downloadTitle: 'From a link to your library', downloadDescription: 'Download media from supported URLs with yt-dlp and gallery-dl. Follow progress, inspect logs, and retry failed tasks.', downloadNote: 'Supported sites and formats depend on the external engines.',
+        organizeTitle: 'Find it your way', organizeDescription: 'Bring in folders already on your PC. Organize with tags, favorites, and user albums, then search by title, author, or platform.', organizeNote: 'Folder imports register files in their existing locations.',
+        editTitle: 'Keep just the scene you love', editDescription: 'Create GIFs and animated WebP images from videos. Trim and crop your scenes, and preview the output quality before saving.', editNote: 'Save edited results while preserving the originals.',
+        screenshotsTitle: 'Make more of the moments you keep.', editorOpen: 'View full-size WebP editor screenshot', editorAlt: 'StorageBucket WebP editor with range and crop controls',
+        editorEyebrow: 'GIF · WEBP', editorTitle: 'For the scenes worth keeping.', editorDescription: 'Choose a range, crop the image, and exclude unwanted frames. Check the preview before saving your result.',
+        playerEyebrow: 'ALBUMS · MEDIA VIEWING', playerTitle: 'Ready for another look.', playerDescription: 'Open images in the viewer and videos or audio in the player. Navigate your user albums with previous and next controls, shuffle, and album repeat.', playerOpen: 'View full-size video player screenshot', playerAlt: 'StorageBucket video player',
+        startEyebrow: 'GET STARTED', startTitle: 'Build your first library.', startDescription: 'Find downloads and release notes on the latest release page. Install and manage the required external tools inside the app.',
+        step1Title: 'Download and launch', step1Description: 'Download the distribution for your environment from the latest release and launch StorageBucket.',
+        step2Title: 'Install external tools', step2Description: 'Follow the engine setup prompt on first launch. You can also install and update tools in Settings → Engine Management.',
+        step3Title: 'Choose a download folder', step3Description: 'In Settings, choose where to save your downloaded media.',
+        step4Title: 'Add a link or import a folder', step4Description: 'Paste a media URL or register an existing local folder to start filling your library.',
+        faqTitle: 'A few things to know', faq1Title: 'Can I use the app on this website?', faq1Description: 'This is the introduction and download page for StorageBucket. Downloading media and managing your library happen in the installed desktop app.',
+        faq2Title: 'Can I browse my library on mobile?', faq2Description: 'Use the app’s local web server with a separately configured Tailscale connection. The desktop app must remain running, and playable formats depend on your browser.',
+        faq3Title: 'Which external tools does it use?', faq3Description: 'StorageBucket uses yt-dlp and gallery-dl for downloads, and FFmpeg, FFprobe, and ImageMagick for media processing. Installing or updating tools requires an internet connection.',
+        readGuide: 'Read the full guide', footerLicense: 'An open source project under the MIT license', footerNav: 'Project links', releases: 'Releases', issues: 'Report an issue', license: 'License',
+      };
+      const nodes = [...document.querySelectorAll('[data-i18n], [data-i18n-alt], [data-i18n-aria]')];
+      const entries = nodes.flatMap(element => [
+        ['i18n', null], ['i18nAlt', 'alt'], ['i18nAria', 'aria-label'],
+      ].filter(([key]) => element.dataset[key]).map(([key, attribute]) => ({
+        element, attribute, key: element.dataset[key], korean: attribute ? element.getAttribute(attribute) : element.textContent,
+      })));
+      const button = document.getElementById('language');
+      const description = document.querySelector('meta[name="description"]');
+      const koreanDescription = description.content;
+      const koreanTitle = document.title;
+      button.hidden = false;
+      button.addEventListener('click', () => {
+        const isEnglish = document.documentElement.lang !== 'en';
+        for (const { element, attribute, key, korean } of entries) {
+          const value = isEnglish ? english[key] : korean;
+          if (attribute) element.setAttribute(attribute, value);
+          else element.textContent = value;
+        }
+        document.documentElement.lang = isEnglish ? 'en' : 'ko';
+        document.title = isEnglish ? 'StorageBucket — Your media, together' : koreanTitle;
+        description.content = isEnglish ? 'StorageBucket — Download, organize, and edit your media in one place. A desktop app for images, videos, and audio.' : koreanDescription;
+        document.getElementById('readme').href = 'https://github.com/Dev-Wonjoon/StorageBucket/blob/main/' + (isEnglish ? 'README.md' : 'README.ko.md');
+        button.textContent = isEnglish ? '한국어' : 'English';
+        button.setAttribute('aria-label', isEnglish ? '한국어로 전환' : 'Switch to English');
+      });
+    })();
+  </script>
+</body>
+</html>
