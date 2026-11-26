@@ -2,13 +2,33 @@
 @import './theme.css';
 @source '../../../docs/index.html';
 
+:root {
+    color-scheme: light;
+    --pages-accent: var(--color-primary);
+    --pages-button-bg: var(--color-primary);
+    --pages-preview-bg: #eef2ff;
+    --pages-preview-border: #c7d2fe;
+    --pages-preview-caption: #312e81;
+    --pages-link-underline: #c7d2fe;
+}
+
+:root.dark {
+    color-scheme: dark;
+    --pages-accent: #a5b4fc;
+    --pages-button-bg: #4f46e5;
+    --pages-preview-bg: #111b35;
+    --pages-preview-border: #334155;
+    --pages-preview-caption: #c7d2fe;
+    --pages-link-underline: #64748b;
+}
+
 @layer base {
     a, button, summary {
         -webkit-tap-highlight-color: transparent;
     }
 
     a:focus-visible, button:focus-visible, summary:focus-visible {
-        outline: 3px solid var(--color-primary);
+        outline: 3px solid var(--pages-accent);
         outline-offset: 5px;
     }
 
