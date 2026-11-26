@@ -57,7 +57,7 @@ export function mountMediaViewer({ mediaId, fileId, getSequence, getFile, conten
     }
     function focusPane(pane = active) { if (!destroyed && pane?.body.isConnected) pane.body.focus({ preventScroll: true }); }
     function select(pane) {
-        if (destroyed || !panes.includes(pane)) return;
+        if (destroyed || !panes.includes(pane) || active === pane && pane.root.classList.contains('is-selected')) return;
         active = pane;
         for (const item of panes) {
             item.root.classList.toggle('is-selected', item === pane);
@@ -145,7 +145,7 @@ export function mountMediaViewer({ mediaId, fileId, getSequence, getFile, conten
             source = node('img'); source.alt = file.title || ''; source.draggable = false; source.src = contentURL(file);
         }
         let fallback = false;
-        pane.viewport = mountViewerViewport(pane.body, { source, state: pane.state, selected: pane === active,
+        pane.viewport = mountViewerViewport(pane.body, { source, state: pane.state, sharedVideo: r === group, selected: pane === active,
             width: file.width, height: file.height, poster: thumbnailURL(file) || previewURL(file), onChange: controls,
             onError: () => {
                 if (!valid(r, own)) return;
@@ -155,7 +155,8 @@ export function mountMediaViewer({ mediaId, fileId, getSequence, getFile, conten
                     else message(r, () => translate('viewer.cannotDisplayThisImageYouCanMoveToThe'));
                 }
             } });
-        if (r.player) pane.detachSurface = r.player.attachSurface(pane.viewport.surface, { focus: () => { select(pane); focusPane(pane); } });
+        if (r.player) pane.detachSurface = r.player.attachSurface(pane.viewport.surface, {
+            focus: () => { select(pane); focusPane(pane); }, bounds: () => pane.body.getBoundingClientRect() });
     }
     async function show(r, autoplay = false, reset = true) {
         const own = ++r.serial; r.loading = true; r.autoplayRequested = autoplay; stop(r);
@@ -248,21 +249,28 @@ export function mountMediaViewer({ mediaId, fileId, getSequence, getFile, conten
         if (destroyed || expanded || panes.length === size) return;
         picker?.destroy();
         const ordered = size < panes.length ? [active, ...panes.filter(pane => pane !== active)] : panes;
-        const chosen = size < panes.length ? 0 : panes.indexOf(active);
-        const snapshots = ordered.slice(0, size).map(capture);
-        while (snapshots.length < size) snapshots.push(group ? { state: freshState() } : undefined);
-        if (group) {
-            rebuild(snapshots, chosen);
-            for (const pane of panes) { bindText(pane.status, group.message); createViewport(pane, group, group.serial); }
-        } else {
-            const playing = ordered.map(pane => Boolean(pane.nativeMedia && !pane.nativeMedia.paused || pane.loading && pane.autoplayRequested));
-            rebuild(snapshots, chosen);
-            panes.forEach((pane, index) => {
-                if (pane.pendingSequence) { const pending = pane.pendingSequence; void loadSequence(pane, pending.albumId, pending.startId, pending.autoplay); }
-                else if (pane.queue) void show(pane, Boolean(playing[index]), false);
-                else message(pane, () => translate('viewer.emptyPane'));
-            });
+        const kept = new Set(ordered.slice(0, size));
+        group?.player?.cancelGestures();
+        for (const pane of panes) {
+            pane.player?.cancelGestures();
+            if (!kept.has(pane)) disposePane(pane);
         }
+        // Keep surviving DOM nodes in place: moving a playing <video> may reload it.
+        panes = panes.filter(pane => kept.has(pane));
+        while (panes.length < size) {
+            const pane = newPane(); panes.push(pane);
+            if (group) { bindText(pane.status, group.message || (() => '')); if (group.file) createViewport(pane, group, group.serial); }
+            else message(pane, () => translate('viewer.emptyPane'));
+        }
+        stage.dataset.layout = String(size);
+        for (const pane of panes) {
+            if (!group && pane.file?.kind === 'audio' && size > 1 && pane.player) {
+                pane.playbackState = capture(pane).playbackState; stop(pane);
+                message(pane, () => translate('viewer.audioSingleOnly'));
+            } else if (!group && pane.file?.kind === 'audio' && size === 1 && !pane.player && !pane.loading) void show(pane, false, false);
+            pane.viewport?.render();
+        }
+        focusPane();
         controls();
     }
     function setMode(same) {
@@ -335,5 +343,12 @@ export function mountMediaViewer({ mediaId, fileId, getSequence, getFile, conten
     dialog.addEventListener('close', closed); dialog.showModal();
     panes = [newPane()]; stage.dataset.layout = '1'; active = panes[0]; select(active); close.focus();
     void loadSequence(active, mediaId, fileId, true);
-    return { destroy, dialog, get currentFile() { return resource()?.file; } };
+    function getPerformance() {
+        return { linked: Boolean(group), layout: panes.length,
+            players: (group ? [group] : panes).filter(r => r.player).map(r => ({ fileId: r.file?.id, ...r.player.getPerformance() })),
+            views: panes.map(pane => pane.viewport?.getPerformance() || null) };
+    }
+    // Available in desktop DevTools without a global variable or background sampler.
+    Object.defineProperty(dialog, 'getPlaybackPerformance', { value: getPerformance });
+    return { destroy, dialog, getPerformance, get currentFile() { return resource()?.file; } };
 }

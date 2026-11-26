@@ -31,6 +31,10 @@ func newAccessSession(expires time.Time) accessSession {
 	return accessSession{expires, ctx, cancel}
 }
 func (s *Service) clearSessionsLocked() {
+	if s.cancelOpenAccess != nil {
+		s.cancelOpenAccess()
+		s.openAccess, s.cancelOpenAccess = nil, nil
+	}
 	for _, session := range s.sessions {
 		session.cancel()
 	}
@@ -48,13 +52,23 @@ func (s *Service) rotateCodeLocked() error {
 }
 
 func (s *Service) sessionContext(r *http.Request) (context.Context, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.sessionContextLocked(r)
+}
+
+func (s *Service) sessionContextLocked(r *http.Request) (context.Context, bool) {
+	if !s.requireCode && s.server != nil {
+		if s.openAccess == nil {
+			s.openAccess, s.cancelOpenAccess = context.WithCancel(context.Background())
+		}
+		return s.openAccess, true
+	}
 	cookie, err := r.Cookie(sessionCookie)
 	if err != nil || len(cookie.Value) > 128 {
 		return nil, false
 	}
 	key := sha256.Sum256([]byte(cookie.Value))
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	session, ok := s.sessions[key]
 	if !ok {
 		return nil, false
@@ -68,12 +82,57 @@ func (s *Service) sessionContext(r *http.Request) (context.Context, bool) {
 }
 func (s *Service) authorized(r *http.Request) bool { _, ok := s.sessionContext(r); return ok }
 
+// ConfigureAccessCode loads the desktop preference before the server starts.
+//
+//wails:ignore
+func (s *Service) ConfigureAccessCode(required bool, save func(bool) error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.requireCode, s.saveRequireCode = required, save
+}
+
+// SetRequireCode is a desktop binding. HTTP clients cannot change access policy.
+func (s *Service) SetRequireCode(required bool) api.Result {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return api.Failure("NOT_READY", "앱을 종료하고 있습니다")
+	}
+	if s.requireCode == required {
+		return api.Success(s.snapshot())
+	}
+	// Prepare the next code before saving, but keep the current state on failure.
+	previousCode, previousExpiry := s.pairCode, s.pairExpires
+	if required && s.server != nil && s.rotateCodeLocked() != nil {
+		return api.Failure("NOT_READY", "연결 코드를 생성하지 못했습니다")
+	}
+	if s.saveRequireCode != nil {
+		if err := s.saveRequireCode(required); err != nil {
+			s.pairCode, s.pairExpires = previousCode, previousExpiry
+			return api.Failure("SETTINGS_SAVE_FAILED", "연결 코드 사용 설정을 저장하지 못했습니다")
+		}
+	}
+	s.clearSessionsLocked()
+	s.requireCode = required
+	if !required {
+		s.pairCode, s.pairExpires = "", time.Time{}
+	}
+	return api.Success(s.snapshot())
+}
+
+func (s *Service) accessStatus(r *http.Request) map[string]bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, authenticated := s.sessionContextLocked(r)
+	return map[string]bool{"required": s.requireCode, "authenticated": authenticated}
+}
+
 // RevokeAccess is a desktop binding. HTTP clients cannot invoke it.
 func (s *Service) RevokeAccess() api.Result {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.clearSessionsLocked()
-	if s.server != nil {
+	if s.requireCode && s.server != nil {
 		if s.rotateCodeLocked() != nil {
 			return api.Failure("NOT_READY", "연결 코드를 생성하지 못했습니다")
 		}
@@ -83,7 +142,7 @@ func (s *Service) RevokeAccess() api.Result {
 
 func (s *Service) accessAPI(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/api/access/status" && (r.Method == "GET" || r.Method == "HEAD") {
-		respond(w, r, map[string]bool{"authenticated": s.authorized(r)})
+		respond(w, r, s.accessStatus(r))
 		return
 	}
 	if r.Method != "POST" || (r.URL.Path != "/api/access/connect" && r.URL.Path != "/api/access/logout") {
@@ -107,7 +166,7 @@ func (s *Service) accessAPI(w http.ResponseWriter, r *http.Request) {
 			s.mu.Unlock()
 		}
 		http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https", SameSite: http.SameSiteStrictMode})
-		respond(w, r, map[string]bool{"authenticated": false})
+		respond(w, r, s.accessStatus(r))
 		return
 	}
 	s.mu.Lock()

@@ -1,4 +1,5 @@
 import { translate, bindAttribute } from './i18n.js';
+import { attachSharedVideo } from './viewer-video-renderer.js';
 
 export const zoomSteps = [1, 1.25, 1.5, 2, 3, 4, 6, 8];
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -37,7 +38,7 @@ function watchVideo(video, paint) {
             frame = frameIsVideo ? video.requestVideoFrameCallback(tick) : requestAnimationFrame(tick);
         };
         const update = () => { cancel(); notify(); schedule(); };
-        const events = ['loadedmetadata', 'loadeddata', 'resize', 'seeked', 'timeupdate', 'play', 'playing', 'pause', 'ended', 'emptied'];
+        const events = ['loadeddata', 'seeked', 'play', 'playing', 'pause', 'ended', 'emptied'];
         for (const event of events) video.addEventListener(event, update);
         watch = { callbacks, schedule, dispose() { cancel(); for (const event of events) video.removeEventListener(event, update); videoWatches.delete(video); } };
         videoWatches.set(video, watch);
@@ -46,19 +47,28 @@ function watchVideo(video, paint) {
     return () => { watch.callbacks.delete(paint); if (!watch.callbacks.size) watch.dispose(); };
 }
 
-export function mountViewerViewport(host, { source, state, selected = true, poster, width, height, onChange = () => {}, onError = () => {} }) {
+export function mountViewerViewport(host, { source, state, sharedVideo = false, selected = true, poster, width, height, onChange = () => {}, onError = () => {} }) {
     const doc = host.ownerDocument, video = source.tagName === 'VIDEO';
-    const surface = video ? doc.createElement('canvas') : source;
-    surface.classList.add(video ? 'sbv-canvas' : 'sbv-image');
-    if (video) { surface.setAttribute('role', 'img'); bindAttribute(surface, 'aria-label', () => source.getAttribute('aria-label') || translate('media.videoTitle')); }
+    const nativeVideo = video && !sharedVideo;
+    const surface = video && sharedVideo ? doc.createElement('canvas') : source;
+    // Move the existing decoder into the viewport; return it before player cleanup.
+    const anchor = nativeVideo && source.parentNode ? doc.createComment('viewer-video') : null;
+    const originalStyle = nativeVideo ? source.getAttribute('style') : null;
+    if (anchor) source.before(anchor);
+    surface.classList.add(nativeVideo ? 'sbv-native-video' : video ? 'sbv-canvas' : 'sbv-image');
+    if (video && !nativeVideo) { surface.setAttribute('role', 'img'); bindAttribute(surface, 'aria-label', () => source.getAttribute('aria-label') || translate('media.videoTitle')); }
     const map = doc.createElement('div'); map.className = 'sbv-minimap';
     const miniature = video ? doc.createElement('canvas') : doc.createElement('img');
     miniature.setAttribute('aria-hidden', 'true'); if (!video) miniature.alt = '';
     const rect = doc.createElement('button'); rect.type = 'button'; rect.className = 'sbv-map-rect'; rect.dataset.minimapControl = 'true';
     bindAttribute(rect, 'aria-label', () => translate('viewer.moveVisibleArea'));
     map.append(miniature, rect); host.append(surface, map);
-    let active = selected, geometry, destroyed = false, drag = null, stopFrames = () => {};
+    let active = selected, geometry, destroyed = false, drag = null, stopFrames = null, mapTimer = null;
+    let viewportWidth = 0, viewportHeight = 0, mapWidth = 0, mapHeight = 0, lastMapPaint = -Infinity;
+    const mapInterval = 200;
     let posterImage;
+    let fallbackContext = null;
+    const renderer = video && sharedVideo ? attachSharedVideo(source, host, () => paint(true)) : null;
     if (video && poster) { posterImage = doc.createElement('img'); posterImage.onload = () => render(); posterImage.src = poster; }
     function canvasContext(canvas, w, h) {
         const ratio = Math.min(2, globalThis.devicePixelRatio || 1);
@@ -70,36 +80,72 @@ export function mountViewerViewport(host, { source, state, selected = true, post
         context?.clearRect(0, 0, w, h);
         return context;
     }
+    function paint(forceMap = false) {
+        if (destroyed || !video || !geometry) return;
+        const g = geometry;
+        const frame = source.readyState >= 2 ? source : posterImage?.complete && posterImage.naturalWidth ? posterImage : null;
+        if (!nativeVideo) {
+            if (renderer?.paint(frame)) {
+                if (fallbackContext) { fallbackContext.clearRect(0, 0, surface.width, surface.height); fallbackContext = null; }
+            } else {
+                const context = fallbackContext = canvasContext(surface, viewportWidth, viewportHeight);
+                if (frame && context) { try { context.drawImage(frame, g.left, g.top, g.width, g.height); } catch { /* A decoded frame may disappear during seeking. */ } }
+            }
+        }
+        const now = performance.now();
+        if (!map.hidden && (forceMap || now - lastMapPaint >= mapInterval)) {
+            lastMapPaint = now;
+            const context = canvasContext(miniature, mapWidth, mapHeight);
+            if (frame && context) { try { context.drawImage(frame, 0, 0, mapWidth, mapHeight); } catch {} }
+        }
+    }
+    function syncFrames() {
+        if (video && !nativeVideo && geometry && !stopFrames) stopFrames = watchVideo(source, () => paint());
+        else if ((!geometry || destroyed) && stopFrames) { stopFrames(); stopFrames = null; }
+        // Native video is composed by the browser. Only a visible minimap needs JS paints.
+        clearTimeout(mapTimer); mapTimer = null;
+        if (nativeVideo && !destroyed && geometry && !map.hidden && !source.paused && !source.ended) {
+            mapTimer = setTimeout(() => { mapTimer = null; paint(); syncFrames(); }, mapInterval);
+        }
+    }
     function render() {
         if (destroyed) return;
-        const w = host.clientWidth, h = host.clientHeight;
+        // Let CSS fit images immediately when the pane changes size (rotation,
+        // mobile browser chrome, or wrapped controls), even before resize callbacks.
+        const fitImage = !video && state.zoom === 1;
+        if (fitImage) Object.assign(surface.style, { width: '100%', height: '100%', left: '0px', top: '0px' });
+        const w = viewportWidth = host.clientWidth, h = viewportHeight = host.clientHeight;
         const mw = (video ? source.videoWidth : source.naturalWidth) || width || posterImage?.naturalWidth;
         const mh = (video ? source.videoHeight : source.naturalHeight) || height || posterImage?.naturalHeight;
         geometry = viewportGeometry(w, h, mw, mh, state);
+        renderer?.update(geometry, w, h);
         map.hidden = !active || state.zoom <= 1 || !geometry;
-        if (!geometry) return;
+        if (!geometry) { syncFrames(); return; }
         const g = geometry; state.x = g.x; state.y = g.y;
-        if (!video) {
-            Object.assign(surface.style, { width: g.width + 'px', height: g.height + 'px', left: g.left + 'px', top: g.top + 'px' });
+        if (nativeVideo) {
+            Object.assign(surface.style, { width: g.width + 'px', height: g.height + 'px',
+                left: '0px', top: '0px', transform: `translate(${g.left}px, ${g.top}px)` });
+        } else if (!video) {
+            if (!fitImage) Object.assign(surface.style, { width: g.width + 'px', height: g.height + 'px', left: g.left + 'px', top: g.top + 'px' });
             if (miniature.getAttribute('src') !== source.getAttribute('src')) miniature.src = source.src;
-        } else {
-            const context = canvasContext(surface, w, h), frame = source.readyState >= 2 ? source : posterImage?.complete && posterImage.naturalWidth ? posterImage : null;
-            if (frame && context) { try { context.drawImage(frame, g.left, g.top, g.width, g.height); } catch { /* A decoded frame may disappear during seeking. */ } }
         }
         if (!map.hidden) {
             const fit = Math.min(160 / mw, 110 / mh, Math.max(1, w * .3) / mw);
-            const mapWidth = Math.max(1, mw * fit), mapHeight = Math.max(1, mh * fit);
+            mapWidth = Math.max(1, mw * fit); mapHeight = Math.max(1, mh * fit);
             map.style.width = mapWidth + 'px'; map.style.height = mapHeight + 'px';
             Object.assign(rect.style, { width: g.visibleX * 100 + '%', height: g.visibleY * 100 + '%', left: (g.x - g.visibleX / 2) * 100 + '%', top: (g.y - g.visibleY / 2) * 100 + '%' });
-            if (video) {
-                const context = canvasContext(miniature, mapWidth, mapHeight);
-                const frame = source.readyState >= 2 ? source : posterImage?.complete && posterImage.naturalWidth ? posterImage : null;
-                if (context && frame) { try { context.drawImage(frame, 0, 0, mapWidth, mapHeight); } catch {} }
-            }
         }
+        paint(true); syncFrames();
     }
     const loaded = () => render();
     source.addEventListener('load', loaded); source.addEventListener('error', onError);
+    const dimensions = ['loadedmetadata', 'resize', 'emptied'];
+    const playback = ['loadeddata', 'seeked', 'play', 'playing', 'pause', 'ended'];
+    const playbackChanged = () => { paint(true); syncFrames(); };
+    if (video) {
+        for (const event of dimensions) source.addEventListener(event, loaded);
+        if (nativeVideo) for (const event of playback) source.addEventListener(event, playbackChanged);
+    }
     rect.onpointerdown = event => {
         if (event.button !== 0 || !geometry) return;
         event.preventDefault(); event.stopPropagation();
@@ -128,18 +174,29 @@ export function mountViewerViewport(host, { source, state, selected = true, post
     };
     const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(render) : null;
     observer?.observe(host); globalThis.addEventListener?.('resize', render);
-    if (video) stopFrames = watchVideo(source, render); else render();
-    return { surface, render, select(value) { active = value; render(); },
+    render();
+    return { surface, render, select(value) { if (active !== value) { active = value; render(); } },
+        getPerformance: () => renderer?.getPerformance() || { backend: nativeVideo ? 'native' : video ? 'canvas2d' : 'image' },
         zoom(direction) {
             state.zoom = direction === 0 ? 1 : zoomSteps[clamp(zoomSteps.indexOf(state.zoom) + direction, 0, zoomSteps.length - 1)];
             if (direction === 0) state.x = state.y = .5;
             render(); onChange();
         },
         destroy() {
-            destroyed = true; drag = null; stopFrames(); observer?.disconnect(); globalThis.removeEventListener?.('resize', render);
+            destroyed = true; drag = null; stopFrames?.(); clearTimeout(mapTimer); observer?.disconnect(); globalThis.removeEventListener?.('resize', render);
+            renderer?.destroy();
             source.removeEventListener('load', loaded); source.removeEventListener('error', onError);
+            if (video) {
+                for (const event of dimensions) source.removeEventListener(event, loaded);
+                if (nativeVideo) for (const event of playback) source.removeEventListener(event, playbackChanged);
+            }
             if (posterImage) { posterImage.onload = null; posterImage.removeAttribute('src'); }
             rect.onpointerdown = rect.onpointermove = rect.onpointerup = rect.onpointercancel = rect.onlostpointercapture = rect.onkeydown = null;
-            surface.remove(); map.remove();
+            if (nativeVideo) {
+                surface.classList.remove('sbv-native-video');
+                if (originalStyle === null) surface.removeAttribute('style'); else surface.setAttribute('style', originalStyle);
+                if (anchor?.parentNode) anchor.replaceWith(source); else surface.remove();
+            } else surface.remove();
+            map.remove();
         } };
 }

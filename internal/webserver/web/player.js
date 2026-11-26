@@ -1,5 +1,6 @@
 import { translate, bindText, bindAttribute, localizeWidget } from './i18n.js'
 import { matchShortcut, isComposing } from './shortcuts.js';
+import { observePlayback } from './player-performance.js';
 const preferenceKey = 'storagebucket:player-seek-seconds:v1';
 const audioPreferenceKey = 'storagebucket:player-audio:v1';
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -39,6 +40,7 @@ export function mountVideoPlayer(host, { src, kind = 'video', title = translate(
     };
     const icon = (el, name) => { el.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + icons[name] + '</svg>'; };
     const screen = node('div', 'sbp-screen'), video = node(kind === 'audio' ? 'audio' : 'video');
+    const performanceStats = observePlayback(video);
     const surface = kind === 'audio' ? node('div', 'sbp-artwork', '♫') : video;
     if (kind === 'audio') {
         bindAttribute(surface, 'aria-label', () => title);
@@ -117,25 +119,44 @@ export function mountVideoPlayer(host, { src, kind = 'video', title = translate(
         const b = button(() => text() + translate("player.suffix.seek"), text, () => jump(delta), jumps); b.dataset.seconds = String(delta);
     }
     const error = () => { bindText(message, () => translate("player.cannotPlayInTheCurrentEnvironmentCheckTheFile")); message.hidden = false; message.setAttribute('role', 'alert'); onError?.(); wake(); };
+    const timeText = () => formatTime(video.currentTime) + ' / ' + formatTime(video.duration);
+    bindText(time, timeText);
+    let lastDuration, lastPaused, lastMuted, lastVolume, lastRate;
+    function syncTime() {
+        const position = String(video.currentTime || 0), label = timeText();
+        if (seek.value !== position) seek.value = position;
+        if (seek.getAttribute('aria-valuetext') !== label) seek.setAttribute('aria-valuetext', label);
+        if (time.firstChild?.data !== label) time.firstChild.data = label;
+    }
     function sync() {
         const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
-        seek.disabled = !duration; seek.max = String(duration); seek.value = String(video.currentTime || 0);
-        seek.setAttribute('aria-valuetext', formatTime(video.currentTime) + ' / ' + formatTime(duration));
-        bindText(time, () => formatTime(video.currentTime) + ' / ' + formatTime(duration));
-        icon(play, video.paused ? 'play' : 'pause'); bindAttribute(play, 'aria-label', () => video.paused ? translate("player.play") : translate("player.pause")); bindAttribute(play, 'title', () => video.paused ? translate("player.play") : translate("player.pause"));
-        icon(mute, video.muted || !video.volume ? 'muted' : 'volume'); bindAttribute(mute, 'aria-label', () => video.muted ? translate("player.unmute") : translate("player.mute"));
-        volume.value = String(video.muted ? 0 : video.volume); root.classList.toggle('is-paused', video.paused);
-        rate.value = String(video.playbackRate);
-        for (const b of jumps.children) b.disabled = !duration;
+        if (duration !== lastDuration) {
+            lastDuration = duration; seek.disabled = !duration; seek.max = String(duration);
+            for (const b of jumps.children) b.disabled = !duration;
+        }
+        if (video.paused !== lastPaused) {
+            lastPaused = video.paused; icon(play, video.paused ? 'play' : 'pause');
+            bindAttribute(play, 'aria-label', () => video.paused ? translate("player.play") : translate("player.pause"));
+            bindAttribute(play, 'title', () => video.paused ? translate("player.play") : translate("player.pause"));
+            root.classList.toggle('is-paused', video.paused);
+        }
+        if (video.muted !== lastMuted || video.volume !== lastVolume) {
+            lastMuted = video.muted; lastVolume = video.volume;
+            icon(mute, video.muted || !video.volume ? 'muted' : 'volume');
+            bindAttribute(mute, 'aria-label', () => video.muted ? translate("player.unmute") : translate("player.mute"));
+            volume.value = String(video.muted ? 0 : video.volume);
+        }
+        if (video.playbackRate !== lastRate) { lastRate = video.playbackRate; rate.value = String(video.playbackRate); }
+        syncTime();
     }
     function audioChanged() {
         try { localStorage.setItem(audioPreferenceKey, JSON.stringify({ volume: video.volume, muted: video.muted })); } catch {}
         sync();
     }
-    function attachSurface(target, { focus = () => root.focus({ preventScroll: true }) } = {}) {
+    function attachSurface(target, { focus = () => root.focus({ preventScroll: true }), bounds = () => target.getBoundingClientRect() } = {}) {
         const owned = [];
         const listen = (event, fn) => owned.push(on(target, event, fn));
-        function sideAt(x) { const r = target.getBoundingClientRect(); return x < r.left + r.width / 2 ? -1 : 1; }
+        function sideAt(x) { const r = bounds(); return x < r.left + r.width / 2 ? -1 : 1; }
         listen('click', event => {
             if (performance.now() - lastTouch < 700 || event.detail > 1) return;
             focus();
@@ -156,10 +177,11 @@ export function mountVideoPlayer(host, { src, kind = 'video', title = translate(
         listen('pointercancel', () => { touchStart = null; lastTap = null; clearTimeout(clickTimer); });
         return () => { owned.forEach(remove => remove()); touchStart = null; lastTap = null; clearTimeout(clickTimer); };
     }
-    attachSurface(surface);
+    if (!externalScreen) attachSurface(surface);
     on(seek, 'input', () => { if (Number.isFinite(video.duration)) video.currentTime = clamp(Number(seek.value), 0, video.duration); sync(); });
     on(seek, 'pointermove', event => { const r = seek.getBoundingClientRect(); seek.title = formatTime(clamp((event.clientX - r.left) / Math.max(1, r.width), 0, 1) * Number(seek.max)); });
-    for (const event of ['loadedmetadata', 'durationchange', 'timeupdate', 'ratechange', 'ended', 'emptied']) on(video, event, sync);
+    for (const event of ['loadedmetadata', 'durationchange', 'ratechange', 'ended', 'emptied']) on(video, event, sync);
+    on(video, 'timeupdate', syncTime);
     on(video, 'volumechange', audioChanged);
     on(video, 'play', () => { message.hidden = true; sync(); wake(); }); on(video, 'pause', () => { sync(); wake(); });
     on(video, 'waiting', () => { bindText(message, () => translate("gallery.loading")); message.hidden = false; }); on(video, 'playing', () => { message.hidden = true; });
@@ -183,5 +205,8 @@ export function mountVideoPlayer(host, { src, kind = 'video', title = translate(
     }
     overlay.append(seek, controls); if (surface !== video) screen.append(surface); screen.append(video, feedback, message, overlay, settings); root.append(screen, jumps); host.append(root); sync(); wake();
     const stopLanguage = localizeWidget(root);
-    return { video, root, keyboardAction, attachSurface, destroy() { stopLanguage(); destroyed = true; leaveExpanded(); clearTimeout(clickTimer); clearTimeout(hideTimer); clearTimeout(feedbackTimer); listeners.forEach(remove => remove()); if (doc.fullscreenElement === root) doc.exitFullscreen()?.catch(() => {}); video.pause(); video.removeAttribute('src'); video.load(); root.remove(); } };
+    return { video, root, keyboardAction, attachSurface,
+        getPerformance: () => performanceStats.sample(),
+        cancelGestures() { clearTimeout(clickTimer); lastTap = null; touchStart = null; },
+        destroy() { stopLanguage(); performanceStats.destroy(); destroyed = true; leaveExpanded(); clearTimeout(clickTimer); clearTimeout(hideTimer); clearTimeout(feedbackTimer); listeners.forEach(remove => remove()); if (doc.fullscreenElement === root) doc.exitFullscreen()?.catch(() => {}); video.pause(); video.removeAttribute('src'); video.load(); root.remove(); } };
 }

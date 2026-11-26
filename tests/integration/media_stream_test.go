@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -10,6 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -187,4 +190,79 @@ func TestSmallVideoCanStillLoadWithoutRange(t *testing.T) {
 	if rec.Code != 200 || rec.Body.Len() != 128 {
 		t.Fatalf("small video response: status=%d bytes=%d", rec.Code, rec.Body.Len())
 	}
+}
+
+func TestMediaOriginalAndPreviewAuthorizationRemainsLive(t *testing.T) {
+	f := newFixture(t)
+	id := f.run(t, f.enqueue(t))
+	original := publishedPath(t, f, id)
+	preview := filepath.Join(f.root, "preview.jpg")
+	if err := os.WriteFile(preview, []byte("preview"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.Exec("UPDATE media_file SET preview_path=? WHERE media_id=?", preview, id); err != nil {
+		t.Fatal(err)
+	}
+	handler := desktop.MediaMiddleware(f.db, filepath.Join(f.root, "cache", "previews"))(http.NotFoundHandler())
+	request := func(path string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "/media?path="+url.QueryEscape(path), nil)
+		req.Header.Set("Range", "bytes=0-3")
+		handler.ServeHTTP(rec, req)
+		return rec
+	}
+	for _, path := range []string{original, preview} {
+		rec := request(path)
+		if rec.Code != 206 || !strings.Contains(rec.Header().Get("Server-Timing"), "library;dur=") || !strings.Contains(rec.Header().Get("Server-Timing"), "file;dur=") {
+			t.Fatalf("registered media: status=%d timing=%q", rec.Code, rec.Header().Get("Server-Timing"))
+		}
+	}
+	if _, err := f.db.Exec("UPDATE media_file SET filepath=?,preview_path=NULL WHERE media_id=?", original+".moved", id); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{original, preview} {
+		if rec := request(path); rec.Code != 404 {
+			t.Fatalf("stale authorization: %s status=%d", path, rec.Code)
+		}
+	}
+}
+
+type cancelMediaWriter struct {
+	*httptest.ResponseRecorder
+	cancel context.CancelFunc
+}
+
+func (w cancelMediaWriter) Write(p []byte) (int, error) {
+	n, err := w.ResponseRecorder.Write(p)
+	w.cancel()
+	return n, err
+}
+
+func TestMediaRangesCancelReadsAndKeepConcurrentOffsetsIndependent(t *testing.T) {
+	const size = 9 << 20
+	handler, target, _ := registeredVideo(t, size)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	req := httptest.NewRequest("GET", target, nil).WithContext(ctx)
+	req.Header.Set("Range", "bytes=0-")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(cancelMediaWriter{rec, cancel}, req)
+	if rec.Code != 206 || rec.Body.Len() == 0 || rec.Body.Len() >= 4<<20 {
+		t.Fatalf("cancelled read continued: status=%d bytes=%d", rec.Code, rec.Body.Len())
+	}
+	var workers sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		workers.Add(1)
+		go func(offset int) {
+			defer workers.Done()
+			req := httptest.NewRequest("GET", target, nil)
+			req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", offset<<20, (offset<<20)+15))
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			if rec.Code != 206 || rec.Body.Len() != 16 || rec.Body.Bytes()[0] != byte(offset+1) {
+				t.Errorf("concurrent range %d: status=%d body=%v", offset, rec.Code, rec.Body.Bytes())
+			}
+		}(i)
+	}
+	workers.Wait()
 }

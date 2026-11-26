@@ -26,6 +26,17 @@ it('keeps all eight jumps outside the video screen and clamps both ends',()=>{
     video.currentTime=5;button('-10초 이동').click();expect(video.currentTime).toBe(0)
     expect(video.controls).toBe(false)
 })
+it('updates playback time without replacing text or button nodes and refreshes icons only on state changes', () => {
+ const video=setup(), time=document.querySelector('.sbp-time')!, text=time.firstChild
+ const play=button('재생'), svg=play.firstChild, mute=button('음소거').firstChild
+ video.currentTime=42;video.dispatchEvent(new Event('timeupdate'))
+ expect(time.textContent).toBe('0:42 / 16:40');expect(time.firstChild).toBe(text)
+ expect(play.firstChild).toBe(svg);expect(button('음소거').firstChild).toBe(mute)
+ video.dispatchEvent(new Event('ratechange'));expect(play.firstChild).toBe(svg)
+ Object.defineProperty(video,'paused',{value:false,configurable:true});video.dispatchEvent(new Event('play'))
+ expect(play.getAttribute('aria-label')).toBe('일시정지');expect(play.firstChild).not.toBe(svg)
+ video.muted=true;video.dispatchEvent(new Event('volumechange'));expect(button('음소거 해제').firstChild).not.toBe(mute)
+})
 it('double-clicks seek without also toggling playback, persists a configurable interval',async()=>{
     const video=setup();video.currentTime=200
     video.dispatchEvent(new MouseEvent('click',{clientX:20,detail:1}))

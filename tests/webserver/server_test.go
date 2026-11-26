@@ -84,6 +84,44 @@ func failure(t *testing.T, result api.Result, code string) {
 		t.Fatalf("기대 %s: %+v", code, result)
 	}
 }
+
+func TestCodePreferenceAcrossServerRestarts(t *testing.T) {
+	f := newFixture(t)
+	status(t, f.server.SetRequireCode(false))
+	client := &http.Client{Transport: &http.Transport{Proxy: nil}, Timeout: 3 * time.Second}
+	defer client.CloseIdleConnections()
+	for range 2 {
+		started := status(t, f.server.Start())
+		if started.RequireCode || started.PairCode != "" {
+			t.Fatal("restart reset the code preference", started)
+		}
+		response, err := client.Get(started.URL + "/api/library")
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		if response.StatusCode != http.StatusOK {
+			t.Fatal("open access was rejected", response.StatusCode)
+		}
+		stopped := status(t, f.server.Stop())
+		if stopped.RequireCode {
+			t.Fatal("stop reset the code preference")
+		}
+	}
+	status(t, f.server.SetRequireCode(true))
+	started := status(t, f.server.Start())
+	if !started.RequireCode || started.PairCode == "" {
+		t.Fatal("code authentication was not restored")
+	}
+	response, err := client.Get(started.URL + "/api/library")
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != http.StatusUnauthorized {
+		t.Fatal("unauthenticated request was admitted", response.StatusCode)
+	}
+}
 func (f *fixture) request(t *testing.T, method, path string, headers map[string]string) (int, http.Header, []byte) {
 	t.Helper()
 	state := status(t, f.server.Status())

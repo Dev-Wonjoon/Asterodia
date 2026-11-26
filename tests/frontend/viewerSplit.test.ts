@@ -133,9 +133,11 @@ it('preserves playback position, speed, audio state and zoom when changing layou
     const old = document.querySelector('video')!; old.currentTime = 67; old.playbackRate = 1.5; old.volume = .35; old.muted = true
     click(button('4분할')); await flush()
     const current = document.querySelector('video')!
-    expect(current).not.toBe(old); expect(old.getAttribute('src')).toBeNull()
+    expect(current).toBe(old); expect(old.getAttribute('src')).toBe('/media/2')
+    expect(HTMLMediaElement.prototype.play).toHaveBeenCalledOnce()
     expect(current.currentTime).toBe(67); expect(current.playbackRate).toBe(1.5); expect(current.volume).toBe(.35); expect(current.muted).toBe(true)
     expect(scale()).toBe('125%'); expect(current.paused).toBe(false)
+    expect((viewer!.dialog as any).getPlaybackPerformance()).toMatchObject({ linked: false, layout: 4, players: [{ fileId: 2 }], views: [{ backend: 'native' }, null, null, null] })
 })
 
 it('shows only the selected zoomed minimap, clamps dragging and restores focus for shortcuts', async () => {
@@ -201,30 +203,53 @@ it('replaces a linked file in all panes and resets their zoom without creating a
 
 it('clears delayed playback gestures on layout change and does not treat minimap clicks as play', async () => {
     vi.useFakeTimers(); setup(2); await flush()
-    document.querySelector('.sbv-canvas')!.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+    document.querySelector('.sbv-native-video')!.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
     const plays = vi.mocked(HTMLMediaElement.prototype.play).mock.calls.length
     click(button('2분할')); await flush(); await vi.advanceTimersByTimeAsync(600)
-    // Reopening the playing pane is expected; the removed surface's delayed click is cancelled.
-    expect(vi.mocked(HTMLMediaElement.prototype.play).mock.calls.length).toBe(plays + 1)
+    // The decoder survives; only the pending gesture is cancelled.
+    expect(vi.mocked(HTMLMediaElement.prototype.play).mock.calls.length).toBe(plays)
     select(0); key('+', { ctrlKey: true }); document.querySelector('.sbv-map-rect')!.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
     await vi.advanceTimersByTimeAsync(600); expect(document.querySelector('video')!.paused).toBe(false)
     viewer!.destroy(); viewer = undefined; await vi.advanceTimersByTimeAsync(3000)
     expect(document.querySelectorAll('video,.sb-viewer')).toHaveLength(0); expect(vi.getTimerCount()).toBe(0)
 })
 
-it('seeks on double-click of the drawn video without toggling playback or scaling its controls', async () => {
+it('seeks on double-click of native video using viewport bounds without toggling playback or scaling its controls', async () => {
     vi.useFakeTimers(); setup(2); await flush()
-    const video = document.querySelector('video')!, canvas = document.querySelector('.sbv-canvas')!
-    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({ left: 0, width: 800 } as DOMRect)
+    const video = document.querySelector('video')!
+    vi.spyOn(surface(), 'getBoundingClientRect').mockReturnValue({ left: 0, width: 800 } as DOMRect)
+    select(0); key('+', { ctrlKey: true }); expect(scale()).toBe('125%')
+    // The zoomed video's midpoint differs from the visible viewport's midpoint.
+    vi.spyOn(video, 'getBoundingClientRect').mockReturnValue({ left: -100, width: 1600 } as DOMRect)
     video.currentTime = 20
-    canvas.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1, clientX: 20 }))
-    canvas.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 2, clientX: 20 }))
-    canvas.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, detail: 2, clientX: 20 }))
+    video.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1, clientX: 500 }))
+    video.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 2, clientX: 500 }))
+    video.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, detail: 2, clientX: 500 }))
     await vi.advanceTimersByTimeAsync(600)
-    expect(video.currentTime).toBe(10); expect(video.paused).toBe(false); expect(video.play).toHaveBeenCalledOnce()
-    key('+', { ctrlKey: true }); expect(scale()).toBe('125%')
+    expect(video.currentTime).toBe(30); expect(video.paused).toBe(false); expect(video.play).toHaveBeenCalledOnce()
     expect(document.querySelector('.sbp-controls')!.closest('.sbv-viewport')).toBeNull()
     expect(document.activeElement).toBe(surface())
+})
+
+it('plays two independent 4K videos without canvas paints and preserves native playback across linked mode', async () => {
+    vi.useFakeTimers()
+    const context = vi.mocked(HTMLCanvasElement.prototype.getContext)
+    setup(2, { getFile: async (id: number) => ({ id, kind: 'video', title: '4K ' + id, width: 3840, height: 2160 }) })
+    await flush(); click(button('2분할')); await flush(); await choose(1, 4)
+    const videos = [...document.querySelectorAll<HTMLVideoElement>('.sbv-viewport>video')]
+    expect(videos).toHaveLength(2); expect(videos[0].src).not.toBe(videos[1].src)
+    await videos[1].play()
+    expect(videos.every(video => !video.paused)).toBe(true)
+    expect(document.querySelector('.sbv-canvas')).toBeNull(); expect(context).not.toHaveBeenCalled()
+    videos[0].click(); await vi.advanceTimersByTimeAsync(600)
+    expect(videos[0].paused).toBe(true); expect(videos[1].paused).toBe(false)
+    select(1); click(button('같은 미디어')); await flush()
+    expect(document.querySelectorAll('video')).toHaveLength(1)
+    expect(document.querySelectorAll('.sbv-canvas')).toHaveLength(2)
+    click(button('서로 다른 미디어')); await flush()
+    expect(document.querySelectorAll('.sbv-viewport>video')).toHaveLength(2)
+    expect(document.querySelector('.sbv-canvas')).toBeNull()
+    expect(videos.every(video => video.getAttribute('src') === null)).toBe(true)
 })
 
 it('ignores stale loads after pane removal and close while preserving the selected pane load', async () => {

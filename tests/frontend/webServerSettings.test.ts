@@ -5,7 +5,7 @@ import type { WebServerStatus, WebServerResult } from '@contracts/webserver-api'
 import { WebServerSettings } from '@renderer/features/settings/WebServerSettings'
 import { cleanupReact, clickButton, deferred, mount } from './reactHarness'
 
-const api = vi.hoisted(() => ({ status: vi.fn(), start: vi.fn(), stop: vi.fn(), setEditing: vi.fn(), setDownloading: vi.fn(), revokeAccess: vi.fn() }))
+const api = vi.hoisted(() => ({ status: vi.fn(), start: vi.fn(), stop: vi.fn(), setRequireCode: vi.fn(), setEditing: vi.fn(), setDownloading: vi.fn(), revokeAccess: vi.fn() }))
 vi.mock('@renderer/shared/api', () => ({ getApi: () => ({ webServer: api }) }))
 const state = (running = false, error: string | null = null): WebServerStatus => ({ running, url: 'http://127.0.0.1:9246', error })
 const ok = (data: WebServerStatus): WebServerResult<WebServerStatus> => ({ ok: true, data })
@@ -15,6 +15,35 @@ beforeEach(() => { vi.resetAllMocks(); api.status.mockResolvedValue(ok(state()))
 afterEach(async () => { await cleanupReact(); vi.useRealTimers() })
 
 describe('localhost web server controls', () => {
+    it('toggles the code requirement while stopped and hides pairing controls when disabled', async () => {
+        api.status.mockResolvedValue(ok({ ...state(), requireCode: true }))
+        api.setRequireCode.mockResolvedValueOnce(ok({ ...state(), requireCode: false }))
+        await mount(h(WebServerSettings))
+        const input = [...document.querySelectorAll('label')].find(label => label.textContent === '접속 시 연결 코드 사용')!.querySelector('input')!
+        expect(input.checked).toBe(true); expect(input.disabled).toBe(false)
+        await act(async () => input.click())
+        expect(api.setRequireCode).toHaveBeenCalledExactlyOnceWith(false)
+        expect(input.checked).toBe(false)
+        api.start.mockResolvedValue(ok({ ...state(true), requireCode: false }))
+        await clickButton('서버 시작')
+        expect(document.querySelector('code')).toBeNull()
+        expect(button('모든 연결 해제 및 코드 재발급')).toBeUndefined()
+        api.setRequireCode.mockResolvedValueOnce(ok({ ...state(true), requireCode: true, pairCode: '87654321' }))
+        await act(async () => input.click())
+        expect(api.setRequireCode).toHaveBeenLastCalledWith(true)
+        expect(document.querySelector('code')?.textContent).toBe('87654321')
+    })
+
+    it('retains the previous code preference when saving fails', async () => {
+        api.status.mockResolvedValue(ok({ ...state(), requireCode: true }))
+        api.setRequireCode.mockResolvedValue({ ok: false, error: { code: 'SETTINGS_SAVE_FAILED', message: '연결 코드 사용 설정을 저장하지 못했습니다' } })
+        await mount(h(WebServerSettings))
+        const input = [...document.querySelectorAll('label')].find(label => label.textContent === '접속 시 연결 코드 사용')!.querySelector('input')!
+        await act(async () => input.click())
+        expect(input.checked).toBe(true)
+        expect(document.querySelector('[role="alert"]')?.textContent).toContain('저장하지 못했습니다')
+    })
+
     it('shows the desktop-only pairing code and revokes connected devices', async () => {
         api.status.mockResolvedValue(ok({ ...state(true), pairCode: '12345678', connected: 2 }))
         api.revokeAccess.mockResolvedValue(ok({ ...state(true), pairCode: '87654321', connected: 0 }))

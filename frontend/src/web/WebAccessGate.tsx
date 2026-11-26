@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { translate, useLanguage } from '@renderer/shared/i18n'
 import { LanguageSelect } from '@renderer/shared/i18n/LanguageSelect'
+
+const CodeRequiredContext = createContext(true)
+export const useCodeRequired = () => useContext(CodeRequiredContext)
 
 export function WebAccessGate({ children }: { children: ReactNode }) {
     useLanguage()
@@ -8,30 +11,35 @@ export function WebAccessGate({ children }: { children: ReactNode }) {
     const [code, setCode] = useState('')
     const [busy, setBusy] = useState(false)
     const [error, setError] = useState('')
+    const [required, setRequired] = useState(true)
     const revision = useRef(0)
     const connecting = useRef(false)
     useEffect(() => {
         let mounted = true
+        let checking = false
         const check = async () => {
-            if (connecting.current) return
+            if (connecting.current || checking) return
+            checking = true
             const own = ++revision.current
             try {
                 const response = await fetch('/api/access/status', { credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(10_000) })
                 if (!response.ok) throw new Error()
-                const access = await response.json() as { authenticated: boolean }
-                if (mounted && own === revision.current) setState(access.authenticated ? 'ready' : 'locked')
+                const access = await response.json() as { authenticated: boolean; required?: boolean }
+                if (mounted && own === revision.current) { setRequired(access.required !== false); setState(access.authenticated ? 'ready' : 'locked') }
             } catch { if (mounted && own === revision.current) { setState('locked'); setError(translate('security.connectionError')) } }
+            finally { checking = false }
         }
         const lock = () => { revision.current++; connecting.current = false; setBusy(false); setCode(''); setError(''); setState('locked') }
         const logout = async () => {
             try {
                 const response = await fetch('/api/access/logout', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: '{}' })
                 if (!response.ok) throw new Error()
-                if (mounted) lock()
+                const access = await response.json() as { authenticated: boolean; required?: boolean }
+                if (mounted) { lock(); setRequired(access.required !== false); if (access.authenticated) setState('ready') }
             } catch { if (mounted) setError(translate('security.connectionError')) }
         }
         void check()
-        const timer = setInterval(() => void check(), 60_000)
+        const timer = setInterval(() => void check(), 2000)
         window.addEventListener('storagebucket:access-expired', lock)
         window.addEventListener('storagebucket:disconnect', logout)
         return () => { mounted = false; revision.current++; clearInterval(timer); window.removeEventListener('storagebucket:access-expired', lock); window.removeEventListener('storagebucket:disconnect', logout) }
@@ -50,7 +58,7 @@ export function WebAccessGate({ children }: { children: ReactNode }) {
         } catch { if (own === revision.current) setError(translate('security.connectionError')) }
         finally { if (own === revision.current) { connecting.current = false; setBusy(false) } }
     }
-    if (state === 'ready') return <>{error && <p role="alert" className="fixed bottom-4 right-4 z-50 max-w-sm rounded border border-red-500 bg-[var(--bg-app)] p-3 text-sm text-red-500">{error}</p>}{children}</>
+    if (state === 'ready') return <CodeRequiredContext.Provider value={required}>{error && <p role="alert" className="fixed bottom-4 right-4 z-50 max-w-sm rounded border border-red-500 bg-[var(--bg-app)] p-3 text-sm text-red-500">{error}</p>}{children}</CodeRequiredContext.Provider>
     return <main className="flex min-h-dvh items-center justify-center bg-[var(--bg-app)] p-6 text-[var(--text-main)]">
         <form onSubmit={event => void connect(event)} className="w-full max-w-sm space-y-4 rounded-xl border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-6">
             <div className="flex items-center justify-between gap-4"><h1 className="text-lg font-semibold">StorageBucket</h1><LanguageSelect /></div>

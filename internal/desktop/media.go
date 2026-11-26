@@ -1,6 +1,7 @@
 package desktop
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
@@ -10,11 +11,28 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // The Windows WebView response writer buffers the entire response before it
 // passes it to WebView2. Bound each video response, even for bytes=0- requests.
 const maxVideoResponseBytes int64 = 4 << 20
+
+var previewCacheName = regexp.MustCompile(`^[0-9a-f]{64}\.jpg$`)
+
+// Observe cancellation between file reads without sharing mutable file offsets
+// between simultaneous range requests.
+type mediaContentReader struct {
+	io.ReadSeeker
+	ctx context.Context
+}
+
+func (r mediaContentReader) Read(p []byte) (int, error) {
+	if err := r.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return r.ReadSeeker.Read(p)
+}
 
 // Only registered library paths (or content-addressed preview cache entries) can
 // be read by the WebView. Arbitrary absolute file paths are never served.
@@ -35,22 +53,31 @@ func MediaMiddleware(db *sql.DB, previewCache string) func(http.Handler) http.Ha
 				return
 			}
 			path = filepath.Clean(path)
+			lookupStarted := time.Now()
 			var allowed, video bool
+			// Original videos use idx_file_path_lookup. Combining unindexed
+			// thumbnail/preview columns with OR forced a full library scan for
+			// every range, including the next chunk of an already playing video.
 			err := db.QueryRowContext(r.Context(), `SELECT
-                EXISTS(SELECT 1 FROM media_file WHERE filepath=? OR thumbnail_path=? OR preview_path=?),
-                EXISTS(SELECT 1 FROM media_file WHERE filepath=? AND kind='video')`, path, path, path, path).Scan(&allowed, &video)
+				EXISTS(SELECT 1 FROM media_file WHERE filepath=?),
+				EXISTS(SELECT 1 FROM media_file WHERE filepath=? AND kind='video')`, path, path).Scan(&allowed, &video)
+			if err == nil && !allowed {
+				err = db.QueryRowContext(r.Context(), `SELECT EXISTS(SELECT 1 FROM media_file WHERE thumbnail_path=? OR preview_path=?)`, path, path).Scan(&allowed)
+			}
 			if err != nil {
 				http.Error(w, "미디어 등록 조회 실패", 500)
 				return
 			}
 			if !allowed {
 				rel, e := filepath.Rel(previewCache, path)
-				allowed = e == nil && filepath.Base(rel) == rel && regexp.MustCompile(`^[0-9a-f]{64}\.jpg$`).MatchString(rel)
+				allowed = e == nil && filepath.Base(rel) == rel && previewCacheName.MatchString(rel)
 			}
 			if !allowed {
 				http.NotFound(w, r)
 				return
 			}
+			lookupDuration := time.Since(lookupStarted)
+			openStarted := time.Now()
 			info, err := os.Lstat(path)
 			if err != nil || !info.Mode().IsRegular() {
 				http.NotFound(w, r)
@@ -68,6 +95,7 @@ func MediaMiddleware(db *sql.DB, previewCache string) func(http.Handler) http.Ha
 				return
 			}
 			w.Header().Set("X-Content-Type-Options", "nosniff")
+			w.Header().Set("Server-Timing", fmt.Sprintf("library;dur=%.3f, file;dur=%.3f", float64(lookupDuration)/float64(time.Millisecond), float64(time.Since(openStarted))/float64(time.Millisecond)))
 			w.Header().Set("Content-Security-Policy", "sandbox")
 			// External originals can change at the same path after a rescan. Use
 			// nanosecond validators instead of replaying a cached old file for 60s.
@@ -100,7 +128,7 @@ func MediaMiddleware(db *sql.DB, previewCache string) func(http.Handler) http.Ha
 			}
 			// Pin the size used for validators and range bounds, even if an
 			// external original grows after this request opened it.
-			http.ServeContent(w, r, info.Name(), info.ModTime(), io.NewSectionReader(file, 0, info.Size()))
+			http.ServeContent(w, r, info.Name(), info.ModTime(), mediaContentReader{io.NewSectionReader(file, 0, info.Size()), r.Context()})
 		})
 	}
 }

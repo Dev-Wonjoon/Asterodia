@@ -1,4 +1,4 @@
-import { WebAccessGate } from './WebAccessGate'
+import { WebAccessGate, useCodeRequired } from './WebAccessGate'
 import { translate, useLanguage } from '@renderer/shared/i18n'
 import { createRoot } from 'react-dom/client'
 import { useState } from 'react'
@@ -13,6 +13,7 @@ import './web.css'
 import { LanguageSelect } from '@renderer/shared/i18n/LanguageSelect'
 
 function WebApp() {
+    const codeRequired = useCodeRequired()
     const [page, setPage] = useState<'gallery' | 'downloads'>('gallery')
     const { language } = useLanguage()
     const { theme, toggleTheme } = useTheme()
@@ -25,7 +26,7 @@ function WebApp() {
                 <button type="button" className="rounded-lg px-3 py-2 text-sm aria-pressed:bg-[var(--bg-hover)]" aria-pressed={page === 'downloads'} onClick={() => setPage('downloads')}>{translate('navigation.downloads')}</button>
             </nav>
             <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">
-                <LanguageSelect /><button type="button" className="rounded-lg px-3 py-2 text-sm" onClick={() => window.dispatchEvent(new Event('storagebucket:disconnect'))}>{translate('security.logout')}</button>
+                <LanguageSelect />{codeRequired && <button type="button" className="rounded-lg px-3 py-2 text-sm" onClick={() => window.dispatchEvent(new Event('storagebucket:disconnect'))}>{translate('security.logout')}</button>}
                 <button type="button" className="rounded-lg p-2 hover:bg-[var(--bg-hover)]" aria-label={translate("common.changeTheme")} onClick={toggleTheme}>{theme === 'dark' ? <Sun className="size-5" /> : <Moon className="size-5" />}</button>
                 <button type="button" className="rounded-lg p-2 hover:bg-[var(--bg-hover)]" aria-label={mode === 'icons' ? translate("common.switchToLabelMode") : translate("common.switchToIconMode")} onClick={toggle}>{mode === 'icons' ? <TextCursorInput className="size-5" /> : <Grid2X2 className="size-5" />}</button>
                 <a href={'/licenses?lang=' + language} className="text-xs text-[var(--text-muted)]">{translate("settings.licenses")}</a>

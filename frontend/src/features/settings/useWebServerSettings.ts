@@ -90,21 +90,21 @@ export function useWebServerSettings() {
             }
         }
     }
-    const togglePermission = async (kind: 'editing' | 'downloading' | 'access') => {
+    const togglePermission = async (kind: 'editing' | 'downloading' | 'access' | 'requireCode') => {
         if (!mounted.current || locked.current || !status) return
         const own = ++revision.current
         locked.current = true; reading.current?.cancel(); reading.current = null
         setLoading(false); setBusy(true); setError(null)
         try {
-            const result = await (kind === 'access' ? getApi().webServer.revokeAccess() : kind === 'editing' ? getApi().webServer.setEditing(!status.editing) : getApi().webServer.setDownloading(!status.downloading))
+            const result = await (kind === 'requireCode' ? getApi().webServer.setRequireCode(status.requireCode === false) : kind === 'access' ? getApi().webServer.revokeAccess() : kind === 'editing' ? getApi().webServer.setEditing(!status.editing) : getApi().webServer.setDownloading(!status.downloading))
             if (!mounted.current || own !== revision.current) return
             if (result.ok) setStatus(result.data)
             else setError(translateError(result.error))
         } catch {
-            if (mounted.current && own === revision.current) setError(translate(kind === 'editing' ? 'settings.couldNotChangeMobileEditingPermission' : 'settings.mobileDownloads.permissionError'))
+            if (mounted.current && own === revision.current) setError(translate(kind === 'requireCode' ? 'security.preferenceError' : kind === 'editing' ? 'settings.couldNotChangeMobileEditingPermission' : 'settings.mobileDownloads.permissionError'))
         } finally {
             if (own === revision.current) { locked.current = false; if (mounted.current) setBusy(false) }
         }
     }
-    return { status, loading, busy, error, refresh, toggle, revokeAccess: () => togglePermission('access'), toggleEditing: () => togglePermission('editing'), toggleDownloading: () => togglePermission('downloading') }
+    return { status, loading, busy, error, refresh, toggle, toggleRequireCode: () => togglePermission('requireCode'), revokeAccess: () => togglePermission('access'), toggleEditing: () => togglePermission('editing'), toggleDownloading: () => togglePermission('downloading') }
 }

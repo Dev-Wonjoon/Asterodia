@@ -16,7 +16,9 @@ export function WebServerSettings() {
             {vm.status && <>
                 <p className="text-xs text-[var(--text-muted)]">{translate("settings.localAddress")}<span className="select-text">{vm.status.url}</span></p>
                 <p className="text-xs text-[var(--text-muted)]">{translate("settings.offWhenTheAppStartsTheServerAlsoStops")}</p>
-                {vm.status.running && <div className="space-y-2 rounded-lg border border-[var(--border-line)] p-3">
+                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={vm.status.requireCode !== false} disabled={vm.loading || vm.busy} onChange={() => void vm.toggleRequireCode()} />{translate('security.requireCode')}</label>
+                <p className="text-xs text-[var(--text-muted)]">{translate('security.requireCodeHelp')}</p>
+                {vm.status.running && vm.status.requireCode !== false && <div className="space-y-2 rounded-lg border border-[var(--border-line)] p-3">
                     <p className="text-sm">{translate('security.code')}: <code className="select-all font-mono text-lg tracking-widest">{vm.status.pairCode}</code></p>
                     <p className="text-xs text-[var(--text-muted)]">{translate('security.codeHelp')}</p>
                     <p className="text-xs">{translate('security.connected', { count: vm.status.connected ?? 0 })}</p>

@@ -66,6 +66,7 @@ func applicationServices(
 	updates.SetDatabase(db)
 	catalog.StartSearchIndex()
 	web := webserver.NewService(catalog, webserver.DefaultAddress)
+	web.ConfigureAccessCode(config.GetWebRequireCode(), config.SetWebRequireCode)
 	web.ConfigureContentFilters(config.SetContentFilters)
 	thumb := thumbnail.NewService(db, filepath.Join(paths.Cache, "thumbnails"), filepath.Join(paths.Bin, "ffmpeg.exe"), func(id int64) {
 		if app := application.Get(); app != nil {

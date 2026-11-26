@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { act, createElement as h, useEffect } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { WebAccessGate } from '@renderer/web/WebAccessGate'
+import { WebAccessGate, useCodeRequired } from '@renderer/web/WebAccessGate'
 import { cleanupReact, clickButton, deferred, mount } from './reactHarness'
 
 const fetchMock = vi.fn()
@@ -35,7 +35,7 @@ it('stays locked after a rejected code and reports rate limiting', async () => {
 })
 
 it('locks immediately on session expiry and logs out through the server', async () => {
-    fetchMock.mockResolvedValue(response(true))
+    fetchMock.mockResolvedValueOnce(response(true)).mockResolvedValue(response(false))
     await mount(h(WebAccessGate, { children: h('p', null, 'Private library') }))
     await act(async () => { window.dispatchEvent(new Event('storagebucket:disconnect')) })
     expect(fetchMock).toHaveBeenLastCalledWith('/api/access/logout', expect.objectContaining({ method: 'POST', credentials: 'same-origin' }))
@@ -59,4 +59,32 @@ it('reports a failed logout without falsely claiming disconnection', async () =>
     await act(async () => { window.dispatchEvent(new Event('storagebucket:disconnect')) })
     expect(document.body.textContent).toContain('Private library')
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('서버에 연결하지 못했습니다')
+})
+
+it('enters without a code and follows desktop access policy changes in both directions', async () => {
+    vi.useFakeTimers()
+    const open = { ok: true, json: async () => ({ authenticated: true, required: false }) }
+    fetchMock.mockResolvedValue(open)
+    function PrivatePage() { return h('p', null, useCodeRequired() ? 'Code required' : 'No code required') }
+    await mount(h(WebAccessGate, { children: h(PrivatePage) }))
+    expect(document.body.textContent).toContain('No code required')
+    expect(document.querySelector('input')).toBeNull()
+    fetchMock.mockResolvedValue(response(false))
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+    expect(document.querySelector('input')).not.toBeNull()
+    expect(document.body.textContent).not.toContain('No code required')
+    fetchMock.mockResolvedValue(open)
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+    expect(document.body.textContent).toContain('No code required')
+})
+
+it('does not discard slow status responses by starting overlapping polls', async () => {
+    vi.useFakeTimers()
+    const pending = deferred<ReturnType<typeof response>>()
+    fetchMock.mockReturnValue(pending.promise)
+    await mount(h(WebAccessGate, { children: h('p', null, 'Private library') }))
+    await act(async () => { await vi.advanceTimersByTimeAsync(6000) })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    await act(async () => { pending.resolve(response(true)) })
+    expect(document.body.textContent).toContain('Private library')
 })

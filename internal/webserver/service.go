@@ -19,6 +19,7 @@ import (
 const DefaultAddress = "127.0.0.1:9246"
 
 type Status struct {
+	RequireCode bool    `json:"requireCode"`
 	PairCode    string  `json:"pairCode,omitempty"`
 	CodeExpires int64   `json:"codeExpires,omitempty"`
 	Connected   int     `json:"connected"`
@@ -30,11 +31,15 @@ type Status struct {
 }
 
 type Service struct {
-	pairCode    string
-	pairExpires time.Time
-	sessions    map[[32]byte]accessSession
-	loginLast   time.Time
-	loginTokens float64
+	requireCode      bool
+	saveRequireCode  func(bool) error
+	openAccess       context.Context
+	cancelOpenAccess context.CancelFunc
+	pairCode         string
+	pairExpires      time.Time
+	sessions         map[[32]byte]accessSession
+	loginLast        time.Time
+	loginTokens      float64
 	// Serialize starts and stops separately from state reads by active handlers.
 	lifecycle          sync.Mutex
 	mu                 sync.Mutex
@@ -64,13 +69,13 @@ func NewService(library *media.Service, address string) *Service {
 	if address == "" {
 		address = DefaultAddress
 	}
-	s := &Service{library: library, address: address, url: "http://" + address, capacity: make(chan struct{}, 32)}
+	s := &Service{library: library, address: address, url: "http://" + address, capacity: make(chan struct{}, 32), requireCode: true}
 	s.handler = s.routes()
 	return s
 }
 
 func (s *Service) snapshot() Status {
-	if s.server != nil && time.Now().After(s.pairExpires) {
+	if s.requireCode && s.server != nil && time.Now().After(s.pairExpires) {
 		_ = s.rotateCodeLocked()
 	}
 	for key, session := range s.sessions {
@@ -83,7 +88,7 @@ func (s *Service) snapshot() Status {
 	if s.pairCode != "" {
 		expires = s.pairExpires.UnixMilli()
 	}
-	return Status{PairCode: s.pairCode, CodeExpires: expires, Connected: len(s.sessions), Running: s.server != nil, URL: s.url, Error: s.lastError, Editing: s.editing, Downloading: s.downloading}
+	return Status{RequireCode: s.requireCode, PairCode: s.pairCode, CodeExpires: expires, Connected: len(s.sessions), Running: s.server != nil, URL: s.url, Error: s.lastError, Editing: s.editing, Downloading: s.downloading}
 }
 
 //wails:ignore
@@ -146,7 +151,7 @@ func (s *Service) Start() api.Result {
 		s.lastError = &message
 		return api.Failure("SERVER_START_FAILED", message)
 	}
-	if s.rotateCodeLocked() != nil {
+	if s.requireCode && s.rotateCodeLocked() != nil {
 		listener.Close()
 		return api.Failure("NOT_READY", "연결 코드를 생성하지 못했습니다")
 	}

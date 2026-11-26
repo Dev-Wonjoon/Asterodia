@@ -3,6 +3,7 @@ package webserver
 import (
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -154,4 +155,103 @@ func TestRevokingAccessCancelsInFlightRequests(t *testing.T) {
 		t.Fatal("revocation did not cancel active request")
 	}
 	<-done
+}
+
+func TestAccessCodeToggleInvalidatesSessionsAndAnonymousRequests(t *testing.T) {
+	s := authFixture(t)
+	defer s.Close()
+	if !s.snapshot().RequireCode {
+		t.Fatal("code authentication must default to on")
+	}
+	r := httptest.NewRequest("GET", "http://localhost/api/library", nil)
+	allowTestRequest(s, r)
+	sessionCtx, _ := s.sessionContext(r)
+	if !s.SetRequireCode(false).OK || sessionCtx.Err() == nil {
+		t.Fatal("disabling code did not clear old sessions")
+	}
+	status := s.snapshot()
+	if status.RequireCode || status.PairCode != "" || status.CodeExpires != 0 || status.Connected != 0 {
+		t.Fatal("code controls remain active", status)
+	}
+	w := authRequest(s, "/api/access/status", "", "", nil)
+	if !strings.Contains(w.Body.String(), `"authenticated":true`) || !strings.Contains(w.Body.String(), `"required":false`) {
+		t.Fatal("anonymous client was not admitted", w.Body.String())
+	}
+	entered, cancelled, done := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	s.handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(entered)
+		<-r.Context().Done()
+		close(cancelled)
+	})
+	go func() {
+		defer close(done)
+		s.serveHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "http://localhost/api/library", nil))
+	}()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("anonymous request was blocked")
+	}
+	if !s.SetRequireCode(true).OK {
+		t.Fatal("enabling code failed")
+	}
+	select {
+	case <-cancelled:
+	case <-time.After(time.Second):
+		t.Fatal("enabling code did not cancel the anonymous request")
+	}
+	<-done
+	if s.pairCode == "" {
+		t.Fatal("enabling code did not generate a code")
+	}
+	for _, cookie := range []*http.Cookie{nil, {Name: sessionCookie, Value: "test-session"}} {
+		if s.authorized(httptest.NewRequest("GET", "http://localhost/api/library", nil)) {
+			t.Fatal("anonymous access survived enabling code")
+		}
+		w := authRequest(s, "/api/access/status", "", "", cookie)
+		if strings.Contains(w.Body.String(), `"authenticated":true`) {
+			t.Fatal("old session survived enabling code")
+		}
+	}
+	w = authRequest(s, "/api/access/connect", `{"code":"`+s.pairCode+`"}`, "http://localhost", nil)
+	if w.Code != 200 {
+		t.Fatal("fresh code was rejected", w.Code, w.Body.String())
+	}
+}
+
+func TestAccessCodePreferenceFailuresRetainCurrentPolicy(t *testing.T) {
+	s := authFixture(t)
+	defer s.Close()
+	s.ConfigureAccessCode(true, func(bool) error { return errors.New("disk full") })
+	code := s.pairCode
+	r := httptest.NewRequest("GET", "http://localhost/api/library", nil)
+	allowTestRequest(s, r)
+	ctx, _ := s.sessionContext(r)
+	if s.SetRequireCode(false).OK || !s.requireCode || s.pairCode != code || ctx.Err() != nil {
+		t.Fatal("failed save changed access policy or disconnected a session")
+	}
+	s.ConfigureAccessCode(false, func(bool) error { return errors.New("disk full") })
+	s.pairCode, s.pairExpires = "", time.Time{}
+	if s.SetRequireCode(true).OK || s.requireCode || s.pairCode != "" {
+		t.Fatal("failed save did not restore the open policy")
+	}
+}
+
+func TestOpenAccessKeepsHostAndOriginChecks(t *testing.T) {
+	s := authFixture(t)
+	defer s.Close()
+	s.SetRequireCode(false)
+	for _, configure := range []func(*http.Request){
+		func(r *http.Request) { r.Host = "evil.example" },
+		func(r *http.Request) { r.Header.Set("Origin", "https://evil.example") },
+		func(r *http.Request) { r.Header.Set("Sec-Fetch-Site", "cross-site") },
+	} {
+		r := httptest.NewRequest("GET", "http://localhost/api/library", nil)
+		configure(r)
+		w := httptest.NewRecorder()
+		s.serveHTTP(w, r)
+		if w.Code != 403 {
+			t.Fatal("open access bypassed request origin checks", w.Code)
+		}
+	}
 }

@@ -128,7 +128,7 @@ func (s *Service) routes() http.Handler {
 	for _, path := range []string{"/langs/ko.json", "/langs/en.json", "/shortcuts.js", "/output-controls.js"} {
 		mux.Handle("GET "+path, http.FileServerFS(web))
 	}
-	for _, path := range []string{"/viewer-viewport.js", "/viewer-picker.js"} {
+	for _, path := range []string{"/viewer-viewport.js", "/viewer-picker.js", "/viewer-video-renderer.js", "/player-performance.js"} {
 		mux.Handle("GET "+path, http.FileServerFS(web))
 	}
 	return mux
