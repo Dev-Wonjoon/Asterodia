@@ -53,10 +53,11 @@
         <a href="#features" class="hover:text-(--pages-accent)" data-i18n="navFeatures">주요 기능</a>
         <a href="#start" class="hover:text-(--pages-accent)" data-i18n="navStart">시작하기</a>
         <a href="https://github.com/Dev-Wonjoon/StorageBucket" class="hover:text-(--pages-accent)">GitHub</a>
-        <button id="theme-toggle" type="button" hidden class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-(--border-line) bg-(--bg-sidebar) px-3 py-2 text-(--text-main) hover:bg-(--bg-hover)" aria-label="다크 테마로 전환">
-          <svg id="theme-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="size-4" aria-hidden="true"><path d="M20.9 13.1A9 9 0 0 1 10.9 3.1a9 9 0 1 0 10 10Z" stroke-linejoin="round"/></svg>
-          <svg id="theme-sun" hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="size-4" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5" stroke-linecap="round"/></svg>
-          <span id="theme-label">다크 테마</span>
+        <button id="theme-toggle" type="button" role="switch" aria-checked="false" hidden class="relative inline-flex h-9 w-16 shrink-0 cursor-pointer rounded-full border border-(--border-line) bg-(--bg-active) p-0" aria-label="다크 테마" title="다크 테마로 전환">
+          <span class="theme-switch-thumb absolute left-0.75 top-0.75 grid size-7 place-items-center rounded-full bg-(--pages-switch-thumb) text-(--pages-switch-icon) shadow-sm" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="theme-switch-sun col-start-1 row-start-1 size-4"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5" stroke-linecap="round"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="theme-switch-moon col-start-1 row-start-1 size-4"><path d="M20.9 13.1A9 9 0 0 1 10.9 3.1a9 9 0 1 0 10 10Z" stroke-linejoin="round"/></svg>
+          </span>
         </button>
         <button id="language" type="button" hidden class="cursor-pointer rounded-lg border border-(--border-line) bg-(--bg-sidebar) px-3 py-2 text-(--text-main) hover:bg-(--bg-hover)" aria-label="Switch to English">English</button>
       </nav>
@@ -236,16 +237,13 @@
       const koreanTitle = document.title;
       const themeToggle = document.getElementById('theme-toggle');
       const renderThemeControl = () => {
-        const nextIsDark = !document.documentElement.classList.contains('dark');
+        const isDark = document.documentElement.classList.contains('dark');
         const isEnglish = document.documentElement.lang === 'en';
-        document.getElementById('theme-label').textContent = isEnglish
-          ? (nextIsDark ? 'Dark theme' : 'Light theme')
-          : (nextIsDark ? '다크 테마' : '화이트 테마');
-        themeToggle.setAttribute('aria-label', isEnglish
-          ? (nextIsDark ? 'Switch to dark theme' : 'Switch to light theme')
-          : (nextIsDark ? '다크 테마로 전환' : '화이트 테마로 전환'));
-        document.getElementById('theme-moon').toggleAttribute('hidden', !nextIsDark);
-        document.getElementById('theme-sun').toggleAttribute('hidden', nextIsDark);
+        themeToggle.setAttribute('aria-checked', String(isDark));
+        themeToggle.setAttribute('aria-label', isEnglish ? 'Dark theme' : '다크 테마');
+        themeToggle.title = isEnglish
+          ? (isDark ? 'Switch to light theme' : 'Switch to dark theme')
+          : (isDark ? '화이트 테마로 전환' : '다크 테마로 전환');
       };
       themeToggle.addEventListener('click', () => window.storageBucketTheme.toggle());
       document.addEventListener('storagebucket:theme-change', renderThemeControl);
