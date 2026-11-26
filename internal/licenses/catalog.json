@@ -4,7 +4,7 @@
   "inputs": {
     "go.mod": "203794d5f3c0ca90a138b1008de90a3e3414e1cfaa009127562b6c3914561a4b",
     "go.sum": "97baf3df15fd24997baaba8ae9faeb7556ad1add70b7e1567b45ca672d7d940c",
-    "frontend/package.json": "073182a79aacc5a66364d5bbe701a7c1c09f3a854baab3db4b5e296507b3e938",
+    "frontend/package.json": "6490a062789d0a5115c49fc5869b84ce40979dbfab529aa4393bf63b78709759",
     "frontend/package-lock.json": "0000c8b9df59c0ce4af563937d3e25784fc0b4475b147919ee4560b95f7f57cc",
     "frontend/public/Inter-Medium.ttf": "a645f55492d1c8cdace43c72be8cbec08e680b5a86d8b4c2d1c50d6e41e9cc96",
     "frontend/public/bg-desktop.jpg": "4c94788acb1ad9c75feebc0b832cfba2720c6edc12ed32620238ab1c52299e5e",
