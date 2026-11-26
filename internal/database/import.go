@@ -493,6 +493,18 @@ func (m *merge) run() error {
 			}
 		}
 	}
+	for _, row := range m.data["instagram_profile_album"] {
+		old, err := integer(row["media_id"])
+		if err != nil {
+			return err
+		}
+		if _, err = m.q.ExecContext(m.ctx, "INSERT INTO instagram_profile_album(owner_id,media_id) VALUES(?,?) ON CONFLICT DO NOTHING", row["owner_id"], m.maps["media"][old]); err != nil {
+			return err
+		}
+	}
+	if err := media.SyncInstagramProfileAlbums(m.ctx, m.q, 0); err != nil {
+		return err
+	}
 	return m.history()
 }
 func (m *merge) lookupRows(table string) error {
@@ -542,6 +554,19 @@ func (m *merge) parent(r record) error {
 	kind := textValue(r["source_kind"])
 	identity := ""
 	var target int64
+	// A profile album has a global account identity across imported databases.
+	for _, album := range m.data["instagram_profile_album"] {
+		if album["media_id"] != old {
+			continue
+		}
+		err = m.q.QueryRowContext(m.ctx, "SELECT media_id FROM instagram_profile_album WHERE owner_id=?", album["owner_id"]).Scan(&target)
+		if err == nil {
+			return m.remember("media", old, target, digest([]any{"instagram", album["owner_id"]}))
+		}
+		if err != sql.ErrNoRows {
+			return err
+		}
+	}
 	switch kind {
 	case "download":
 		urlID, e := integer(r["request_url_id"])

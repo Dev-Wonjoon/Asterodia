@@ -128,7 +128,7 @@ func TestV5CheckpointMigrationAndRollback(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer opened.Close()
-			if countDB(t, opened, "PRAGMA user_version") != 13 || textDB(t, opened, "SELECT file_uuid FROM media_file WHERE media_id=7") != identity || textDB(t, opened, "SELECT filename_token FROM media_file WHERE media_id=7") != token || countDB(t, opened, "SELECT count(*) FROM migration_run WHERE id='v5-history' AND target_version=5") != 1 {
+			if countDB(t, opened, "PRAGMA user_version") != 14 || textDB(t, opened, "SELECT file_uuid FROM media_file WHERE media_id=7") != identity || textDB(t, opened, "SELECT filename_token FROM media_file WHERE media_id=7") != token || countDB(t, opened, "SELECT count(*) FROM migration_run WHERE id='v5-history' AND target_version=5") != 1 {
 				t.Fatal("식별자 또는 이전 이관 이력 유실")
 			}
 			if countDB(t, opened, "SELECT count(*) FROM local_import_job WHERE id='old' AND work_version=1 AND scan_complete=1") != 1 || countDB(t, opened, "SELECT count(*) FROM local_import_target WHERE id='target'") != 1 {
@@ -139,7 +139,7 @@ func TestV5CheckpointMigrationAndRollback(t *testing.T) {
 			if result := service.Resume(t.Context(), localimport.Request{JobID: "old"}); result.OK {
 				t.Fatal("이전 폴더 단위 작업을 파일 단위 재개로 오인했습니다")
 			}
-			backup := rawDB(t, textDB(t, opened, "SELECT backup_path FROM migration_run WHERE target_version=13"))
+			backup := rawDB(t, textDB(t, opened, "SELECT backup_path FROM migration_run WHERE target_version=14"))
 			defer backup.Close()
 			if countDB(t, backup, "PRAGMA user_version") != 5 {
 				t.Fatal("v5 백업 유실")

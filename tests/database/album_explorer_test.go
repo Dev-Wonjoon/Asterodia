@@ -135,7 +135,7 @@ func TestV12AlbumHierarchyMigrationRollbackBackupAndImport(t *testing.T) {
 	db := latestDB(t, path)
 	addModernMedia(t, db, 1, "https://example.test/v12", "keep", filepath.Join(root, "keep.mp4"), "keep")
 	albumObject(t, media.NewService(db).SaveAlbum(t.Context(), media.AlbumRequest{Title: albumTitle("kept album"), AddFileIDs: []int64{1}}))
-	execDB(t, db, "DROP TABLE album_parent;PRAGMA user_version=12")
+	execDB(t, db, "DROP TABLE instagram_profile_source;DROP TABLE instagram_profile_album;DROP TABLE album_parent;PRAGMA user_version=12")
 	db.Close()
 	opts := database.MigrationOptions{BackupDirectory: filepath.Join(root, "backups"), Checkpoint: func(step string) error {
 		if step == "before_commit" {
@@ -158,10 +158,10 @@ func TestV12AlbumHierarchyMigrationRollbackBackupAndImport(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer upgraded.Close()
-	if countDB(t, upgraded, "PRAGMA user_version") != 13 || countDB(t, upgraded, "SELECT count(*) FROM user_album_file") != 1 {
+	if countDB(t, upgraded, "PRAGMA user_version") != 14 || countDB(t, upgraded, "SELECT count(*) FROM user_album_file") != 1 {
 		t.Fatal("migration lost membership")
 	}
-	backup := rawDB(t, textDB(t, upgraded, "SELECT backup_path FROM migration_run WHERE target_version=13"))
+	backup := rawDB(t, textDB(t, upgraded, "SELECT backup_path FROM migration_run WHERE target_version=14"))
 	defer backup.Close()
 	if countDB(t, backup, "PRAGMA user_version") != 12 {
 		t.Fatal("backup version")

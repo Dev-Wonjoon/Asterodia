@@ -283,6 +283,7 @@ func (s *Service) register(ctx context.Context, job, attempt string, files []ver
 	}
 	now := time.Now().UnixMilli()
 	var mediaID int64
+	preserveInstagram := false
 	if mode == "create" {
 		result, e := tx.ExecContext(ctx, "INSERT INTO media(source_kind,request_url_id,source_title,created_at,updated_at) VALUES('download',?,?,?,?)", requestID, files[0].metadata.Title, now, now)
 		if e != nil {
@@ -307,16 +308,24 @@ func (s *Service) register(ctx context.Context, job, attempt string, files []ver
 		if err = tx.QueryRowContext(ctx, "SELECT revision FROM media WHERE id=? AND request_url_id=?", mediaID, requestID).Scan(&revision); err != nil || revision != *expected.Revision {
 			return 0, ErrRevisionConflict
 		}
-		if _, err = tx.ExecContext(ctx, "UPDATE media SET cover_mode='auto',cover_file_id=NULL WHERE id=?", mediaID); err != nil {
+		preserveInstagram, err = prepareInstagramReplacement(ctx, tx, mediaID, files)
+		if err != nil {
 			return 0, err
+		}
+		if !preserveInstagram {
+			if _, err = tx.ExecContext(ctx, "UPDATE media SET cover_mode='auto',cover_file_id=NULL WHERE id=?", mediaID); err != nil {
+				return 0, err
+			}
 		}
 		// Old files stay on disk. Their DB registration is replaced atomically; the
 		// maintenance record allows safe, retryable reclamation after commit.
 		if err = s.queueObsolete(ctx, tx, mediaID, now); err != nil {
 			return 0, err
 		}
-		if _, err = tx.ExecContext(ctx, "DELETE FROM media_file WHERE media_id=?", mediaID); err != nil {
-			return 0, err
+		if !preserveInstagram {
+			if _, err = tx.ExecContext(ctx, "DELETE FROM media_file WHERE media_id=?", mediaID); err != nil {
+				return 0, err
+			}
 		}
 	}
 	if _, err = tx.ExecContext(ctx, "UPDATE download_attempt SET target_media_id=?,target_media_id_snapshot=? WHERE id=?", mediaID, mediaID, attempt); err != nil {
@@ -356,9 +365,28 @@ func (s *Service) register(ctx context.Context, job, attempt string, files []ver
 			}
 			profileID = id
 		}
-		if _, err = tx.ExecContext(ctx, `INSERT INTO media_file(media_id,file_key,filename_token,storage_kind,directory_id,source_url,external_id,platform_id,profile_id,title,filepath,filesize,mtime_ns,hash_algorithm,content_hash,kind,position,duration,detected_format,width,height,created_at) VALUES(?,?,?,'app_managed',?,?,?,?,?,?,?,?,?, 'sha256',?,?,?,?,?,?,?,?)`, mediaID, v.key, v.token, directoryID, v.source, v.metadata.ExternalID, platformID, profileID, v.metadata.Title, v.final, v.size, fmt.Sprint(v.mtime), v.hash, v.metadata.Kind, v.position, v.metadata.Duration, v.format, v.width, v.height, now); err != nil {
+		insertFile := `INSERT INTO media_file(media_id,file_key,filename_token,storage_kind,directory_id,source_url,external_id,platform_id,profile_id,title,filepath,filesize,mtime_ns,hash_algorithm,content_hash,kind,position,duration,detected_format,width,height,created_at) VALUES(?,?,?,'app_managed',?,?,?,?,?,?,?,?,?, 'sha256',?,?,?,?,?,?,?,?)`
+		if preserveInstagram {
+			insertFile += ` ON CONFLICT(media_id,file_key) DO UPDATE SET
+ storage_kind=excluded.storage_kind,filename_token=excluded.filename_token,directory_id=excluded.directory_id,
+ canonical_path_key=NULL,relative_path=NULL,local_folder_location_id=NULL,
+ source_url=excluded.source_url,external_id=excluded.external_id,platform_id=excluded.platform_id,profile_id=excluded.profile_id,
+ title=excluded.title,filepath=excluded.filepath,filesize=excluded.filesize,mtime_ns=excluded.mtime_ns,
+ hash_algorithm=excluded.hash_algorithm,content_hash=excluded.content_hash,kind=excluded.kind,position=excluded.position,
+ duration=excluded.duration,detected_format=excluded.detected_format,width=excluded.width,height=excluded.height,
+ orientation=NULL,frame_count=NULL,page_count=NULL,primary_image_index=NULL,thumbnail_path=NULL,thumbnail_origin='none',preview_path=NULL,cache_key=NULL,image_engine_version=NULL,transform_version=NULL`
+		}
+		if _, err = tx.ExecContext(ctx, insertFile, mediaID, v.key, v.token, directoryID, v.source, v.metadata.ExternalID, platformID, profileID, v.metadata.Title, v.final, v.size, fmt.Sprint(v.mtime), v.hash, v.metadata.Kind, v.position, v.metadata.Duration, v.format, v.width, v.height, now); err != nil {
 			return 0, err
 		}
+	}
+	if preserveInstagram {
+		if err = removeReplacedInstagramFiles(ctx, tx, mediaID, files); err != nil {
+			return 0, err
+		}
+	}
+	if err = media.SyncInstagramProfileAlbums(ctx, tx, mediaID); err != nil {
+		return 0, err
 	}
 	if _, err = tx.ExecContext(ctx, "UPDATE media SET source_title=?,last_download_commit_attempt_id=?,revision=revision+1,updated_at=? WHERE id=?", files[0].metadata.Title, attempt, now, mediaID); err != nil {
 		return 0, err

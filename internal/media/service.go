@@ -222,7 +222,10 @@ func pageBounds(limit, offset int) (int, error) {
 }
 func placeholders(n int) string { return strings.TrimSuffix(strings.Repeat("?,", n), ",") }
 func filterSQL(req ListRequest) (string, []any, error) {
-	where := []string{"1=1"}
+	// Retain post records for history and re-download, while listing a fully
+	// collected post only through its profile album. Removing the album or a
+	// membership exposes the original source again.
+	where := []string{`NOT EXISTS(SELECT 1 FROM instagram_profile_source ips WHERE ips.source_media_id=m.id AND NOT EXISTS(SELECT 1 FROM media_file f WHERE f.media_id=m.id AND NOT EXISTS(SELECT 1 FROM user_album_file a JOIN media_file collected ON collected.id=a.file_id WHERE a.album_id=ips.album_id AND (a.file_id=f.id OR (f.external_id IS NOT NULL AND f.external_id<>'' AND collected.external_id=f.external_id)))))`}
 	args := []any{}
 	f := req.Filter
 	if len(f.Tags) > 100 || len(f.Platforms) > 100 || len(f.Authors) > 100 || len(f.Keyword) > 2000 || (f.TagMode != "" && f.TagMode != "and" && f.TagMode != "or") || (f.CreatedFrom != nil && f.CreatedTo != nil && *f.CreatedFrom > *f.CreatedTo) {

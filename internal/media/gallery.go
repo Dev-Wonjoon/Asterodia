@@ -43,14 +43,14 @@ func listGallery(ctx context.Context, q queryer, req ListRequest, where string, 
 	}
 	visibleWhere := ""
 	if hideFiles {
-		visibleWhere = " AND (EXISTS(SELECT 1 FROM gallery_pin WHERE media_id=m.id) OR NOT EXISTS(SELECT 1 FROM user_album_file a WHERE a.file_id=f.id))"
+		visibleWhere = " AND (EXISTS(SELECT 1 FROM gallery_pin WHERE media_id=m.id) OR NOT EXISTS(SELECT 1 FROM user_album_file a WHERE a.file_id=f.id AND NOT EXISTS(SELECT 1 FROM instagram_profile_album WHERE media_id=a.album_id)))"
 	}
 	viewWhere, forceFiles := "1=1", "0"
 	switch req.GalleryView {
 	case "albums":
 		viewWhere = "userAlbum=1"
 	case "files":
-		viewWhere, forceFiles = "userAlbum=0 AND visibleFiles>0", "1"
+		viewWhere, forceFiles = "(userAlbum=0 OR profileAlbum=1) AND visibleFiles>0", "1"
 	}
 	if pinFiles {
 		viewWhere += " AND (userAlbum=1 OR hasChildren=1 OR totalFiles=0 OR visibleFiles>0 OR pinnedAt IS NOT NULL)"
@@ -62,14 +62,16 @@ func listGallery(ctx context.Context, q queryer, req ListRequest, where string, 
 	if req.AlbumCards {
 		automaticExpansion = "0"
 	}
-	forced := "userAlbum=0 AND visibleFiles>0 AND (" + forceFiles + " OR (" + automaticExpansion + "))"
+	forced := "(userAlbum=0 OR profileAlbum=1) AND visibleFiles>0 AND (" + forceFiles + " OR (" + automaticExpansion + "))"
 	cte := fmt.Sprintf(`WITH candidates AS (
         SELECT m.id,m.created_at,(SELECT created_at FROM gallery_pin WHERE media_id=m.id) AS pinnedAt,
           EXISTS(SELECT 1 FROM user_album WHERE media_id=m.id) AS userAlbum,
+          EXISTS(SELECT 1 FROM instagram_profile_album WHERE media_id=m.id) AS profileAlbum,
           EXISTS(SELECT 1 FROM album_parent WHERE parent_id=m.id) AS hasChildren,
           m.id IN (SELECT value FROM json_each(?)) AS requestedExpanded,
           ((SELECT count(*) FROM media_file WHERE media_id=m.id)+(SELECT count(*) FROM user_album_file WHERE album_id=m.id)) AS totalFiles,
-          (SELECT count(*) FROM media_file f WHERE f.media_id=m.id%s%s) AS visibleFiles,
+          ((SELECT count(*) FROM media_file f WHERE f.media_id=m.id%s%s)+
+           (SELECT count(*) FROM user_album_file a JOIN media_file f ON f.id=a.file_id WHERE a.album_id=m.id AND EXISTS(SELECT 1 FROM instagram_profile_album WHERE media_id=m.id)%s%s)) AS visibleFiles,
           ((SELECT count(*) FROM media_file f WHERE f.media_id=m.id%s)+
            (SELECT count(*) FROM user_album_file a JOIN media_file f ON f.id=a.file_id WHERE a.album_id=m.id%s)) AS remainingFiles
         FROM media m WHERE %s
@@ -90,7 +92,7 @@ func listGallery(ctx context.Context, q queryer, req ListRequest, where string, 
     ), positioned AS (
         SELECT id,fileId,slots,userAlbum,expanded,canCollapse,pinnedAt IS NOT NULL AS pinned,coalesce(sum(slots) OVER (ORDER BY pinnedAt IS NOT NULL DESC,pinnedAt DESC,created_at DESC,id DESC,fileId DESC ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING),0) AS first
         FROM albums
-    ) `, visibleWhere, unpinnedWhere, unpinnedWhere, unpinnedWhere, where, pinEnabled, forced, forced, forced, viewWhere)
+    ) `, visibleWhere, unpinnedWhere, visibleWhere, unpinnedWhere, unpinnedWhere, unpinnedWhere, where, pinEnabled, forced, forced, forced, viewWhere)
 	params := append([]any{string(raw)}, args...)
 	var total int64
 	if err := q.QueryRowContext(ctx, cte+"SELECT coalesce(sum(slots),0) FROM positioned", params...).Scan(&total); err != nil {
@@ -181,7 +183,7 @@ func galleryFiles(ctx context.Context, q queryer, id int64, limit, offset int, h
 		args = append(args, pinnedFileID)
 	} else {
 		if hideFiles {
-			where += " AND NOT EXISTS(SELECT 1 FROM user_album_file a WHERE a.file_id=media_file.id)"
+			where += " AND NOT EXISTS(SELECT 1 FROM user_album_file a WHERE a.file_id=media_file.id AND NOT EXISTS(SELECT 1 FROM instagram_profile_album WHERE media_id=a.album_id))"
 		}
 		if excludePins {
 			where += " AND NOT EXISTS(SELECT 1 FROM gallery_pin p WHERE p.file_id=media_file.id)"

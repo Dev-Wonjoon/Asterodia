@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
 	"github.com/google/uuid"
 	whatwg "github.com/nlnwa/whatwg-url/url"
 )
@@ -141,6 +142,14 @@ func Migrate(ctx context.Context, db *sql.DB, options MigrationOptions) (Migrati
 	}
 	if result.FromVersion < 13 {
 		if _, err = conn.ExecContext(ctx, albumHierarchyDDL); err != nil {
+			return result, err
+		}
+	}
+	if result.FromVersion < 14 {
+		if _, err = conn.ExecContext(ctx, instagramProfileAlbumDDL); err != nil {
+			return result, err
+		}
+		if err = media.SyncInstagramProfileAlbums(ctx, conn, 0); err != nil {
 			return result, err
 		}
 	}

@@ -14,6 +14,9 @@ import (
 // Existing historical fixtures are reconstructed from current DDL. Strip the
 // complete v11 additions before applying their own older-version differences.
 func beforeAlbumSchema(name, table, ddl string) (string, bool) {
+	if strings.HasPrefix(name, "instagram_profile_") || strings.HasPrefix(name, "idx_instagram_profile_") {
+		return "", false
+	}
 	if name == "gallery_pin" || table == "gallery_pin" || name == "album_parent" || table == "album_parent" || strings.HasPrefix(name, "v13_") {
 		return "", false
 	}
@@ -435,10 +438,10 @@ func TestV10AlbumMigrationPreservesFilesAndBackup(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer upgraded.Close()
-	if countDB(t, upgraded, "PRAGMA user_version") != 13 || textDB(t, upgraded, "SELECT file_uuid FROM media_file WHERE id=7") != identity {
+	if countDB(t, upgraded, "PRAGMA user_version") != 14 || textDB(t, upgraded, "SELECT file_uuid FROM media_file WHERE id=7") != identity {
 		t.Fatal("migration lost identity")
 	}
-	backup := rawDB(t, textDB(t, upgraded, "SELECT backup_path FROM migration_run WHERE target_version=13"))
+	backup := rawDB(t, textDB(t, upgraded, "SELECT backup_path FROM migration_run WHERE target_version=14"))
 	if countDB(t, backup, "PRAGMA user_version") != 10 {
 		t.Fatal("backup not preserved")
 	}

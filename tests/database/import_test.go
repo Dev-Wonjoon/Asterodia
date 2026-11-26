@@ -141,7 +141,7 @@ func TestWailsImportAndReadOnlyHistory(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if result.SourceVersion != 13 || result.AddedMedia != 1 || result.AddedHistory != 1 {
+	if result.SourceVersion != 14 || result.AddedMedia != 1 || result.AddedHistory != 1 {
 		t.Fatal(result)
 	}
 	if before != fileDigest(t, sourcePath) {
