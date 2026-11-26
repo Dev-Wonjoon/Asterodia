@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -210,5 +211,109 @@ func TestParallelImportRejectsChangedResultBeforeOrderedCommit(t *testing.T) {
 	p = wait(t, f.service, p.Job.ID, "completed_with_errors")
 	if p.Job.Counts.Added != 3 || p.Job.Counts.Failed != 1 || p.Job.Counts.Processed != 4 || count(t, f, "SELECT count(*) FROM media_file WHERE title='0002.png'") != 0 {
 		t.Fatalf("changed speculative result was committed: %+v", p.Job.Counts)
+	}
+}
+
+func TestImportPipelineRefillsBeforeSlowBatchTailFinishes(t *testing.T) {
+	workers := max(1, runtime.NumCPU()/2)
+	if workers < 2 {
+		t.Skip("requires at least two import workers")
+	}
+	f := newFixture(t)
+	window := workers * 2
+	parallelFiles(t, f, window*3+1)
+	release, tailStarted, refilled := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	t.Cleanup(func() { once.Do(func() { close(release) }) })
+	original := f.inspect
+	f.inspect = func(ctx context.Context, path, kind string) (engine.LocalMetadata, error) {
+		switch filepath.Base(path) {
+		case fmt.Sprintf("%04d.png", window):
+			close(tailStarted)
+			select {
+			case <-release:
+			case <-ctx.Done():
+				return engine.LocalMetadata{}, ctx.Err()
+			}
+		case fmt.Sprintf("%04d.png", window+1):
+			close(refilled)
+		}
+		return original(ctx, path, kind)
+	}
+	p := scan(t, f)
+	ok(t, f.service.Run(t.Context(), localimport.Request{JobID: p.Job.ID}))
+	awaitInspections(t, tailStarted, 1)
+	// The next window starts while the previous window's last file is blocked.
+	awaitInspections(t, refilled, 1)
+	once.Do(func() { close(release) })
+	p = wait(t, f.service, p.Job.ID, "completed")
+	if p.Job.Counts.Added != window*3+1 {
+		t.Fatal(p.Job.Counts)
+	}
+}
+
+func TestSlowFolderDoesNotBlockLaterFolders(t *testing.T) {
+	workers := max(1, runtime.NumCPU()/2)
+	if workers < 2 {
+		t.Skip("requires at least two import workers")
+	}
+	f := newFixture(t)
+	write(t, filepath.Join(f.source, "00-slow", "0000.png"), []byte{1})
+	write(t, filepath.Join(f.source, "00-slow", "0001.png"), []byte{1})
+	lastFolder := fmt.Sprintf("folder-%03d", workers+2)
+	for i := 1; i <= workers+2; i++ {
+		write(t, filepath.Join(f.source, fmt.Sprintf("folder-%03d", i), "0000.png"), []byte{1})
+	}
+	release, blocked, lastStarted := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	t.Cleanup(func() { once.Do(func() { close(release) }) })
+	original := f.inspect
+	f.inspect = func(ctx context.Context, path, kind string) (engine.LocalMetadata, error) {
+		if filepath.Base(path) == "0001.png" {
+			close(blocked)
+			select {
+			case <-release:
+			case <-ctx.Done():
+				return engine.LocalMetadata{}, ctx.Err()
+			}
+		}
+		if filepath.Base(filepath.Dir(path)) == lastFolder {
+			close(lastStarted)
+		}
+		return original(ctx, path, kind)
+	}
+	p := scan(t, f)
+	ok(t, f.service.Run(t.Context(), localimport.Request{JobID: p.Job.ID}))
+	awaitInspections(t, blocked, 1)
+	awaitInspections(t, lastStarted, 1)
+	// Admission must advance beyond the initial active-folder window even while
+	// the first folder still has an unfinished ordered result.
+	once.Do(func() { close(release) })
+	p = wait(t, f.service, p.Job.ID, "completed")
+	if p.Job.Counts.Added != workers+4 || p.Job.Counts.CompletedFolders != workers+3 || count(t, f, "SELECT count(*) FROM media") != int64(workers+3) {
+		t.Fatal(p.Job.Counts)
+	}
+}
+
+func TestSharedImportBootstrapsAfterFirstFileFailure(t *testing.T) {
+	f := newFixture(t)
+	for _, folder := range []string{"one", "two"} {
+		for i := range 3 {
+			write(t, filepath.Join(f.source, folder, fmt.Sprintf("%04d.png", i)), []byte{1})
+		}
+	}
+	original := f.inspect
+	f.inspect = func(ctx context.Context, path, kind string) (engine.LocalMetadata, error) {
+		if filepath.Base(path) == "0000.png" {
+			return engine.LocalMetadata{}, fmt.Errorf("broken bootstrap candidate")
+		}
+		return original(ctx, path, kind)
+	}
+	p := run(t, f, scan(t, f))
+	if p.Job.Counts.Added != 4 || p.Job.Counts.Failed != 2 || p.Job.Counts.Processed != 6 || p.Job.Counts.FailedFolders != 2 || count(t, f, "SELECT count(*) FROM media") != 2 {
+		t.Fatal(p.Job.Counts)
+	}
+	if count(t, f, "SELECT count(*) FROM media_file WHERE (position=0 AND title='0001.png') OR (position=1 AND title='0002.png')") != 4 {
+		t.Fatal("failed bootstrap changed grouping or file order")
 	}
 }

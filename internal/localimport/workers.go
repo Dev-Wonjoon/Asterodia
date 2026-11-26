@@ -18,148 +18,255 @@ type inspection struct {
 	name    string
 	refresh bool
 	problem error
-	done    chan error
+	ready   bool
 }
 
-type importProgress struct {
-	lastMedia                  int64
-	lastNotify, lastPathUpdate time.Time
+// Folder queues and database access belong to the coordinator. Workers own a
+// target until its result arrives; each folder commits in natural file order.
+type importFolder struct {
+	base                    target
+	afterKey, afterID       string
+	bootstrapped, exhausted bool
+	pending                 []*inspection
+	lastMedia               int64
+	lastNotify              time.Time
 }
 
-func (s *Service) pendingInspections(ctx context.Context, base target, limit int) ([]*inspection, error) {
-	// Bootstrap a new group's first successful checkpoint before inspecting its
-	// remaining files. All prepared targets must capture the same import media ID.
-	var mediaID int64
-	err := s.db.QueryRowContext(ctx, "SELECT coalesce(import_media_id,0) FROM media_directory WHERE directory_key=? AND key_version=1", base.key).Scan(&mediaID)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
+type inspectionResult struct {
+	item *inspection
+	err  error
+}
+
+func (s *Service) nextImportFolder(ctx context.Context, job string, after int64) (*importFolder, int64, error) {
+	f := &importFolder{}
+	var row, mediaID int64
+	err := s.db.QueryRowContext(ctx, `SELECT f.rowid,f.id,f.current_attempt_id,f.directory_path,f.directory_key,coalesce(d.import_media_id,0)
+ FROM local_import_folder f LEFT JOIN media_directory d ON d.directory_key=f.directory_key AND d.key_version=1
+ WHERE f.job_id=? AND f.state IN ('pending','running','interrupted') AND f.rowid>?
+ ORDER BY f.rowid LIMIT 1`, job, after).Scan(&row, &f.base.folder, &f.base.attempt, &f.base.path, &f.base.key, &mediaID)
+	if err == sql.ErrNoRows {
+		return nil, after, nil
 	}
-	if mediaID == 0 {
-		limit = 1
+	if err != nil {
+		return nil, after, err
 	}
-	rows, err := s.db.QueryContext(ctx, "SELECT id,relative_path,expected_stat_json,refresh_requested FROM local_import_target WHERE attempt_id=? AND state='pending' ORDER BY sort_key,id LIMIT ?", base.attempt, limit)
+	f.bootstrapped = mediaID != 0
+	_, err = s.db.ExecContext(ctx, "UPDATE local_import_folder SET state='running' WHERE id=?", f.base.folder)
+	return f, row, err
+}
+
+func (s *Service) nextInspection(ctx context.Context, root string, f *importFolder) (*inspection, error) {
+	item := &inspection{target: f.base}
+	var raw, key string
+	err := s.db.QueryRowContext(ctx, `SELECT id,relative_path,expected_stat_json,refresh_requested,sort_key
+ FROM local_import_target WHERE attempt_id=? AND state='pending' AND (sort_key,id)>(?,?)
+ ORDER BY sort_key,id LIMIT 1`, f.base.attempt, f.afterKey, f.afterID).Scan(&item.target.id, &item.name, &raw, &item.refresh, &key)
+	if err == sql.ErrNoRows {
+		f.exhausted = true
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var batch []*inspection
-	for rows.Next() {
-		item := &inspection{target: base, done: make(chan error, 1)}
-		var raw string
-		if err = rows.Scan(&item.target.id, &item.name, &raw, &item.refresh); err != nil {
-			return nil, err
-		}
-		if err = json.Unmarshal([]byte(raw), &item.target.state); err != nil {
-			return nil, err
-		}
-		item.target.expectedSize = item.target.state.Size
-		batch = append(batch, item)
+	if err = json.Unmarshal([]byte(raw), &item.target.state); err != nil {
+		return nil, err
 	}
-	return batch, rows.Err()
+	f.afterKey, f.afterID = key, item.target.id
+	t := &item.target
+	t.expectedSize = t.state.Size
+	if filepath.Base(item.name) != item.name || item.name == "." || !filepath.IsLocal(item.name) || t.state.Path != filepath.Join(t.path, item.name) {
+		item.problem = fileError(fmt.Errorf("파일의 탐색 경로가 일치하지 않습니다"))
+	} else {
+		item.problem = s.prepareTarget(ctx, root, t, item.refresh)
+	}
+	var failure *fileFailure
+	if item.problem != nil && !errors.As(item.problem, &failure) {
+		return nil, item.problem
+	}
+	return item, nil
 }
 
-func (s *Service) runFolder(ctx context.Context, job, root string, base target, workers int) error {
-	progress := importProgress{}
+func (s *Service) commitInspection(ctx context.Context, job, root string, f *importFolder, item *inspection) error {
+	t := &item.target
+	err := item.problem
+	if err == nil {
+		err = s.commitTarget(ctx, job, root, t)
+	}
+	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		var failure *fileFailure
+		if !errors.As(err, &failure) {
+			return err
+		}
+		return s.recordFailure(ctx, job, t.id, t.expectedSize, err)
+	}
+	// A new group's next file must see the first successful checkpoint's group
+	// ID. Failed/foreign files do not bootstrap a group.
+	if t.mediaID > 0 {
+		f.bootstrapped = true
+		if s.notify != nil && (f.lastMedia != t.mediaID || time.Since(f.lastNotify) >= 500*time.Millisecond) {
+			s.notify(t.mediaID)
+			f.lastNotify = time.Now()
+		}
+		f.lastMedia = t.mediaID
+	}
+	return nil
+}
+
+func (s *Service) runInspections(ctx context.Context, job, root string, workers int) error {
+	work, cancel := context.WithCancel(ctx)
+	window := workers * 2
+	jobs := make(chan *inspection, window)
+	results := make(chan inspectionResult, window)
+	var wg sync.WaitGroup
+	for range workers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-work.Done():
+					return
+				case item := <-jobs:
+					if work.Err() != nil {
+						return
+					}
+					err := item.problem
+					if err == nil {
+						err = s.inspectTarget(work, root, &item.target)
+					}
+					select {
+					case results <- inspectionResult{item, err}:
+					case <-work.Done():
+						return
+					}
+				}
+			}
+		}()
+	}
+	// Join all decoders before publishing a terminal state. Pending database
+	// checkpoints remain resumable after pause, cancellation and Close.
+	defer func() { cancel(); wg.Wait() }()
+
+	// Bound both folder contexts and queued/running/completed targets. Fair
+	// per-folder windows keep a slow ordered result from monopolizing the queue.
+	folders := make([]*importFolder, workers)
+	var afterFolder int64
+	var allFolders bool
+	var outstanding, dispatchNext, commitNext int
+	var lastPathUpdate time.Time
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		// At most two targets per worker exist in memory, including completed
-		// results waiting for an earlier file. No unbounded reorder buffer.
-		batch, err := s.pendingInspections(ctx, base, workers*2)
-		if err != nil {
-			return err
-		}
-		if len(batch) == 0 {
-			break
-		}
-		for _, item := range batch {
-			t := &item.target
-			if filepath.Base(item.name) != item.name || item.name == "." || !filepath.IsLocal(item.name) || t.state.Path != filepath.Join(t.path, item.name) {
-				item.problem = fileError(fmt.Errorf("파일의 탐색 경로가 일치하지 않습니다"))
-			} else {
-				item.problem = s.prepareTarget(ctx, root, t, item.refresh)
+		for i, f := range folders {
+			if f != nil && f.exhausted && len(f.pending) == 0 {
+				if err := s.completeFolder(ctx, job, f.base.folder, f.base.attempt); err != nil {
+					return err
+				}
+				if f.lastMedia > 0 && s.notify != nil {
+					s.notify(f.lastMedia)
+				}
+				folders[i] = nil
 			}
-			var failure *fileFailure
-			if item.problem != nil && !errors.As(item.problem, &failure) {
-				return item.problem
+			if folders[i] == nil && !allFolders {
+				next, row, err := s.nextImportFolder(ctx, job, afterFolder)
+				if err != nil {
+					return err
+				}
+				folders[i], afterFolder = next, row
+				allFolders = next == nil
 			}
 		}
-		if err = s.inspectBatch(ctx, job, root, batch, workers, &progress); err != nil {
-			return err
+		activeFolders := 0
+		for _, f := range folders {
+			if f != nil {
+				activeFolders++
+			}
 		}
-	}
-	if progress.lastMedia > 0 && s.notify != nil {
-		s.notify(progress.lastMedia)
-	}
-	return nil
-}
+		if allFolders && activeFolders == 0 {
+			return nil
+		}
+		perFolder := max(2, window/max(1, activeFolders))
+		finishedFolder := false
+		for outstanding < window {
+			advanced := false
+			for n := range len(folders) {
+				i := (dispatchNext + n) % len(folders)
+				f := folders[i]
+				if f == nil || f.exhausted || len(f.pending) >= perFolder || (!f.bootstrapped && len(f.pending) != 0) {
+					continue
+				}
+				item, err := s.nextInspection(ctx, root, f)
+				if err != nil {
+					return err
+				}
+				advanced = true
+				dispatchNext = (i + 1) % len(folders)
+				if item == nil {
+					finishedFolder = len(f.pending) == 0 || finishedFolder
+					break
+				}
+				f.pending = append(f.pending, item)
+				outstanding++
+				path := filepath.Join(item.target.path, item.name)
+				s.setCurrentPath(job, path)
+				if time.Since(lastPathUpdate) >= 200*time.Millisecond {
+					if _, err = s.db.ExecContext(ctx, "UPDATE local_import_job SET current_path=?,updated_at=?,revision=revision+1 WHERE id=?", path, time.Now().UnixMilli(), job); err != nil {
+						return err
+					}
+					lastPathUpdate = time.Now()
+				}
+				select {
+				case jobs <- item:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+				break
+			}
+			if !advanced {
+				break
+			}
+		}
 
-func (s *Service) inspectBatch(ctx context.Context, job, root string, batch []*inspection, workers int, progress *importProgress) error {
-	work, cancel := context.WithCancel(ctx)
-	jobs := make(chan *inspection, len(batch))
-	for _, item := range batch {
-		jobs <- item
-	}
-	close(jobs)
-	var wg sync.WaitGroup
-	for range min(workers, len(batch)) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for item := range jobs {
-				if work.Err() != nil {
-					return
-				}
-				err := item.problem
-				if err == nil {
-					err = s.inspectTarget(work, root, &item.target)
-				}
-				item.done <- err
+		// Commit one ready ordered result, then refill its slot before the next
+		// database write. Unrelated folders need not wait for a slow result.
+	collect:
+		for {
+			select {
+			case result := <-results:
+				result.item.problem, result.item.ready = result.err, true
+			default:
+				break collect
 			}
-		}()
-	}
-	// Cancellation/fatal errors join every worker before the job becomes
-	// resumable or Close returns. Uncommitted targets stay pending on disk.
-	defer func() { cancel(); wg.Wait() }()
-	for _, item := range batch {
-		// Only the coordinator accesses this target after receiving its result.
-		path := filepath.Join(item.target.path, item.name)
-		s.setCurrentPath(job, path)
-		if time.Since(progress.lastPathUpdate) >= 200*time.Millisecond {
-			if _, err := s.db.ExecContext(ctx, "UPDATE local_import_job SET current_path=?,updated_at=?,revision=revision+1 WHERE id=?", path, time.Now().UnixMilli(), job); err != nil {
+		}
+		committed := false
+		for n := range len(folders) {
+			i := (commitNext + n) % len(folders)
+			f := folders[i]
+			if f == nil || len(f.pending) == 0 || !f.pending[0].ready {
+				continue
+			}
+			if err := s.commitInspection(ctx, job, root, f, f.pending[0]); err != nil {
 				return err
 			}
-			progress.lastPathUpdate = time.Now()
+			f.pending[0] = nil
+			f.pending = f.pending[1:]
+			outstanding--
+			commitNext = (i + 1) % len(folders)
+			committed = true
+			break
 		}
-		var err error
+		if committed || finishedFolder || outstanding == 0 {
+			continue
+		}
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case err = <-item.done:
-		}
-		t := &item.target
-		if err == nil {
-			err = s.commitTarget(ctx, job, root, t)
-		}
-		if err != nil {
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
-			var failure *fileFailure
-			if !errors.As(err, &failure) {
-				return err
-			}
-			if err = s.recordFailure(ctx, job, t.id, t.expectedSize, err); err != nil {
-				return err
-			}
-		} else if t.mediaID > 0 && s.notify != nil {
-			if progress.lastMedia != t.mediaID || time.Since(progress.lastNotify) >= 500*time.Millisecond {
-				s.notify(t.mediaID)
-				progress.lastNotify = time.Now()
-			}
-			progress.lastMedia = t.mediaID
+		case result := <-results:
+			result.item.problem, result.item.ready = result.err, true
 		}
 	}
-	return nil
 }

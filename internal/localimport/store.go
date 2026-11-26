@@ -41,34 +41,11 @@ func (s *Service) run(ctx context.Context, job string) {
 		s.stopWork(ctx, job, err)
 		return
 	}
-	for {
-		if err := ctx.Err(); err != nil {
-			s.stopWork(ctx, job, err)
-			return
-		}
-		var folder, attempt, path, key string
-		err := s.db.QueryRowContext(ctx, `SELECT id,current_attempt_id,directory_path,directory_key FROM local_import_folder WHERE job_id=? AND state IN ('pending','running','interrupted') ORDER BY rowid LIMIT 1`, job).Scan(&folder, &attempt, &path, &key)
-		if err == sql.ErrNoRows {
-			s.complete(ctx, job, "completed")
-			return
-		}
-		if err != nil {
-			s.stopWork(ctx, job, err)
-			return
-		}
-		if _, err = s.db.ExecContext(ctx, "UPDATE local_import_folder SET state='running' WHERE id=?", folder); err != nil {
-			s.stopWork(ctx, job, err)
-			return
-		}
-		if err = s.runFolder(ctx, job, root, target{folder: folder, attempt: attempt, path: path, key: key}, workers); err != nil {
-			s.stopWork(ctx, job, err)
-			return
-		}
-		if err = s.completeFolder(ctx, job, folder, attempt); err != nil {
-			s.stopWork(ctx, job, err)
-			return
-		}
+	if err := s.runInspections(ctx, job, root, workers); err != nil {
+		s.stopWork(ctx, job, err)
+		return
 	}
+	s.complete(ctx, job, "completed")
 }
 func hashFile(ctx context.Context, path string) (string, error) {
 	f, err := os.Open(path)

@@ -7,7 +7,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -69,6 +71,54 @@ func TestPauseResumeWithinOneFolderPreservesEdits(t *testing.T) {
 	}
 	if count(t, f, "SELECT count(*) FROM media WHERE id=? AND custom_title=?", id, title) != 1 || count(t, f, "SELECT count(*) FROM media_file WHERE id=?", fileID) != 1 {
 		t.Fatal("기존 편집 또는 파일 ID 유실")
+	}
+}
+
+func TestPauseResumeAcrossFoldersJoinsSharedWorkers(t *testing.T) {
+	workers := max(1, runtime.NumCPU()/2)
+	if workers < 2 {
+		t.Skip("requires at least two import workers")
+	}
+	f := newFixture(t)
+	total := workers + 2
+	for i := range total {
+		write(t, filepath.Join(f.source, fmt.Sprintf("%03d", i), "file.png"), []byte{1})
+	}
+	original := f.inspect
+	entered := make(chan struct{}, total)
+	var active, peak atomic.Int32
+	f.inspect = func(ctx context.Context, path, kind string) (engine.LocalMetadata, error) {
+		if filepath.Base(filepath.Dir(path)) == "000" {
+			return original(ctx, path, kind)
+		}
+		n := active.Add(1)
+		defer active.Add(-1)
+		for old := peak.Load(); n > old && !peak.CompareAndSwap(old, n); old = peak.Load() {
+		}
+		entered <- struct{}{}
+		<-ctx.Done()
+		return engine.LocalMetadata{}, ctx.Err()
+	}
+	p := scan(t, f)
+	ok(t, f.service.Run(t.Context(), localimport.Request{JobID: p.Job.ID}))
+	awaitInspections(t, entered, workers)
+	if active.Load() != int32(workers) || peak.Load() != int32(workers) {
+		t.Fatalf("shared workers: active=%d peak=%d", active.Load(), peak.Load())
+	}
+	ok(t, f.service.Pause(t.Context(), localimport.Request{JobID: p.Job.ID}))
+	p = wait(t, f.service, p.Job.ID, "paused")
+	if active.Load() != 0 || p.Job.Counts.Added != 1 {
+		t.Fatalf("pause left workers or lost checkpoint: active=%d counts=%+v", active.Load(), p.Job.Counts)
+	}
+	first := count(t, f, "SELECT id FROM media_file")
+	f.inspect = original
+	ok(t, f.service.Resume(t.Context(), localimport.Request{JobID: p.Job.ID}))
+	p = wait(t, f.service, p.Job.ID, "completed")
+	if p.Job.Counts.Added != total || p.Job.Counts.Processed != total || p.Job.Counts.CompletedFolders != total || f.calls.Load() != int32(total) {
+		t.Fatal(p.Job.Counts)
+	}
+	if count(t, f, "SELECT count(*) FROM media_file WHERE id=?", first) != 1 || count(t, f, "SELECT count(DISTINCT file_uuid) FROM media_file") != int64(total) || count(t, f, "SELECT count(*) FROM pragma_foreign_key_check()") != 0 {
+		t.Fatal("resume lost a checkpoint, duplicated a file or broke a foreign key")
 	}
 }
 

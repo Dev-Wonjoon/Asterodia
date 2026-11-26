@@ -120,6 +120,19 @@ func TestCancelKeepsCompletedFolders(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("두 번째 폴더 검사 대기 실패")
 	}
+	// Different folders now inspect concurrently. The second inspection starting
+	// no longer implies the first folder's durable completion checkpoint exists.
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		current := ok(t, f.service.Get(t.Context(), localimport.Request{JobID: p.Job.ID})).(localimport.Page)
+		if current.Job.Counts.CompletedFolders == 1 && current.Job.Counts.Added == 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("첫 번째 폴더 완료 체크포인트 대기 실패", current.Job)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 	ok(t, f.service.Cancel(t.Context(), localimport.Request{JobID: p.Job.ID}))
 	p = wait(t, f.service, p.Job.ID, "cancelled")
 	if p.Job.Counts.CompletedFolders != 1 || p.Job.Counts.Added != 1 || count(t, f, "SELECT count(*) FROM media_file") != 1 {
