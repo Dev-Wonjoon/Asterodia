@@ -146,7 +146,7 @@ func objects(ctx context.Context, q queryer, stmt string, args ...any) ([]Object
 	return result, rows.Err()
 }
 
-const summarySQL = `SELECT m.id,m.source_kind AS sourceKind,u.url AS requestUrl,m.source_title AS sourceTitle,m.custom_title AS customTitle,coalesce(nullif(m.custom_title,''),nullif(m.source_title,''),'제목 없음') AS title,m.revision,m.cover_mode AS coverMode,m.created_at AS createdAt,m.updated_at AS updatedAt,((SELECT count(*) FROM media_file WHERE media_id=m.id)+(SELECT count(*) FROM user_album_file WHERE album_id=m.id)) AS fileCount,(SELECT count(*) FROM media_file WHERE media_id=m.id AND storage_kind='app_managed') AS managedFileCount,EXISTS(SELECT 1 FROM user_album a WHERE a.media_id=m.id) AS isUserAlbum,EXISTS(SELECT 1 FROM favorite WHERE media_id=m.id) AS isFavorite FROM media m LEFT JOIN download_urls u ON u.id=m.request_url_id`
+const summarySQL = `SELECT m.id,m.source_kind AS sourceKind,u.url AS requestUrl,m.source_title AS sourceTitle,m.custom_title AS customTitle,coalesce(nullif(m.custom_title,''),nullif(m.source_title,''),'제목 없음') AS title,m.revision,m.cover_mode AS coverMode,m.created_at AS createdAt,m.updated_at AS updatedAt,((SELECT count(*) FROM media_file WHERE media_id=m.id)+(SELECT count(*) FROM user_album_file WHERE album_id=m.id)) AS fileCount,(SELECT count(*) FROM media_file WHERE media_id=m.id AND storage_kind='app_managed') AS managedFileCount,EXISTS(SELECT 1 FROM user_album a WHERE a.media_id=m.id) AS isUserAlbum,EXISTS(SELECT 1 FROM instagram_profile_album ipa WHERE ipa.media_id=m.id) AS isProfileAlbum,EXISTS(SELECT 1 FROM favorite WHERE media_id=m.id) AS isFavorite FROM media m LEFT JOIN download_urls u ON u.id=m.request_url_id`
 
 func summary(ctx context.Context, q queryer, id int64) (Object, error) {
 	rows, err := objects(ctx, q, summarySQL+" WHERE m.id=?", id)
@@ -164,6 +164,7 @@ func summary(ctx context.Context, q queryer, id int64) (Object, error) {
 	}
 	obj["isPinned"] = pinned
 	obj["isUserAlbum"] = obj["isUserAlbum"] == int64(1)
+	obj["isProfileAlbum"] = obj["isProfileAlbum"] == int64(1)
 	var parent sql.NullInt64
 	var children int64
 	if err = q.QueryRowContext(ctx, "SELECT (SELECT parent_id FROM album_parent WHERE album_id=?),(SELECT count(*) FROM album_parent WHERE parent_id=?)", id, id).Scan(&parent, &children); err != nil {

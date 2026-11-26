@@ -62,7 +62,7 @@ func listGallery(ctx context.Context, q queryer, req ListRequest, where string, 
 	if req.AlbumCards {
 		automaticExpansion = "0"
 	}
-	forced := "(userAlbum=0 OR profileAlbum=1) AND visibleFiles>0 AND (" + forceFiles + " OR (" + automaticExpansion + "))"
+	forced := "(userAlbum=0 OR (profileAlbum=1 AND " + forceFiles + ")) AND visibleFiles>0 AND (" + forceFiles + " OR (" + automaticExpansion + "))"
 	cte := fmt.Sprintf(`WITH candidates AS (
         SELECT m.id,m.created_at,(SELECT created_at FROM gallery_pin WHERE media_id=m.id) AS pinnedAt,
           EXISTS(SELECT 1 FROM user_album WHERE media_id=m.id) AS userAlbum,
@@ -133,7 +133,7 @@ func listGallery(ctx context.Context, q queryer, req ListRequest, where string, 
 		first, slots := int(slice["first"].(int64)), int(slice["slots"].(int64))
 		start, end := max(0, offset-first), min(slots, offset+limit-first)
 		var files []Object
-		files, err = galleryFiles(ctx, q, id, end-start, start, hideFiles && slice["userAlbum"] == int64(0) && album["isPinned"] != true, pinFiles, slice["fileId"].(int64))
+		files, err = galleryFiles(ctx, q, id, end-start, start, hideFiles && (slice["userAlbum"] == int64(0) || (album["isProfileAlbum"] == true && req.GalleryView == "files")) && album["isPinned"] != true, pinFiles, slice["fileId"].(int64))
 		if err != nil {
 			return failure(err)
 		}

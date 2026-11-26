@@ -112,6 +112,23 @@ func TestInstagramProfileAlbumsAppendAndPreserveSources(t *testing.T) {
 	if found != 4 {
 		t.Fatal("file-only view lost profile files", files)
 	}
+	showCollected := false
+	filtered := albumObject(t, catalog.List(t.Context(), media.ListRequest{Gallery: true, GalleryView: "files", ShowAlbumFiles: &showCollected, Limit: 100}))
+	visible := []int64{}
+	for _, row := range filtered["data"].([]media.Object) {
+		if row["id"] == album {
+			visible = append(visible, row["galleryFile"].(media.Object)["id"].(int64))
+		}
+	}
+	if fmt.Sprint(visible) != "[2 100]" {
+		t.Fatal("file view ignored collected-file visibility", visible)
+	}
+	collapsed := albumObject(t, catalog.List(t.Context(), media.ListRequest{Gallery: true, ShowAlbumFiles: &showCollected, Limit: 100}))
+	for _, row := range collapsed["data"].([]media.Object) {
+		if row["id"] == album && row["galleryFile"] != nil {
+			t.Fatal("profile album expanded automatically")
+		}
+	}
 	assertHealthyDB(t, db)
 }
 
