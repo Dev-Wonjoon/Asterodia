@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
 	"github.com/google/uuid"
 )
 

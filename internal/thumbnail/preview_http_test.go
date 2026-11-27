@@ -22,7 +22,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/database"
+	"github.com/Dev-Wonjoon/Asterodia/internal/database"
 )
 
 func TestPreviewBlocksNonPublicAddresses(t *testing.T) {

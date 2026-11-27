@@ -3,7 +3,7 @@ import type { AppMenu } from '../navigation'
 import { useEffect, useState, type ReactNode } from 'react'
 import { SidebarItem } from '@renderer/app/layouts/SidebarItem'
 import { useTheme } from '@renderer/shared/hooks/useTheme'
-import appIcon from '@renderer/assets/icon.ico?url'
+import { BrandMark } from '@renderer/shared/components/BrandMark'
 import { Download, Moon, PanelLeftClose, PanelLeftOpen, Settings, Sun, TextCursorInput, Grid2X2 } from 'lucide-react'
 import { useActionDisplay } from '@renderer/shared/hooks/useActionDisplay'
 import { useDownloadViewModel } from '@renderer/features/download/useDownloadViewModel'
@@ -115,16 +115,10 @@ export const Sidebar = ({
             >
                 {!collapsed && (
                     <div className="flex-1 min-w-0 flex items-center gap-2">
-                        <img
-                            src={appIcon}
-                            alt=""
-                            width={28}
-                            height={28}
-                            className="size-7 shrink-0 object-contain"
-                        />
+                        <BrandMark className="size-7 text-[var(--text-main)]" />
 
                         <h1 className="text-base font-bold whitespace-nowrap text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
-                            Storage Bucket
+                            Asterodia
                         </h1>
                     </div>
                 )}

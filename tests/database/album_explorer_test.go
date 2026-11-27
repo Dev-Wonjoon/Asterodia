@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/database"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/database"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
 )
 
 func albumParent(id int64) *int64 { return &id }

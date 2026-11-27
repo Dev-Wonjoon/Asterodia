@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
 )
 
 func (s *Service) GetContentFilters() media.ContentFilters {

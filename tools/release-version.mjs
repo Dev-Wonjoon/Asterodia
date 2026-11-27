@@ -47,7 +47,7 @@ export function versionResources(root = repository) {
     }
     files.set(infoName, JSON.stringify(info, null, '\t') + '\n')
     const manifest = 'build/windows/wails.exe.manifest'
-    files.set(manifest, replaceOne(read(manifest), /(<assemblyIdentity type="win32" name="com\.storagebucket\.app" version=")[^"]+/, (_, before) => `${before}${numeric}`, manifest))
+    files.set(manifest, replaceOne(read(manifest), /(<assemblyIdentity type="win32" name="com\.asterodia\.app" version=")[^"]+/, (_, before) => `${before}${numeric}`, manifest))
     for (const msix of ['build/windows/msix/app_manifest.xml', 'build/windows/msix/template.xml']) {
         files.set(msix, replaceOne(read(msix), /(\bVersion=")[^"]+/, (_, before) => `${before}${numeric}`, msix))
     }

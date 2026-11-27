@@ -3,7 +3,7 @@ package webserver_test
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/webserver"
+	"github.com/Dev-Wonjoon/Asterodia/internal/webserver"
 	"io"
 	"net/http"
 	"strings"

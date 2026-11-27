@@ -70,7 +70,7 @@ function listQuery(fetcher: Awaited<ReturnType<typeof setup>>) {
 }
 async function intersect() { await act(async () => { observers.findLast(item => item.active)!.callback([{ isIntersecting: true }]); await flush() }) }
 it('opens the shared album explorer over HTTP and keeps album searches separate from the original gallery search', async () => {
-    localStorage.setItem('storagebucket:expanded-albums:v1', JSON.stringify([1, 2]))
+    localStorage.setItem('asterodia:expanded-albums:v1', JSON.stringify([1, 2]))
     const fetcher = await setup()
     expect(listQuery(fetcher).get('albumCards')).toBe('1')
     expect(listQuery(fetcher).get('expanded')).toBe('')
@@ -97,7 +97,7 @@ it('manages shared hidden sites and tags from an empty list and refreshes the we
     }
     await add('숨길 사이트', 'YouTube')
     const post = fetcher.mock.calls.find(([, options]) => options?.method === 'POST')!
-    expect(post[1]?.headers).toEqual({ 'Content-Type': 'application/json', 'X-StorageBucket-CSRF': 'content-csrf' })
+    expect(post[1]?.headers).toEqual({ 'Content-Type': 'application/json', 'X-Asterodia-CSRF': 'content-csrf' })
     expect(JSON.parse(String(post[1]?.body))).toEqual({ hiddenPlatforms: ['YouTube'], hiddenTags: [] })
     expect(document.querySelector('[aria-label="YouTube 숨김 해제"]')).not.toBeNull()
     expect(document.querySelectorAll('article')).toHaveLength(0)

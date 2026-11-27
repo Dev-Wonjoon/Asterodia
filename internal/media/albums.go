@@ -8,7 +8,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
 )
 
 const albumFileWhere = `(media_id=? OR id IN (SELECT file_id FROM user_album_file WHERE album_id=?))`

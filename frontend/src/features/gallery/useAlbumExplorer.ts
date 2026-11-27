@@ -1,3 +1,4 @@
+import { readPreference } from '../../../../internal/webserver/web/preferences.js'
 import { useEffect, useRef, useState } from 'react'
 import { getApi } from '@renderer/shared/api'
 import { translate, translateError } from '@renderer/shared/i18n'
@@ -13,7 +14,7 @@ const defaults = (): ExplorerPreferences => ({ mode: 'icons', iconSize: 160, sor
 export function readExplorerPreferences(id: number): ExplorerPreferences {
     const value = defaults()
     try {
-        const saved = JSON.parse(localStorage.getItem('storagebucket:album-view:' + id) ?? 'null')
+        const saved = JSON.parse(readPreference('asterodia:album-view:' + id) ?? 'null')
         if (!saved) return value
         if (['icons', 'list', 'details'].includes(saved.mode)) value.mode = saved.mode
         if (typeof saved.iconSize === 'number' && Number.isFinite(saved.iconSize)) value.iconSize = Math.max(80, Math.min(240, saved.iconSize))
@@ -29,7 +30,7 @@ export function useExplorerPreferences(id: number) {
     function update(change: Partial<ExplorerPreferences>) {
         setPreferences(previous => {
             const next = { ...previous, ...change }
-            try { localStorage.setItem('storagebucket:album-view:' + id, JSON.stringify(next)) } catch { /* Viewing remains available without browser storage. */ }
+            try { localStorage.setItem('asterodia:album-view:' + id, JSON.stringify(next)) } catch { /* Viewing remains available without browser storage. */ }
             return next
         })
     }

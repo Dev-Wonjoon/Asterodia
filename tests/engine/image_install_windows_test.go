@@ -11,12 +11,12 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 	"golang.org/x/sys/windows"
 )
 
 func TestImageEngineInstallation(t *testing.T) {
-	if os.Getenv("STORAGEBUCKET_IMAGE_INSTALL_TEST") != "1" {
+	if os.Getenv("ASTERODIA_IMAGE_INSTALL_TEST") != "1" {
 		t.Skip("공식 배포본 다운로드 검증은 명시적으로 실행합니다")
 	}
 	root := engineTestRoot(t, "engine-parsers")

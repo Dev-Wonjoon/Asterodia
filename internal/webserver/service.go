@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/mediaedit"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/download"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/mediaedit"
 	"github.com/google/uuid"
 )
 

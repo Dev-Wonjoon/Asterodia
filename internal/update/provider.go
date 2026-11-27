@@ -45,17 +45,25 @@ func MatchAsset(req updater.CheckRequest, assets []github.ReleaseAsset) int {
 	if req.Platform != "windows" || (req.Arch != "amd64" && req.Arch != "arm64") {
 		return -1
 	}
-	want := "StorageBucket-windows-" + req.Arch + ".exe"
-	matched := -1
-	for i, asset := range assets {
-		if asset.Name == want {
-			if matched != -1 {
-				return -1
+	// New releases include an identical legacy alias for pre-rename clients.
+	// Prefer the Asterodia asset, while still accepting pre-rename releases.
+	selected := -1
+	for _, name := range []string{"Asterodia", "StorageBucket"} {
+		want := name + "-windows-" + req.Arch + ".exe"
+		matched := -1
+		for i, asset := range assets {
+			if asset.Name == want {
+				if matched != -1 {
+					return -1
+				}
+				matched = i
 			}
-			matched = i
+		}
+		if selected == -1 {
+			selected = matched
 		}
 	}
-	return matched
+	return selected
 }
 
 func (p *Provider) Name() string { return p.source.Name() }

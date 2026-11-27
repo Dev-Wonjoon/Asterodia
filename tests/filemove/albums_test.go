@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/filemove"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/filemove"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
 )
 
 func TestMergeAndGatherCreatesOneRecoverableJob(t *testing.T) {

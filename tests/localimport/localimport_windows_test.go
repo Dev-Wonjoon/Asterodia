@@ -16,11 +16,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/database"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/localimport"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/database"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/localimport"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
 )
 
 type inspectFunc func(context.Context, string, string) (engine.LocalMetadata, error)
@@ -39,7 +39,7 @@ type fixture struct {
 
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
-	base := os.Getenv("STORAGEBUCKET_TEST_ROOT")
+	base := os.Getenv("ASTERODIA_TEST_ROOT")
 	if !filepath.IsAbs(base) {
 		t.Fatal("격리된 테스트 경로가 필요합니다")
 	}
@@ -160,7 +160,7 @@ func TestRecursiveMixedMediaAndNaturalOrder(t *testing.T) {
 		write(t, filepath.Join(f.source, filepath.FromSlash(name)), data)
 	}
 	write(t, filepath.Join(f.source, "notes.txt"), []byte("not media"))
-	write(t, filepath.Join(f.source, ".storagebucket", "ignored.png"), data)
+	write(t, filepath.Join(f.source, ".asterodia", "ignored.png"), data)
 	p := scan(t, f)
 	if p.Job.Counts.Discovered != 6 || p.Job.Counts.Excluded != 2 {
 		t.Fatalf("탐색 집계: %+v", p.Job.Counts)

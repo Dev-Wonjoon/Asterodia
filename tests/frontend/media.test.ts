@@ -5,17 +5,17 @@ import { isHttpUrl } from '@renderer/shared/utils/url'
 describe('local media URLs', () => {
     it('preserves reserved filename characters and Unicode on Windows', () => {
         const filepath = 'C:\\사진\\a #1%?.jpg'
-        const url = new URL(toMediaUrl(filepath)!, 'http://storagebucket.local')
+        const url = new URL(toMediaUrl(filepath)!, 'http://asterodia.local')
         expect(url.pathname).toBe('/media')
         expect(url.hash).toBe('')
         expect(url.searchParams.get('path')).toBe(filepath)
     })
     it('preserves absolute POSIX paths', () => {
-        expect(new URL(toMediaUrl('/home/user/photo.jpg')!, 'http://storagebucket.local').searchParams.get('path')).toBe('/home/user/photo.jpg')
+        expect(new URL(toMediaUrl('/home/user/photo.jpg')!, 'http://asterodia.local').searchParams.get('path')).toBe('/home/user/photo.jpg')
     })
     it('preserves UNC path separators', () => {
         const path = '\\\\server\\share\\a.jpg'
-        expect(new URL(toMediaUrl(path)!, 'http://storagebucket.local').searchParams.get('path')).toBe(path)
+        expect(new URL(toMediaUrl(path)!, 'http://asterodia.local').searchParams.get('path')).toBe(path)
     })
     it('handles missing thumbnails', () => {
         expect(toMediaUrl(null)).toBeNull()

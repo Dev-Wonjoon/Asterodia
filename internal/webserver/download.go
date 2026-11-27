@@ -10,9 +10,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/download"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 func (s *Service) downloadRoutes(mux *http.ServeMux) {
@@ -55,7 +55,7 @@ func (s *Service) downloadAPI(w http.ResponseWriter, r *http.Request) {
 	} else if r.Method == http.MethodPost {
 		origin, err := url.Parse(r.Header.Get("Origin"))
 		contentType, _, ce := mime.ParseMediaType(r.Header.Get("Content-Type"))
-		if err != nil || origin.Host != r.Host || (origin.Scheme != "http" && origin.Scheme != "https") || ce != nil || contentType != "application/json" || csrf == "" || subtle.ConstantTimeCompare([]byte(csrf), []byte(r.Header.Get("X-StorageBucket-CSRF"))) != 1 {
+		if err != nil || origin.Host != r.Host || (origin.Scheme != "http" && origin.Scheme != "https") || ce != nil || contentType != "application/json" || csrf == "" || subtle.ConstantTimeCompare([]byte(csrf), []byte(r.Header.Get("X-Asterodia-CSRF"))) != 1 {
 			http.Error(w, "요청 출처와 다운로드 권한을 확인하세요", 403)
 			return
 		}

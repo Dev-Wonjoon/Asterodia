@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
 	"github.com/bodgit/sevenzip"
 )
 
@@ -504,7 +504,7 @@ func downloadEngineAsset(
 		return fmt.Errorf("HTTPS 다운로드 주소가 필요합니다")
 	}
 
-	request.Header.Set("User-Agent", "StorageBucket")
+	request.Header.Set("User-Agent", "Asterodia")
 
 	client := &http.Client{
 		CheckRedirect: func(

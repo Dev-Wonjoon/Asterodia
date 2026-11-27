@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/mediaedit"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/mediaedit"
 	"github.com/google/uuid"
 )
 
@@ -56,7 +56,7 @@ func TestOutputDirectoryStoresOneFileWithAlbumReferencesAndResultTags(t *testing
 		if err != nil {
 			return err
 		}
-		if entry.IsDir() && entry.Name() == ".storagebucket-tmp" {
+		if entry.IsDir() && entry.Name() == ".asterodia-tmp" {
 			return filepath.SkipDir
 		}
 		if !entry.IsDir() && strings.HasSuffix(path, ".webp") {

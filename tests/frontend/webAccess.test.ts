@@ -6,7 +6,7 @@ import { cleanupReact, clickButton, deferred, mount } from './reactHarness'
 
 const fetchMock = vi.fn()
 const response = (authenticated: boolean, status = 200) => ({ ok: status === 200, status, json: async () => ({ authenticated }) })
-beforeEach(() => { vi.stubGlobal('fetch', fetchMock); fetchMock.mockReset(); localStorage.setItem('storagebucket:language:v1', 'ko') })
+beforeEach(() => { vi.stubGlobal('fetch', fetchMock); fetchMock.mockReset(); localStorage.setItem('asterodia:language:v1', 'ko') })
 afterEach(async () => { await cleanupReact(); vi.unstubAllGlobals(); vi.useRealTimers() })
 const inputCode = async (value: string) => {
     const node = document.querySelector('input')!
@@ -37,7 +37,7 @@ it('stays locked after a rejected code and reports rate limiting', async () => {
 it('locks immediately on session expiry and logs out through the server', async () => {
     fetchMock.mockResolvedValueOnce(response(true)).mockResolvedValue(response(false))
     await mount(h(WebAccessGate, { children: h('p', null, 'Private library') }))
-    await act(async () => { window.dispatchEvent(new Event('storagebucket:disconnect')) })
+    await act(async () => { window.dispatchEvent(new Event('asterodia:disconnect')) })
     expect(fetchMock).toHaveBeenLastCalledWith('/api/access/logout', expect.objectContaining({ method: 'POST', credentials: 'same-origin' }))
     expect(document.body.textContent).not.toContain('Private library')
 })
@@ -48,7 +48,7 @@ it('does not restore a revoked session from an older status response', async () 
     fetchMock.mockResolvedValueOnce(response(true)).mockReturnValueOnce(pending.promise)
     await mount(h(WebAccessGate, { children: h('p', null, 'Private library') }))
     await act(async () => { vi.advanceTimersByTime(60_000) })
-    await act(async () => { window.dispatchEvent(new Event('storagebucket:access-expired')) })
+    await act(async () => { window.dispatchEvent(new Event('asterodia:access-expired')) })
     await act(async () => { pending.resolve(response(true)) })
     expect(document.body.textContent).not.toContain('Private library')
 })
@@ -56,7 +56,7 @@ it('does not restore a revoked session from an older status response', async () 
 it('reports a failed logout without falsely claiming disconnection', async () => {
     fetchMock.mockResolvedValueOnce(response(true)).mockResolvedValueOnce(response(false, 503))
     await mount(h(WebAccessGate, { children: h('p', null, 'Private library') }))
-    await act(async () => { window.dispatchEvent(new Event('storagebucket:disconnect')) })
+    await act(async () => { window.dispatchEvent(new Event('asterodia:disconnect')) })
     expect(document.body.textContent).toContain('Private library')
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('서버에 연결하지 못했습니다')
 })

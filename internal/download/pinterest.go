@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 func (r Runner) resolvePinterestVideos(ctx context.Context, discovery engine.GalleryDLDiscovery, originalURL, dir string, options engine.Options) (map[int]engine.YtdlpTarget, error) {

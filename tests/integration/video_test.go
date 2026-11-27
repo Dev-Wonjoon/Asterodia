@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/download"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 type localVideo struct {
@@ -41,7 +41,7 @@ func (v observedGeneric) DownloadSingle(ctx context.Context, target engine.Ytdlp
 }
 
 func TestGenericWebpagePublication(t *testing.T) {
-	ytdlp, probe := os.Getenv("STORAGEBUCKET_TEST_YTDLP_EXE"), os.Getenv("STORAGEBUCKET_TEST_FFPROBE_EXE")
+	ytdlp, probe := os.Getenv("ASTERODIA_TEST_YTDLP_EXE"), os.Getenv("ASTERODIA_TEST_FFPROBE_EXE")
 	if !filepath.IsAbs(ytdlp) || !filepath.IsAbs(probe) {
 		t.Skip("실제 Generic 검증에는 yt-dlp와 ffprobe 경로가 필요합니다")
 	}
@@ -292,8 +292,8 @@ func (v localVideo) DownloadSingle(ctx context.Context, target engine.YtdlpTarge
 }
 
 func TestRealVideoAudioAndMKVPublication(t *testing.T) {
-	ytdlp := os.Getenv("STORAGEBUCKET_TEST_YTDLP_EXE")
-	probe := os.Getenv("STORAGEBUCKET_TEST_FFPROBE_EXE")
+	ytdlp := os.Getenv("ASTERODIA_TEST_YTDLP_EXE")
+	probe := os.Getenv("ASTERODIA_TEST_FFPROBE_EXE")
 	if ytdlp == "" || probe == "" {
 		t.Skip("로컬 엔진 검증에는 yt-dlp와 ffprobe 경로가 필요합니다")
 	}

@@ -23,7 +23,7 @@ function promptOptions(prompt: Prompt): ConfirmOptions {
         }
         case 'ready': return {
             title: translate("settings.updateReady"),
-            message: translate("settings.storagebucketHasBeenDownloadedAndVerifiedRestartTheApp", { version: prompt.status.version }),
+            message: translate("settings.asterodiaHasBeenDownloadedAndVerifiedRestartTheApp", { version: prompt.status.version }),
             confirmLabel: translate("settings.restartNow"), cancelLabel: translate("settings.later"),
         }
         case 'latest': return { title: translate("settings.checkForUpdates"), message: translate("settings.youAreUpToDate"), confirmLabel: translate("common.confirm"), cancelLabel: translate("common.close") }

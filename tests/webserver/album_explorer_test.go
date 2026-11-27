@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/webserver"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/webserver"
 )
 
 func TestWebAlbumExplorerCRUDSearchAndPrivacy(t *testing.T) {
@@ -33,7 +33,7 @@ func TestWebAlbumExplorerCRUDSearchAndPrivacy(t *testing.T) {
 		}
 		req.Header.Set("Origin", address)
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-StorageBucket-CSRF", token)
+		req.Header.Set("X-Asterodia-CSRF", token)
 		response, err := f.client.Do(req)
 		if err != nil {
 			t.Fatal(err)

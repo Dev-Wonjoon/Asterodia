@@ -9,14 +9,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/database"
+	"github.com/Dev-Wonjoon/Asterodia/internal/database"
 )
 
 func migrationRoot(t *testing.T) string {
 	t.Helper()
-	configured := os.Getenv("STORAGEBUCKET_TEST_ROOT")
+	configured := os.Getenv("ASTERODIA_TEST_ROOT")
 	if !filepath.IsAbs(configured) {
-		t.Fatal("STORAGEBUCKET_TEST_ROOT 절대 경로가 필요합니다")
+		t.Fatal("ASTERODIA_TEST_ROOT 절대 경로가 필요합니다")
 	}
 	_, source, _, _ := runtime.Caller(0)
 	repo := filepath.Clean(filepath.Join(filepath.Dir(source), "..", ".."))
@@ -89,9 +89,9 @@ func latestDB(t *testing.T, path string) *sql.DB {
 	return db
 }
 func TestMigrationProcessCrash(t *testing.T) {
-	if os.Getenv("STORAGEBUCKET_MIGRATION_CRASH") == "1" {
-		path := os.Getenv("STORAGEBUCKET_MIGRATION_FIXTURE")
-		configured := os.Getenv("STORAGEBUCKET_TEST_ROOT")
+	if os.Getenv("ASTERODIA_MIGRATION_CRASH") == "1" {
+		path := os.Getenv("ASTERODIA_MIGRATION_FIXTURE")
+		configured := os.Getenv("ASTERODIA_TEST_ROOT")
 		relative, e := filepath.Rel(configured, path)
 		if e != nil || !filepath.IsAbs(configured) || filepath.IsAbs(relative) || strings.HasPrefix(relative, "..") {
 			t.Fatal("테스트 전용 DB가 필요합니다")
@@ -117,7 +117,7 @@ func TestV4MigrationProcessCrash(t *testing.T) {
 	addModernMedia(t, db, 7, "https://example.test/post/crash", "게시글", filepath.Join(root, "original.mp4"), "original-file")
 	db.Close()
 	command := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestMigrationProcessCrash$", "-test.count=1")
-	command.Env = append(os.Environ(), "STORAGEBUCKET_MIGRATION_CRASH=1", "STORAGEBUCKET_MIGRATION_FIXTURE="+path)
+	command.Env = append(os.Environ(), "ASTERODIA_MIGRATION_CRASH=1", "ASTERODIA_MIGRATION_FIXTURE="+path)
 	output, err := command.CombinedOutput()
 	if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 73 {
 		t.Fatalf("예상하지 않은 종료: %v %s", err, output)

@@ -2,7 +2,7 @@ package integration_test
 
 import (
 	"fmt"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/database"
+	"github.com/Dev-Wonjoon/Asterodia/internal/database"
 	"os"
 	"path/filepath"
 	"sort"
@@ -10,16 +10,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
 )
 
 func TestSearchPerformance(t *testing.T) {
-	count, err := strconv.Atoi(os.Getenv("STORAGEBUCKET_SEARCH_PERF_COUNT"))
+	count, err := strconv.Atoi(os.Getenv("ASTERODIA_SEARCH_PERF_COUNT"))
 	if err != nil || count < 10000 {
-		t.Skip("대용량 측정은 STORAGEBUCKET_SEARCH_PERF_COUNT>=10000으로 명시 실행")
+		t.Skip("대용량 측정은 ASTERODIA_SEARCH_PERF_COUNT>=10000으로 명시 실행")
 	}
 	db, s := searchDB(t)
-	if root := os.Getenv("STORAGEBUCKET_SEARCH_PERF_ROOT"); root != "" {
+	if root := os.Getenv("ASTERODIA_SEARCH_PERF_ROOT"); root != "" {
 		repo, err := filepath.Abs(filepath.Join("..", ".."))
 		if err != nil {
 			t.Fatal(err)

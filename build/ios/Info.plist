@@ -3,15 +3,15 @@
 <plist version="1.0">
 	<dict>
 		<key>CFBundleDisplayName</key>
-		<string>StorageBucket</string>
+		<string>Asterodia</string>
 		<key>CFBundleExecutable</key>
-		<string>StorageBucket</string>
+		<string>Asterodia</string>
 		<key>CFBundleGetInfoString</key>
 		<string>Some Product Comments</string>
 		<key>CFBundleIdentifier</key>
-		<string>com.storagebucket.app</string>
+		<string>com.asterodia.app</string>
 		<key>CFBundleName</key>
-		<string>StorageBucket</string>
+		<string>Asterodia</string>
 		<key>CFBundlePackageType</key>
 		<string>APPL</string>
 		<key>CFBundleShortVersionString</key>

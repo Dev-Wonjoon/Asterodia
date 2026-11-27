@@ -2,7 +2,7 @@ package engine
 
 import (
 	"context"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/netguard"
+	"github.com/Dev-Wonjoon/Asterodia/internal/netguard"
 	"strings"
 )
 

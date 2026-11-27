@@ -7,13 +7,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/database"
+	"github.com/Dev-Wonjoon/Asterodia/internal/database"
 )
 
 func TestOpenExisting(t *testing.T) {
-	configured := os.Getenv("STORAGEBUCKET_TEST_ROOT")
+	configured := os.Getenv("ASTERODIA_TEST_ROOT")
 	if !filepath.IsAbs(configured) {
-		t.Fatal("STORAGEBUCKET_TEST_ROOT에 절대 경로를 지정하세요")
+		t.Fatal("ASTERODIA_TEST_ROOT에 절대 경로를 지정하세요")
 	}
 	root, err := filepath.EvalSymlinks(configured)
 	if err != nil {

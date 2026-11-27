@@ -34,7 +34,7 @@ function fixture() {
     return { store, list, get }
 }
 it('starts explorer entry cards grouped despite saved inline expansions and still permits explicit expansion', async () => {
-    localStorage.setItem('storagebucket:expanded-albums:v1', JSON.stringify([1, 2]))
+    localStorage.setItem('asterodia:expanded-albums:v1', JSON.stringify([1, 2]))
     const { list, get } = fixture()
     const api = { list, get } as unknown as MediaApi
     const store = createGalleryStore(api, { expandAlbums: true, albumCards: true })

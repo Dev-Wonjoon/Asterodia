@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/desktop"
+	"github.com/Dev-Wonjoon/Asterodia/internal/desktop"
 )
 
 func TestRegisteredMediaRangeAndCacheValidation(t *testing.T) {

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
 )
 
 func publicSummary(row map[string]any) map[string]any {

@@ -14,6 +14,7 @@ function Get-VerifiedReleaseFile {
         $machine = if ($Arch -eq 'amd64') { 0x8664 } else { 0xaa64 }
         if ([BitConverter]::ToUInt16($pe, 4) -ne $machine) { throw "Executable architecture does not match $Arch." }
         $info = [Diagnostics.FileVersionInfo]::GetVersionInfo($Path)
+        if ($info.ProductName -cne 'Asterodia') { throw "Executable product name must be Asterodia: $Path" }
         $numericVersion = (& node (Join-Path $PSScriptRoot 'release-version.mjs') --windows-version $Version).Trim()
         if ($LASTEXITCODE -ne 0) { throw 'Invalid release version.' }
         $productVersion = '{0}.{1}.{2}.{3}' -f $info.ProductMajorPart, $info.ProductMinorPart, $info.ProductBuildPart, $info.ProductPrivatePart

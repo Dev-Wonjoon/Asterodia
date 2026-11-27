@@ -11,12 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 // This opt-in test downloads the official pinned release into an isolated bin.
 func TestGalleryDLUpgradeAndReuse(t *testing.T) {
-	if os.Getenv("STORAGEBUCKET_GALLERYDL_UPDATE_TEST") != "1" {
+	if os.Getenv("ASTERODIA_GALLERYDL_UPDATE_TEST") != "1" {
 		t.Skip("공식 gallery-dl 업데이트 검증은 명시적으로 실행합니다")
 	}
 	root := engineTestRoot(t, "engine-parsers")
@@ -25,8 +25,8 @@ func TestGalleryDLUpgradeAndReuse(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(bin) })
-	old := os.Getenv("STORAGEBUCKET_TEST_GALLERYDL_OLD_EXE")
-	latest := os.Getenv("STORAGEBUCKET_TEST_GALLERYDL_LATEST_EXE")
+	old := os.Getenv("ASTERODIA_TEST_GALLERYDL_OLD_EXE")
+	latest := os.Getenv("ASTERODIA_TEST_GALLERYDL_LATEST_EXE")
 	if !filepath.IsAbs(old) || !filepath.IsAbs(latest) {
 		t.Fatal("구버전과 검증된 최신 버전 엔진의 절대 경로가 필요합니다")
 	}

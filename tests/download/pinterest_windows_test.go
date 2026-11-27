@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/download"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 type pinterestFixture struct {
@@ -19,12 +19,12 @@ type pinterestFixture struct {
 }
 
 func TestRunnerPinterestLive(t *testing.T) {
-	page := os.Getenv("STORAGEBUCKET_PINTEREST_LIVE_URL")
+	page := os.Getenv("ASTERODIA_PINTEREST_LIVE_URL")
 	if page == "" {
 		t.Skip("explicit public Pinterest fixture URL required")
 	}
 	root := downloadTestRoot(t)
-	ytdlp, gallery, ffmpeg, ffprobe := os.Getenv("STORAGEBUCKET_TEST_YTDLP_EXE"), os.Getenv("STORAGEBUCKET_TEST_GALLERYDL_EXE"), os.Getenv("STORAGEBUCKET_TEST_FFMPEG_EXE"), os.Getenv("STORAGEBUCKET_TEST_FFPROBE_EXE")
+	ytdlp, gallery, ffmpeg, ffprobe := os.Getenv("ASTERODIA_TEST_YTDLP_EXE"), os.Getenv("ASTERODIA_TEST_GALLERYDL_EXE"), os.Getenv("ASTERODIA_TEST_FFMPEG_EXE"), os.Getenv("ASTERODIA_TEST_FFPROBE_EXE")
 	for _, path := range []string{ytdlp, gallery, ffmpeg, ffprobe} {
 		if !filepath.IsAbs(path) {
 			t.Fatal("absolute engine path required", path)

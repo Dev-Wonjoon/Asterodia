@@ -7,13 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/licenses"
+	"github.com/Dev-Wonjoon/Asterodia/internal/licenses"
 )
 
 var licensesPage = template.Must(template.New("licenses").Parse(`<!doctype html>
 <html lang="{{.Language}}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{.Labels.title}} · StorageBucket</title><link rel="stylesheet" href="/licenses.css"></head>
-<body><main><nav><a href="/">← {{.Labels.gallery}}</a> · <a href="/licenses.txt" download="StorageBucket-licenses.txt">{{.Labels.download}}</a> · <a href="?lang=ko" lang="ko">한국어</a> · <a href="?lang=en" lang="en">English</a></nav>
+<title>{{.Labels.title}} · Asterodia</title><link rel="stylesheet" href="/licenses.css"></head>
+<body><main><nav><a href="/">← {{.Labels.gallery}}</a> · <a href="/licenses.txt" download="Asterodia-licenses.txt">{{.Labels.download}}</a> · <a href="?lang=ko" lang="ko">한국어</a> · <a href="?lang=en" lang="en">English</a></nav>
 <h1>{{.Labels.title}}</h1><p>{{.Labels.intro}}</p>
 <p>{{.Labels.scopes}}</p>
 {{range .Entries}}<details><summary><strong>{{.Name}}</strong><span>{{.Version}} · {{.Scope}} · {{.License}}</span></summary>
@@ -61,6 +61,6 @@ func (s *Service) licenseNotices(w http.ResponseWriter, r *http.Request) {
 
 func (s *Service) licenseText(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("Content-Disposition", `attachment; filename="StorageBucket-licenses.txt"`)
+	w.Header().Set("Content-Disposition", `attachment; filename="Asterodia-licenses.txt"`)
 	http.ServeContent(w, r, "licenses.txt", time.Time{}, bytes.NewReader([]byte(licenses.Text())))
 }

@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/database"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/database"
+	"github.com/Dev-Wonjoon/Asterodia/internal/download"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 	_ "modernc.org/sqlite"
 )
 
@@ -20,11 +20,11 @@ func TestStoreCreateInitialAttempt(t *testing.T) {
 	const normalized = "https://example.test/watch?v=abc&list=p#part"
 	input := download.InitialAttemptInput{
 		OriginalURL: original,
-		StorageRoot: filepath.Join(os.Getenv("STORAGEBUCKET_TEST_ROOT"), "downloads"),
+		StorageRoot: filepath.Join(os.Getenv("ASTERODIA_TEST_ROOT"), "downloads"),
 		Options:     engine.Options{Type: "video", Quality: "480", Extension: "mp4"},
 	}
 	if !filepath.IsAbs(input.StorageRoot) {
-		t.Fatal("STORAGEBUCKET_TEST_ROOT에 실행별 절대 경로를 지정하세요")
+		t.Fatal("ASTERODIA_TEST_ROOT에 실행별 절대 경로를 지정하세요")
 	}
 
 	for _, name := range []string{"new-url", "existing-url"} {
@@ -126,9 +126,9 @@ func TestStoreCreateInitialAttempt(t *testing.T) {
 }
 
 func TestInstagramDownloadURLs(t *testing.T) {
-	root := filepath.Join(os.Getenv("STORAGEBUCKET_TEST_ROOT"), "instagram-urls")
+	root := filepath.Join(os.Getenv("ASTERODIA_TEST_ROOT"), "instagram-urls")
 	if !filepath.IsAbs(root) {
-		t.Fatal("STORAGEBUCKET_TEST_ROOT에 실행별 절대 경로를 지정하세요")
+		t.Fatal("ASTERODIA_TEST_ROOT에 실행별 절대 경로를 지정하세요")
 	}
 	const post = "https://www.instagram.com/p/DgCmlEARzrh"
 	for _, tc := range []struct {
@@ -211,9 +211,9 @@ func TestInstagramDownloadURLs(t *testing.T) {
 }
 
 func TestInstagramDownloadServiceURLs(t *testing.T) {
-	root := filepath.Join(os.Getenv("STORAGEBUCKET_TEST_ROOT"), "instagram-service-urls")
+	root := filepath.Join(os.Getenv("ASTERODIA_TEST_ROOT"), "instagram-service-urls")
 	if !filepath.IsAbs(root) {
-		t.Fatal("STORAGEBUCKET_TEST_ROOT에 실행별 절대 경로를 지정하세요")
+		t.Fatal("ASTERODIA_TEST_ROOT에 실행별 절대 경로를 지정하세요")
 	}
 	db := openStoreTestDB(t)
 	service := download.NewService(db, func() string { return root }, nil, nil)
@@ -240,9 +240,9 @@ func TestInstagramDownloadServiceURLs(t *testing.T) {
 }
 
 func TestStoreFreezeTargets(t *testing.T) {
-	root := os.Getenv("STORAGEBUCKET_TEST_ROOT")
+	root := os.Getenv("ASTERODIA_TEST_ROOT")
 	if !filepath.IsAbs(root) {
-		t.Fatal("STORAGEBUCKET_TEST_ROOT에 실행별 절대 경로를 지정하세요")
+		t.Fatal("ASTERODIA_TEST_ROOT에 실행별 절대 경로를 지정하세요")
 	}
 
 	targets := []download.TargetInput{
@@ -374,9 +374,9 @@ func TestStoreFreezeTargets(t *testing.T) {
 }
 
 func TestStoreRecordStagedResults(t *testing.T) {
-	root := os.Getenv("STORAGEBUCKET_TEST_ROOT")
+	root := os.Getenv("ASTERODIA_TEST_ROOT")
 	if !filepath.IsAbs(root) {
-		t.Fatal("STORAGEBUCKET_TEST_ROOT에 실행별 절대 경로를 지정하세요")
+		t.Fatal("ASTERODIA_TEST_ROOT에 실행별 절대 경로를 지정하세요")
 	}
 
 	targets := []download.TargetInput{

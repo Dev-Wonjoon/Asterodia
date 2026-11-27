@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
+	"github.com/Dev-Wonjoon/Asterodia/internal/download"
 )
 
 func TestGalleryActivityIndependentOfHistoryPage(t *testing.T) {
@@ -15,7 +15,7 @@ func TestGalleryActivityIndependentOfHistoryPage(t *testing.T) {
 	service := download.NewService(db, nil, nil, nil)
 	defer service.Close()
 	for i, state := range []string{"pending", "running", "failed", "cancelled", "interrupted", "completed", "cleanup", "rollback", "history"} {
-		job, err := store.CreateInitialAttempt(t.Context(), download.InitialAttemptInput{OriginalURL: fmt.Sprintf("https://example.invalid/%d", i), StorageRoot: filepath.Join(os.Getenv("STORAGEBUCKET_TEST_ROOT"), "downloads")})
+		job, err := store.CreateInitialAttempt(t.Context(), download.InitialAttemptInput{OriginalURL: fmt.Sprintf("https://example.invalid/%d", i), StorageRoot: filepath.Join(os.Getenv("ASTERODIA_TEST_ROOT"), "downloads")})
 		if err != nil {
 			t.Fatal(err)
 		}

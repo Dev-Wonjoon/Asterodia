@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 	"github.com/google/uuid"
 )
 
@@ -152,7 +152,7 @@ func (s *Service) scanDirectory(ctx context.Context, job, root string, id int64,
 					item.state.Size = info.Size()
 				}
 			}
-			if item.directory && (strings.EqualFold(item.name, ".git") || strings.EqualFold(item.name, ".storagebucket")) {
+			if item.directory && (strings.EqualFold(item.name, ".git") || strings.EqualFold(item.name, ".asterodia")) {
 				item.excluded = true
 			}
 			if !item.directory && engine.LocalKind(item.path) == "" {

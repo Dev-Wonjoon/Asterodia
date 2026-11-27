@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
+	"github.com/Dev-Wonjoon/Asterodia/internal/download"
 )
 
 type Cleaner struct {
@@ -172,7 +172,7 @@ func (s *Cleaner) removeOwnedFile(ctx context.Context, path string) error {
 			continue
 		}
 		parts := strings.Split(relative, string(filepath.Separator))
-		if len(parts) != 5 || parts[0] != ".storagebucket" || parts[1] != "files" || !ownerPattern.MatchString(parts[2]) || !itemPattern.MatchString(parts[3]) || !strings.HasPrefix(parts[4], "media.") {
+		if len(parts) != 5 || parts[0] != ".asterodia" || parts[1] != "files" || !ownerPattern.MatchString(parts[2]) || !itemPattern.MatchString(parts[3]) || !strings.HasPrefix(parts[4], "media.") {
 			continue
 		}
 		root, e := os.OpenRoot(base)

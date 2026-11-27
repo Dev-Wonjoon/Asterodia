@@ -19,12 +19,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/database"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/filemove"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/localimport"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/database"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/filemove"
+	"github.com/Dev-Wonjoon/Asterodia/internal/localimport"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
 	"modernc.org/sqlite"
 )
 
@@ -55,7 +55,7 @@ func execSQL(t *testing.T, db *sql.DB, q string, args ...any) {
 }
 func createFixture(t *testing.T) *fixture {
 	t.Helper()
-	base := os.Getenv("STORAGEBUCKET_TEST_ROOT")
+	base := os.Getenv("ASTERODIA_TEST_ROOT")
 	repo, e := filepath.Abs("../..")
 	must(t, e)
 	actual, e := filepath.EvalSymlinks(base)
@@ -262,11 +262,11 @@ func TestMoveValidationAndFilename(t *testing.T) {
 	}
 }
 func TestMoveCrashRecovery(t *testing.T) {
-	mode := os.Getenv("STORAGEBUCKET_MOVE_CRASH_CHILD")
+	mode := os.Getenv("ASTERODIA_MOVE_CRASH_CHILD")
 	if mode != "" {
 		must(t, sqlite.RegisterScalarFunction("move_crash", 0, func(*sqlite.FunctionContext, []driver.Value) (driver.Value, error) { os.Exit(79); return nil, nil }))
 		f := createFixture(t)
-		must(t, os.WriteFile(filepath.Join(os.Getenv("STORAGEBUCKET_TEST_ROOT"), "child-path.txt"), []byte(f.root), 0600))
+		must(t, os.WriteFile(filepath.Join(os.Getenv("ASTERODIA_TEST_ROOT"), "child-path.txt"), []byte(f.root), 0600))
 		id := f.create(t)
 		state := "committed"
 		if mode == "after-commit" {
@@ -286,11 +286,11 @@ func TestMoveCrashRecovery(t *testing.T) {
 			must(t, e)
 			cmd := exec.CommandContext(t.Context(), exe, "-test.run=^TestMoveCrashRecovery$", "-test.timeout=30s")
 			for _, v := range os.Environ() {
-				if !strings.HasPrefix(strings.ToUpper(v), "STORAGEBUCKET_TEST_ROOT=") && !strings.HasPrefix(v, "STORAGEBUCKET_MOVE_CRASH_CHILD=") {
+				if !strings.HasPrefix(strings.ToUpper(v), "ASTERODIA_TEST_ROOT=") && !strings.HasPrefix(v, "ASTERODIA_MOVE_CRASH_CHILD=") {
 					cmd.Env = append(cmd.Env, v)
 				}
 			}
-			cmd.Env = append(cmd.Env, "STORAGEBUCKET_TEST_ROOT="+childBase, "STORAGEBUCKET_MOVE_CRASH_CHILD="+mode)
+			cmd.Env = append(cmd.Env, "ASTERODIA_TEST_ROOT="+childBase, "ASTERODIA_MOVE_CRASH_CHILD="+mode)
 			output, e := cmd.CombinedOutput()
 			if exit, yes := e.(*exec.ExitError); !yes || exit.ExitCode() != 79 {
 				t.Fatalf("강제종료 %s %v", output, e)
@@ -434,7 +434,7 @@ func TestMovePreservesReplacedCommittedCopyAndSharedSources(t *testing.T) {
 
 // TestPrepareNativeVerification writes only an opt-in disposable app fixture.
 func TestPrepareNativeVerification(t *testing.T) {
-	output := os.Getenv("STORAGEBUCKET_NATIVE_FIXTURE_OUTPUT")
+	output := os.Getenv("ASTERODIA_NATIVE_FIXTURE_OUTPUT")
 	if output == "" {
 		return
 	}
@@ -466,7 +466,7 @@ func TestPrepareNativeVerification(t *testing.T) {
 	must(t, f.db.Close())
 	data, e := os.ReadFile(f.filename)
 	must(t, e)
-	must(t, os.WriteFile(filepath.Join(f.root, "storagebucket.db"), data, 0600))
+	must(t, os.WriteFile(filepath.Join(f.root, "asterodia.db"), data, 0600))
 	must(t, os.WriteFile(output, []byte(f.root), 0600))
 }
 

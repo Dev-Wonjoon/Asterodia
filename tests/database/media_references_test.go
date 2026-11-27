@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/database"
+	"github.com/Dev-Wonjoon/Asterodia/internal/database"
 )
 
 func TestV3MediaReferencesMigration(t *testing.T) {

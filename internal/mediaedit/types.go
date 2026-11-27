@@ -1,6 +1,6 @@
 package mediaedit
 
-import "github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+import "github.com/Dev-Wonjoon/Asterodia/internal/engine"
 
 type PrepareRequest struct {
 	QuickVideo     bool    `json:"quickVideo,omitempty"`

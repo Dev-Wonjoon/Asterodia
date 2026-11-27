@@ -16,7 +16,7 @@ func AcquireLock(filename string) (func(), error) {
 	var overlapped windows.Overlapped
 	if err = windows.LockFileEx(windows.Handle(file.Fd()), windows.LOCKFILE_EXCLUSIVE_LOCK|windows.LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &overlapped); err != nil {
 		file.Close()
-		return nil, fmt.Errorf("이 데이터 폴더를 사용하는 StorageBucket이 이미 실행 중입니다: %w", err)
+		return nil, fmt.Errorf("이 데이터 폴더를 사용하는 Asterodia가 이미 실행 중입니다: %w", err)
 	}
 	return func() { _ = windows.UnlockFileEx(windows.Handle(file.Fd()), 0, 1, 0, &overlapped); file.Close() }, nil
 }

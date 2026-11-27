@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
 )
 
 type SearchSuggestRequest struct {

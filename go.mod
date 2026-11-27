@@ -1,4 +1,4 @@
-module github.com/Dev-Wonjoon/StorageBucket
+module github.com/Dev-Wonjoon/Asterodia
 
 go 1.26.0
 

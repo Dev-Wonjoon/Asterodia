@@ -4,9 +4,9 @@ import { translate } from '@renderer/shared/i18n'
 let csrf = ''
 async function call<T>(name: string, value?: unknown, read = false): Promise<T> {
     const response = await fetch('/api/download/' + name, read ? { credentials: 'same-origin' } : {
-        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-StorageBucket-CSRF': csrf }, body: JSON.stringify(value),
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Asterodia-CSRF': csrf }, body: JSON.stringify(value),
     })
-    if (response.status === 401) window.dispatchEvent(new Event('storagebucket:access-expired'))
+    if (response.status === 401) window.dispatchEvent(new Event('asterodia:access-expired'))
     if (!response.headers.get('Content-Type')?.includes('application/json')) {
         throw new Error(translate(response.status === 403 ? 'web.download.permission' : response.status === 429 ? 'web.download.rateLimited' : 'common.couldNotConnectToTheServerTryAgainShortly'))
     }

@@ -1,19 +1,19 @@
 import { translate } from '@renderer/shared/i18n'
-import { Service as FileMoveService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/filemove";
-import { Service as UpdateService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/update";
-import { Service as MediaEditService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/mediaedit";
+import { Service as FileMoveService } from "../../../bindings/github.com/Dev-Wonjoon/Asterodia/internal/filemove";
+import { Service as UpdateService } from "../../../bindings/github.com/Dev-Wonjoon/Asterodia/internal/update";
+import { Service as MediaEditService } from "../../../bindings/github.com/Dev-Wonjoon/Asterodia/internal/mediaedit";
 import type { AppApi } from "@contracts/api";
-import { Service as WebServerService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/webserver";
-import { Service as LocalImportService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/localimport";
-import { Service as DownloadService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/download";
-import { Manager as EngineManager } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/engine";
+import { Service as WebServerService } from "../../../bindings/github.com/Dev-Wonjoon/Asterodia/internal/webserver";
+import { Service as LocalImportService } from "../../../bindings/github.com/Dev-Wonjoon/Asterodia/internal/localimport";
+import { Service as DownloadService } from "../../../bindings/github.com/Dev-Wonjoon/Asterodia/internal/download";
+import { Manager as EngineManager } from "../../../bindings/github.com/Dev-Wonjoon/Asterodia/internal/engine";
 import type { EngineStatus } from "@contracts/types";
 import { Events } from "@wailsio/runtime";
-import { Service as MediaService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/media";
-import { Service as ThumbnailService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/thumbnail";
-import { Service as SettingsService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/settings";
-import { SystemService, Service as DesktopService } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/desktop";
-import type { Result } from "../../../bindings/github.com/Dev-Wonjoon/StorageBucket/internal/api/models";
+import { Service as MediaService } from "../../../bindings/github.com/Dev-Wonjoon/Asterodia/internal/media";
+import { Service as ThumbnailService } from "../../../bindings/github.com/Dev-Wonjoon/Asterodia/internal/thumbnail";
+import { Service as SettingsService } from "../../../bindings/github.com/Dev-Wonjoon/Asterodia/internal/settings";
+import { SystemService, Service as DesktopService } from "../../../bindings/github.com/Dev-Wonjoon/Asterodia/internal/desktop";
+import type { Result } from "../../../bindings/github.com/Dev-Wonjoon/Asterodia/internal/api/models";
 
 // The Go bindings describe optional JSON fields as required zero values. Keep
 // that transport detail at this boundary; renderer callers use the app contracts.

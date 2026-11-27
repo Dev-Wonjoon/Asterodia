@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/download"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 type progressFixtureYtdlp struct {
@@ -26,7 +26,7 @@ func (f progressFixtureYtdlp) Discover(context.Context, string, string) (json.Ra
 }
 
 func TestMediaTransferVisibleThroughServiceWhileDownloading(t *testing.T) {
-	executable := os.Getenv("STORAGEBUCKET_TEST_YTDLP_EXE")
+	executable := os.Getenv("ASTERODIA_TEST_YTDLP_EXE")
 	if executable == "" {
 		t.Skip("yt-dlp 실행 경로 필요")
 	}
@@ -105,7 +105,7 @@ func TestMediaTransferVisibleThroughServiceWhileDownloading(t *testing.T) {
 		t.Fatal(logs.Error)
 	}
 	for _, entry := range logs.Data.(download.LogPage).Entries {
-		if strings.Contains(entry.Text, "__STORAGEBUCKET_PROGRESS__:") {
+		if strings.Contains(entry.Text, "__ASTERODIA_PROGRESS__:") {
 			t.Fatal("private progress frames leaked into diagnostics")
 		}
 	}

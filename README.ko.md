@@ -1,29 +1,31 @@
-# StorageBucket
+# Asterodia
+
+기존 라이브러리 데이터와 설정은 자동 이전하여 이어서 사용합니다.
 
 미디어 다운로드부터 정리와 편집까지, 한곳에서.
 
-StorageBucket은 이미지·영상·오디오를 관리하기 위한 데스크톱 앱입니다.
+Asterodia는 이미지·영상·오디오를 관리하기 위한 데스크톱 앱입니다.
 지원되는 URL에서 미디어를 다운로드하거나 PC에 있는 파일을 등록하고,
 태그와 즐겨찾기로 라이브러리를 정리할 수 있습니다.
 
 [English](./README.md) | [한국어](./README.ko.md)
 
-[다운로드](https://github.com/Dev-Wonjoon/StorageBucket/releases) ·
-[문제 신고](https://github.com/Dev-Wonjoon/StorageBucket/issues)
+[다운로드](https://github.com/Dev-Wonjoon/Asterodia/releases) ·
+[문제 신고](https://github.com/Dev-Wonjoon/Asterodia/issues)
 
 ## 스크린샷
 
 ### 갤러리와 다운로드 진행 상황
 
-![StorageBucket 갤러리와 다운로드 진행 상황](./docs/images/img1.png)
+![Asterodia 갤러리와 다운로드 진행 상황](./docs/images/img1.png)
 
 ### WebP 편집
 
-![StorageBucket WebP 편집기](./docs/images/img2.png)
+![Asterodia WebP 편집기](./docs/images/img2.png)
 
 ### 영상 재생
 
-![StorageBucket 동영상 플레이어](./docs/images/img3.png)
+![Asterodia 동영상 플레이어](./docs/images/img3.png)
 
 ## 주요 기능
 
@@ -69,13 +71,13 @@ StorageBucket은 이미지·영상·오디오를 관리하기 위한 데스크�
 - 별도로 설정한 Tailscale 연결을 통한 모바일 접근
 - PC에서 모바일 편집을 허용한 경우 모바일에서 편집 작업 요청 및 상태 확인
 
-이용 중에는 PC의 StorageBucket이 실행 중이어야 합니다.
+이용 중에는 PC의 Asterodia가 실행 중이어야 합니다.
 미디어 재생 가능 여부는 브라우저가 지원하는 형식에 따라 달라집니다.
 
 ## 시작하기
 
-1. [릴리스 페이지](https://github.com/Dev-Wonjoon/StorageBucket/releases)에서 배포 파일을 다운로드합니다.
-2. StorageBucket을 실행합니다.
+1. [릴리스 페이지](https://github.com/Dev-Wonjoon/Asterodia/releases)에서 배포 파일을 다운로드합니다.
+2. Asterodia를 실행합니다.
 3. 처음 실행할 때 표시되는 엔진 설정 안내에 따라 필요한 외부 도구를 설치합니다.
 4. 설정에서 다운로드 경로를 지정합니다.
 5. 미디어 URL을 추가하거나 로컬 폴더를 가져와 라이브러리를 구성합니다.
@@ -84,7 +86,7 @@ StorageBucket은 이미지·영상·오디오를 관리하기 위한 데스크�
 
 ## 외부 도구
 
-StorageBucket은 미디어 다운로드, 정보 검사, 편집을 위해 다음 외부 도구를 사용합니다.
+Asterodia는 미디어 다운로드, 정보 검사, 편집을 위해 다음 외부 도구를 사용합니다.
 
 | 도구 | 용도 |
 | --- | --- |
@@ -99,7 +101,7 @@ StorageBucket은 미디어 다운로드, 정보 검사, 편집을 위해 다음 
 ## 데이터베이스 가져오기
 
 설정 → 일반 설정 → Wails 데이터베이스 가져오기에서
-StorageBucket Wails 데이터베이스를 현재 라이브러리에 병합할 수 있습니다.
+Asterodia Wails 데이터베이스를 현재 라이브러리에 병합할 수 있습니다.
 
 ## 브라우저·모바일에서 이용하기
 
@@ -127,7 +129,7 @@ StorageBucket Wails 데이터베이스를 현재 라이브러리에 병합할 �
 
 ## 개발
 
-StorageBucket 2.0은 Wails v3와 Go 기반 데스크톱 백엔드,
+Asterodia 2.0은 Wails v3와 Go 기반 데스크톱 백엔드,
 React·TypeScript 기반 UI, SQLite 기반 로컬 데이터 저장소로 구성되어 있습니다.
 
 필요한 개발 환경:
@@ -171,7 +173,7 @@ Windows 숫자 메타데이터의 네 번째 자리는 기본 버전이면 0, a�
 
 ## 사용 책임
 
-StorageBucket은 사용자가 소유하거나 다운로드·관리할 권한을 가진
+Asterodia는 사용자가 소유하거나 다운로드·관리할 권한을 가진
 미디어를 위한 도구입니다.
 
 사용자는 저작권법, 플랫폼 이용약관, 콘텐츠 라이선스를 준수해야 합니다.
@@ -179,7 +181,7 @@ StorageBucket은 사용자가 소유하거나 다운로드·관리할 권한을 
 
 ## 라이선스
 
-StorageBucket은 [MIT 라이선스](./LICENSE)를 따릅니다.
+Asterodia는 [MIT 라이선스](./LICENSE)를 따릅니다.
 
 사용된 라이브러리와 외부 도구에는 각각의 라이선스가 적용됩니다.
 [서드파티 고지](./THIRD_PARTY_LICENSES.md) 또는 앱 내 라이선스 안내에서

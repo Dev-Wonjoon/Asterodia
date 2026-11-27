@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/mediaedit"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/mediaedit"
 	"github.com/google/uuid"
 )
 

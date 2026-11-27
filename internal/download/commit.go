@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
 )
 
 type verifiedFile struct {
@@ -30,7 +30,7 @@ type verifiedFile struct {
 
 func workPaths(job, attempt string) (string, string) {
 	owner := stageOwner(job, attempt)
-	return filepath.Join(".storagebucket", "staging", owner), filepath.Join(".storagebucket", "files", owner)
+	return filepath.Join(".asterodia", "staging", owner), filepath.Join(".asterodia", "files", owner)
 }
 func (s *Service) beginCommit(ctx context.Context, job, attempt string) error {
 	return requireOne(s.db.ExecContext(ctx, `UPDATE download_attempt SET phase='committing' WHERE id=? AND job_id=? AND phase='verifying' AND outcome IS NULL AND cancel_requested_at IS NULL AND EXISTS (SELECT 1 FROM download_queue WHERE id=? AND current_attempt_id=? AND state='running' AND cleanup_required=0)`, attempt, job, job, attempt))
@@ -147,7 +147,7 @@ func (s *Service) commit(ctx context.Context, job, attempt, storage string) (int
 		return 0, err
 	}
 	defer root.Close()
-	if err = root.MkdirAll(filepath.Join(".storagebucket", "files"), 0700); err != nil {
+	if err = root.MkdirAll(filepath.Join(".asterodia", "files"), 0700); err != nil {
 		return 0, err
 	}
 	parentInfo, err := root.Lstat(filepath.Dir(finalRel))
@@ -483,7 +483,7 @@ func removeWorkspace(storage, job, attempt string) error {
 	stage, final := workPaths(job, attempt)
 	for _, rel := range []string{stage, final} {
 		// Reject changed parent paths instead of following a reparse point.
-		for _, parent := range []string{".storagebucket", filepath.Dir(rel)} {
+		for _, parent := range []string{".asterodia", filepath.Dir(rel)} {
 			info, e := root.Lstat(parent)
 			if os.IsNotExist(e) {
 				continue

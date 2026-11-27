@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 // Sites can expose only WebM/Opus audio, which must still be convertible to MP3.
 func TestYtdlpDownloadAudioSources(t *testing.T) {
-	ytdlpPath := os.Getenv("STORAGEBUCKET_TEST_YTDLP_EXE")
-	probePath := os.Getenv("STORAGEBUCKET_TEST_FFPROBE_EXE")
+	ytdlpPath := os.Getenv("ASTERODIA_TEST_YTDLP_EXE")
+	probePath := os.Getenv("ASTERODIA_TEST_FFPROBE_EXE")
 	if ytdlpPath == "" && probePath == "" {
 		t.Skip("yt-dlp·FFmpeg 실행 경로 필요")
 	}

@@ -7,7 +7,7 @@ import { GalleryCardActions } from '@renderer/features/gallery/GalleryCardAction
 import { cleanupReact, clickButton, mount } from './reactHarness'
 
 vi.mock('@renderer/features/download/useDownloadViewModel', () => ({ useDownloadViewModel: () => ({ requestedIds: [] }) }))
-const key = 'storagebucket:action-display:v1'
+const key = 'asterodia:action-display:v1'
 beforeEach(() => { localStorage.clear() })
 afterEach(cleanupReact)
 const sidebar = () => h(Sidebar, { activeMenu: 'gallery', collapsed: false, onToggle: vi.fn(), onMenuClick: vi.fn() })

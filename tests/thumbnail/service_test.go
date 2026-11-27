@@ -20,11 +20,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/database"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/desktop"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/thumbnail"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/database"
+	"github.com/Dev-Wonjoon/Asterodia/internal/desktop"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/thumbnail"
 )
 
 func previewJob(t *testing.T, f *fixture, url, job string, mediaID int64) {
@@ -273,8 +273,8 @@ func TestDownloadPreviewUsesLegacyAssociationAndManualCover(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
-	if marker := os.Getenv("STORAGEBUCKET_HOLD_THUMBNAIL_ENGINE"); marker != "" {
-		rel, err := filepath.Rel(os.Getenv("STORAGEBUCKET_TEST_ROOT"), marker)
+	if marker := os.Getenv("ASTERODIA_HOLD_THUMBNAIL_ENGINE"); marker != "" {
+		rel, err := filepath.Rel(os.Getenv("ASTERODIA_TEST_ROOT"), marker)
 		if err != nil || !filepath.IsLocal(rel) {
 			os.Exit(2)
 		}
@@ -285,14 +285,14 @@ func TestMain(m *testing.M) {
 			time.Sleep(time.Second)
 		}
 	}
-	if os.Getenv("STORAGEBUCKET_EMPTY_THUMBNAIL_ENGINE") == "1" {
+	if os.Getenv("ASTERODIA_EMPTY_THUMBNAIL_ENGINE") == "1" {
 		os.Exit(0)
 	}
 	os.Exit(m.Run())
 }
 
 func TestShutdownStopsGenerationAndRestartResumesPendingTask(t *testing.T) {
-	ffmpeg := os.Getenv("STORAGEBUCKET_TEST_FFMPEG_EXE")
+	ffmpeg := os.Getenv("ASTERODIA_TEST_FFMPEG_EXE")
 	if !filepath.IsAbs(ffmpeg) {
 		t.Fatal("실제 FFmpeg 절대 경로가 필요합니다")
 	}
@@ -304,7 +304,7 @@ func TestShutdownStopsGenerationAndRestartResumesPendingTask(t *testing.T) {
 	must(t, err)
 	req := seed(t, f.db, path, "unknown", nil)
 	marker := filepath.Join(f.root, "engine-started.txt")
-	t.Setenv("STORAGEBUCKET_HOLD_THUMBNAIL_ENGINE", marker)
+	t.Setenv("ASTERODIA_HOLD_THUMBNAIL_ENGINE", marker)
 	must(t, f.service.Start(t.Context()))
 	deadline := time.Now().Add(5 * time.Second)
 	for {
@@ -326,7 +326,7 @@ func TestShutdownStopsGenerationAndRestartResumesPendingTask(t *testing.T) {
 	if state != "pending" {
 		t.Fatal(state)
 	}
-	t.Setenv("STORAGEBUCKET_HOLD_THUMBNAIL_ENGINE", "")
+	t.Setenv("ASTERODIA_HOLD_THUMBNAIL_ENGINE", "")
 	restarted := thumbnail.NewService(f.db, filepath.Join(f.root, "cache"), ffmpeg, nil)
 	defer restarted.Close()
 	must(t, restarted.Start(t.Context()))
@@ -365,7 +365,7 @@ func newFixture(t *testing.T, ffmpeg string) *fixture {
 	_, source, _, _ := runtime.Caller(0)
 	repo, err := filepath.EvalSymlinks(filepath.Join(filepath.Dir(source), "..", ".."))
 	must(t, err)
-	base, err := filepath.EvalSymlinks(os.Getenv("STORAGEBUCKET_TEST_ROOT"))
+	base, err := filepath.EvalSymlinks(os.Getenv("ASTERODIA_TEST_ROOT"))
 	must(t, err)
 	rel, err := filepath.Rel(filepath.Join(repo, ".test-data", "thumbnail"), base)
 	if err != nil || rel == "." || !filepath.IsLocal(rel) {
@@ -507,7 +507,7 @@ func TestExistingThumbnailsAndUnsupportedFilesStayUnchanged(t *testing.T) {
 }
 
 func TestAudioArtwork(t *testing.T) {
-	ffmpeg := os.Getenv("STORAGEBUCKET_TEST_FFMPEG_EXE")
+	ffmpeg := os.Getenv("ASTERODIA_TEST_FFMPEG_EXE")
 	if !filepath.IsAbs(ffmpeg) {
 		t.Fatal("실제 FFmpeg 절대 경로가 필요합니다")
 	}
@@ -635,7 +635,7 @@ func TestBackfillContinuesAcrossBatchesAndRecoversRunningTask(t *testing.T) {
 }
 
 func TestVideoThumbnailUsesAnActualFFmpegFrame(t *testing.T) {
-	ffmpeg := os.Getenv("STORAGEBUCKET_TEST_FFMPEG_EXE")
+	ffmpeg := os.Getenv("ASTERODIA_TEST_FFMPEG_EXE")
 	if !filepath.IsAbs(ffmpeg) {
 		t.Fatal("실제 FFmpeg 절대 경로가 필요합니다")
 	}
@@ -663,7 +663,7 @@ func TestSuccessfulEngineWithoutFrameIsNotPublished(t *testing.T) {
 	f := newFixture(t, executable)
 	path := filepath.Join(f.root, "source.mp4")
 	must(t, os.WriteFile(path, []byte("fixture"), 0600))
-	t.Setenv("STORAGEBUCKET_EMPTY_THUMBNAIL_ENGINE", "1")
+	t.Setenv("ASTERODIA_EMPTY_THUMBNAIL_ENGINE", "1")
 	req := seed(t, f.db, path, "video", nil)
 	must(t, f.service.Start(t.Context()))
 	wait(t, f, req, "failed")

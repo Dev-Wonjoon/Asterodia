@@ -1,13 +1,14 @@
+import { readPreference } from '../../../../internal/webserver/web/preferences.js'
 import { useSyncExternalStore } from 'react'
 
 type ActionDisplay = 'icons' | 'details'
-const key = 'storagebucket:action-display:v1'
+const key = 'asterodia:action-display:v1'
 const listeners = new Set<() => void>()
 let fallback: ActionDisplay = 'icons'
 let volatile = false
 function snapshot(): ActionDisplay {
     if (volatile) return fallback
-    try { return localStorage.getItem(key) === 'details' ? 'details' : 'icons' }
+    try { return readPreference(key) === 'details' ? 'details' : 'icons' }
     catch { return fallback }
 }
 function notify() { for (const listener of listeners) listener() }

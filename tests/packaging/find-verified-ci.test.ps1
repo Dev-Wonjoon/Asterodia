@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '../../tools/find-verified-ci.ps1') -LibraryOnly
-$repo = 'owner/StorageBucket'
+$repo = 'owner/Asterodia'
 $sha = 'a' * 40
 function Assert-Equal($Actual, $Expected, [string]$Message) {
     if ($Actual -cne $Expected) { throw "$Message (expected '$Expected', got '$Actual')" }
@@ -33,7 +33,7 @@ Assert-Equal (Invoke-Case @() @()) '' 'Missing CI must run full verification'
 foreach ($change in @(
     @{ head_sha = ('b' * 40) }, @{ head_branch = 'feature' }, @{ event = 'pull_request' },
     @{ event = 'workflow_dispatch' }, @{ path = '.github/workflows/other.yml' },
-    @{ head_repository = @{ full_name = 'fork/StorageBucket' } },
+    @{ head_repository = @{ full_name = 'fork/Asterodia' } },
     @{ conclusion = 'failure' }, @{ conclusion = 'cancelled' }, @{ conclusion = 'skipped' },
     @{ status = 'in_progress'; conclusion = $null }, @{ id = 'invalid' }
 )) {

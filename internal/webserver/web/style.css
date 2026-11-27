@@ -9,3 +9,5 @@ button{transition:filter 120ms ease}
 @media(prefers-color-scheme:dark){:root{--button-hover-brightness:1.12}}
 @media(hover:hover){button:enabled:not([aria-disabled="true"]):hover{filter:brightness(var(--button-hover-brightness))}}
 @media(prefers-reduced-motion:reduce){button{transition:none}}
+
+.asterodia-mark{display:inline-block;flex-shrink:0;width:32px;height:32px;background:currentColor;mask:url(/asterodia.svg) center/contain no-repeat;-webkit-mask:url(/asterodia.svg) center/contain no-repeat}

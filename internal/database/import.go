@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
 	"os"
 	"path/filepath"
 	"sort"
@@ -131,7 +131,7 @@ func (i *Importer) Import(ctx context.Context, sourcePath string) (ImportResult,
 		return result, err
 	}
 	// Keep a durable identity without altering the current v3 schema.
-	if _, err = conn.ExecContext(ctx, `INSERT INTO legacy_record(table_name,row_key,payload_json) VALUES('_storagebucket_database','identity',?) ON CONFLICT DO NOTHING`, jsonValue(record{"id": uuid.NewString()})); err != nil {
+	if _, err = conn.ExecContext(ctx, `INSERT INTO legacy_record(table_name,row_key,payload_json) VALUES('_asterodia_database','identity',COALESCE((SELECT payload_json FROM legacy_record WHERE table_name=? AND row_key='identity'),?)) ON CONFLICT DO NOTHING`, legacyDatabaseIdentity, jsonValue(record{"id": uuid.NewString()})); err != nil {
 		return result, err
 	}
 	if _, err = conn.ExecContext(ctx, "COMMIT"); err != nil {
@@ -157,7 +157,7 @@ func checkImportIdle(ctx context.Context, q connection) error {
 }
 func sourceIdentity(data map[string][]record, path string) string {
 	for _, row := range data["legacy_record"] {
-		if row["table_name"] == "_storagebucket_database" && row["row_key"] == "identity" {
+		if isDatabaseIdentity(textValue(row["table_name"])) && row["row_key"] == "identity" {
 			var identity struct {
 				ID string `json:"id"`
 			}
@@ -320,7 +320,7 @@ func (m *merge) run() error {
 			name, key, payload := "import:"+m.source+":"+table, rowKey(row), jsonValue(row)
 			if table == "legacy_record" {
 				original := textValue(row["table_name"])
-				if strings.HasPrefix(original, "import-map:") || original == "_storagebucket_database" {
+				if strings.HasPrefix(original, "import-map:") || isDatabaseIdentity(original) {
 					continue
 				}
 				name = "import-origin:" + m.source + ":" + original

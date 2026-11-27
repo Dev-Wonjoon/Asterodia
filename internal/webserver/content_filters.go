@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
 )
 
 // ConfigureContentFilters connects web changes to the same preferences used by the PC app.
@@ -43,7 +43,7 @@ func (s *Service) setContentFilters(w http.ResponseWriter, r *http.Request) {
 	s.mu.Unlock()
 	origin, err := url.Parse(r.Header.Get("Origin"))
 	contentType, _, typeErr := mime.ParseMediaType(r.Header.Get("Content-Type"))
-	if save == nil || err != nil || origin.Host != r.Host || (origin.Scheme != "http" && origin.Scheme != "https") || typeErr != nil || contentType != "application/json" || csrf == "" || subtle.ConstantTimeCompare([]byte(csrf), []byte(r.Header.Get("X-StorageBucket-CSRF"))) != 1 {
+	if save == nil || err != nil || origin.Host != r.Host || (origin.Scheme != "http" && origin.Scheme != "https") || typeErr != nil || contentType != "application/json" || csrf == "" || subtle.ConstantTimeCompare([]byte(csrf), []byte(r.Header.Get("X-Asterodia-CSRF"))) != 1 {
 		http.Error(w, "요청 출처와 숨김 설정 변경 권한을 확인하세요", http.StatusForbidden)
 		return
 	}

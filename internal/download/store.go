@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
 	"github.com/google/uuid"
 	whatwgurl "github.com/nlnwa/whatwg-url/url"
 )

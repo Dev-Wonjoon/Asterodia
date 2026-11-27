@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 func TestPinterestDiscovery(t *testing.T) {
@@ -84,9 +84,9 @@ func TestPinterestDirectDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 	records, _ := json.Marshal([]map[string]any{{"Name": "photo.png", "Metadata": metadata, "Payload": "image fixture"}})
-	t.Setenv("STORAGEBUCKET_GALLERYDL_FIXTURE", "1")
-	t.Setenv("STORAGEBUCKET_GALLERYDL_EXPECT_FILTER", "num in [3]")
-	t.Setenv("STORAGEBUCKET_GALLERYDL_DOWNLOAD_RESULTS", string(records))
+	t.Setenv("ASTERODIA_GALLERYDL_FIXTURE", "1")
+	t.Setenv("ASTERODIA_GALLERYDL_EXPECT_FILTER", "num in [3]")
+	t.Setenv("ASTERODIA_GALLERYDL_DOWNLOAD_RESULTS", string(records))
 	exe, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
@@ -118,8 +118,8 @@ func TestPinterestLegacyImageMetadata(t *testing.T) {
 		t.Fatal(targets, err)
 	}
 	records, _ := json.Marshal([]map[string]any{{"Name": "photo.png", "Metadata": metadata, "Payload": "legacy image fixture"}})
-	t.Setenv("STORAGEBUCKET_GALLERYDL_FIXTURE", "1")
-	t.Setenv("STORAGEBUCKET_GALLERYDL_DOWNLOAD_RESULTS", string(records))
+	t.Setenv("ASTERODIA_GALLERYDL_FIXTURE", "1")
+	t.Setenv("ASTERODIA_GALLERYDL_DOWNLOAD_RESULTS", string(records))
 	exe, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)

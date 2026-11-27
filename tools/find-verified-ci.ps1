@@ -67,7 +67,7 @@ function Find-VerifiedCIRun {
 if ($LibraryOnly) { return }
 $ErrorActionPreference = 'Stop'
 $apiRoot = if ($env:GITHUB_API_URL) { $env:GITHUB_API_URL.TrimEnd('/') } else { 'https://api.github.com' }
-$headers = @{ Accept = 'application/vnd.github+json'; 'User-Agent' = 'StorageBucket-release' }
+$headers = @{ Accept = 'application/vnd.github+json'; 'User-Agent' = 'Asterodia-release' }
 if ($env:GH_TOKEN) { $headers.Authorization = "Bearer $env:GH_TOKEN" }
 $request = {
     param($Path)

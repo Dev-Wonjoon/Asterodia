@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/mediaedit"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/download"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/mediaedit"
 )
 
 func TestPublicDownloadErrorsDoNotExposeDiagnostics(t *testing.T) {
@@ -205,7 +205,7 @@ func TestRejectedWritesDoNotConsumeSharedRateLimit(t *testing.T) {
 					for i := 0; i < 12; i++ {
 						r := httptest.NewRequest(http.MethodPost, "http://localhost"+path, strings.NewReader("{}"))
 						r.Header.Set("Origin", headers.origin)
-						r.Header.Set("X-StorageBucket-CSRF", headers.token)
+						r.Header.Set("X-Asterodia-CSRF", headers.token)
 						r.Header.Set("Content-Type", headers.contentType)
 						w := httptest.NewRecorder()
 						allowTestRequest(s, r)
@@ -234,7 +234,7 @@ func TestAuthorizedWritesRemainRateLimited(t *testing.T) {
 			post := func(path, body string) int {
 				r := httptest.NewRequest(http.MethodPost, "http://localhost"+path, strings.NewReader(body))
 				r.Header.Set("Origin", "http://localhost")
-				r.Header.Set("X-StorageBucket-CSRF", s.csrf)
+				r.Header.Set("X-Asterodia-CSRF", s.csrf)
 				r.Header.Set("Content-Type", "application/json")
 				w := httptest.NewRecorder()
 				allowTestRequest(s, r)

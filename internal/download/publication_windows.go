@@ -1,7 +1,7 @@
 package download
 
 import (
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
 	"os"
 )
 

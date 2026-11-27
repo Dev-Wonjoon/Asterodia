@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/download"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 func TestDownloadLogChild(t *testing.T) {
-	mode := os.Getenv("STORAGEBUCKET_LOG_CHILD")
+	mode := os.Getenv("ASTERODIA_LOG_CHILD")
 	if mode == "" {
 		return
 	}
@@ -25,7 +25,7 @@ func TestDownloadLogChild(t *testing.T) {
 	fmt.Fprintln(os.Stderr, "Cookie: session=should-not-leak")
 	fmt.Fprintln(os.Stderr, "https://example.test/file?signature=should-not-leak")
 	fmt.Println(`{"private_extractor_metadata":"should-not-leak"}`)
-	fmt.Println(`__STORAGEBUCKET_RESULT__:{"filepath":"private transport"}`)
+	fmt.Println(`__ASTERODIA_RESULT__:{"filepath":"private transport"}`)
 	if mode == "wait" {
 		time.Sleep(30 * time.Second)
 	}
@@ -97,7 +97,7 @@ func TestDownloadOutputLogsPersistAndSeparateAttempts(t *testing.T) {
 	if _, err := f.db.Exec("UPDATE download_queue SET log='previous unstructured log' WHERE id=?", job.ID); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("STORAGEBUCKET_LOG_CHILD", "fail")
+	t.Setenv("ASTERODIA_LOG_CHILD", "fail")
 	errorCode(t, f.service.Run(t.Context(), download.RunRequest{JobID: job.ID, Trigger: "manual_initial"}), "DOWNLOAD_ENGINE_FAILED")
 	got := success(t, f.service.Get(t.Context(), download.JobRequest{JobID: job.ID})).(download.Job)
 	if got.ErrorMessage == nil || !strings.Contains(*got.ErrorMessage, "7") {
@@ -120,7 +120,7 @@ func TestDownloadOutputLogsPersistAndSeparateAttempts(t *testing.T) {
 		t.Fatal("실제 출력 보존/민감정보 제외 실패", text.String())
 	}
 	firstAttempt := *page.CurrentAttemptID
-	t.Setenv("STORAGEBUCKET_LOG_CHILD", "ok")
+	t.Setenv("ASTERODIA_LOG_CHILD", "ok")
 	success(t, f.service.Run(t.Context(), download.RunRequest{JobID: job.ID, Trigger: "manual_retry"}))
 	page = logs(t, f, job.ID, download.LogRequest{Limit: 200})
 	if len(page.Attempts) != 2 || *page.CurrentAttemptID == firstAttempt {
@@ -151,7 +151,7 @@ func TestDownloadOutputLogsPersistAndSeparateAttempts(t *testing.T) {
 }
 func TestLiveLogsDoNotBlockGetOrCancel(t *testing.T) {
 	f := newFixture(t)
-	t.Setenv("STORAGEBUCKET_LOG_CHILD", "wait")
+	t.Setenv("ASTERODIA_LOG_CHILD", "wait")
 	f.gallery = func(ctx context.Context, url, dir string) (engine.GalleryDLDiscovery, error) {
 		return engine.GalleryDLDiscovery{}, logChild(ctx, dir)
 	}
@@ -192,7 +192,7 @@ func TestLiveLogsDoNotBlockGetOrCancel(t *testing.T) {
 func TestLogRetentionAndStorageFailure(t *testing.T) {
 	t.Run("bounded", func(t *testing.T) {
 		f := newFixture(t)
-		t.Setenv("STORAGEBUCKET_LOG_CHILD", "burst")
+		t.Setenv("ASTERODIA_LOG_CHILD", "burst")
 		original := f.gallery
 		f.gallery = func(ctx context.Context, url, dir string) (engine.GalleryDLDiscovery, error) {
 			if err := logChild(ctx, dir); err != nil {

@@ -17,10 +17,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/database"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/webserver"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/database"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/webserver"
 )
 
 type fixture struct {
@@ -37,7 +37,7 @@ func newFixture(t *testing.T) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	base, err := filepath.EvalSymlinks(os.Getenv("STORAGEBUCKET_TEST_ROOT"))
+	base, err := filepath.EvalSymlinks(os.Getenv("ASTERODIA_TEST_ROOT"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,10 +236,14 @@ func TestFavicon(t *testing.T) {
 	f := newFixture(t)
 	status(t, f.server.Start())
 	code, _, page := f.request(t, "GET", "/", nil)
-	if code != http.StatusOK || !bytes.Contains(page, []byte(`rel="icon" type="image/x-icon" href="/favicon.ico"`)) {
+	if code != http.StatusOK || !bytes.Contains(page, []byte(`rel="icon" type="image/svg+xml" href="/favicon.svg"`)) {
 		t.Fatal("페이지의 favicon 연결이 없습니다")
 	}
-	code, headers, data := f.request(t, "GET", "/favicon.ico", nil)
+	code, headers, data := f.request(t, "GET", "/favicon.svg", nil)
+	if code != http.StatusOK || !strings.HasPrefix(headers.Get("Content-Type"), "image/svg+xml") || !bytes.Contains(data, []byte("<svg")) || !bytes.Contains(data, []byte("prefers-color-scheme")) {
+		t.Fatal("테마에 대응하는 SVG favicon 응답이 없습니다")
+	}
+	code, headers, data = f.request(t, "GET", "/favicon.ico", nil)
 	contentType := headers.Get("Content-Type")
 	if code != http.StatusOK || (contentType != "image/x-icon" && contentType != "image/vnd.microsoft.icon") || len(data) < 6 || !bytes.Equal(data[:4], []byte{0, 0, 1, 0}) || (data[4] == 0 && data[5] == 0) {
 		t.Fatalf("유효한 ICO 응답이 아닙니다: 상태 %d, 형식 %s, 크기 %d", code, headers.Get("Content-Type"), len(data))

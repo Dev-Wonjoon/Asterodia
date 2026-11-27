@@ -23,7 +23,7 @@ export default defineConfig({
         '@wailsio/runtime': root + '/frontend/node_modules/@wailsio/runtime/dist/index.js',
         '@renderer': root + '/frontend/src',
         '@contracts': root + '/frontend/src/contracts',
-        '@bindings': root + '/frontend/bindings/github.com/Dev-Wonjoon/StorageBucket/internal'
+        '@bindings': root + '/frontend/bindings/github.com/Dev-Wonjoon/Asterodia/internal'
     } },
     test: {
         include: ['tests/frontend/**/*.test.ts'], environment: 'node', watch: false,

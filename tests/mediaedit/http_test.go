@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/mediaedit"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/webserver"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/mediaedit"
+	"github.com/Dev-Wonjoon/Asterodia/internal/webserver"
 	"github.com/google/uuid"
 )
 
@@ -33,7 +33,7 @@ func TestMobileWriteBoundaryAndSharedJobs(t *testing.T) {
 		}
 		req.Header.Set("Content-Type", "application/json")
 		if csrf != "" {
-			req.Header.Set("X-StorageBucket-CSRF", csrf)
+			req.Header.Set("X-Asterodia-CSRF", csrf)
 		}
 		if origin != "" {
 			req.Header.Set("Origin", origin)

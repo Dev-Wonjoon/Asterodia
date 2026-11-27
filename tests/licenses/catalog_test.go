@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/licenses"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/settings"
+	"github.com/Dev-Wonjoon/Asterodia/internal/licenses"
+	"github.com/Dev-Wonjoon/Asterodia/internal/settings"
 )
 
 func TestOfflineNoticesAndSettings(t *testing.T) {

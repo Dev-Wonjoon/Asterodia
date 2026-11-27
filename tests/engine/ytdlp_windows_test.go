@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 func TestYtdlpDownloadSingle(t *testing.T) {
@@ -24,13 +24,13 @@ func TestYtdlpDownloadSingle(t *testing.T) {
 
 func testYtdlpDownloadSingle(t *testing.T, audio bool) {
 	t.Helper()
-	originalURL := os.Getenv("STORAGEBUCKET_YTDLP_TEST_URL")
+	originalURL := os.Getenv("ASTERODIA_YTDLP_TEST_URL")
 	if originalURL == "" {
-		t.Skip("실제 다운로드를 검증하려면 STORAGEBUCKET_YTDLP_TEST_URL을 지정하세요")
+		t.Skip("실제 다운로드를 검증하려면 ASTERODIA_YTDLP_TEST_URL을 지정하세요")
 	}
 
-	ytdlpPath := os.Getenv("STORAGEBUCKET_TEST_YTDLP_EXE")
-	ffprobePath := os.Getenv("STORAGEBUCKET_TEST_FFPROBE_EXE")
+	ytdlpPath := os.Getenv("ASTERODIA_TEST_YTDLP_EXE")
+	ffprobePath := os.Getenv("ASTERODIA_TEST_FFPROBE_EXE")
 	if !filepath.IsAbs(ytdlpPath) || !filepath.IsAbs(ffprobePath) {
 		t.Fatal("yt-dlp.exe와 ffprobe.exe의 절대 경로를 지정하세요")
 	}
@@ -47,9 +47,9 @@ func testYtdlpDownloadSingle(t *testing.T, audio bool) {
 	defer cancel()
 
 	ytdlp := engine.Ytdlp{Executable: ytdlpPath}
-	if nodePath := os.Getenv("STORAGEBUCKET_TEST_NODE_EXE"); nodePath != "" {
+	if nodePath := os.Getenv("ASTERODIA_TEST_NODE_EXE"); nodePath != "" {
 		if !filepath.IsAbs(nodePath) {
-			t.Fatal("STORAGEBUCKET_TEST_NODE_EXE에 node.exe의 절대 경로를 지정하세요")
+			t.Fatal("ASTERODIA_TEST_NODE_EXE에 node.exe의 절대 경로를 지정하세요")
 		}
 		ytdlp.JSRuntime = "node:" + nodePath
 		ytdlp.FFmpegLocation = filepath.Dir(ffprobePath)
@@ -120,9 +120,9 @@ func ytdlpTestRoot(t *testing.T) string {
 func engineTestRoot(t *testing.T, categoryName string) string {
 	t.Helper()
 
-	configuredRoot := os.Getenv("STORAGEBUCKET_TEST_ROOT")
+	configuredRoot := os.Getenv("ASTERODIA_TEST_ROOT")
 	if !filepath.IsAbs(configuredRoot) {
-		t.Fatal("STORAGEBUCKET_TEST_ROOT에 절대 경로를 지정하세요")
+		t.Fatal("ASTERODIA_TEST_ROOT에 절대 경로를 지정하세요")
 	}
 	root, err := filepath.EvalSymlinks(configuredRoot)
 	if err != nil {

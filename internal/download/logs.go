@@ -11,8 +11,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 const maxLogBytes = 1 << 20
@@ -257,7 +257,7 @@ func (r *logRecorder) write(output engine.Output) {
 	}
 	// Structured extractor metadata and private result frames are transport,
 	// not console diagnostics; they may contain signed media addresses.
-	if strings.HasPrefix(line, transferPrefix) || output.Stream == "stdout" && (strings.HasPrefix(line, "__STORAGEBUCKET_RESULT__:") || json.Valid([]byte(line))) {
+	if strings.HasPrefix(line, transferPrefix) || output.Stream == "stdout" && (strings.HasPrefix(line, "__ASTERODIA_RESULT__:") || json.Valid([]byte(line))) {
 		return
 	}
 	text := cleanLogText(line)

@@ -261,7 +261,7 @@ func (y *Ytdlp) DownloadSingle(
 			"--no-js-runtimes", "--no-remote-components",
 			"--encoding", "utf-8", "--abort-on-error",
 			"--no-simulate", "--no-quiet", "--progress", "--newline", "--progress-delta", "0.5",
-			"--progress-template", fmt.Sprintf(`download:__STORAGEBUCKET_PROGRESS__:{"streams":%d,"formatId":%%(info.format_id)j,"download":%%(progress.{status,downloaded_bytes,total_bytes,total_bytes_estimate,speed,eta})j}`, len(selected)),
+			"--progress-template", fmt.Sprintf(`download:__ASTERODIA_PROGRESS__:{"streams":%d,"formatId":%%(info.format_id)j,"download":%%(progress.{status,downloaded_bytes,total_bytes,total_bytes_estimate,speed,eta})j}`, len(selected)),
 			"--abort-on-unavailable-fragments", "--fixup", "detect_or_warn",
 			"--downloader", "m3u8:native",
 			"--paths", "home:" + stageDir,
@@ -371,7 +371,7 @@ func (y *Ytdlp) DownloadSingle(
 	return path, nil
 }
 
-const resultPrefix = "__STORAGEBUCKET_RESULT__:"
+const resultPrefix = "__ASTERODIA_RESULT__:"
 
 type YtdlpTarget struct {
 	OwnerID      string   `json:"uploader_id"`

@@ -2,7 +2,7 @@ package mediaedit_test
 
 import (
 	"encoding/json"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/webserver"
+	"github.com/Dev-Wonjoon/Asterodia/internal/webserver"
 	"io"
 	"net/http"
 	"net/http/cookiejar"

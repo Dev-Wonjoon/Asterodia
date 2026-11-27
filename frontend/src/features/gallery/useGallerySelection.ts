@@ -9,7 +9,7 @@ export const gallerySelectionKey = (item: MediaSummaryDto) => item.galleryFile ?
 export const galleryDisplayKey = (item: MediaSummaryDto) => `${item.id}:${gallerySelectionKey(item)}`
 const displayKey = galleryDisplayKey
 const target = (item: MediaSummaryDto): MoveSelection => ({ mediaId: item.id, revision: item.revision, ...(item.galleryFile ? { fileIds: [item.galleryFile.id] } : {}) })
-export const albumDragType = 'application/x-storagebucket-album-selection'
+export const albumDragType = 'application/x-asterodia-album-selection'
 export type AlbumDragSelection = { fileIds: number[]; mediaIds: number[] }
 type Modifiers = Pick<MouseEvent, 'ctrlKey' | 'metaKey' | 'shiftKey'>
 type Rectangle = { left: number; top: number; width: number; height: number }

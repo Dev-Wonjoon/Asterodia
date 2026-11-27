@@ -1,16 +1,17 @@
+import { readPreference } from './preferences.js'
 import { translate, bindText, bindAttribute, localizeWidget } from './i18n.js'
 import { matchShortcut, isComposing } from './shortcuts.js';
 import { observePlayback } from './player-performance.js';
-const preferenceKey = 'storagebucket:player-seek-seconds:v1';
-const audioPreferenceKey = 'storagebucket:player-audio:v1';
+const preferenceKey = 'asterodia:player-seek-seconds:v1';
+const audioPreferenceKey = 'asterodia:player-audio:v1';
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 export function readSeekSeconds() {
-    try { const n = Number(localStorage.getItem(preferenceKey)); return Number.isInteger(n) && n >= 1 && n <= 300 ? n : 10; }
+    try { const n = Number(readPreference(preferenceKey)); return Number.isInteger(n) && n >= 1 && n <= 300 ? n : 10; }
     catch { return 10; }
 }
 function readAudioPreference() {
     try {
-        const saved = JSON.parse(localStorage.getItem(audioPreferenceKey));
+        const saved = JSON.parse(readPreference(audioPreferenceKey));
         if (saved && typeof saved.volume === 'number' && Number.isFinite(saved.volume) && saved.volume >= 0 && saved.volume <= 1 && typeof saved.muted === 'boolean') return saved;
     } catch {}
     return { volume: 1, muted: false };

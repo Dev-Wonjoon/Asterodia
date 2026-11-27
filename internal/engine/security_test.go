@@ -69,7 +69,7 @@ func TestManagerReportsUnverifiedBinariesWithoutVersionProbe(t *testing.T) {
 }
 
 func TestPinnedOfficialArtifactsMatchBeforeVersionProbe(t *testing.T) {
-	root := os.Getenv("STORAGEBUCKET_SECURITY_ENGINE_ROOT")
+	root := os.Getenv("ASTERODIA_SECURITY_ENGINE_ROOT")
 	if root == "" {
 		t.Skip("verified official artifacts not configured")
 	}
@@ -127,7 +127,7 @@ func TestEngineJobHasMemoryAndTerminationLimits(t *testing.T) {
 
 func TestOfficialEnginesUseConfiguredProxy(t *testing.T) {
 	t.Setenv("NO_PROXY", "*")
-	root := os.Getenv("STORAGEBUCKET_SECURITY_ENGINE_ROOT")
+	root := os.Getenv("ASTERODIA_SECURITY_ENGINE_ROOT")
 	if root == "" {
 		t.Skip("verified official test binaries not configured")
 	}
@@ -165,7 +165,7 @@ func TestOfficialEnginesUseConfiguredProxy(t *testing.T) {
 
 func TestOfficialYtdlpDoesNotBypassProxyForNonHTTPRedirect(t *testing.T) {
 	t.Setenv("NO_PROXY", "*")
-	root := os.Getenv("STORAGEBUCKET_SECURITY_ENGINE_ROOT")
+	root := os.Getenv("ASTERODIA_SECURITY_ENGINE_ROOT")
 	if root == "" {
 		t.Skip("verified official test binary not configured")
 	}

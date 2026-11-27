@@ -1,12 +1,13 @@
+import { readPreference } from './preferences.js'
 import { catalogs } from './translations.js';
 
-export const languageKey = 'storagebucket:language:v1';
+export const languageKey = 'asterodia:language:v1';
 const listeners = new Set();
 let memoryPreference = 'system', volatile = false;
 export function getLanguagePreference() {
     if (volatile) return memoryPreference;
     try {
-        const saved = globalThis.localStorage?.getItem(languageKey);
+        const saved = readPreference(languageKey);
         return saved === 'ko' || saved === 'en' ? saved : 'system';
     } catch { return memoryPreference; }
 }

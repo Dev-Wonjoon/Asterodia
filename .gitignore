@@ -96,6 +96,9 @@ cache/
 
 # Local backups and download workspaces
 /backups/
+.asterodia/
 .storagebucket/
 VERIFICATION.md
 diff.txt
+
+.eslintcache

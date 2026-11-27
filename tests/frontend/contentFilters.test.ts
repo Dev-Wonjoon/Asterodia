@@ -90,7 +90,7 @@ it('keeps web access tokens out of preference objects and reports save failures'
         const value = await getWebApi().getContentFilters()
         expect(value).toEqual({ hiddenPlatforms: ['site'], hiddenTags: [] })
         await expect(getWebApi().setContentFilters(value)).rejects.toThrow('숨김 설정')
-        expect(fetcher.mock.calls[2][1].headers['X-StorageBucket-CSRF']).toBe('new-token')
+        expect(fetcher.mock.calls[2][1].headers['X-Asterodia-CSRF']).toBe('new-token')
         expect(JSON.parse(fetcher.mock.calls[2][1].body)).toEqual(value)
     } finally { vi.unstubAllGlobals() }
 })

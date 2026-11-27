@@ -2,7 +2,7 @@ package mediaedit
 
 import (
 	"fmt"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
 	"mime"
 	"net/http"
 	"os"

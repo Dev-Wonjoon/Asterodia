@@ -14,12 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 func TestYtdlpDownloadMerge(t *testing.T) {
-	ytdlpPath := os.Getenv("STORAGEBUCKET_TEST_YTDLP_EXE")
-	ffprobePath := os.Getenv("STORAGEBUCKET_TEST_FFPROBE_EXE")
+	ytdlpPath := os.Getenv("ASTERODIA_TEST_YTDLP_EXE")
+	ffprobePath := os.Getenv("ASTERODIA_TEST_FFPROBE_EXE")
 	if ytdlpPath == "" && ffprobePath == "" {
 		t.Skip("yt-dlp와 FFmpeg 실행 경로를 지정하세요")
 	}
@@ -218,7 +218,7 @@ func TestYtdlpDownloadMerge(t *testing.T) {
 					cancelledDuringSleep.Store(true)
 					stop()
 				}
-				const prefix = "__STORAGEBUCKET_PROGRESS__:"
+				const prefix = "__ASTERODIA_PROGRESS__:"
 				if strings.HasPrefix(output.Text, prefix) {
 					var frame struct {
 						Streams  int    `json:"streams"`

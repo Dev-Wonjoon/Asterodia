@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/settings"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/webserver"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/settings"
+	"github.com/Dev-Wonjoon/Asterodia/internal/webserver"
 )
 
 func contentFilterToken(t *testing.T, f *fixture) string {
@@ -36,7 +36,7 @@ func postContentFilters(t *testing.T, f *fixture, token, body string, headers ma
 	}
 	req.Header.Set("Origin", address)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-StorageBucket-CSRF", token)
+	req.Header.Set("X-Asterodia-CSRF", token)
 	for key, value := range headers {
 		req.Header.Set(key, value)
 	}
@@ -132,7 +132,7 @@ func TestWebContentFilterWritesRejectInvalidRequests(t *testing.T) {
 		{"missing origin", `{}`, map[string]string{"Origin": ""}, 403},
 		{"foreign origin", `{}`, map[string]string{"Origin": "https://example.com"}, 403},
 		{"cross site", `{}`, map[string]string{"Sec-Fetch-Site": "cross-site"}, 403},
-		{"missing token", `{}`, map[string]string{"X-StorageBucket-CSRF": ""}, 403},
+		{"missing token", `{}`, map[string]string{"X-Asterodia-CSRF": ""}, 403},
 		{"wrong type", `{}`, map[string]string{"Content-Type": "text/plain"}, 403},
 		{"unknown field", `{"otherSetting":true}`, nil, 400},
 		{"invalid json", `{`, nil, 400},

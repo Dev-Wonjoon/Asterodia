@@ -12,13 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
 )
 
 // Opt-in fixture bridge for the isolated browser test; never part of the app.
 func TestBrowserFixture(t *testing.T) {
-	if os.Getenv("STORAGEBUCKET_BROWSER_FIXTURE") != "1" {
+	if os.Getenv("ASTERODIA_BROWSER_FIXTURE") != "1" {
 		return
 	}
 	f := newFixture(t)
@@ -55,7 +55,7 @@ func TestBrowserFixture(t *testing.T) {
 	if err := f.db.QueryRow("SELECT media_id FROM media_file WHERE filepath=?", imagePath).Scan(&mixedID); err != nil {
 		t.Fatal(err)
 	}
-	ffmpeg := os.Getenv("STORAGEBUCKET_TEST_FFMPEG_EXE")
+	ffmpeg := os.Getenv("ASTERODIA_TEST_FFMPEG_EXE")
 	if !filepath.IsAbs(ffmpeg) {
 		t.Fatal("FFmpeg 절대 경로가 필요합니다")
 	}

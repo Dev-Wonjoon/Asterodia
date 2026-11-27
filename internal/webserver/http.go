@@ -122,7 +122,7 @@ func (s *Service) routes() http.Handler {
 	web, _ := fs.Sub(assets, "web")
 	ui, _ := fs.Sub(assets, "web/dist")
 	mux.Handle("GET /ui/", http.StripPrefix("/ui/", http.FileServerFS(ui)))
-	for _, path := range []string{"/i18n.js", "/translations.js", "/app.js", "/style.css", "/favicon.ico", "/editor.js", "/editor.css", "/search.js", "/search.css", "/licenses.css", "/player.js", "/player.css", "/album-state.js", "/viewer.js", "/viewer-queue.js", "/viewer.css"} {
+	for _, path := range []string{"/i18n.js", "/preferences.js", "/translations.js", "/app.js", "/style.css", "/favicon.ico", "/favicon.svg", "/asterodia.svg", "/editor.js", "/editor.css", "/search.js", "/search.css", "/licenses.css", "/player.js", "/player.css", "/album-state.js", "/viewer.js", "/viewer-queue.js", "/viewer.css"} {
 		mux.Handle("GET "+path, http.FileServerFS(web))
 	}
 	for _, path := range []string{"/langs/ko.json", "/langs/en.json", "/shortcuts.js", "/output-controls.js"} {

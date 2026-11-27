@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 func instagramPublicFixturePost(kind int) map[string]any {
@@ -242,7 +242,7 @@ func TestInstagramPublicPhotoTransfer(t *testing.T) {
 // Optional local evidence. The supplied HTML can contain signed URLs or private
 // fields, so it is never copied into the repository or logged by this test.
 func TestInstagramPublicSuppliedHTML(t *testing.T) {
-	path := os.Getenv("STORAGEBUCKET_TEST_INSTAGRAM_HTML")
+	path := os.Getenv("ASTERODIA_TEST_INSTAGRAM_HTML")
 	if path == "" {
 		t.Skip("첨부 HTML 검증은 환경 변수로 별도 지정합니다")
 	}

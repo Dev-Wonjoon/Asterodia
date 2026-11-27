@@ -12,7 +12,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/licenses"
+	"github.com/Dev-Wonjoon/Asterodia/internal/licenses"
 )
 
 var engineNoticeName = regexp.MustCompile(`(?i)^(licenses?|licences?|copying|notices?|copyright|third[_-]?party)([._-]|$)`)

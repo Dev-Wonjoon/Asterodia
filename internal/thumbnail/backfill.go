@@ -4,7 +4,7 @@ import (
 	"context"
 	"os"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 func thumbnailExists(path *string) bool {

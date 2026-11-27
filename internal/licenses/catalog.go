@@ -1,4 +1,4 @@
-// Package licenses provides the offline notices shipped with StorageBucket.
+// Package licenses provides the offline notices shipped with Asterodia.
 package licenses
 
 import (
@@ -69,7 +69,7 @@ func List() []Entry { return append([]Entry(nil), catalog...) }
 // Text returns the full notices for offline viewing or saving as plain text.
 func Text() string {
 	var text strings.Builder
-	text.WriteString("StorageBucket — Third-Party Software Notices\n\n")
+	text.WriteString("Asterodia — Third-Party Software Notices\n\n")
 	for _, item := range catalog {
 		fmt.Fprintf(&text, "%s | %s | %s | %s\n%s\n%s\n\n%s\n", item.Name, item.Version, item.Scope, item.License, item.URL, item.Notice, item.Text)
 	}

@@ -6,17 +6,17 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/webserver"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/webserver"
 )
 
 // Opt-in browser fixture. Every file and database belongs to the isolated run.
 func TestEditorBrowserFixture(t *testing.T) {
-	if os.Getenv("STORAGEBUCKET_EDITOR_FIXTURE") != "1" {
+	if os.Getenv("ASTERODIA_EDITOR_FIXTURE") != "1" {
 		t.Skip("브라우저 확인 전용")
 	}
 	var f *fixture
-	if os.Getenv("STORAGEBUCKET_EDITOR_GIF") == "1" {
+	if os.Getenv("ASTERODIA_EDITOR_GIF") == "1" {
 		f = gifFixtureFrames(t, 10)
 	} else {
 		f = newFixture(t)

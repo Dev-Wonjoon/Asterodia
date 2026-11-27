@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
-const transferPrefix = "__STORAGEBUCKET_PROGRESS__:"
+const transferPrefix = "__ASTERODIA_PROGRESS__:"
 
 // TransferProgress describes the current file, not publication to the library.
 // It is transient and belongs to one attempt; retrying never reuses old samples.

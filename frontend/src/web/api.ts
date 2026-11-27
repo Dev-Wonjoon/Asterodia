@@ -6,7 +6,7 @@ import type { AlbumExplorePage } from '@contracts/media-v2'
 
 export async function request<T>(path: string, options?: RequestInit): Promise<T> {
     const response = await fetch(path, { credentials: 'same-origin', ...options })
-    if (response.status === 401) window.dispatchEvent(new Event('storagebucket:access-expired'))
+    if (response.status === 401) window.dispatchEvent(new Event('asterodia:access-expired'))
     if (!response.ok) throw new Error(response.status === 403 ? translate("common.checkMobileEditingPermissionInThePcApp") : translate("common.couldNotConnectToTheServerTryAgainShortly"))
     return response.json()
 }
@@ -39,7 +39,7 @@ const media: MediaApi = {
     }),
     saveAlbum: async value => {
         const access = await request<{ csrf: string }>('/api/albums/access')
-        const response = await request<MediaResult<MediaSummaryDto>>('/api/albums', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-StorageBucket-CSRF': access.csrf }, body: JSON.stringify(value) })
+        const response = await request<MediaResult<MediaSummaryDto>>('/api/albums', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Asterodia-CSRF': access.csrf }, body: JSON.stringify(value) })
         return response.ok ? { ok: true, data: summary(response.data) } : response
     },
     list: (value = {}) => result(async () => {
@@ -71,7 +71,7 @@ let access: EditAccess = { enabled: false, csrf: '' }
 export async function refreshAccess() { access = await request<EditAccess>('/api/edit/status'); return access }
 async function editRequest(name: string, value?: unknown, read = false, attempt = 0): Promise<any> {
     const query = read && value ? '?' + new URLSearchParams(Object.entries(value).map(([key, item]) => [key, String(item)])) : ''
-    const response = await fetch('/api/edit/' + name + query, read ? { credentials: 'same-origin' } : { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-StorageBucket-CSRF': access.csrf }, body: JSON.stringify(value) })
+    const response = await fetch('/api/edit/' + name + query, read ? { credentials: 'same-origin' } : { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Asterodia-CSRF': access.csrf }, body: JSON.stringify(value) })
     if (response.status === 429 && attempt < 5) { await new Promise(resolve => setTimeout(resolve, 1200)); return editRequest(name, value, read, attempt + 1) }
     if (!response.ok && !response.headers.get('Content-Type')?.includes('application/json')) throw new Error(await response.text())
     return response.json()
@@ -99,7 +99,7 @@ const api = {
         if (!access.csrf) throw new Error(translate('contentFilters.saveError'))
         const response = await fetch('/api/content-filters', {
             method: 'POST', credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json', 'X-StorageBucket-CSRF': access.csrf },
+            headers: { 'Content-Type': 'application/json', 'X-Asterodia-CSRF': access.csrf },
             body: JSON.stringify({ hiddenPlatforms: value.hiddenPlatforms, hiddenTags: value.hiddenTags }),
         })
         if (!response.ok) throw new Error(translate('contentFilters.saveError'))

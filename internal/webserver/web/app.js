@@ -263,7 +263,7 @@ let editAccess = { enabled: false, csrf: '' };
 let openedEditor = null;
 async function editRequest(name, value, read = false, attempt = 0) {
     const path = '/api/edit/' + name + (read && value?.id ? '?'+new URLSearchParams(Object.entries(value).map(([k,v])=>[k,String(v)])).toString() : '');
-    const response = await fetch(path, read ? { credentials: 'same-origin' } : { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-StorageBucket-CSRF': editAccess.csrf }, body: JSON.stringify(value) });
+    const response = await fetch(path, read ? { credentials: 'same-origin' } : { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Asterodia-CSRF': editAccess.csrf }, body: JSON.stringify(value) });
     if(response.status===429&&attempt<5){await new Promise(resolve=>setTimeout(resolve,1200));return editRequest(name,value,read,attempt+1);}
     if (!response.ok && !response.headers.get('Content-Type')?.includes('application/json'))
         throw new Error(await response.text());

@@ -36,14 +36,14 @@ function Invoke-TestGroup {
     param([string]$Category, [string]$Package, [string]$Pattern = '.', [string]$CoverPackage = '')
     $timer = [Diagnostics.Stopwatch]::StartNew()
     Write-Output "[$Category]"
-    $env:STORAGEBUCKET_TEST_ROOT = Join-Path $repositoryPath ".test-data/$Category/$runId"
-    New-Item -ItemType Directory -Force -Path $env:STORAGEBUCKET_TEST_ROOT | Out-Null
-    $binaryPath = Join-Path $env:STORAGEBUCKET_TEST_ROOT 'suite.test.exe'
+    $env:ASTERODIA_TEST_ROOT = Join-Path $repositoryPath ".test-data/$Category/$runId"
+    New-Item -ItemType Directory -Force -Path $env:ASTERODIA_TEST_ROOT | Out-Null
+    $binaryPath = Join-Path $env:ASTERODIA_TEST_ROOT 'suite.test.exe'
     $coverFlags = @()
     $runtimeFlags = @()
     if ($CoverPackage) {
         $coverFlags = @('-cover', "-coverpkg=$CoverPackage")
-        $profilePath = Join-Path $env:STORAGEBUCKET_TEST_ROOT 'coverage.out'
+        $profilePath = Join-Path $env:ASTERODIA_TEST_ROOT 'coverage.out'
         $runtimeFlags = @("-test.coverprofile=$profilePath")
     }
     & go test $Package '-c' '-o' $binaryPath @testFlags @coverFlags
@@ -98,23 +98,23 @@ function Invoke-ParallelTestGroups {
     }
 }
 Push-Location $repositoryPath
-$oldRoot = $env:STORAGEBUCKET_TEST_ROOT
-$oldLive = $env:STORAGEBUCKET_LIVE_TESTS
-$oldYtdlp = $env:STORAGEBUCKET_TEST_YTDLP_EXE
-$oldGallery = $env:STORAGEBUCKET_TEST_GALLERYDL_EXE
-$oldProbe = $env:STORAGEBUCKET_TEST_FFPROBE_EXE
+$oldRoot = $env:ASTERODIA_TEST_ROOT
+$oldLive = $env:ASTERODIA_LIVE_TESTS
+$oldYtdlp = $env:ASTERODIA_TEST_YTDLP_EXE
+$oldGallery = $env:ASTERODIA_TEST_GALLERYDL_EXE
+$oldProbe = $env:ASTERODIA_TEST_FFPROBE_EXE
 if (-not $oldYtdlp -and -not $oldProbe) {
     $probeCommand = Get-Command ffprobe -ErrorAction SilentlyContinue
     $localYtdlp = Join-Path $repositoryPath 'bin/yt-dlp.exe'
     if ($probeCommand -and (Test-Path -LiteralPath $localYtdlp)) {
-        $env:STORAGEBUCKET_TEST_YTDLP_EXE = $localYtdlp
-        $env:STORAGEBUCKET_TEST_FFPROBE_EXE = $probeCommand.Source
+        $env:ASTERODIA_TEST_YTDLP_EXE = $localYtdlp
+        $env:ASTERODIA_TEST_FFPROBE_EXE = $probeCommand.Source
     }
 }
 if (-not $oldGallery -and (Test-Path -LiteralPath (Join-Path $repositoryPath 'bin/gallery-dl.exe'))) {
-    $env:STORAGEBUCKET_TEST_GALLERYDL_EXE = Join-Path $repositoryPath 'bin/gallery-dl.exe'
+    $env:ASTERODIA_TEST_GALLERYDL_EXE = Join-Path $repositoryPath 'bin/gallery-dl.exe'
 }
-if ($Live) { $env:STORAGEBUCKET_LIVE_TESTS = '1' } else { $env:STORAGEBUCKET_LIVE_TESTS = '0' }
+if ($Live) { $env:ASTERODIA_LIVE_TESTS = '1' } else { $env:ASTERODIA_LIVE_TESTS = '0' }
 try {
     if ($Jobs -gt 1) {
         Invoke-ParallelTestGroups
@@ -128,10 +128,10 @@ try {
         Write-Output ('[go-vet] passed in {0:N1}s' -f $vetTimer.Elapsed.TotalSeconds)
     }
 } finally {
-    $env:STORAGEBUCKET_TEST_ROOT = $oldRoot
-    $env:STORAGEBUCKET_LIVE_TESTS = $oldLive
-    $env:STORAGEBUCKET_TEST_YTDLP_EXE = $oldYtdlp
-    $env:STORAGEBUCKET_TEST_GALLERYDL_EXE = $oldGallery
-    $env:STORAGEBUCKET_TEST_FFPROBE_EXE = $oldProbe
+    $env:ASTERODIA_TEST_ROOT = $oldRoot
+    $env:ASTERODIA_LIVE_TESTS = $oldLive
+    $env:ASTERODIA_TEST_YTDLP_EXE = $oldYtdlp
+    $env:ASTERODIA_TEST_GALLERYDL_EXE = $oldGallery
+    $env:ASTERODIA_TEST_FFPROBE_EXE = $oldProbe
     Pop-Location
 }

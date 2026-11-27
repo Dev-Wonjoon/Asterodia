@@ -1,4 +1,4 @@
-name: Set up StorageBucket build
+name: Set up Asterodia build
 description: Install the SDK, frontend dependencies, and optional verified media test tools.
 inputs:
   test-tools:

@@ -3,7 +3,7 @@
 #
 # The lines below are called `modelines`. See `:help modeline`
 
-name: "StorageBucket"
+name: "Asterodia"
 arch: ${GOARCH}
 platform: "linux"
 version: "2.3.4"
@@ -17,12 +17,12 @@ license: "MIT"
 release: "1"
 
 contents:
-  - src: "./bin/StorageBucket"
-    dst: "/usr/local/bin/StorageBucket"
+  - src: "./bin/Asterodia"
+    dst: "/usr/local/bin/Asterodia"
   - src: "./build/appicon.png"
-    dst: "/usr/share/icons/hicolor/128x128/apps/StorageBucket.png"
-  - src: "./build/linux/StorageBucket.desktop"
-    dst: "/usr/share/applications/StorageBucket.desktop"
+    dst: "/usr/share/icons/hicolor/128x128/apps/Asterodia.png"
+  - src: "./build/linux/Asterodia.desktop"
+    dst: "/usr/share/applications/Asterodia.desktop"
 
 # Default dependencies for the GTK4 + WebKitGTK 6.0 stack (Ubuntu 24.04+ / Debian 13+)
 depends:

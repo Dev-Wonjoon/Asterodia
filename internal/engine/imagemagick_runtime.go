@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/licenses"
+	"github.com/Dev-Wonjoon/Asterodia/internal/licenses"
 	_ "golang.org/x/image/webp"
 )
 

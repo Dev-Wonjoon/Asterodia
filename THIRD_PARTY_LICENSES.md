@@ -1,8 +1,8 @@
 # Third-Party Software Notices
 
-StorageBucket uses the components listed below. Scope identifies bundled components, separately installed external tools, and build-only packages. Original license, copyright, NOTICE and third-party texts supplied by these components are retained in `internal/licenses/texts/`, embedded in the application, and available offline in Settings → Open-source licenses and the mobile `/licenses` page.
+Asterodia uses the components listed below. Scope identifies bundled components, separately installed external tools, and build-only packages. Original license, copyright, NOTICE and third-party texts supplied by these components are retained in `internal/licenses/texts/`, embedded in the application, and available offline in Settings → Open-source licenses and the mobile `/licenses` page.
 
-The StorageBucket project license is in [LICENSE](LICENSE). External tools are downloaded from upstream on the user’s machine and executed separately. Their binary distributions and included dependencies have their own terms. Redistributing those binaries requires satisfying the terms for the exact binaries and their corresponding source, not just retaining this summary.
+The Asterodia project license is in [LICENSE](LICENSE). External tools are downloaded from upstream on the user’s machine and executed separately. Their binary distributions and included dependencies have their own terms. Redistributing those binaries requires satisfying the terms for the exact binaries and their corresponding source, not just retaining this summary.
 
 | Component | Version | Scope | License | Original notices |
 | --- | --- | --- | --- | --- |

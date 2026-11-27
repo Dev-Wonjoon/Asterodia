@@ -22,14 +22,14 @@ try {
         $env:GOOS = 'windows'; $env:GOARCH = $arch; $env:CGO_ENABLED = '0'
         $directory = Join-Path $caseRoot "input/$arch"
         New-Item -ItemType Directory -Force -Path $directory | Out-Null
-        $name = "StorageBucket-windows-$arch.exe"
+        $name = "Asterodia-windows-$arch.exe"
         $executable = Join-Path $directory $name
         & go build -buildvcs=false -o $executable .
         if ($LASTEXITCODE -ne 0) { throw "Fixture build failed: $arch" }
         $payload = Get-VerifiedReleaseFile -Path $executable -Arch $arch -Version $version
         [IO.File]::WriteAllText((Join-Path $directory 'SHA256SUMS'), "$($payload.Hash)  $name`n", [Text.UTF8Encoding]::new($false))
     }
-    $amd = Join-Path $caseRoot 'input/amd64/StorageBucket-windows-amd64.exe'
+    $amd = Join-Path $caseRoot 'input/amd64/Asterodia-windows-amd64.exe'
     Expect-Failure { Get-VerifiedReleaseFile -Path $amd -Arch arm64 -Version $version } 'architecture mismatch'
     Expect-Failure { Get-VerifiedReleaseFile -Path $amd -Arch amd64 -Version '0.0.0' } 'version mismatch'
     $invalid = Join-Path $caseRoot 'invalid.exe'; Set-Content -LiteralPath $invalid -Value 'not an executable'
@@ -40,7 +40,7 @@ try {
     if (Test-Path -LiteralPath $rejectedOutput) { throw 'Tag rejection wrote release output.' }
     $sumsPath = Join-Path $caseRoot 'input/amd64/SHA256SUMS'
     $originalSums = [IO.File]::ReadAllText($sumsPath)
-    [IO.File]::WriteAllText($sumsPath, ('0' * 64) + '  StorageBucket-windows-amd64.exe')
+    [IO.File]::WriteAllText($sumsPath, ('0' * 64) + '  Asterodia-windows-amd64.exe')
     Expect-Failure { & $verify -InputDirectory $inputs -OutputDirectory $rejectedOutput -Tag "v$version" } 'tampered checksum'
     if (Test-Path -LiteralPath $rejectedOutput) { throw 'Checksum rejection wrote release output.' }
     [IO.File]::WriteAllText($sumsPath, $originalSums)
@@ -51,11 +51,14 @@ try {
     $output = Join-Path $caseRoot 'ready'
     & $verify -InputDirectory $inputs -OutputDirectory $output -Tag "v$version"
     $lines = @(Get-Content -LiteralPath (Join-Path $output 'SHA256SUMS'))
-    if ($lines.Count -ne 2) { throw 'The combined release must contain two checksums.' }
+    if ($lines.Count -ne 4) { throw 'The combined release must contain four checksums including legacy aliases.' }
     foreach ($arch in @('amd64', 'arm64')) {
-        $name = "StorageBucket-windows-$arch.exe"
+        $name = "Asterodia-windows-$arch.exe"
         $hash = (Get-FileHash -LiteralPath (Join-Path $output $name) -Algorithm SHA256).Hash.ToLowerInvariant()
         if ($lines -cnotcontains "$hash  $name") { throw "Incorrect final checksum: $arch" }
+        $legacy = "StorageBucket-windows-$arch.exe"
+        $legacyHash = (Get-FileHash -LiteralPath (Join-Path $output $legacy) -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($legacyHash -cne $hash -or $lines -cnotcontains "$hash  $legacy") { throw "Legacy alias must contain identical verified bytes: $arch" }
     }
     foreach ($extendedVersion in @('2.2.6a', '2.2.6.1', '2.2.6.1a')) {
         $extendedRoot = Join-Path $caseRoot $extendedVersion

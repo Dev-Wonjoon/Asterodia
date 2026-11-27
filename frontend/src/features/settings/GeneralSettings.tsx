@@ -25,7 +25,7 @@ export const GeneralSettings = (): React.JSX.Element => {
             <WorkingDirectorySettings disabled={importing} />
             <SettingRow
                 label={translate("settings.importWailsDatabase")}
-                value={importing ? translate("settings.checkingAndMergingTheDatabase") : translate("settings.selectAStoragebucketWailsDatabaseElectronDatabasesAreNot")}
+                value={importing ? translate("settings.checkingAndMergingTheDatabase") : translate("settings.selectAnAsterodiaWailsDatabaseElectronDatabasesAreNot")}
                 action={
                     <Button disabled={importing} onClick={() => void importDatabase()}>
                         {importing ? translate("settings.importing") : translate("settings.import")}

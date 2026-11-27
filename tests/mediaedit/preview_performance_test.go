@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/mediaedit"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/mediaedit"
 )
 
 func TestOverviewDoesNotIndexFramesAndReusesUnchangedSource(t *testing.T) {

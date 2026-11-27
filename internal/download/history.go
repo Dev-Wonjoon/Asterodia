@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
 )
 
 var errDeleteState = errors.New("정리가 끝난 실패·취소 요청 기록만 삭제할 수 있습니다")

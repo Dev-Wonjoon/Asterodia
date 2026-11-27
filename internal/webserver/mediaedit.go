@@ -9,8 +9,8 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/mediaedit"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/mediaedit"
 )
 
 func (s *Service) editRoutes(mux *http.ServeMux) {
@@ -82,7 +82,7 @@ func (s *Service) editAPI(w http.ResponseWriter, r *http.Request) {
 	} else if r.Method == "POST" {
 		origin, e := url.Parse(r.Header.Get("Origin"))
 		contentType, _, ce := mime.ParseMediaType(r.Header.Get("Content-Type"))
-		if e != nil || origin.Host != r.Host || (origin.Scheme != "https" && origin.Scheme != "http") || ce != nil || contentType != "application/json" || csrf == "" || subtle.ConstantTimeCompare([]byte(csrf), []byte(r.Header.Get("X-StorageBucket-CSRF"))) != 1 {
+		if e != nil || origin.Host != r.Host || (origin.Scheme != "https" && origin.Scheme != "http") || ce != nil || contentType != "application/json" || csrf == "" || subtle.ConstantTimeCompare([]byte(csrf), []byte(r.Header.Get("X-Asterodia-CSRF"))) != 1 {
 			http.Error(w, "요청 출처와 편집 권한을 확인하세요", 403)
 			return
 		}

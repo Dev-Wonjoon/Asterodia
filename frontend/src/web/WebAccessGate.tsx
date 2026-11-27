@@ -40,9 +40,9 @@ export function WebAccessGate({ children }: { children: ReactNode }) {
         }
         void check()
         const timer = setInterval(() => void check(), 2000)
-        window.addEventListener('storagebucket:access-expired', lock)
-        window.addEventListener('storagebucket:disconnect', logout)
-        return () => { mounted = false; revision.current++; clearInterval(timer); window.removeEventListener('storagebucket:access-expired', lock); window.removeEventListener('storagebucket:disconnect', logout) }
+        window.addEventListener('asterodia:access-expired', lock)
+        window.addEventListener('asterodia:disconnect', logout)
+        return () => { mounted = false; revision.current++; clearInterval(timer); window.removeEventListener('asterodia:access-expired', lock); window.removeEventListener('asterodia:disconnect', logout) }
     }, [])
     const connect = async (event: React.FormEvent) => {
         event.preventDefault()
@@ -61,7 +61,7 @@ export function WebAccessGate({ children }: { children: ReactNode }) {
     if (state === 'ready') return <CodeRequiredContext.Provider value={required}>{error && <p role="alert" className="fixed bottom-4 right-4 z-50 max-w-sm rounded border border-red-500 bg-[var(--bg-app)] p-3 text-sm text-red-500">{error}</p>}{children}</CodeRequiredContext.Provider>
     return <main className="flex min-h-dvh items-center justify-center bg-[var(--bg-app)] p-6 text-[var(--text-main)]">
         <form onSubmit={event => void connect(event)} className="w-full max-w-sm space-y-4 rounded-xl border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-6">
-            <div className="flex items-center justify-between gap-4"><h1 className="text-lg font-semibold">StorageBucket</h1><LanguageSelect /></div>
+            <div className="flex items-center justify-between gap-4"><h1 className="flex items-center gap-2 text-lg font-semibold"><BrandMark />Asterodia</h1><LanguageSelect /></div>
             <p>{translate(state === 'checking' ? 'settings.checkingStatus' : 'security.connectHelp')}</p>
             <label className="block space-y-2"><span>{translate('security.code')}</span><input autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{8}" maxLength={8} value={code} onChange={event => setCode(event.target.value.replace(/\D/g, ''))} disabled={busy || state === 'checking'} className="w-full rounded border border-[var(--border-line)] bg-[var(--bg-app)] px-3 py-2 text-xl tracking-widest" /></label>
             {error && <p role="alert" className="text-sm text-red-500">{error}</p>}
@@ -69,3 +69,4 @@ export function WebAccessGate({ children }: { children: ReactNode }) {
         </form>
     </main>
 }
+import { BrandMark } from '@renderer/shared/components/BrandMark'

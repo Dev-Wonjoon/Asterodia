@@ -14,13 +14,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 // Exercise discovery and the frozen extractor metadata with real segment downloaders.
 func TestYtdlpDownloadStreams(t *testing.T) {
-	ytdlpPath := os.Getenv("STORAGEBUCKET_TEST_YTDLP_EXE")
-	probePath := os.Getenv("STORAGEBUCKET_TEST_FFPROBE_EXE")
+	ytdlpPath := os.Getenv("ASTERODIA_TEST_YTDLP_EXE")
+	probePath := os.Getenv("ASTERODIA_TEST_FFPROBE_EXE")
 	if ytdlpPath == "" && probePath == "" {
 		t.Skip("yt-dlp·FFmpeg 실행 경로 필요")
 	}
@@ -131,7 +131,7 @@ func TestYtdlpDownloadStreams(t *testing.T) {
 					before := segments.Load()
 					var progressFrames atomic.Int32
 					ctx = engine.WithOutputObserver(ctx, func(output engine.Output) {
-						const prefix = "__STORAGEBUCKET_PROGRESS__:"
+						const prefix = "__ASTERODIA_PROGRESS__:"
 						if !strings.HasPrefix(output.Text, prefix) {
 							return
 						}

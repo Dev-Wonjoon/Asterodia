@@ -9,7 +9,7 @@ adapters. It does not import the native Wails adapter or contact a download engi
 - `npm --prefix frontend run build:pages` — rebuild the landing page stylesheet.
 
 Commit `docs/demo/` with its sources: GitHub Pages publishes `main /docs` without
-running Vite. The build uses relative URLs so it also works under `/StorageBucket/`.
+running Vite. The build uses relative URLs so it also works under `/Asterodia/`.
 
 All changes live in memory. Reloading or Reset restores the seed. Sample downloads
 finish after about seven seconds and append a new image to the Instagram profile

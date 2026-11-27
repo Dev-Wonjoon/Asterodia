@@ -17,11 +17,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/database"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/mediaedit"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/database"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/mediaedit"
 	"github.com/google/uuid"
 )
 
@@ -47,7 +47,7 @@ func newFixture(t *testing.T) *fixture {
 	if e != nil {
 		t.Fatal(e)
 	}
-	base, e := filepath.EvalSymlinks(os.Getenv("STORAGEBUCKET_TEST_ROOT"))
+	base, e := filepath.EvalSymlinks(os.Getenv("ASTERODIA_TEST_ROOT"))
 	if e != nil {
 		t.Fatal(e)
 	}

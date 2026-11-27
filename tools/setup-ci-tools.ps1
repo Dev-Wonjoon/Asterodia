@@ -40,12 +40,12 @@ $probe = Find-CITool (Join-Path $ToolsDirectory 'ffmpeg') 'ffprobe.exe'
 $image = Find-CITool (Join-Path $ToolsDirectory 'imagemagick') 'magick.exe'
 $lint = Find-CITool (Join-Path $ToolsDirectory 'actionlint') 'actionlint.exe'
 $variables = @{
-    STORAGEBUCKET_TEST_FFMPEG_EXE = $ffmpeg
-    STORAGEBUCKET_TEST_FFPROBE_EXE = $probe
-    STORAGEBUCKET_TEST_IMAGE_EXE = $image
-    STORAGEBUCKET_TEST_YTDLP_EXE = Join-Path $downloads 'yt-dlp.exe'
-    STORAGEBUCKET_TEST_GALLERYDL_EXE = Join-Path $downloads 'gallery-dl.exe'
-    STORAGEBUCKET_TEST_NODE_EXE = (Get-Command node -ErrorAction Stop).Source
+    ASTERODIA_TEST_FFMPEG_EXE = $ffmpeg
+    ASTERODIA_TEST_FFPROBE_EXE = $probe
+    ASTERODIA_TEST_IMAGE_EXE = $image
+    ASTERODIA_TEST_YTDLP_EXE = Join-Path $downloads 'yt-dlp.exe'
+    ASTERODIA_TEST_GALLERYDL_EXE = Join-Path $downloads 'gallery-dl.exe'
+    ASTERODIA_TEST_NODE_EXE = (Get-Command node -ErrorAction Stop).Source
 }
 foreach ($name in $variables.Keys) {
     [Environment]::SetEnvironmentVariable($name, $variables[$name], 'Process')

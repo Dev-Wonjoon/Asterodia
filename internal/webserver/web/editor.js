@@ -1,3 +1,4 @@
+import { readPreference } from './preferences.js'
 import { translate, bindText, bindAttribute, localizeWidget, getLocale, translateError, translateMessage } from "./i18n.js"
 import { matchShortcut, isComposing, isTextInput, shortcutKeys, shortcuts, formatShortcut, shortcutAria } from './shortcuts.js';
 import { mountOutputControls } from './output-controls.js';
@@ -380,7 +381,7 @@ export function mountMediaEditor(host, options) {
         }
     }
     function stopPlayback() { playing = false; playbackVersion++; clearTimeout(playTimer); bindText(play, () => translate("editor.playEditedOutput")); }
-    const storageKey = () => `storagebucket-edit-v1:${session.id}`;
+    const storageKey = () => `asterodia-edit-v1:${session.id}`;
     function persist() {
         if (!session || !crop)
             return;
@@ -938,7 +939,7 @@ export function mountMediaEditor(host, options) {
         qualityFormat = kind.value === 'webp' ? 'webp' : 'gif';
         let v;
         try {
-            v = JSON.parse(localStorage.getItem('storagebucket-quality:' + qualityFormat) || 'null');
+            v = JSON.parse(readPreference('asterodia-quality:' + qualityFormat) || 'null');
         }
         catch { }
         preset.value = ['small', 'balanced', 'high', 'max', 'custom'].includes(v?.preset) ? v.preset : 'balanced';
@@ -965,7 +966,7 @@ export function mountMediaEditor(host, options) {
         }
         if (webp && !lossless && webpPreset.value !== 'none') effort.value = 'normal';
         try {
-            localStorage.setItem('storagebucket-quality:' + qualityFormat, JSON.stringify({ ...qualityValue(), ...(webp ? { webpPreset: webpPreset.value } : {}) }));
+            localStorage.setItem('asterodia-quality:' + qualityFormat, JSON.stringify({ ...qualityValue(), ...(webp ? { webpPreset: webpPreset.value } : {}) }));
         }
         catch { }
         createRetry = null;
@@ -1208,7 +1209,7 @@ export function mountMediaEditor(host, options) {
         }
         if (value.state === 'ready' && value.options.kind !== 'trim') {
             try {
-                const draft = JSON.parse(localStorage.getItem(storageKey()) || 'null');
+                const draft = JSON.parse(readPreference(storageKey()) || 'null');
                 if (draft && draft.crop && Array.isArray(draft.deleted)) {
                     crop = boundedCrop(draft.crop, value.width, value.height);
                     appliedCrop = boundedCrop(draft.appliedCrop || draft.crop, value.width, value.height);
@@ -1833,7 +1834,7 @@ export function mountMediaEditor(host, options) {
                         return;
                     await unwrap(api.release({ id: item.id }));
                     try {
-                        localStorage.removeItem(`storagebucket-edit-v1:${item.id}`);
+                        localStorage.removeItem(`asterodia-edit-v1:${item.id}`);
                     }
                     catch { }
                     if (session?.id === item.id) {
@@ -1925,11 +1926,11 @@ export function mountMediaEditor(host, options) {
                 if (job.preview && id && !previewJobs.has(id)) previewJobs.set(id, job);
             }
             try {
-                const retained = new Set(sessions.map(item => `storagebucket-edit-v1:${item.id}`));
+                const retained = new Set(sessions.map(item => `asterodia-edit-v1:${item.id}`));
                 if (session?.localQuick) retained.add(storageKey());
                 for (let i = localStorage.length - 1; i >= 0; i--) {
                     const key = localStorage.key(i);
-                    if (key?.startsWith('storagebucket-edit-v1:') && !retained.has(key)) localStorage.removeItem(key);
+                    if (key?.startsWith('asterodia-edit-v1:') && !retained.has(key)) localStorage.removeItem(key);
                 }
             } catch { }
             if (session) {

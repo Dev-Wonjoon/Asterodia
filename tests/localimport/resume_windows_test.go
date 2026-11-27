@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/database"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/localimport"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/database"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/localimport"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
 )
 
 func TestPauseResumeWithinOneFolderPreservesEdits(t *testing.T) {
@@ -182,9 +182,9 @@ func TestExcludeAllFailuresReconcilesFolder(t *testing.T) {
 }
 
 func TestImportProcessCrash(t *testing.T) {
-	if os.Getenv("STORAGEBUCKET_IMPORT_CRASH") == "1" {
-		path := os.Getenv("STORAGEBUCKET_IMPORT_DB")
-		base := os.Getenv("STORAGEBUCKET_TEST_ROOT")
+	if os.Getenv("ASTERODIA_IMPORT_CRASH") == "1" {
+		path := os.Getenv("ASTERODIA_IMPORT_DB")
+		base := os.Getenv("ASTERODIA_TEST_ROOT")
 		rel, err := filepath.Rel(base, path)
 		if err != nil || !filepath.IsAbs(base) || !filepath.IsLocal(rel) {
 			t.Fatal("격리 DB가 필요합니다")
@@ -203,8 +203,8 @@ func TestImportProcessCrash(t *testing.T) {
 		})
 		service := localimport.NewService(db, inspector, nil, nil)
 		defer service.Close()
-		ok(t, service.Run(t.Context(), localimport.Request{JobID: os.Getenv("STORAGEBUCKET_IMPORT_JOB")}))
-		wait(t, service, os.Getenv("STORAGEBUCKET_IMPORT_JOB"), "completed")
+		ok(t, service.Run(t.Context(), localimport.Request{JobID: os.Getenv("ASTERODIA_IMPORT_JOB")}))
+		wait(t, service, os.Getenv("ASTERODIA_IMPORT_JOB"), "completed")
 		t.Fatal("강제 종료 지점 미도달")
 	}
 	f := newFixture(t)
@@ -216,7 +216,7 @@ func TestImportProcessCrash(t *testing.T) {
 	f.db.Close()
 	path := filepath.Join(f.root, "library.db")
 	command := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestImportProcessCrash$", "-test.count=1")
-	command.Env = append(os.Environ(), "STORAGEBUCKET_IMPORT_CRASH=1", "STORAGEBUCKET_IMPORT_DB="+path, "STORAGEBUCKET_IMPORT_JOB="+p.Job.ID)
+	command.Env = append(os.Environ(), "ASTERODIA_IMPORT_CRASH=1", "ASTERODIA_IMPORT_DB="+path, "ASTERODIA_IMPORT_JOB="+p.Job.ID)
 	output, err := command.CombinedOutput()
 	if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 74 {
 		t.Fatalf("예상하지 않은 종료: %v %s", err, output)

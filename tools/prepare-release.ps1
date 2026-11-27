@@ -13,13 +13,13 @@ try {
         & wails3 build "GOARCH=$Arch"
         if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
     }
-    $releaseBinary = Join-Path $releaseRepository 'dist/StorageBucket.exe'
+    $releaseBinary = Join-Path $releaseRepository 'dist/Asterodia.exe'
     $verified = Get-VerifiedReleaseFile -Path $releaseBinary -Arch $Arch -Version $releaseVersion
     $releaseOutput = Join-Path $releaseRepository "dist/releases/v$releaseVersion"
     New-Item -ItemType Directory -Force -Path $releaseOutput | Out-Null
-    $releaseAsset = Join-Path $releaseOutput "StorageBucket-windows-$Arch.exe"
+    $releaseAsset = Join-Path $releaseOutput "Asterodia-windows-$Arch.exe"
     Copy-Item -LiteralPath $releaseBinary -Destination $releaseAsset
-    $releaseSums = @(Get-ChildItem -LiteralPath $releaseOutput -Filter 'StorageBucket-windows-*.exe' -File | Sort-Object Name | ForEach-Object {
+    $releaseSums = @(Get-ChildItem -LiteralPath $releaseOutput -Filter 'Asterodia-windows-*.exe' -File | Sort-Object Name | ForEach-Object {
         $releaseHash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
         "$releaseHash  $($_.Name)"
     })

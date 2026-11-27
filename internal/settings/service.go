@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/licenses"
+	"github.com/Dev-Wonjoon/Asterodia/internal/licenses"
 )
 
 type Dialogs struct {

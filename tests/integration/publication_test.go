@@ -16,12 +16,12 @@ import (
 	"testing"
 	"unicode/utf16"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/database"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/maintenance"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/database"
+	"github.com/Dev-Wonjoon/Asterodia/internal/download"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/maintenance"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
 	"modernc.org/sqlite"
 )
 
@@ -244,7 +244,7 @@ func TestPublicationConcurrentCollision(t *testing.T) {
 }
 
 func TestPublicationCrashRecovery(t *testing.T) {
-	if os.Getenv("STORAGEBUCKET_PUBLICATION_CRASH_CHILD") == "1" {
+	if os.Getenv("ASTERODIA_PUBLICATION_CRASH_CHILD") == "1" {
 		if err := sqlite.RegisterScalarFunction("fixture_crash", 0, func(*sqlite.FunctionContext, []driver.Value) (driver.Value, error) {
 			os.Exit(77)
 			return nil, nil
@@ -252,7 +252,7 @@ func TestPublicationCrashRecovery(t *testing.T) {
 			t.Fatal(err)
 		}
 		f := newFixture(t)
-		if err := os.WriteFile(filepath.Join(os.Getenv("STORAGEBUCKET_TEST_ROOT"), "child-root.txt"), []byte(f.root), 0600); err != nil {
+		if err := os.WriteFile(filepath.Join(os.Getenv("ASTERODIA_TEST_ROOT"), "child-root.txt"), []byte(f.root), 0600); err != nil {
 			t.Fatal(err)
 		}
 		foreign := filepath.Join(f.root, "downloads", "instagram", "unknown", "Instagram Fixture.png")
@@ -279,11 +279,11 @@ func TestPublicationCrashRecovery(t *testing.T) {
 	}
 	cmd := exec.CommandContext(t.Context(), executable, "-test.run=^TestPublicationCrashRecovery$", "-test.timeout=30s")
 	for _, value := range os.Environ() {
-		if !strings.HasPrefix(strings.ToUpper(value), "STORAGEBUCKET_TEST_ROOT=") && !strings.HasPrefix(strings.ToUpper(value), "STORAGEBUCKET_PUBLICATION_CRASH_CHILD=") {
+		if !strings.HasPrefix(strings.ToUpper(value), "ASTERODIA_TEST_ROOT=") && !strings.HasPrefix(strings.ToUpper(value), "ASTERODIA_PUBLICATION_CRASH_CHILD=") {
 			cmd.Env = append(cmd.Env, value)
 		}
 	}
-	cmd.Env = append(cmd.Env, "STORAGEBUCKET_TEST_ROOT="+childBase, "STORAGEBUCKET_PUBLICATION_CRASH_CHILD=1")
+	cmd.Env = append(cmd.Env, "ASTERODIA_TEST_ROOT="+childBase, "ASTERODIA_PUBLICATION_CRASH_CHILD=1")
 	output, err := cmd.CombinedOutput()
 	var exit *exec.ExitError
 	if !errors.As(err, &exit) || exit.ExitCode() != 77 {

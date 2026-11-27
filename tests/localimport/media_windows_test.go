@@ -11,13 +11,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/localimport"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/thumbnail"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/localimport"
+	"github.com/Dev-Wonjoon/Asterodia/internal/thumbnail"
 )
 
 func TestNativeImageVideoAudioImport(t *testing.T) {
-	probe, magick := os.Getenv("STORAGEBUCKET_TEST_FFPROBE_EXE"), os.Getenv("STORAGEBUCKET_TEST_IMAGE_EXE")
+	probe, magick := os.Getenv("ASTERODIA_TEST_FFPROBE_EXE"), os.Getenv("ASTERODIA_TEST_IMAGE_EXE")
 	if !filepath.IsAbs(probe) || !filepath.IsAbs(magick) {
 		t.Skip("실제 미디어 검사에는 FFprobe와 ImageMagick 절대 경로가 필요합니다")
 	}
@@ -31,7 +31,7 @@ func TestNativeImageVideoAudioImport(t *testing.T) {
 			t.Fatalf("합성 %s: %s %v", ext, result.Stderr, err)
 		}
 	}
-	if heic := os.Getenv("STORAGEBUCKET_TEST_HEIC_FILE"); heic != "" {
+	if heic := os.Getenv("ASTERODIA_TEST_HEIC_FILE"); heic != "" {
 		data, err := os.ReadFile(heic)
 		if err != nil {
 			t.Fatal(err)
@@ -69,7 +69,7 @@ func TestNativeImageVideoAudioImport(t *testing.T) {
 	defer f.service.Close()
 	p := run(t, f, scan(t, f))
 	want := 10
-	if os.Getenv("STORAGEBUCKET_TEST_HEIC_FILE") != "" {
+	if os.Getenv("ASTERODIA_TEST_HEIC_FILE") != "" {
 		want++
 	}
 	if p.Job.Counts.Added != want || p.Job.Counts.FailedFolders != 0 {

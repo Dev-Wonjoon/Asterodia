@@ -1,29 +1,31 @@
-# StorageBucket
+# Asterodia
+
+Existing library data and settings are migrated automatically.
 
 Download, organize, and edit your media in one place.
 
-StorageBucket is a desktop application for managing images, videos,
+Asterodia is a desktop application for managing images, videos,
 and audio. Download media from supported URLs, register files already
 on your PC, and organize your library with tags and favorites.
 
 [English](./README.md) | [한국어](./README.ko.md)
 
-[Downloads](https://github.com/Dev-Wonjoon/StorageBucket/releases) ·
-[Report an Issue](https://github.com/Dev-Wonjoon/StorageBucket/issues)
+[Downloads](https://github.com/Dev-Wonjoon/Asterodia/releases) ·
+[Report an Issue](https://github.com/Dev-Wonjoon/Asterodia/issues)
 
 ## Screenshots
 
 ### Gallery and Download Progress
 
-![StorageBucket gallery and download progress](./docs/images/img1.png)
+![Asterodia gallery and download progress](./docs/images/img1.png)
 
 ### WebP Editing
 
-![StorageBucket WebP editor](./docs/images/img2.png)
+![Asterodia WebP editor](./docs/images/img2.png)
 
 ### Video Playback
 
-![StorageBucket video player](./docs/images/img3.png)
+![Asterodia video player](./docs/images/img3.png)
 
 ## Features
 
@@ -74,8 +76,8 @@ formats supported by your browser.
 
 ## Getting Started
 
-1. Download a release from the [Releases page](https://github.com/Dev-Wonjoon/StorageBucket/releases).
-2. Launch StorageBucket.
+1. Download a release from the [Releases page](https://github.com/Dev-Wonjoon/Asterodia/releases).
+2. Launch Asterodia.
 3. Follow the engine setup prompt to install the required external tools.
 4. Choose a download folder in Settings.
 5. Add a media URL or import a local folder to start building your library.
@@ -84,7 +86,7 @@ External tools can also be installed or updated from Settings → Engine Managem
 
 ## External Tools
 
-StorageBucket uses external tools for downloading, inspecting, and processing media.
+Asterodia uses external tools for downloading, inspecting, and processing media.
 
 | Tool | Purpose |
 | --- | --- |
@@ -99,7 +101,7 @@ Installing or updating these tools requires an internet connection.
 ## Importing a Database
 
 Use Settings → General Settings → Import Wails Database to merge a
-StorageBucket Wails database into your current library.
+Asterodia Wails database into your current library.
 
 ## Browser and Mobile Access
 
@@ -130,7 +132,7 @@ it from Settings → Engine Management.
 
 ## Development
 
-StorageBucket 2.0 uses Wails v3 and Go for the desktop backend,
+Asterodia 2.0 uses Wails v3 and Go for the desktop backend,
 React and TypeScript for the interface, and SQLite for local data storage.
 
 Prerequisites:
@@ -180,15 +182,15 @@ combined format; download and replace the executable manually once to install
 
 ## Responsible Use
 
-Use StorageBucket only with media you own or have permission to download
+Use Asterodia only with media you own or have permission to download
 and manage. You are responsible for complying with copyright laws,
 platform terms, and content licenses.
 
-StorageBucket is not intended for DRM circumvention or unauthorized redistribution.
+Asterodia is not intended for DRM circumvention or unauthorized redistribution.
 
 ## License
 
-StorageBucket is licensed under the [MIT License](./LICENSE).
+Asterodia is licensed under the [MIT License](./LICENSE).
 
 Third-party libraries and external tools are covered by their respective
 licenses. See [Third-Party Notices](./THIRD_PARTY_LICENSES.md) or view the

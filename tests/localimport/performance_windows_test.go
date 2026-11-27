@@ -12,15 +12,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 // Opt-in comparison of the real hash/checkpoint path with controlled inspection
-// latency, or the real ImageMagick inspector when STORAGEBUCKET_IMPORT_PERF_NATIVE
+// latency, or the real ImageMagick inspector when ASTERODIA_IMPORT_PERF_NATIVE
 // is 1. Timings exclude fixture generation and scanning and have no pass threshold.
 func TestImportPipelinePerformance(t *testing.T) {
-	if os.Getenv("STORAGEBUCKET_IMPORT_PERF") != "1" {
-		t.Skip("set STORAGEBUCKET_IMPORT_PERF=1 for scheduler throughput measurements")
+	if os.Getenv("ASTERODIA_IMPORT_PERF") != "1" {
+		t.Skip("set ASTERODIA_IMPORT_PERF=1 for scheduler throughput measurements")
 	}
 	for _, tc := range []struct {
 		name           string
@@ -29,10 +29,10 @@ func TestImportPipelinePerformance(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newFixture(t)
 			data := make([]byte, 128*1024)
-			native := os.Getenv("STORAGEBUCKET_IMPORT_PERF_NATIVE") == "1"
+			native := os.Getenv("ASTERODIA_IMPORT_PERF_NATIVE") == "1"
 			if native {
-				if !filepath.IsAbs(os.Getenv("STORAGEBUCKET_TEST_IMAGE_EXE")) {
-					t.Fatal("native measurement requires STORAGEBUCKET_TEST_IMAGE_EXE")
+				if !filepath.IsAbs(os.Getenv("ASTERODIA_TEST_IMAGE_EXE")) {
+					t.Fatal("native measurement requires ASTERODIA_TEST_IMAGE_EXE")
 				}
 				img := image.NewRGBA(image.Rect(0, 0, 1024, 768))
 				for i := range img.Pix {
@@ -52,7 +52,7 @@ func TestImportPipelinePerformance(t *testing.T) {
 			var active, peak atomic.Int32
 			original := f.inspect
 			if native {
-				inspector := engine.LocalInspector{ImageMagick: os.Getenv("STORAGEBUCKET_TEST_IMAGE_EXE"), Cache: filepath.Join(f.root, "cache"), InspectionThreads: 1}
+				inspector := engine.LocalInspector{ImageMagick: os.Getenv("ASTERODIA_TEST_IMAGE_EXE"), Cache: filepath.Join(f.root, "cache"), InspectionThreads: 1}
 				original = inspector.Inspect
 			}
 			f.inspect = func(ctx context.Context, path, kind string) (engine.LocalMetadata, error) {

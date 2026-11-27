@@ -19,10 +19,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/thumbnail"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/download"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/thumbnail"
 )
 
 type imageInspectFunc func(context.Context, string, string) (engine.LocalMetadata, error)
@@ -185,7 +185,7 @@ func TestDownloadImageCommitCancellationBoundary(t *testing.T) {
 }
 
 func TestDownloadExtendedImageFormats(t *testing.T) {
-	magick := os.Getenv("STORAGEBUCKET_TEST_IMAGE_EXE")
+	magick := os.Getenv("ASTERODIA_TEST_IMAGE_EXE")
 	if !filepath.IsAbs(magick) {
 		t.Skip("ImageMagick의 절대 경로를 지정하세요")
 	}
@@ -195,7 +195,7 @@ func TestDownloadExtendedImageFormats(t *testing.T) {
 			var data []byte
 			var err error
 			if ext == "heic" {
-				path := os.Getenv("STORAGEBUCKET_TEST_HEIC_FILE")
+				path := os.Getenv("ASTERODIA_TEST_HEIC_FILE")
 				if path == "" {
 					t.Skip("읽기 검증용 HEIC 파일을 지정하세요")
 				}

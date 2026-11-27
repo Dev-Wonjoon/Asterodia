@@ -4,7 +4,7 @@ import (
 	"runtime"
 	"testing"
 
-	appupdate "github.com/Dev-Wonjoon/StorageBucket/internal/update"
+	appupdate "github.com/Dev-Wonjoon/Asterodia/internal/update"
 )
 
 func TestReleaseVersionOrdering(t *testing.T) {

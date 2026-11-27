@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
 )
 
 // Page the weighted album list first, then read only each intersecting file slice.

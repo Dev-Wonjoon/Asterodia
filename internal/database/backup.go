@@ -50,7 +50,7 @@ func backup(ctx context.Context, q connection, directory, purpose string) (strin
 	if err := os.MkdirAll(directory, 0700); err != nil {
 		return "", err
 	}
-	path := filepath.Join(directory, "storagebucket."+purpose+"."+time.Now().UTC().Format("20060102T150405.000")+"."+uuid.NewString()+".db")
+	path := filepath.Join(directory, "asterodia."+purpose+"."+time.Now().UTC().Format("20060102T150405.000")+"."+uuid.NewString()+".db")
 	reserved, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if err != nil {
 		return "", err

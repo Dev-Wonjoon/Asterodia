@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/download"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 type waitingGallery struct {
@@ -56,7 +56,7 @@ func downloadPost(t *testing.T, f *fixture, path, body, token string) (int, api.
 	}
 	req.Header.Set("Origin", state.URL)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-StorageBucket-CSRF", token)
+	req.Header.Set("X-Asterodia-CSRF", token)
 	response, err := f.client.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -106,7 +106,7 @@ func TestWebDownloadPermissionsOriginAndRequestValidation(t *testing.T) {
 	req, _ := http.NewRequest("POST", state.URL+"/api/download/enqueue", strings.NewReader(`{"url":"https://example.com/video"}`))
 	req.Header.Set("Origin", "https://evil.example")
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-StorageBucket-CSRF", token)
+	req.Header.Set("X-Asterodia-CSRF", token)
 	response, err := f.client.Do(req)
 	if err != nil {
 		t.Fatal(err)

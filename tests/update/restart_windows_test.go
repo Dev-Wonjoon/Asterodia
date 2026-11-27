@@ -12,14 +12,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/desktop"
+	"github.com/Dev-Wonjoon/Asterodia/internal/desktop"
 	"github.com/wailsapp/wails/v3/pkg/updater"
 )
 
 // The copied test executable acts as both the old app and the new app. Its
 // helper entry mirrors main.go: helper mode precedes the single-instance lock.
 func init() {
-	root := os.Getenv("STORAGEBUCKET_UPDATE_PROBE_ROOT")
+	root := os.Getenv("ASTERODIA_UPDATE_PROBE_ROOT")
 	if root == "" {
 		return
 	}
@@ -90,9 +90,9 @@ func TestWindowsExecutableSwapAndRelaunchPreservesData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	updated := append(append([]byte(nil), original...), []byte("\nStorageBucket update probe\n")...)
-	target := filepath.Join(root, "StorageBucket.exe")
-	for file, data := range map[string][]byte{"StorageBucket.exe": original, "payload.exe": updated, "storagebucket.db": []byte("existing library"), "config.json": []byte("existing settings")} {
+	updated := append(append([]byte(nil), original...), []byte("\nAsterodia update probe\n")...)
+	target := filepath.Join(root, "Asterodia.exe")
+	for file, data := range map[string][]byte{"Asterodia.exe": original, "payload.exe": updated, "asterodia.db": []byte("existing library"), "config.json": []byte("existing settings")} {
 		if err = os.WriteFile(filepath.Join(root, file), data, 0700); err != nil {
 			t.Fatal(err)
 		}
@@ -100,7 +100,7 @@ func TestWindowsExecutableSwapAndRelaunchPreservesData(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 25*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, target)
-	cmd.Env = append(os.Environ(), "STORAGEBUCKET_UPDATE_PROBE_ROOT="+root)
+	cmd.Env = append(os.Environ(), "ASTERODIA_UPDATE_PROBE_ROOT="+root)
 	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: 0x08000000} // CREATE_NO_WINDOW
 	if output, err := cmd.CombinedOutput(); err != nil {
 		failure, _ := os.ReadFile(filepath.Join(root, "probe-error.txt"))
@@ -124,7 +124,7 @@ func TestWindowsExecutableSwapAndRelaunchPreservesData(t *testing.T) {
 	if sha256.Sum256(actual) != sha256.Sum256(updated) {
 		t.Fatal("executable was not replaced")
 	}
-	for file, want := range map[string]string{"storagebucket.db": "existing library", "config.json": "existing settings"} {
+	for file, want := range map[string]string{"asterodia.db": "existing library", "config.json": "existing settings"} {
 		actual, err := os.ReadFile(filepath.Join(root, file))
 		if err != nil || string(actual) != want {
 			t.Fatal(fmt.Sprintf("user data changed: %s: %q %v", file, actual, err))

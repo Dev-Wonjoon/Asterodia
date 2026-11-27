@@ -9,7 +9,7 @@ import (
 // Version is injected from the root VERSION file by production builds.
 var Version = "dev"
 
-const Repository = "Dev-Wonjoon/StorageBucket"
+const Repository = "Dev-Wonjoon/Asterodia"
 
 var stableVersion = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:\.([1-9][0-9]*))?([a-z])?$`)
 

@@ -2,7 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react'
 import { getApi } from '@renderer/shared/api'
 import type { ContentFilters } from '@contracts/media-v2'
 
-const changed = 'storagebucket:content-filters-changed'
+const changed = 'asterodia:content-filters-changed'
 const listeners = new Set<() => void>()
 let showHidden = false
 export function setShowHidden(value: boolean) { showHidden = value; for (const listener of listeners) listener() }

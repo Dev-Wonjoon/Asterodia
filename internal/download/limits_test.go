@@ -3,8 +3,8 @@ package download
 import (
 	"database/sql"
 	"errors"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/database"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/database"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 	"os"
 	"path/filepath"
 	"strconv"

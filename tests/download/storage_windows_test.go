@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
+	"github.com/Dev-Wonjoon/Asterodia/internal/download"
 )
 
 func TestPrepareDownloadStage(t *testing.T) {
@@ -39,7 +39,7 @@ func TestPrepareDownloadStage(t *testing.T) {
 		t.Fatal(err)
 	}
 	const owner = "e3677bfd8cee25dc27e5c906bf980d9c31610052a3f797d86d717415f2de01c1"
-	want := filepath.Join(root, ".storagebucket", "staging", owner)
+	want := filepath.Join(root, ".asterodia", "staging", owner)
 	if stage != want {
 		t.Fatalf("작업 폴더: %q, 기대값: %q", stage, want)
 	}
@@ -67,9 +67,9 @@ func TestPrepareDownloadStage(t *testing.T) {
 func downloadTestRoot(t *testing.T) string {
 	t.Helper()
 
-	configured := os.Getenv("STORAGEBUCKET_TEST_ROOT")
+	configured := os.Getenv("ASTERODIA_TEST_ROOT")
 	if !filepath.IsAbs(configured) {
-		t.Fatal("STORAGEBUCKET_TEST_ROOT에 절대 경로를 지정하세요")
+		t.Fatal("ASTERODIA_TEST_ROOT에 절대 경로를 지정하세요")
 	}
 	root, err := filepath.EvalSymlinks(configured)
 	if err != nil {

@@ -10,7 +10,7 @@ import (
 )
 
 func TestLocalInspectionThreadLimitWithOfficialEngines(t *testing.T) {
-	root := os.Getenv("STORAGEBUCKET_SECURITY_ENGINE_ROOT")
+	root := os.Getenv("ASTERODIA_SECURITY_ENGINE_ROOT")
 	if root == "" {
 		t.Skip("verified official artifacts not configured")
 	}

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 func chainHandler(name string, decision engine.DiscoveryDecision, value string, err error) engine.DiscoveryHandler[string] {

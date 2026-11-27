@@ -10,20 +10,20 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/database"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/desktop"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/filemove"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/localimport"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/maintenance"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/mediaedit"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/settings"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/thumbnail"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/update"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/webserver"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/database"
+	"github.com/Dev-Wonjoon/Asterodia/internal/desktop"
+	"github.com/Dev-Wonjoon/Asterodia/internal/download"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/filemove"
+	"github.com/Dev-Wonjoon/Asterodia/internal/localimport"
+	"github.com/Dev-Wonjoon/Asterodia/internal/maintenance"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/mediaedit"
+	"github.com/Dev-Wonjoon/Asterodia/internal/settings"
+	"github.com/Dev-Wonjoon/Asterodia/internal/thumbnail"
+	"github.com/Dev-Wonjoon/Asterodia/internal/update"
+	"github.com/Dev-Wonjoon/Asterodia/internal/webserver"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -36,7 +36,7 @@ func applicationServices(
 	if err := os.MkdirAll(paths.Data, 0700); err != nil {
 		return nil, nil, nil, err
 	}
-	unlock, err := desktop.AcquireLock(filepath.Join(paths.Data, "storagebucket.lock"))
+	unlock, err := desktop.AcquireLibraryLock(paths.Data)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -53,7 +53,11 @@ func applicationServices(
 		unlock()
 		return nil, nil, nil, err
 	}
-	databasePath := filepath.Join(paths.Root, "storagebucket.db")
+	databasePath, err := database.ApplicationPath(context.Background(), paths.Root)
+	if err != nil {
+		unlock()
+		return nil, nil, nil, err
+	}
 	db, err := database.OpenWithOptions(context.Background(), databasePath, database.MigrationOptions{BackupDirectory: filepath.Join(paths.Root, "backups")})
 	if err != nil {
 		unlock()
@@ -190,7 +194,7 @@ func applicationServices(
 	}
 	manager.UpdateGate = updateGate
 	desktopService := desktop.NewService(databaseImporter, func() (string, error) {
-		return application.Get().Dialog.OpenFile().CanChooseFiles(true).CanChooseDirectories(false).AddFilter("StorageBucket 데이터베이스", "*.db;*.sqlite;*.sqlite3").SetTitle("병합할 데이터베이스 선택").PromptForSingleSelection()
+		return application.Get().Dialog.OpenFile().CanChooseFiles(true).CanChooseDirectories(false).AddFilter("Asterodia 데이터베이스", "*.db;*.sqlite;*.sqlite3").SetTitle("병합할 데이터베이스 선택").PromptForSingleSelection()
 	}, func() {
 		thumb.ScheduleMissing()
 		if app := application.Get(); app != nil {

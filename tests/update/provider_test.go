@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	appupdate "github.com/Dev-Wonjoon/StorageBucket/internal/update"
+	appupdate "github.com/Dev-Wonjoon/Asterodia/internal/update"
 	"github.com/wailsapp/wails/v3/pkg/updater"
 	"github.com/wailsapp/wails/v3/pkg/updater/providers/github"
 )
@@ -34,6 +34,63 @@ func TestAssetSelection(t *testing.T) {
 	}
 }
 
+func TestAsterodiaAssetSelection(t *testing.T) {
+	for _, arch := range []string{"amd64", "arm64"} {
+		t.Run(arch, func(t *testing.T) {
+			modern := github.ReleaseAsset{Name: "Asterodia-windows-" + arch + ".exe"}
+			legacy := github.ReleaseAsset{Name: "StorageBucket-windows-" + arch + ".exe"}
+			req := updater.CheckRequest{Platform: "windows", Arch: arch}
+			for _, tc := range []struct {
+				name   string
+				assets []github.ReleaseAsset
+				want   int
+			}{
+				{"new-only", []github.ReleaseAsset{modern}, 0},
+				{"legacy-only", []github.ReleaseAsset{legacy}, 0},
+				{"prefer-new", []github.ReleaseAsset{legacy, modern}, 1},
+				{"prefer-new-reversed", []github.ReleaseAsset{modern, legacy}, 0},
+				{"duplicate-new", []github.ReleaseAsset{modern, modern, legacy}, -1},
+				{"duplicate-legacy", []github.ReleaseAsset{modern, legacy, legacy}, -1},
+				{"installer-only", []github.ReleaseAsset{{Name: "Asterodia-windows-" + arch + "-installer.exe"}}, -1},
+			} {
+				if got := appupdate.MatchAsset(req, tc.assets); got != tc.want {
+					t.Errorf("%s: got %d, want %d", tc.name, got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+func TestAsterodiaReleaseChecksumAndDownload(t *testing.T) {
+	payload := []byte("Asterodia executable")
+	digest := sha256.Sum256(payload)
+	for _, valid := range []bool{true, false} {
+		sums := hex.EncodeToString(digest[:]) + "  StorageBucket-windows-amd64.exe\n"
+		if valid {
+			sums += hex.EncodeToString(digest[:]) + "  Asterodia-windows-amd64.exe\n"
+		}
+		provider := fixtureProvider(t, "v2.3.5", sums, payload, func(release map[string]any) {
+			assets := release["assets"].([]map[string]any)
+			modern := map[string]any{"id": 3, "name": "Asterodia-windows-amd64.exe", "size": len(payload), "browser_download_url": "https://updates.test/app"}
+			release["assets"] = append(assets, modern)
+		})
+		release, err := provider.Check(t.Context(), updater.CheckRequest{CurrentVersion: "2.3.4", Platform: "windows", Arch: "amd64"})
+		if !valid {
+			if err == nil {
+				t.Fatal("new asset accepted with only the legacy checksum")
+			}
+			continue
+		}
+		if err != nil || release == nil || release.Artifact.Filename != "Asterodia-windows-amd64.exe" {
+			t.Fatalf("new release: %v, %v", release, err)
+		}
+		var output bytes.Buffer
+		if err := provider.Download(t.Context(), release, &output, nil); err != nil || !bytes.Equal(output.Bytes(), payload) {
+			t.Fatalf("new executable download: %v", err)
+		}
+	}
+}
+
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
@@ -43,7 +100,7 @@ func fixtureProvider(t *testing.T, version, sums string, payload []byte, configu
 	const baseURL = "https://updates.test"
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/repos/Dev-Wonjoon/StorageBucket/releases/latest":
+		case "/repos/Dev-Wonjoon/Asterodia/releases/latest":
 			if r.Header.Get("Authorization") != "" {
 				t.Error("public update should not embed a token")
 			}

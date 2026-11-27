@@ -1,7 +1,7 @@
 package integration_test
 
 import (
-	"github.com/Dev-Wonjoon/StorageBucket/internal/settings"
+	"github.com/Dev-Wonjoon/Asterodia/internal/settings"
 	"path/filepath"
 	"testing"
 )

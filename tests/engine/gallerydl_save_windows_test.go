@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 	"image"
 	"image/color"
 	"image/png"
@@ -18,7 +18,7 @@ import (
 )
 
 func TestGalleryDLSaveImages(t *testing.T) {
-	exe := os.Getenv("STORAGEBUCKET_TEST_GALLERYDL_EXE")
+	exe := os.Getenv("ASTERODIA_TEST_GALLERYDL_EXE")
 	if !filepath.IsAbs(exe) {
 		t.Skip("gallery-dl 실제 실행 파일이 필요합니다")
 	}
@@ -106,7 +106,7 @@ func TestGalleryDLDownloadResults(t *testing.T) {
 		t.Fatal(err)
 	}
 	root := engineTestRoot(t, "gallerydl-download")
-	t.Setenv("STORAGEBUCKET_GALLERYDL_FIXTURE", "1")
+	t.Setenv("ASTERODIA_GALLERYDL_FIXTURE", "1")
 	for _, mode := range []string{"ordered", "reordered", "extension-alias", "generic-id-schema", "partial", "changed-id", "changed-post", "extra-file", "instagram"} {
 		t.Run(mode, func(t *testing.T) {
 			stage, err := os.MkdirTemp(root, "results-")
@@ -165,7 +165,7 @@ func TestGalleryDLDownloadResults(t *testing.T) {
 				records = append(records, map[string]any{"Name": "unreported.txt", "Payload": "extra"})
 			}
 			payload, _ := json.Marshal(records)
-			t.Setenv("STORAGEBUCKET_GALLERYDL_DOWNLOAD_RESULTS", string(payload))
+			t.Setenv("ASTERODIA_GALLERYDL_DOWNLOAD_RESULTS", string(payload))
 			paths, err := (&engine.GalleryDL{Executable: exe}).Download(t.Context(), address, d, stage)
 			if mode != "ordered" && mode != "reordered" && mode != "extension-alias" && mode != "generic-id-schema" && mode != "instagram" {
 				if err == nil || len(paths) != 0 {

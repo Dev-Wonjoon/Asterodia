@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
 )
 
 func (s *Service) albumRoutes(mux *http.ServeMux) {
@@ -59,7 +59,7 @@ func (s *Service) saveAlbum(w http.ResponseWriter, r *http.Request) {
 	s.mu.Unlock()
 	origin, err := url.Parse(r.Header.Get("Origin"))
 	contentType, _, typeErr := mime.ParseMediaType(r.Header.Get("Content-Type"))
-	if err != nil || origin.Host != r.Host || (origin.Scheme != "http" && origin.Scheme != "https") || typeErr != nil || contentType != "application/json" || csrf == "" || subtle.ConstantTimeCompare([]byte(csrf), []byte(r.Header.Get("X-StorageBucket-CSRF"))) != 1 {
+	if err != nil || origin.Host != r.Host || (origin.Scheme != "http" && origin.Scheme != "https") || typeErr != nil || contentType != "application/json" || csrf == "" || subtle.ConstantTimeCompare([]byte(csrf), []byte(r.Header.Get("X-Asterodia-CSRF"))) != 1 {
 		http.Error(w, "요청 출처와 앨범 변경 권한을 확인하세요", 403)
 		return
 	}

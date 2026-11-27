@@ -18,7 +18,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 type instagramRoundTripper func(*http.Request) (*http.Response, error)
@@ -325,12 +325,12 @@ func TestInstagramEmbedHTTPFailures(t *testing.T) {
 // Opt-in verification of actual embed extraction AND file transfer. No CLI,
 // account session, or external package is needed for this path.
 func TestInstagramEmbedLive(t *testing.T) {
-	if os.Getenv("STORAGEBUCKET_LIVE_TESTS") != "1" {
-		t.Skip("실제 사이트 검증은 STORAGEBUCKET_LIVE_TESTS=1로 실행하세요")
+	if os.Getenv("ASTERODIA_LIVE_TESTS") != "1" {
+		t.Skip("실제 사이트 검증은 ASTERODIA_LIVE_TESTS=1로 실행하세요")
 	}
-	address := os.Getenv("STORAGEBUCKET_TEST_INSTAGRAM_URL")
+	address := os.Getenv("ASTERODIA_TEST_INSTAGRAM_URL")
 	if address == "" {
-		t.Skip("STORAGEBUCKET_TEST_INSTAGRAM_URL에 게시물 주소를 지정하세요")
+		t.Skip("ASTERODIA_TEST_INSTAGRAM_URL에 게시물 주소를 지정하세요")
 	}
 	stage, err := os.MkdirTemp(engineTestRoot(t, "engine-parsers"), "instagram-live-")
 	if err != nil {

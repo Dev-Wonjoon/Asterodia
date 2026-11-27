@@ -142,7 +142,7 @@ it('confirms album-reference removal before Delete and preserves the selection o
     expect(row.getAttribute('aria-selected')).toBe('true')
 })
 it('falls back to safe preferences when stored values are malformed', () => {
-    localStorage.setItem('storagebucket:album-view:1', JSON.stringify({ mode: 'bad', iconSize: 1000, sort: 'bad', columns: ['kind', 'kind', 'other'] }))
+    localStorage.setItem('asterodia:album-view:1', JSON.stringify({ mode: 'bad', iconSize: 1000, sort: 'bad', columns: ['kind', 'kind', 'other'] }))
     expect(readExplorerPreferences(1)).toMatchObject({ mode: 'icons', iconSize: 240, sort: 'name', columns: ['kind'] })
 })
 it('restores album selection under StrictMode while shared hiding rules are active', async () => {

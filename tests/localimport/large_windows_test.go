@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/localimport"
+	"github.com/Dev-Wonjoon/Asterodia/internal/localimport"
 )
 
 func TestTenThousandFilesPauseResume(t *testing.T) {

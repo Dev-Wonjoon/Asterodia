@@ -1,13 +1,13 @@
 [Desktop Entry]
 Version=1.0
-Name=StorageBucket
+Name=Asterodia
 Comment=미디어 다운로드 및 로컬 라이브러리 관리
 # The Exec line includes %u to pass the URL to the application
-Exec=/usr/local/bin/StorageBucket %u
+Exec=/usr/local/bin/Asterodia %u
 Terminal=false
 Type=Application
-Icon=StorageBucket
+Icon=Asterodia
 Categories=Utility;
-StartupWMClass=StorageBucket
+StartupWMClass=Asterodia
 
  

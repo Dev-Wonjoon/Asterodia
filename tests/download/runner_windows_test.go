@@ -17,8 +17,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/download"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 type ytdlpDiscoverFunc func(context.Context, string, string) (json.RawMessage, error)
@@ -169,11 +169,11 @@ func (f ytdlpDiscoverFunc) DownloadSingle(
 }
 
 func TestRunnerStageAttempt(t *testing.T) {
-	if os.Getenv("STORAGEBUCKET_LIVE_TESTS") != "1" {
-		t.Skip("실제 사이트 검증은 STORAGEBUCKET_LIVE_TESTS=1로 실행하세요")
+	if os.Getenv("ASTERODIA_LIVE_TESTS") != "1" {
+		t.Skip("실제 사이트 검증은 ASTERODIA_LIVE_TESTS=1로 실행하세요")
 	}
-	ytdlpPath := os.Getenv("STORAGEBUCKET_TEST_YTDLP_EXE")
-	galleryPath := os.Getenv("STORAGEBUCKET_TEST_GALLERYDL_EXE")
+	ytdlpPath := os.Getenv("ASTERODIA_TEST_YTDLP_EXE")
+	galleryPath := os.Getenv("ASTERODIA_TEST_GALLERYDL_EXE")
 	if ytdlpPath == "" && galleryPath == "" {
 		t.Skip("실제 저장을 검증하려면 두 엔진의 실행 경로를 지정하세요")
 	}
@@ -191,8 +191,8 @@ func TestRunnerStageAttempt(t *testing.T) {
 		kind engine.Kind
 		url  string
 	}{
-		{engine.KindYtdlp, "https://raw.githubusercontent.com/chromium/chromium/main/media/test/data/bear.mp4?storagebucket=m4"},
-		{engine.KindGalleryDL, "https://bsky.app/profile/fruttymoment.bsky.social/post/3lcdqq3x47s2h?storagebucket=m4"},
+		{engine.KindYtdlp, "https://raw.githubusercontent.com/chromium/chromium/main/media/test/data/bear.mp4?asterodia=m4"},
+		{engine.KindGalleryDL, "https://bsky.app/profile/fruttymoment.bsky.social/post/3lcdqq3x47s2h?asterodia=m4"},
 	} {
 		t.Run(string(tc.kind), func(t *testing.T) {
 			attempt, err := runner.DiscoverAttempt(

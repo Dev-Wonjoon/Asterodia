@@ -47,7 +47,7 @@ RUN go mod tidy
 #   override with --build-arg CGO_ENABLED=1 (see header) for CGO apps.
 RUN APP_VERSION=$(tr -d '\r\n' < VERSION) && \
     CGO_ENABLED=${CGO_ENABLED} go build -tags server,production -trimpath -buildvcs=false \
-    -ldflags="-s -w -X github.com/Dev-Wonjoon/StorageBucket/internal/update.Version=${APP_VERSION}" -o server .
+    -ldflags="-s -w -X github.com/Dev-Wonjoon/Asterodia/internal/update.Version=${APP_VERSION}" -o server .
 
 # Runtime stage - minimal image
 FROM ${RUNTIME_IMAGE}

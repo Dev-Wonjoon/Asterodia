@@ -9,16 +9,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 func TestYtdlpDownloadPlaylist(t *testing.T) {
-	originalURL := os.Getenv("STORAGEBUCKET_YTDLP_TEST_PLAYLIST_URL")
+	originalURL := os.Getenv("ASTERODIA_YTDLP_TEST_PLAYLIST_URL")
 	if originalURL == "" {
 		t.Skip("재생목록 테스트 URL을 지정하세요")
 	}
 
-	wantIDs := strings.Split(os.Getenv("STORAGEBUCKET_YTDLP_TEST_PLAYLIST_IDS"), ",")
+	wantIDs := strings.Split(os.Getenv("ASTERODIA_YTDLP_TEST_PLAYLIST_IDS"), ",")
 	if len(wantIDs) != 2 {
 		t.Fatal("재생목록에 있는 영상 ID 두 개를 쉼표로 구분해 지정하세요")
 	}
@@ -29,9 +29,9 @@ func TestYtdlpDownloadPlaylist(t *testing.T) {
 		}
 	}
 
-	ytdlpPath := os.Getenv("STORAGEBUCKET_TEST_YTDLP_EXE")
-	nodePath := os.Getenv("STORAGEBUCKET_TEST_NODE_EXE")
-	ffprobePath := os.Getenv("STORAGEBUCKET_TEST_FFPROBE_EXE")
+	ytdlpPath := os.Getenv("ASTERODIA_TEST_YTDLP_EXE")
+	nodePath := os.Getenv("ASTERODIA_TEST_NODE_EXE")
+	ffprobePath := os.Getenv("ASTERODIA_TEST_FFPROBE_EXE")
 	if !filepath.IsAbs(ytdlpPath) || !filepath.IsAbs(nodePath) || !filepath.IsAbs(ffprobePath) {
 		t.Fatal("yt-dlp.exe, node.exe, ffprobe.exe의 절대 경로를 지정하세요")
 	}

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 func TestParseGalleryDLDiscovery(t *testing.T) {
@@ -55,18 +55,18 @@ func TestParseGalleryDLDiscovery(t *testing.T) {
 }
 
 func TestGalleryDLDiscoverBluesky(t *testing.T) {
-	if os.Getenv("STORAGEBUCKET_LIVE_TESTS") != "1" {
-		t.Skip("실제 사이트 검증은 STORAGEBUCKET_LIVE_TESTS=1로 실행하세요")
+	if os.Getenv("ASTERODIA_LIVE_TESTS") != "1" {
+		t.Skip("실제 사이트 검증은 ASTERODIA_LIVE_TESTS=1로 실행하세요")
 	}
-	executable := os.Getenv("STORAGEBUCKET_TEST_GALLERYDL_EXE")
+	executable := os.Getenv("ASTERODIA_TEST_GALLERYDL_EXE")
 	if executable == "" {
-		t.Skip("실제 조회를 실행하려면 STORAGEBUCKET_TEST_GALLERYDL_EXE를 지정하세요")
+		t.Skip("실제 조회를 실행하려면 ASTERODIA_TEST_GALLERYDL_EXE를 지정하세요")
 	}
 	if !filepath.IsAbs(executable) {
 		t.Fatal("gallery-dl.exe의 절대 경로를 지정하세요")
 	}
 
-	const originalURL = "https://bsky.app/profile/fruttymoment.bsky.social/post/3lcdqq3x47s2h?storagebucket=m3"
+	const originalURL = "https://bsky.app/profile/fruttymoment.bsky.social/post/3lcdqq3x47s2h?asterodia=m3"
 	const wantPostID = "3lcdqq3x47s2h"
 
 	kind, err := engine.Select(originalURL, engine.Options{})

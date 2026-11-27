@@ -11,12 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 // Opt-in public URL diagnosis. Normal regression runs use local HTTP fixtures.
 func TestYtdlpLiveShorts(t *testing.T) {
-	url := os.Getenv("STORAGEBUCKET_LIVE_SHORTS_URL")
+	url := os.Getenv("ASTERODIA_LIVE_SHORTS_URL")
 	if url == "" {
 		t.Skip("공개 Shorts 재현 URL을 지정해야 합니다")
 	}
@@ -30,8 +30,8 @@ func TestYtdlpLiveShorts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	executable := os.Getenv("STORAGEBUCKET_TEST_YTDLP_EXE")
-	ffmpeg := os.Getenv("STORAGEBUCKET_TEST_FFMPEG_EXE")
+	executable := os.Getenv("ASTERODIA_TEST_YTDLP_EXE")
+	ffmpeg := os.Getenv("ASTERODIA_TEST_FFMPEG_EXE")
 	if !filepath.IsAbs(executable) || !filepath.IsAbs(ffmpeg) {
 		t.Fatal("격리된 실제 엔진 경로가 필요합니다")
 	}
@@ -40,7 +40,7 @@ func TestYtdlpLiveShorts(t *testing.T) {
 	var mu sync.Mutex
 	var lines []string
 	ctx = engine.WithOutputObserver(ctx, func(output engine.Output) {
-		if output.Stream == "stdout" && (json.Valid([]byte(output.Text)) || strings.HasPrefix(output.Text, "__STORAGEBUCKET_RESULT__:")) {
+		if output.Stream == "stdout" && (json.Valid([]byte(output.Text)) || strings.HasPrefix(output.Text, "__ASTERODIA_RESULT__:")) {
 			return
 		}
 		text := output.Text

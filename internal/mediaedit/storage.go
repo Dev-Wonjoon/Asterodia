@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
 )
 
 func (s *Service) render(ctx context.Context, id string) (err error) {
@@ -49,7 +49,7 @@ func (s *Service) render(ctx context.Context, id string) (err error) {
 	direct := j.Options.OutputDirectory != "" && !j.Preview
 	stageDirectory := "edits"
 	if direct {
-		stageDirectory = ".storagebucket-tmp"
+		stageDirectory = ".asterodia-tmp"
 	}
 	if err = root.MkdirAll(stageDirectory, 0700); err != nil {
 		return err

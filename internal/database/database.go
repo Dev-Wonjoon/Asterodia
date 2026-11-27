@@ -13,7 +13,7 @@ import (
 
 const schemaVersion = 14
 const minimumSchemaVersion = 3
-const electronDBUnsupported = "StorageBucket 2.1.0부터 Electron DB는 지원하지 않습니다. Wails 형식의 DB를 선택하세요."
+const electronDBUnsupported = "Asterodia 2.1.0부터 Electron DB는 지원하지 않습니다. Wails 형식의 DB를 선택하세요."
 
 func supportedDatabaseVersion(version int) error {
 	if version >= 0 && version < minimumSchemaVersion {

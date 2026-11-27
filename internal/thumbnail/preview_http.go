@@ -2,7 +2,7 @@ package thumbnail
 
 import (
 	"context"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/netguard"
+	"github.com/Dev-Wonjoon/Asterodia/internal/netguard"
 	"net"
 	"net/http"
 	"net/netip"

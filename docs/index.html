@@ -3,40 +3,40 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="StorageBucket은 Windows용 무료 오픈 소스 미디어 다운로더입니다. 이미지·영상·오디오를 다운로드하고 Instagram 프로필 앨범, 태그·즐겨찾기로 정리하세요. 앱 다운로드와 웹 데모를 제공합니다.">
-  <link rel="canonical" href="https://dev-wonjoon.github.io/StorageBucket/">
+  <meta name="description" content="Asterodia는 Windows용 무료 오픈 소스 미디어 다운로더입니다. 이미지·영상·오디오를 다운로드하고 Instagram 프로필 앨범, 태그·즐겨찾기로 정리하세요. 앱 다운로드와 웹 데모를 제공합니다.">
+  <link rel="canonical" href="https://dev-wonjoon.github.io/Asterodia/">
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="StorageBucket">
+  <meta property="og:site_name" content="Asterodia">
   <meta property="og:locale" content="ko_KR">
-  <meta property="og:url" content="https://dev-wonjoon.github.io/StorageBucket/">
-  <meta property="og:title" content="StorageBucket — 이미지·영상 다운로드와 미디어 관리">
+  <meta property="og:url" content="https://dev-wonjoon.github.io/Asterodia/">
+  <meta property="og:title" content="Asterodia — 이미지·영상 다운로드와 미디어 관리">
   <meta property="og:description" content="Windows용 무료 오픈 소스 미디어 다운로더. 이미지·영상·오디오를 다운로드하고 Instagram 프로필 앨범과 태그로 정리하세요. 웹 데모로 먼저 체험할 수 있습니다.">
-  <meta property="og:image" content="https://dev-wonjoon.github.io/StorageBucket/images/img1.png">
+  <meta property="og:image" content="https://dev-wonjoon.github.io/Asterodia/images/img1.png">
   <meta property="og:image:width" content="986">
   <meta property="og:image:height" content="611">
-  <meta property="og:image:alt" content="StorageBucket의 미디어 갤러리와 다운로드 진행 화면">
+  <meta property="og:image:alt" content="Asterodia의 미디어 갤러리와 다운로드 진행 화면">
   <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
-      "@id": "https://dev-wonjoon.github.io/StorageBucket/#software",
-      "name": "StorageBucket",
-      "url": "https://dev-wonjoon.github.io/StorageBucket/",
+      "@id": "https://dev-wonjoon.github.io/Asterodia/#software",
+      "name": "Asterodia",
+      "url": "https://dev-wonjoon.github.io/Asterodia/",
       "description": "Windows용 무료 오픈 소스 미디어 다운로더. 이미지·영상·오디오 다운로드, Instagram 프로필 앨범, 태그·즐겨찾기와 GIF·WebP 편집을 지원합니다.",
       "applicationCategory": "MultimediaApplication",
       "operatingSystem": "Windows",
       "inLanguage": ["ko", "en"],
       "isAccessibleForFree": true,
-      "license": "https://github.com/Dev-Wonjoon/StorageBucket/blob/main/LICENSE",
-      "downloadUrl": "https://github.com/Dev-Wonjoon/StorageBucket/releases/latest",
-      "screenshot": "https://dev-wonjoon.github.io/StorageBucket/images/img1.png",
-      "image": "https://dev-wonjoon.github.io/StorageBucket/assets/icon.png",
-      "sameAs": "https://github.com/Dev-Wonjoon/StorageBucket",
+      "license": "https://github.com/Dev-Wonjoon/Asterodia/blob/main/LICENSE",
+      "downloadUrl": "https://github.com/Dev-Wonjoon/Asterodia/releases/latest",
+      "screenshot": "https://dev-wonjoon.github.io/Asterodia/images/img1.png",
+      "image": "https://dev-wonjoon.github.io/Asterodia/assets/icon.png",
+      "sameAs": "https://github.com/Dev-Wonjoon/Asterodia",
       "offers": {
         "@type": "Offer",
         "price": "0",
         "priceCurrency": "USD",
-        "url": "https://github.com/Dev-Wonjoon/StorageBucket/releases/latest"
+        "url": "https://github.com/Dev-Wonjoon/Asterodia/releases/latest"
       },
       "featureList": [
         "이미지·영상·오디오 다운로드",
@@ -50,11 +50,16 @@
   <meta name="theme-color" content="#f8fafc">
   <script>
     (() => {
-      const storageKey = 'storagebucket-pages-theme';
+      const storageKey = 'asterodia-pages-theme';
       const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
       let preference = null;
       try {
-        const stored = window.localStorage.getItem(storageKey);
+        let stored = window.localStorage.getItem(storageKey);
+        // Read the previous brand's preference only when migrating this key.
+        if (stored === null) {
+          stored = window.localStorage.getItem('storagebucket-pages-theme');
+          if (stored !== null) { try { window.localStorage.setItem(storageKey, stored); } catch {} }
+        }
         if (stored === 'light' || stored === 'dark') preference = stored;
       } catch { /* Keep theme switching available when storage is blocked. */ }
 
@@ -62,12 +67,12 @@
         const theme = preference || (systemTheme.matches ? 'dark' : 'light');
         document.documentElement.classList.toggle('dark', theme === 'dark');
         document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#020617' : '#f8fafc';
-        document.dispatchEvent(new Event('storagebucket:theme-change'));
+        document.dispatchEvent(new Event('asterodia:theme-change'));
       };
 
       // Apply before the stylesheet loads so the first paint uses the chosen theme.
       applyTheme();
-      window.storageBucketTheme = {
+      window.asterodiaTheme = {
         toggle() {
           preference = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
           try { window.localStorage.setItem(storageKey, preference); } catch { /* Session-only choice. */ }
@@ -79,8 +84,9 @@
       });
     })();
   </script>
-  <title>StorageBucket — 이미지·영상 다운로드와 미디어 관리</title>
-  <link rel="icon" type="image/x-icon" href="./assets/favicon.ico">
+  <title>Asterodia — 이미지·영상 다운로드와 미디어 관리</title>
+  <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
+  <link rel="alternate icon" type="image/x-icon" href="./assets/favicon.ico">
   <link rel="stylesheet" href="./assets/tailwind.css">
 </head>
 <body class="min-w-0">
@@ -88,14 +94,14 @@
 
   <header class="border-b border-(--border-line) bg-(--bg-sidebar)">
     <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-6 gap-y-4 px-5 py-5 sm:px-8 lg:px-12">
-      <a href="./" class="flex items-center gap-3 text-lg font-bold tracking-tight" aria-label="StorageBucket">
-        <img src="./assets/icon.png" alt="" width="40" height="40" class="size-10 shrink-0 object-contain">
-        StorageBucket
+      <a href="./" class="flex items-center gap-3 text-lg font-bold tracking-tight" aria-label="Asterodia">
+        <span aria-hidden="true" class="size-10 shrink-0 bg-current" style="mask: url('./assets/asterodia.svg') center / contain no-repeat; -webkit-mask: url('./assets/asterodia.svg') center / contain no-repeat;"></span>
+        Asterodia
       </a>
       <nav aria-label="주 메뉴" data-i18n-aria="nav" class="flex flex-wrap items-center gap-5 text-sm font-medium text-(--text-muted) sm:gap-7">
         <a href="#features" class="hover:text-(--pages-accent)" data-i18n="navFeatures">주요 기능</a>
         <a href="#start" class="hover:text-(--pages-accent)" data-i18n="navStart">시작하기</a>
-        <a href="https://github.com/Dev-Wonjoon/StorageBucket" class="hover:text-(--pages-accent)">GitHub</a>
+        <a href="https://github.com/Dev-Wonjoon/Asterodia" class="hover:text-(--pages-accent)">GitHub</a>
         <button id="theme-toggle" type="button" role="switch" aria-checked="false" hidden class="relative inline-flex h-9 w-16 shrink-0 cursor-pointer rounded-full border border-(--border-line) bg-(--bg-active) p-0" aria-label="다크 테마" title="다크 테마로 전환">
           <span class="theme-switch-thumb absolute left-0.75 top-0.75 grid size-7 place-items-center rounded-full bg-(--pages-switch-thumb) text-(--pages-switch-icon) shadow-sm" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="theme-switch-sun col-start-1 row-start-1 size-4"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5" stroke-linecap="round"/></svg>
@@ -116,24 +122,24 @@
             <span class="block" data-i18n="heroLine1">이미지·영상 다운로드,</span>
             <span class="mt-2 block text-(--pages-accent)" data-i18n="heroLine2">정리까지 한곳에서.</span>
           </h1>
-          <p class="mt-6 max-w-lg text-lg leading-relaxed text-pretty text-(--text-muted)" data-i18n="heroDescription">StorageBucket으로 이미지·영상·오디오를 다운로드하고 태그와 앨범으로 정리하세요. Windows용 무료 오픈 소스 앱으로 GIF·WebP 편집도 이어집니다.</p>
+          <p class="mt-6 max-w-lg text-lg leading-relaxed text-pretty text-(--text-muted)" data-i18n="heroDescription">Asterodia로 이미지·영상·오디오를 다운로드하고 태그와 앨범으로 정리하세요. Windows용 무료 오픈 소스 앱으로 GIF·WebP 편집도 이어집니다.</p>
           <div class="mt-8 flex flex-wrap items-center gap-3">
-            <a href="https://github.com/Dev-Wonjoon/StorageBucket/releases/latest/download/StorageBucket-windows-amd64.exe" class="inline-flex items-center gap-2 rounded-xl bg-(--pages-button-bg) px-6 py-3.5 font-semibold text-white hover:brightness-110">
+            <a href="https://github.com/Dev-Wonjoon/Asterodia/releases/latest/download/StorageBucket-windows-amd64.exe" class="inline-flex items-center gap-2 rounded-xl bg-(--pages-button-bg) px-6 py-3.5 font-semibold text-white hover:brightness-110">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="size-5" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
               <span data-i18n="download">Windows x64 다운로드</span>
             </a>
             <a href="./demo/" class="rounded-xl border border-(--border-line) bg-(--bg-sidebar) px-6 py-3.5 font-semibold hover:bg-(--bg-hover)" data-i18n="tryDemo">데모 체험하기</a>
           </div>
           <p class="mt-4 text-sm">
-            <a href="https://github.com/Dev-Wonjoon/StorageBucket/releases/latest/download/StorageBucket-windows-arm64.exe" class="font-semibold text-(--pages-accent) underline decoration-(--pages-link-underline) underline-offset-4 hover:decoration-current" data-i18n="downloadArm64">Windows ARM64 다운로드</a>
+            <a href="https://github.com/Dev-Wonjoon/Asterodia/releases/latest/download/StorageBucket-windows-arm64.exe" class="font-semibold text-(--pages-accent) underline decoration-(--pages-link-underline) underline-offset-4 hover:decoration-current" data-i18n="downloadArm64">Windows ARM64 다운로드</a>
           </p>
           <p class="mt-5 text-sm text-(--text-muted)" data-i18n="heroNote">데스크톱 앱 · 오픈 소스 · MIT 라이선스</p>
         </div>
         <figure class="min-w-0 rounded-2xl bg-(--pages-preview-bg) p-3 ring-1 ring-(--pages-preview-border) sm:p-5 lg:-mr-20 lg:p-6">
           <a href="./images/img1.png" class="block rounded-xl" aria-label="갤러리 화면 크게 보기" data-i18n-aria="galleryOpen">
-            <img src="./images/img1.png" alt="StorageBucket의 갤러리와 다운로드 진행 상황" data-i18n-alt="galleryAlt" width="986" height="611" fetchpriority="high" class="h-auto w-full rounded-lg shadow-xl ring-1 ring-(--border-line)">
+            <img src="./images/img1.png" alt="Asterodia의 갤러리와 다운로드 진행 상황" data-i18n-alt="galleryAlt" width="986" height="611" fetchpriority="high" class="h-auto w-full rounded-lg shadow-xl ring-1 ring-(--border-line)">
           </a>
-          <figcaption class="mt-4 px-1 text-sm leading-relaxed text-(--pages-preview-caption)" data-i18n="galleryCaption">다운로드 진행 상황과 모아 둔 미디어를 한눈에.</figcaption>
+          <figcaption class="mt-4 px-1 text-sm leading-relaxed text-(--pages-preview-caption)" data-i18n="galleryCaption">다운로드 진행 상황과 모아 둔 미디어를 한눈에. 화면 예시는 이름 변경 전 버전입니다.</figcaption>
         </figure>
       </div>
     </section>
@@ -169,7 +175,7 @@
         <div class="mt-12 grid items-center gap-8 lg:grid-cols-[1.35fr_0.65fr] lg:gap-14">
           <figure class="min-w-0">
             <a href="./images/img2.png" class="block rounded-xl" aria-label="WebP 편집 화면 크게 보기" data-i18n-aria="editorOpen">
-              <img src="./images/img2.png" alt="구간과 크롭 영역을 지정하는 StorageBucket WebP 편집기" data-i18n-alt="editorAlt" width="986" height="611" loading="lazy" decoding="async" class="h-auto w-full rounded-xl border border-(--border-line) shadow-lg">
+              <img src="./images/img2.png" alt="구간과 크롭 영역을 지정하는 Asterodia WebP 편집기" data-i18n-alt="editorAlt" width="986" height="611" loading="lazy" decoding="async" class="h-auto w-full rounded-xl border border-(--border-line) shadow-lg">
             </a>
           </figure>
           <div>
@@ -186,7 +192,7 @@
           </div>
           <figure class="order-1 min-w-0 lg:order-2">
             <a href="./images/img3.png" class="block rounded-xl" aria-label="영상 재생 화면 크게 보기" data-i18n-aria="playerOpen">
-              <img src="./images/img3.png" alt="StorageBucket의 동영상 플레이어" data-i18n-alt="playerAlt" width="986" height="611" loading="lazy" decoding="async" class="h-auto w-full rounded-xl border border-(--border-line) shadow-lg">
+              <img src="./images/img3.png" alt="Asterodia의 동영상 플레이어" data-i18n-alt="playerAlt" width="986" height="611" loading="lazy" decoding="async" class="h-auto w-full rounded-xl border border-(--border-line) shadow-lg">
             </a>
           </figure>
         </div>
@@ -198,13 +204,13 @@
         <p class="text-sm font-semibold text-(--pages-accent)" data-i18n="startEyebrow">시작하기</p>
         <h2 class="mt-3 text-3xl leading-tight font-bold tracking-tight sm:text-4xl" data-i18n="startTitle">첫 라이브러리를 만들어 보세요.</h2>
         <p class="mt-5 max-w-md leading-relaxed text-(--text-muted)" data-i18n="startDescription">최신 릴리스에서 배포 파일과 릴리스 노트를 확인할 수 있습니다. 필요한 외부 도구는 앱 안에서 설치하고 관리하세요.</p>
-        <a href="https://github.com/Dev-Wonjoon/StorageBucket/releases/latest/download/StorageBucket-windows-amd64.exe" class="mt-7 inline-flex rounded-xl bg-(--pages-button-bg) px-6 py-3.5 font-semibold text-white hover:brightness-110" data-i18n="download">Windows x64 다운로드</a>
+        <a href="https://github.com/Dev-Wonjoon/Asterodia/releases/latest/download/StorageBucket-windows-amd64.exe" class="mt-7 inline-flex rounded-xl bg-(--pages-button-bg) px-6 py-3.5 font-semibold text-white hover:brightness-110" data-i18n="download">Windows x64 다운로드</a>
         <p class="mt-4 text-sm">
-          <a href="https://github.com/Dev-Wonjoon/StorageBucket/releases/latest/download/StorageBucket-windows-arm64.exe" class="font-semibold text-(--pages-accent) underline decoration-(--pages-link-underline) underline-offset-4 hover:decoration-current" data-i18n="downloadArm64">Windows ARM64 다운로드</a>
+          <a href="https://github.com/Dev-Wonjoon/Asterodia/releases/latest/download/StorageBucket-windows-arm64.exe" class="font-semibold text-(--pages-accent) underline decoration-(--pages-link-underline) underline-offset-4 hover:decoration-current" data-i18n="downloadArm64">Windows ARM64 다운로드</a>
         </p>
       </div>
       <ol class="list-decimal space-y-6 pl-6 marker:font-semibold marker:text-(--pages-accent)">
-        <li class="pl-2"><h3 class="text-lg font-semibold" data-i18n="step1Title">다운로드하고 실행</h3><p class="mt-2 leading-relaxed text-(--text-muted)" data-i18n="step1Description">최신 릴리스에서 사용 환경에 맞는 배포 파일을 다운로드하고 StorageBucket을 실행하세요.</p></li>
+        <li class="pl-2"><h3 class="text-lg font-semibold" data-i18n="step1Title">다운로드하고 실행</h3><p class="mt-2 leading-relaxed text-(--text-muted)" data-i18n="step1Description">최신 릴리스에서 사용 환경에 맞는 배포 파일을 다운로드하고 Asterodia를 실행하세요.</p></li>
         <li class="pl-2"><h3 class="text-lg font-semibold" data-i18n="step2Title">외부 도구 설치</h3><p class="mt-2 leading-relaxed text-(--text-muted)" data-i18n="step2Description">첫 실행의 엔진 설정 안내를 따르세요. 설정의 엔진 관리에서도 설치와 업데이트가 가능합니다.</p></li>
         <li class="pl-2"><h3 class="text-lg font-semibold" data-i18n="step3Title">다운로드 폴더 지정</h3><p class="mt-2 leading-relaxed text-(--text-muted)" data-i18n="step3Description">설정에서 다운로드할 미디어를 저장할 폴더를 선택하세요.</p></li>
         <li class="pl-2"><h3 class="text-lg font-semibold" data-i18n="step4Title">링크 추가 또는 폴더 가져오기</h3><p class="mt-2 leading-relaxed text-(--text-muted)" data-i18n="step4Description">미디어 URL을 붙여 넣거나 기존 로컬 폴더를 등록해 라이브러리를 채워 보세요.</p></li>
@@ -226,19 +232,19 @@
           <summary class="cursor-pointer text-lg font-semibold" data-i18n="faq3Title">어떤 외부 도구를 사용하나요?</summary>
           <p class="mt-4 leading-relaxed text-(--text-muted)" data-i18n="faq3Description">다운로드에는 yt-dlp와 gallery-dl을, 미디어 처리에는 FFmpeg·FFprobe·ImageMagick을 사용합니다. 도구를 설치하거나 업데이트하려면 인터넷 연결이 필요합니다.</p>
         </details>
-        <a id="readme" href="https://github.com/Dev-Wonjoon/StorageBucket/blob/main/README.ko.md" class="mt-7 inline-block font-semibold text-(--pages-accent) underline decoration-(--pages-link-underline) underline-offset-4 hover:decoration-current" data-i18n="readGuide">자세한 사용 안내 읽기</a>
+        <a id="readme" href="https://github.com/Dev-Wonjoon/Asterodia/blob/main/README.ko.md" class="mt-7 inline-block font-semibold text-(--pages-accent) underline decoration-(--pages-link-underline) underline-offset-4 hover:decoration-current" data-i18n="readGuide">자세한 사용 안내 읽기</a>
       </div>
     </section>
   </main>
 
   <footer class="border-t border-(--border-line)">
     <div class="mx-auto flex max-w-7xl flex-col justify-between gap-6 px-5 py-8 text-sm text-(--text-muted) sm:flex-row sm:items-center sm:px-8 lg:px-12">
-      <p>StorageBucket <span aria-hidden="true">·</span> <span data-i18n="footerLicense">MIT 라이선스의 오픈 소스 프로젝트</span></p>
+      <p>Asterodia <span aria-hidden="true">·</span> <span data-i18n="footerLicense">MIT 라이선스의 오픈 소스 프로젝트</span></p>
       <nav aria-label="프로젝트 링크" data-i18n-aria="footerNav" class="flex flex-wrap gap-x-6 gap-y-3">
-        <a href="https://github.com/Dev-Wonjoon/StorageBucket" class="hover:text-(--pages-accent)">GitHub</a>
-        <a href="https://github.com/Dev-Wonjoon/StorageBucket/releases" class="hover:text-(--pages-accent)" data-i18n="releases">릴리스</a>
-        <a href="https://github.com/Dev-Wonjoon/StorageBucket/issues" class="hover:text-(--pages-accent)" data-i18n="issues">문제 신고</a>
-        <a href="https://github.com/Dev-Wonjoon/StorageBucket/blob/main/LICENSE" class="hover:text-(--pages-accent)" data-i18n="license">라이선스</a>
+        <a href="https://github.com/Dev-Wonjoon/Asterodia" class="hover:text-(--pages-accent)">GitHub</a>
+        <a href="https://github.com/Dev-Wonjoon/Asterodia/releases" class="hover:text-(--pages-accent)" data-i18n="releases">릴리스</a>
+        <a href="https://github.com/Dev-Wonjoon/Asterodia/issues" class="hover:text-(--pages-accent)" data-i18n="issues">문제 신고</a>
+        <a href="https://github.com/Dev-Wonjoon/Asterodia/blob/main/LICENSE" class="hover:text-(--pages-accent)" data-i18n="license">라이선스</a>
       </nav>
     </div>
   </footer>
@@ -248,24 +254,24 @@
       const english = {
         skip: 'Skip to content', nav: 'Main navigation', navFeatures: 'Features', navStart: 'Get started',
         eyebrow: 'FREE MEDIA DOWNLOADER FOR WINDOWS', heroLine1: 'Download your media.', heroLine2: 'Keep it organized.',
-        heroDescription: 'Download images, videos, and audio with StorageBucket. Organize them with tags and albums, then create GIFs and animated WebP images in a free, open source Windows app.',
+        heroDescription: 'Download images, videos, and audio with Asterodia. Organize them with tags and albums, then create GIFs and animated WebP images in a free, open source Windows app.',
         download: 'Download for Windows x64', downloadArm64: 'Download for Windows ARM64', tryDemo: 'Try the live demo', heroNote: 'Desktop app · Open source · MIT license',
-        galleryOpen: 'View full-size gallery screenshot', galleryAlt: 'StorageBucket gallery and download progress', galleryCaption: 'Your downloads and media library, at a glance.',
+        galleryOpen: 'View full-size gallery screenshot', galleryAlt: 'Asterodia gallery and download progress', galleryCaption: 'Your downloads and media library, at a glance. Screenshots show the version before the name change.',
         featuresEyebrow: 'BEYOND THE DOWNLOAD', featuresTitle: 'Give your media a place of its own.',
         downloadTitle: 'From a link to your library', downloadDescription: 'Download media from supported URLs with yt-dlp and gallery-dl. Follow progress, inspect logs, and retry failed tasks.', downloadNote: 'Supported sites and formats depend on the external engines.',
         organizeTitle: 'Find it your way', organizeDescription: 'Import PC folders or keep appending Instagram downloads to profile albums. Organize with tags and favorites, then search by title, author, or platform.', organizeNote: 'Folder imports register files in their existing locations.',
         editTitle: 'Keep just the scene you love', editDescription: 'Create GIFs and animated WebP images from videos. Trim and crop your scenes, and preview the output quality before saving.', editNote: 'Save edited results while preserving the originals.',
-        screenshotsTitle: 'Make more of the moments you keep.', editorOpen: 'View full-size WebP editor screenshot', editorAlt: 'StorageBucket WebP editor with range and crop controls',
+        screenshotsTitle: 'Make more of the moments you keep.', editorOpen: 'View full-size WebP editor screenshot', editorAlt: 'Asterodia WebP editor with range and crop controls',
         editorEyebrow: 'GIF · WEBP', editorTitle: 'For the scenes worth keeping.', editorDescription: 'Choose a range, crop the image, and exclude unwanted frames. Check the preview before saving your result.',
-        playerEyebrow: 'ALBUMS · MEDIA VIEWING', playerTitle: 'Ready for another look.', playerDescription: 'Open images in the viewer and videos or audio in the player. Navigate your user albums with previous and next controls, shuffle, and album repeat.', playerOpen: 'View full-size video player screenshot', playerAlt: 'StorageBucket video player',
+        playerEyebrow: 'ALBUMS · MEDIA VIEWING', playerTitle: 'Ready for another look.', playerDescription: 'Open images in the viewer and videos or audio in the player. Navigate your user albums with previous and next controls, shuffle, and album repeat.', playerOpen: 'View full-size video player screenshot', playerAlt: 'Asterodia video player',
         startEyebrow: 'GET STARTED', startTitle: 'Build your first library.', startDescription: 'Find downloads and release notes on the latest release page. Install and manage the required external tools inside the app.',
-        step1Title: 'Download and launch', step1Description: 'Download the distribution for your environment from the latest release and launch StorageBucket.',
+        step1Title: 'Download and launch', step1Description: 'Download the distribution for your environment from the latest release and launch Asterodia.',
         step2Title: 'Install external tools', step2Description: 'Follow the engine setup prompt on first launch. You can also install and update tools in Settings → Engine Management.',
         step3Title: 'Choose a download folder', step3Description: 'In Settings, choose where to save your downloaded media.',
         step4Title: 'Add a link or import a folder', step4Description: 'Paste a media URL or register an existing local folder to start filling your library.',
         faqTitle: 'A few things to know', faq1Title: 'Can I use the app on this website?', faq1Description: 'Try the gallery, albums, tags, and simulated download progress with sample media in the demo. Install the desktop app to download real media and manage your PC library.',
         faq2Title: 'Can I browse my library on mobile?', faq2Description: 'Use the app’s local web server with a separately configured Tailscale connection. The desktop app must remain running, and playable formats depend on your browser.',
-        faq3Title: 'Which external tools does it use?', faq3Description: 'StorageBucket uses yt-dlp and gallery-dl for downloads, and FFmpeg, FFprobe, and ImageMagick for media processing. Installing or updating tools requires an internet connection.',
+        faq3Title: 'Which external tools does it use?', faq3Description: 'Asterodia uses yt-dlp and gallery-dl for downloads, and FFmpeg, FFprobe, and ImageMagick for media processing. Installing or updating tools requires an internet connection.',
         readGuide: 'Read the full guide', footerLicense: 'An open source project under the MIT license', footerNav: 'Project links', releases: 'Releases', issues: 'Report an issue', license: 'License',
       };
       const nodes = [...document.querySelectorAll('[data-i18n], [data-i18n-alt], [data-i18n-aria]')];
@@ -294,8 +300,8 @@
           ? (isDark ? 'Switch to light theme' : 'Switch to dark theme')
           : (isDark ? '화이트 테마로 전환' : '다크 테마로 전환');
       };
-      themeToggle.addEventListener('click', () => window.storageBucketTheme.toggle());
-      document.addEventListener('storagebucket:theme-change', renderThemeControl);
+      themeToggle.addEventListener('click', () => window.asterodiaTheme.toggle());
+      document.addEventListener('asterodia:theme-change', renderThemeControl);
       renderThemeControl();
       themeToggle.hidden = false;
       button.hidden = false;
@@ -307,13 +313,13 @@
           else element.textContent = value;
         }
         document.documentElement.lang = isEnglish ? 'en' : 'ko';
-        document.title = isEnglish ? 'StorageBucket — Media Downloader and Organizer for Windows' : koreanTitle;
-        description.content = isEnglish ? 'StorageBucket is a free, open source media downloader for Windows. Download images, videos, and audio, organize Instagram profile albums, and manage tags and favorites. Try the web demo or download the app.' : koreanDescription;
+        document.title = isEnglish ? 'Asterodia — Media Downloader and Organizer for Windows' : koreanTitle;
+        description.content = isEnglish ? 'Asterodia is a free, open source media downloader for Windows. Download images, videos, and audio, organize Instagram profile albums, and manage tags and favorites. Try the web demo or download the app.' : koreanDescription;
         ogTitle.content = document.title;
         ogDescription.content = isEnglish ? description.content : koreanOgDescription;
         ogLocale.content = isEnglish ? 'en_US' : 'ko_KR';
-        ogImageAlt.content = isEnglish ? 'StorageBucket media gallery and download progress' : koreanOgImageAlt;
-        document.getElementById('readme').href = 'https://github.com/Dev-Wonjoon/StorageBucket/blob/main/' + (isEnglish ? 'README.md' : 'README.ko.md');
+        ogImageAlt.content = isEnglish ? 'Asterodia media gallery and download progress' : koreanOgImageAlt;
+        document.getElementById('readme').href = 'https://github.com/Dev-Wonjoon/Asterodia/blob/main/' + (isEnglish ? 'README.md' : 'README.ko.md');
         button.textContent = isEnglish ? '한국어' : 'English';
         button.setAttribute('aria-label', isEnglish ? '한국어로 전환' : 'Switch to English');
         renderThemeControl();

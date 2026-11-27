@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 	"os"
 	"path/filepath"
 	"sync"
@@ -378,7 +378,7 @@ func (s *Service) Run(ctx context.Context, req RunRequest) api.Result {
 		} else {
 			journal.note("다운로드 대상 조회 시작")
 			runner := s.factory(root, opts)
-			stopWatch := watchDownloadResources(workCtx, cancel, root, filepath.Join(root, ".storagebucket", "staging", stageOwner(req.JobID, attempt)))
+			stopWatch := watchDownloadResources(workCtx, cancel, root, filepath.Join(root, ".asterodia", "staging", stageOwner(req.JobID, attempt)))
 			closeNetwork := func() {}
 			if runner.SecureNetwork {
 				workCtx, closeNetwork, err = engine.SecureContext(workCtx)
@@ -396,7 +396,7 @@ func (s *Service) Run(ctx context.Context, req RunRequest) api.Result {
 				err = limitErr
 			}
 			if err == nil {
-				err = checkDownloadResources(root, filepath.Join(root, ".storagebucket", "staging", stageOwner(req.JobID, attempt)))
+				err = checkDownloadResources(root, filepath.Join(root, ".asterodia", "staging", stageOwner(req.JobID, attempt)))
 			}
 		}
 	case <-workCtx.Done():

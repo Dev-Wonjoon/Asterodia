@@ -13,7 +13,7 @@ if ($architecturesToVerify.Count -ne $Architectures.Count) { throw 'Duplicate re
 $verified = @()
 foreach ($arch in $architecturesToVerify) {
     $directory = Join-Path $InputDirectory $arch
-    $name = "StorageBucket-windows-$arch.exe"
+    $name = "Asterodia-windows-$arch.exe"
     $files = @(Get-ChildItem -LiteralPath $directory -Force)
     if ($files.Count -ne 2 -or @($files | Where-Object { $_.PSIsContainer -or ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -or $_.Name -cnotin @($name, 'SHA256SUMS') }).Count) {
         throw "Expected only $name and SHA256SUMS in $directory"
@@ -22,6 +22,8 @@ foreach ($arch in $architecturesToVerify) {
     $sums = (Get-Content -LiteralPath (Join-Path $directory 'SHA256SUMS') -Raw).Trim()
     if ($sums -cne "$($file.Hash)  $name") { throw "Release checksum mismatch: $name" }
     $verified += [pscustomobject]@{ Name = $name; File = $file }
+    # Pre-rename clients require this exact asset name and checksum.
+    $verified += [pscustomobject]@{ Name = "StorageBucket-windows-$arch.exe"; File = $file }
 }
 # Verify every payload before writing anything to the assembled release.
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null

@@ -28,7 +28,7 @@ def image_bytes(index):
             rows.extend(((x * 255 // width + index * 45) % 256, y * 255 // height, 140 + index * 30))
     return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b"")
 
-with sqlite3.connect(root / "storagebucket.db") as db:
+with sqlite3.connect(root / "asterodia.db") as db:
     db.executescript((repo / "internal/database/schema.sql").read_text(encoding="utf-8"))
     db.execute("PRAGMA user_version=3")
     now = int(time.time() * 1000)

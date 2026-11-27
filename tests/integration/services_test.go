@@ -21,15 +21,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/database"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/desktop"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/download"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/maintenance"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/settings"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/thumbnail"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/database"
+	"github.com/Dev-Wonjoon/Asterodia/internal/desktop"
+	"github.com/Dev-Wonjoon/Asterodia/internal/download"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/maintenance"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/settings"
+	"github.com/Dev-Wonjoon/Asterodia/internal/thumbnail"
 )
 
 const postURL = "https://www.instagram.com/p/Fixture/"
@@ -106,9 +106,9 @@ type fixture struct {
 
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
-	base := os.Getenv("STORAGEBUCKET_TEST_ROOT")
+	base := os.Getenv("ASTERODIA_TEST_ROOT")
 	if !filepath.IsAbs(base) {
-		t.Fatal("STORAGEBUCKET_TEST_ROOT 절대 경로가 필요합니다")
+		t.Fatal("ASTERODIA_TEST_ROOT 절대 경로가 필요합니다")
 	}
 	base, err := filepath.EvalSymlinks(base)
 	if err != nil {
@@ -206,7 +206,7 @@ func TestInstagramMultipleMediaPublication(t *testing.T) {
 	}
 	var video []byte
 	ffmpeg := ""
-	if probe := os.Getenv("STORAGEBUCKET_TEST_FFPROBE_EXE"); probe != "" {
+	if probe := os.Getenv("ASTERODIA_TEST_FFPROBE_EXE"); probe != "" {
 		ffmpeg = filepath.Join(filepath.Dir(probe), "ffmpeg.exe")
 		path := filepath.Join(assets.root, "source.mp4")
 		_, e := new(engine.ProcessRunner).Run(t.Context(), engine.ProcessRequest{Executable: ffmpeg, Directory: assets.root, Timeout: 30 * time.Second, Arguments: []string{"-nostdin", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=blue:s=32x24:d=0.2", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", path}})
@@ -541,7 +541,7 @@ func TestFailureCancellationRetryAndRecovery(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		finalDir := filepath.Join(root, ".storagebucket", "files", filepath.Base(discovery.StageDir()))
+		finalDir := filepath.Join(root, ".asterodia", "files", filepath.Base(discovery.StageDir()))
 		os.MkdirAll(filepath.Dir(finalDir), 0700)
 		rel, _ := filepath.Rel(discovery.StageDir(), files[0].Path)
 		final := filepath.Join(finalDir, rel)

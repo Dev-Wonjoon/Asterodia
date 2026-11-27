@@ -9,14 +9,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 // Execute the same test binary as a deterministic gallery-dl CLI fixture.
 func TestMain(m *testing.M) {
-	if len(os.Args) > 1 && os.Args[1] == "--config-ignore" && os.Getenv("STORAGEBUCKET_GALLERYDL_FIXTURE") == "1" {
+	if len(os.Args) > 1 && os.Args[1] == "--config-ignore" && os.Getenv("ASTERODIA_GALLERYDL_FIXTURE") == "1" {
 		args := strings.Join(os.Args[1:], "\n")
-		if filter := os.Getenv("STORAGEBUCKET_GALLERYDL_EXPECT_FILTER"); filter != "" && !strings.Contains(args, "--filter\n"+filter+"\n") {
+		if filter := os.Getenv("ASTERODIA_GALLERYDL_EXPECT_FILTER"); filter != "" && !strings.Contains(args, "--filter\n"+filter+"\n") {
 			fmt.Fprintln(os.Stderr, "Pinterest 파일 필터 누락")
 			os.Exit(2)
 		}
@@ -26,7 +26,7 @@ func TestMain(m *testing.M) {
 				os.Exit(2)
 			}
 		}
-		if auth := os.Getenv("STORAGEBUCKET_GALLERYDL_EXPECT_AUTH"); auth != "" {
+		if auth := os.Getenv("ASTERODIA_GALLERYDL_EXPECT_AUTH"); auth != "" {
 			hasFile := strings.Contains(args, "--cookies\n")
 			hasBrowser := strings.Contains(args, "--cookies-from-browser\n")
 			hasGraphQL := strings.Contains(args, "-o\nextractor.instagram.api=graphql\n")
@@ -48,7 +48,7 @@ func TestMain(m *testing.M) {
 				}
 			}
 		}
-		if raw := os.Getenv("STORAGEBUCKET_GALLERYDL_DOWNLOAD_RESULTS"); raw != "" {
+		if raw := os.Getenv("ASTERODIA_GALLERYDL_DOWNLOAD_RESULTS"); raw != "" {
 			var records []struct {
 				Name     string
 				Metadata json.RawMessage
@@ -63,7 +63,7 @@ func TestMain(m *testing.M) {
 					out = os.Args[i+1]
 				}
 			}
-			rel, err := filepath.Rel(os.Getenv("STORAGEBUCKET_TEST_ROOT"), out)
+			rel, err := filepath.Rel(os.Getenv("ASTERODIA_TEST_ROOT"), out)
 			if err != nil || !filepath.IsLocal(rel) || out == "" {
 				os.Exit(2)
 			}
@@ -80,8 +80,8 @@ func TestMain(m *testing.M) {
 			}
 			os.Exit(0)
 		}
-		fmt.Print(os.Getenv("STORAGEBUCKET_GALLERYDL_FIXTURE_RESPONSE"))
-		fmt.Fprint(os.Stderr, os.Getenv("STORAGEBUCKET_GALLERYDL_FIXTURE_STDERR"))
+		fmt.Print(os.Getenv("ASTERODIA_GALLERYDL_FIXTURE_RESPONSE"))
+		fmt.Fprint(os.Stderr, os.Getenv("ASTERODIA_GALLERYDL_FIXTURE_STDERR"))
 		os.Exit(0)
 	}
 	os.Exit(m.Run())
@@ -93,7 +93,7 @@ func testGalleryDLInstagramAPISelection(t *testing.T) {
 	if err := os.WriteFile(cookie, []byte("synthetic cookie"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("STORAGEBUCKET_GALLERYDL_FIXTURE", "1")
+	t.Setenv("ASTERODIA_GALLERYDL_FIXTURE", "1")
 	const address = "https://www.instagram.com/p/Fixture_123/"
 	metadata := json.RawMessage(`{"category":"instagram","subcategory":"post","post_shortcode":"Fixture_123","typename":"GraphImage","post_id":"123","media_id":"123","count":1,"extension":"jpg"}`)
 	raw, err := json.Marshal([][]any{{2, metadata}, {3, "https://cdn.invalid/photo.jpg", metadata}})
@@ -113,8 +113,8 @@ func testGalleryDLInstagramAPISelection(t *testing.T) {
 		{"cookie-file-precedence", "firefox", cookie, "file"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Setenv("STORAGEBUCKET_GALLERYDL_EXPECT_AUTH", tc.auth)
-			t.Setenv("STORAGEBUCKET_GALLERYDL_FIXTURE_RESPONSE", string(raw))
+			t.Setenv("ASTERODIA_GALLERYDL_EXPECT_AUTH", tc.auth)
+			t.Setenv("ASTERODIA_GALLERYDL_FIXTURE_RESPONSE", string(raw))
 			g := engine.GalleryDL{Executable: os.Args[0], CookieBrowser: tc.browser, CookieFile: tc.file}
 			// Exercise CLI fallback without contacting Instagram from this fixture.
 			g.HTTPClient = instagramUnavailableClient()
@@ -133,7 +133,7 @@ func testGalleryDLInstagramAPISelection(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			t.Setenv("STORAGEBUCKET_GALLERYDL_DOWNLOAD_RESULTS", string(payload))
+			t.Setenv("ASTERODIA_GALLERYDL_DOWNLOAD_RESULTS", string(payload))
 			paths, err := g.Download(t.Context(), address, discovery, stage)
 			if err != nil || len(paths) != 1 {
 				t.Fatalf("다운로드 실패: %v %v", paths, err)
@@ -294,7 +294,7 @@ func TestGalleryDLInstagramTargetKey(t *testing.T) {
 		if e := os.WriteFile(cookie, []byte("synthetic cookie"), 0600); e != nil {
 			t.Fatal(e)
 		}
-		t.Setenv("STORAGEBUCKET_GALLERYDL_FIXTURE", "1")
+		t.Setenv("ASTERODIA_GALLERYDL_FIXTURE", "1")
 		g := engine.GalleryDL{Executable: os.Args[0], CookieFile: cookie}
 		for _, tc := range []struct {
 			name, raw, stderr string
@@ -312,8 +312,8 @@ func TestGalleryDLInstagramTargetKey(t *testing.T) {
 				if e != nil {
 					t.Fatal(e)
 				}
-				t.Setenv("STORAGEBUCKET_GALLERYDL_FIXTURE_RESPONSE", tc.raw)
-				t.Setenv("STORAGEBUCKET_GALLERYDL_FIXTURE_STDERR", tc.stderr)
+				t.Setenv("ASTERODIA_GALLERYDL_FIXTURE_RESPONSE", tc.raw)
+				t.Setenv("ASTERODIA_GALLERYDL_FIXTURE_STDERR", tc.stderr)
 				result, e := g.Discover(t.Context(), originalURL, work)
 				if tc.want != nil {
 					if !errors.Is(e, tc.want) || len(result.Files) != 0 {

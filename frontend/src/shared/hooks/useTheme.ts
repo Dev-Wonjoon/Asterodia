@@ -1,3 +1,4 @@
+import { readPreference } from '../../../../internal/webserver/web/preferences.js'
 import { useLayoutEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 
@@ -5,7 +6,7 @@ type Theme = 'light' | 'dark'
 
 export function useTheme(): { theme: Theme; toggleTheme(): void } {
     const [theme, setTheme] = useState<Theme>(() => {
-        const saved = localStorage.getItem('theme')
+        const saved = readPreference('asterodia:theme:v1')
         if (saved === 'light' || saved === 'dark') return saved
         return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
     })
@@ -14,7 +15,7 @@ export function useTheme(): { theme: Theme; toggleTheme(): void } {
     const transition = useRef<ViewTransition | null>(null)
     useLayoutEffect(() => {
         document.documentElement.classList.toggle('dark', theme === 'dark')
-        localStorage.setItem('theme', theme)
+        localStorage.setItem('asterodia:theme:v1', theme)
     }, [theme])
     useLayoutEffect(() => () => {
         revision.current++

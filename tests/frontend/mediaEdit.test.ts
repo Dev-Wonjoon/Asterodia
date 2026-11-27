@@ -261,7 +261,7 @@ it('shows automatic retention for both drafts and jobs and still allows manual d
 })
 it('clears an automatically removed draft and its saved editing state and disables retry without a ready draft',async()=>{
     const api=await setup()
-    const key='storagebucket-edit-v1:'+draft().id
+    const key='asterodia-edit-v1:'+draft().id
     localStorage.setItem(key,'{}')
     localStorage.setItem('other-setting','keep')
     api.list.mockResolvedValue(ok({sessions:[],jobs:[{id:'old-job',sessionId:draft().id,state:'failed',options:{kind:'gif',sessionId:draft().id},error:'failed',progress:0}]}))
@@ -690,7 +690,7 @@ it('sends maximum quality for both save and preview, preserving edits and separa
     preset.value='max';preset.dispatchEvent(new Event('change'))
     button('미리보기 만들기').click();await flush()
     expect(api.create.mock.calls[1][0]).toMatchObject({kind:'webp',preview:true,deleted:[2],quality:{preset:'max',quality:100,lossless:false}})
-    expect(JSON.parse(localStorage.getItem('storagebucket-quality:webp')!)).toMatchObject({preset:'max',quality:100})
+    expect(JSON.parse(localStorage.getItem('asterodia-quality:webp')!)).toMatchObject({preset:'max',quality:100})
     chooseFormat('gif')
     expect(preset.value).toBe('max');expect(quality.value).toBe('100')
     instance!.destroy();document.body.replaceChildren();await setup()
@@ -744,8 +744,8 @@ it('shows simple WebP compression outside advanced settings and preserves lossle
 })
 
 it('migrates saved lossless preferences and ignores unknown saved algorithms',async()=>{
-    localStorage.setItem('storagebucket-quality:webp',JSON.stringify({preset:'custom',quality:91,effort:'precise',lossless:true,webpPreset:'not-supported'}))
-    localStorage.setItem('storagebucket-quality:gif',JSON.stringify({preset:'balanced',dither:'not-supported'}))
+    localStorage.setItem('asterodia-quality:webp',JSON.stringify({preset:'custom',quality:91,effort:'precise',lossless:true,webpPreset:'not-supported'}))
+    localStorage.setItem('asterodia-quality:gif',JSON.stringify({preset:'balanced',dither:'not-supported'}))
     await setup()
     const labelled=(label:string)=>[...document.querySelectorAll('label')].find(el=>el.firstChild?.textContent===label)!
     expect(labelled('GIF 디더링').querySelector('select')!.value).toBe('auto')

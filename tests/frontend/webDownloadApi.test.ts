@@ -10,10 +10,10 @@ it('uses only same-origin JSON requests and the current download permission toke
     const { webDownloads } = await import('../../frontend/src/web/download-api')
     fetch.mockResolvedValueOnce(response({ enabled: true, csrf: 'download-token' })).mockResolvedValueOnce(response({ ok: true, data: { id: 'job' } }))
     await webDownloads.status(); await webDownloads.start('https://example.com/video', { type: 'video', quality: 'best' })
-    expect(fetch).toHaveBeenLastCalledWith('/api/download/enqueue', expect.objectContaining({ method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-StorageBucket-CSRF': 'download-token' }, body: JSON.stringify({ url: 'https://example.com/video', options: { type: 'video', quality: 'best' } }) }))
+    expect(fetch).toHaveBeenLastCalledWith('/api/download/enqueue', expect.objectContaining({ method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Asterodia-CSRF': 'download-token' }, body: JSON.stringify({ url: 'https://example.com/video', options: { type: 'video', quality: 'best' } }) }))
     fetch.mockResolvedValueOnce(response({ enabled: false, csrf: '' })).mockResolvedValueOnce(response({ ok: false }, 403))
     await webDownloads.status(); await webDownloads.cancel('job')
-    expect(fetch.mock.calls.at(-1)?.[1].headers['X-StorageBucket-CSRF']).toBe('')
+    expect(fetch.mock.calls.at(-1)?.[1].headers['X-Asterodia-CSRF']).toBe('')
 })
 it('translates permission and throttling errors while preserving structured download failures', async () => {
     const { webDownloads } = await import('../../frontend/src/web/download-api')

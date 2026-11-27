@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	if os.Getenv("STORAGEBUCKET_TEST_IMAGE_MISSING_DLL_CHILD") == "1" {
+	if os.Getenv("ASTERODIA_TEST_IMAGE_MISSING_DLL_CHILD") == "1" {
 		code := uint32(0xc0000135)
 		os.Exit(int(code))
 	}
@@ -28,7 +28,7 @@ func TestImageRuntimeMissingDLLExitExplainsExecutionFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("STORAGEBUCKET_TEST_IMAGE_MISSING_DLL_CHILD", "1")
+	t.Setenv("ASTERODIA_TEST_IMAGE_MISSING_DLL_CHILD", "1")
 	_, err = new(ProcessRunner).ReadVersion(t.Context(), "imagemagick", executable)
 	if err == nil || !strings.Contains(err.Error(), "실행 검증 실패") || !strings.Contains(err.Error(), "DLL") || !strings.Contains(err.Error(), "0xc0000135") {
 		t.Fatal("missing DLL was not explained as an execution verification failure", err)

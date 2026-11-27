@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/netguard"
+	"github.com/Dev-Wonjoon/Asterodia/internal/netguard"
 	"html"
 	"io"
 	"net/http"

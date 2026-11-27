@@ -5,13 +5,13 @@
 !include "FileFunc.nsh"
 
 !ifndef INFO_PROJECTNAME
-    !define INFO_PROJECTNAME "StorageBucket"
+    !define INFO_PROJECTNAME "Asterodia"
 !endif
 !ifndef INFO_COMPANYNAME
     !define INFO_COMPANYNAME "Dev-Wonjoon"
 !endif
 !ifndef INFO_PRODUCTNAME
-    !define INFO_PRODUCTNAME "StorageBucket"
+    !define INFO_PRODUCTNAME "Asterodia"
 !endif
 !ifndef INFO_PRODUCTVERSION
     !define INFO_PRODUCTVERSION "2.3.4"

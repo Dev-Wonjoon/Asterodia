@@ -1,3 +1,4 @@
+import { readPreference } from './preferences.js'
 // Shared keyboard definitions and preferences for React and native DOM widgets.
 import { translate } from './i18n.js';
 
@@ -57,7 +58,7 @@ export const shortcuts = [
     define('editor.redo', 'editor', "editor.redo", 'Ctrl+Shift+Z'),
     define('editor.export', 'editor', "common.export", 'Ctrl+Enter'),
 ];
-export const shortcutStorageKey = 'storagebucket:shortcuts:v1';
+export const shortcutStorageKey = 'asterodia:shortcuts:v1';
 const listeners = new Set(), commands = new Map();
 let version = 0, memory;
 function notify() { version++; for (const fn of listeners) fn(); }
@@ -70,7 +71,7 @@ function storage(event) { if (event.key === shortcutStorageKey || event.key === 
 export const shortcutVersion = () => version;
 function preferences() {
     if (memory) return memory;
-    try { const value = JSON.parse(globalThis.localStorage?.getItem(shortcutStorageKey) || '{}'); memory = value && typeof value === 'object' && !Array.isArray(value) ? value : {}; }
+    try { const value = JSON.parse(readPreference(shortcutStorageKey) || '{}'); memory = value && typeof value === 'object' && !Array.isArray(value) ? value : {}; }
     catch { memory = {}; }
     return memory;
 }

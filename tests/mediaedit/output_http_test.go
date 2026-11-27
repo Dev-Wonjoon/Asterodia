@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/mediaedit"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/webserver"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/mediaedit"
+	"github.com/Dev-Wonjoon/Asterodia/internal/webserver"
 	"github.com/google/uuid"
 )
 
@@ -39,7 +39,7 @@ func TestMobileOutputOptionsAndJobsKeepPhysicalPathsPrivate(t *testing.T) {
 		}
 		r.Header.Set("Content-Type", "application/json")
 		r.Header.Set("Origin", state.URL)
-		r.Header.Set("X-StorageBucket-CSRF", csrf)
+		r.Header.Set("X-Asterodia-CSRF", csrf)
 		response, err := client.Do(r)
 		if err != nil {
 			t.Fatal(err)

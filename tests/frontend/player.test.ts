@@ -84,7 +84,7 @@ it('expands the entire player with its jump buttons when native fullscreen is un
 })
 
 
-const audioKey = 'storagebucket:player-audio:v1'
+const audioKey = 'asterodia:player-audio:v1'
 function changeVolume(value: string) {
  const volume=document.querySelector<HTMLInputElement>('.sbp-volume')!
  volume.value=value;volume.dispatchEvent(new Event('input'))

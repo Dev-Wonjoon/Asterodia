@@ -186,9 +186,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.version.outputs.tag }}
         run: |
-          # gh creates a draft, uploads all three assets, then publishes it.
+          # Publish both Asterodia assets and identical legacy aliases for old updaters.
           # Existing releases are not overwritten on reruns.
           $notesPath = ".github/release-notes/$($env:RELEASE_TAG).md"
           $notesArguments = if (Test-Path -LiteralPath $notesPath -PathType Leaf) { @('--notes-file', $notesPath) } else { @('--generate-notes') }
-          gh release create $env:RELEASE_TAG release/StorageBucket-windows-amd64.exe release/StorageBucket-windows-arm64.exe release/SHA256SUMS --verify-tag @notesArguments --title $env:RELEASE_TAG --latest
+          gh release create $env:RELEASE_TAG release/Asterodia-windows-amd64.exe release/Asterodia-windows-arm64.exe release/StorageBucket-windows-amd64.exe release/StorageBucket-windows-arm64.exe release/SHA256SUMS --verify-tag @notesArguments --title $env:RELEASE_TAG --latest
           if ($LASTEXITCODE -ne 0) { throw 'Release publication failed. Inspect the existing draft before retrying.' }

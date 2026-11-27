@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
 const maxCancellationWait = 20 * time.Second
@@ -37,9 +37,9 @@ func processPathInside(base, target string) bool {
 func processTestRoot(t *testing.T) string {
 	t.Helper()
 
-	configured := os.Getenv("STORAGEBUCKET_TEST_ROOT")
+	configured := os.Getenv("ASTERODIA_TEST_ROOT")
 	if !filepath.IsAbs(configured) {
-		t.Fatal("STORAGEBUCKET_TEST_ROOT에 절대 경로를 지정하세요")
+		t.Fatal("ASTERODIA_TEST_ROOT에 절대 경로를 지정하세요")
 	}
 
 	root, err := filepath.EvalSymlinks(configured)

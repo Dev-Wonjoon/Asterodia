@@ -8,7 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/Dev-Wonjoon/StorageBucket/internal/api"
+	"github.com/Dev-Wonjoon/Asterodia/internal/api"
 	"io"
 	"math/big"
 	"mime"
@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-const sessionCookie = "StorageBucketSession"
+const sessionCookie = "AsterodiaSession"
 
 type accessSession struct {
 	expires time.Time

@@ -12,7 +12,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/Dev-Wonjoon/StorageBucket/internal/media"
+	"github.com/Dev-Wonjoon/Asterodia/internal/media"
 	"github.com/google/uuid"
 )
 
@@ -46,8 +46,8 @@ func (s Storage) PrepareStage(jobID, attemptID string) (string, error) {
 	}
 	defer root.Close()
 
-	parent := filepath.Join(".storagebucket", "staging")
-	for _, dir := range []string{".storagebucket", parent} {
+	parent := filepath.Join(".asterodia", "staging")
+	for _, dir := range []string{".asterodia", parent} {
 		if err := root.Mkdir(dir, 0o700); err != nil && !errors.Is(err, os.ErrExist) {
 			return "", fmt.Errorf("작업 폴더의 상위 디렉터리 생성 실패: %w", err)
 		}
@@ -224,7 +224,7 @@ func readPublication(root *os.Root, job, attempt string) (publicationRecord, err
 	}
 	for _, entry := range record.Files {
 		parts := strings.Split(entry.Path, string(filepath.Separator))
-		if !filepath.IsLocal(entry.Path) || filepath.Clean(entry.Path) != entry.Path || len(parts) != 3 || strings.EqualFold(parts[0], ".storagebucket") || entry.Identity == "" || !fileHashPattern.MatchString(entry.Hash) || entry.Size <= 0 {
+		if !filepath.IsLocal(entry.Path) || filepath.Clean(entry.Path) != entry.Path || len(parts) != 3 || strings.EqualFold(parts[0], ".asterodia") || entry.Identity == "" || !fileHashPattern.MatchString(entry.Hash) || entry.Size <= 0 {
 			return record, fmt.Errorf("파일 배치 기록이 올바르지 않습니다")
 		}
 	}

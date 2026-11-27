@@ -16,7 +16,7 @@ import { useActionDisplay } from '@renderer/shared/hooks/useActionDisplay'
 import { LanguageSelect } from '@renderer/shared/i18n/LanguageSelect'
 import { useLanguage } from '@renderer/shared/i18n'
 import { demo } from './api'
-import appIcon from '../../../docs/assets/favicon.ico'
+import { BrandMark } from '@renderer/shared/components/BrandMark'
 import '@renderer/styles/index.css'
 import './demo.css'
 
@@ -35,7 +35,7 @@ function DemoApp({ reset }: { reset(): void }) {
     const tryDownload = async () => {
         if (guard.current && !await guard.current()) return
         setPage('gallery')
-        await downloads.startDownload('https://www.instagram.com/p/storagebucket-demo/')
+        await downloads.startDownload('https://www.instagram.com/p/asterodia-demo/')
     }
     const nav: { id: Page; label: string; icon: ReactNode }[] = [
         { id: 'gallery', label: text('갤러리', 'Gallery'), icon: <Images /> },
@@ -45,7 +45,7 @@ function DemoApp({ reset }: { reset(): void }) {
     ]
     return <LeaveGuardContext.Provider value={guard}><div className="demo-app">
         <header className="demo-header">
-            <a className="demo-brand" href="../"><img src={appIcon} width="26" height="26" alt="" /><span>StorageBucket <small>PLAYGROUND</small></span></a>
+            <a className="demo-brand" href="../"><BrandMark className="size-7" /><span>Asterodia <small>PLAYGROUND</small></span></a>
             <div className="demo-tools">
                 <LanguageSelect />
                 <button className="demo-icon" onClick={toggleTheme} aria-label={text('테마 변경', 'Change theme')}>{theme === 'dark' ? <Sun /> : <Moon />}</button>
@@ -53,7 +53,7 @@ function DemoApp({ reset }: { reset(): void }) {
                 <button className="demo-reset" aria-label={text('데모 초기화', 'Reset demo')} onClick={async () => {
                     if (await confirm({ title: text('데모 초기화', 'Reset demo'), message: text('변경한 샘플 데이터와 다운로드 진행을 초기화할까요?', 'Reset sample changes and download progress?'), confirmLabel: text('초기화', 'Reset') })) reset()
                 }}><RotateCcw size={16} /><span>{text('초기화', 'Reset')}</span></button>
-                <a className="demo-install" href="https://github.com/Dev-Wonjoon/StorageBucket/releases/latest/download/StorageBucket-windows-amd64.exe">{text('앱 다운로드', 'Get the app')}<ArrowUpRight size={15} /></a>
+                <a className="demo-install" href="https://github.com/Dev-Wonjoon/Asterodia/releases/latest/download/StorageBucket-windows-amd64.exe">{text('앱 다운로드', 'Get the app')}<ArrowUpRight size={15} /></a>
             </div>
         </header>
         <section className="demo-intro" aria-label={text('데모 안내', 'About this demo')}>
