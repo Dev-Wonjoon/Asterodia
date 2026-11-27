@@ -7,7 +7,7 @@ import { ConfirmProvider } from '@renderer/app/providers/ConfirmProvider'
 import { albumDragType } from '@renderer/features/gallery/useGallerySelection'
 import { useInfiniteScroll } from '@renderer/shared/hooks/useInfiniteScroll'
 import { useGalleryViewModel } from '@renderer/features/gallery/useGalleryViewModel'
-const mocks = vi.hoisted(() => ({ realConfirm: false, bulk: vi.fn(), unregister: vi.fn(), confirm: vi.fn(async () => true), refresh: vi.fn(), getSnapshot: vi.fn(), get: vi.fn(), create: vi.fn(), run: vi.fn(), directories: vi.fn(), on: vi.fn(), mediaGet: vi.fn(), mountEditor: vi.fn(), destroyEditor: vi.fn(), state: null as any }))
+const mocks = vi.hoisted(() => ({ realConfirm: false, metadata: vi.fn(), bulk: vi.fn(), unregister: vi.fn(), confirm: vi.fn(async () => true), refresh: vi.fn(), getSnapshot: vi.fn(), get: vi.fn(), create: vi.fn(), run: vi.fn(), directories: vi.fn(), on: vi.fn(), mediaGet: vi.fn(), mountEditor: vi.fn(), destroyEditor: vi.fn(), state: null as any }))
 const api = {fileMove:{get:mocks.get,create:mocks.create,run:mocks.run},media:{exploreAlbum:vi.fn(),directories:mocks.directories,albums:vi.fn(),saveAlbum:vi.fn(),mergeAlbum:vi.fn(),get:mocks.mediaGet},onMediaThumbnailUpdated:mocks.on,showItemInFolder:vi.fn()}
 vi.mock('../../internal/webserver/web/editor.js',()=>({mountMediaEditor:mocks.mountEditor}))
 vi.mock('@renderer/shared/hooks/useConfirm', async importOriginal => {
@@ -15,7 +15,7 @@ vi.mock('@renderer/shared/hooks/useConfirm', async importOriginal => {
  return { ...actual, useConfirm: () => mocks.realConfirm ? actual.useConfirm() : { confirm: mocks.confirm, isOpen: false } }
 })
 vi.mock('@renderer/shared/api',()=>({getApi:()=>api}))
-const store = {refresh:mocks.refresh,getSnapshot:mocks.getSnapshot,unregisterMedia:mocks.unregister,bulk:mocks.bulk,closeDetail:vi.fn(),toggleAlbum:vi.fn(),loadMore:vi.fn(),openDetail:vi.fn(),edit:vi.fn()}
+const store = {refreshMetadata:mocks.metadata,refresh:mocks.refresh,getSnapshot:mocks.getSnapshot,unregisterMedia:mocks.unregister,bulk:mocks.bulk,closeDetail:vi.fn(),toggleAlbum:vi.fn(),loadMore:vi.fn(),openDetail:vi.fn(),edit:vi.fn()}
 const downloads = { activeJobs: [] as any[], cancellingIds: [], openDetail: vi.fn(), closeDetail: vi.fn(), cancelDownload: vi.fn() }
 vi.mock('@renderer/features/gallery/useGalleryViewModel',()=>({useGalleryViewModel:vi.fn(()=>({store,snapshot:mocks.state,openInFolder:vi.fn(),downloads}))}))
 vi.mock('@renderer/shared/hooks/useLeaveGuard',()=>({useLeaveGuard:vi.fn()}))
@@ -383,6 +383,7 @@ it('does not delete cards from an open card menu or while a write is in progress
 function setup(){
  store.edit.mockReset().mockResolvedValue(true)
  mocks.refresh.mockReset()
+ mocks.metadata.mockReset().mockResolvedValue(true)
  vi.mocked(useGalleryViewModel).mockClear()
  mocks.mediaGet.mockReset().mockResolvedValue({ok:false,error:{code:'NOT_FOUND',message:'찾지 못했습니다.'}});mocks.destroyEditor.mockReset();api.showItemInFolder.mockReset()
  mocks.mountEditor.mockReset().mockImplementation((host:HTMLElement,options:any)=>{
@@ -613,7 +614,7 @@ it('keeps refresh available after a list error while blocking selection',async()
  await clickButton('메뉴');expect([...document.querySelectorAll('button')].find(item=>item.textContent==='현재 목록 전체 선택')?.disabled).toBe(true)
 })
 
-it('places selection actions beside the gallery title while keeping the main controls stable',async()=>{
+it('places selection actions in the gallery dock while keeping the main controls stable',async()=>{
  setup();await mount(h(GalleryPage))
  const header=document.querySelector('header')!
  const toolbar=header.querySelector('[data-gallery-toolbar]')!
@@ -623,7 +624,10 @@ it('places selection actions beside the gallery title while keeping the main con
  expect(header.textContent).not.toContain('묶음');expect(header.textContent).not.toContain('게시글')
  await act(async()=>document.querySelector<HTMLInputElement>('input[type=checkbox]')!.click())
  const bar=document.querySelector('[aria-label="선택 항목 작업"]')!
- expect(bar.closest('header')).toBe(header)
+ const dock=document.querySelector('[data-gallery-selection-dock]')!
+ expect(dock.contains(bar)).toBe(true)
+ expect(bar.closest('header')).toBeNull()
+ expect(dock.closest('[data-keyboard-region]')).toBe(document.querySelector('.motion-gallery-grid')!.closest('[data-keyboard-region]'))
  expect(header.querySelector('h1')?.textContent).toBe('갤러리')
  expect(document.querySelectorAll('[aria-label="선택 항목 작업"]')).toHaveLength(1)
  expect(bar.querySelector('[role=status]')?.textContent).toBe('1개 선택')
@@ -635,7 +639,24 @@ it('places selection actions beside the gallery title while keeping the main con
  await act(async()=>clear.click())
  expect(header.querySelector('[role=status]')).toBeNull()
  expect(document.querySelector('[aria-label="선택 항목 작업"]')).toBeNull()
+ expect(document.querySelector('[data-gallery-selection-dock]')).toBe(dock)
  expect([...toolbar.querySelectorAll('button')].map(item=>item.textContent)).toEqual(initialControls)
+})
+
+it('keeps selection when dragging on the floating toolbar and still opens tag actions',async()=>{
+ setup();await mount(h(GalleryPage));await selectCard(0)
+ const bar=document.querySelector<HTMLElement>('[aria-label="선택 항목 작업"]')!
+ const pointer=async(type:string,target:EventTarget,x:number,y:number)=>act(async()=>target.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:1,pointerType:'mouse',button:0,clientX:x,clientY:y})))
+ await pointer('pointerdown',bar,10,10)
+ await pointer('pointermove',window,150,150)
+ expect(document.querySelector('.pointer-events-none.fixed')).toBeNull()
+ await pointer('pointerup',window,150,150)
+ expect(bar.querySelector('[role=status]')?.textContent).toBe('1개 선택')
+ expect(document.querySelectorAll('[data-selected=true]')).toHaveLength(1)
+ await clickButton('선택 작업');await clickButton('태그 추가')
+ expect(document.querySelector('[role=dialog]')?.textContent).toContain('1개')
+ await clickButton('취소')
+ expect(document.querySelector('[aria-label="선택 항목 작업"]')).toBe(bar)
 })
 
 it('offers direct selection without selection-mode menu entries or checkbox text',async()=>{
@@ -994,32 +1015,32 @@ it('defers thumbnail refreshes until the active album drag ends', async () => {
  vi.useFakeTimers()
  try {
   await dragEvent('dragstart', sourceCard(1), transfer)
-  await act(async () => { mocks.on.mock.lastCall![0](); await vi.advanceTimersByTimeAsync(500) })
-  expect(mocks.refresh).not.toHaveBeenCalled()
+  await act(async () => { mocks.on.mock.lastCall![0](1); await vi.advanceTimersByTimeAsync(500) })
+  expect(mocks.metadata).not.toHaveBeenCalled()
   expect(document.querySelector('[aria-label="선택 항목 작업"]')).toBeNull()
   await dragEvent('dragend', sourceCard(1), transfer)
-  expect(mocks.refresh).toHaveBeenCalledOnce()
+  expect(mocks.metadata).toHaveBeenCalledOnce()
  } finally { vi.useRealTimers() }
 })
 
 it('coalesces continuous thumbnail events, preserves focus and selection, and clears trailing work on unmount', async () => {
  setup(); await mount(h(GalleryPage)); await selectCard(0)
  const focused = document.activeElement, pending = deferred<boolean>()
- mocks.refresh.mockReturnValueOnce(pending.promise)
+ mocks.metadata.mockReturnValueOnce(pending.promise)
  vi.useFakeTimers()
  try {
   const notify = mocks.on.mock.lastCall![0]
-  for (let i=0;i<5;i++) await act(async () => { notify(); await vi.advanceTimersByTimeAsync(100) })
-  expect(mocks.refresh).toHaveBeenCalledExactlyOnceWith({background:true})
+  for (let i=0;i<5;i++) await act(async () => { notify(1); await vi.advanceTimersByTimeAsync(100) })
+  expect(mocks.metadata).toHaveBeenCalledExactlyOnceWith([1])
   expect(document.activeElement).toBe(focused)
   expect(document.querySelector('[aria-label="선택 항목 작업"]')?.textContent).toContain('1개 선택')
-  for (let i=0;i<10;i++) notify()
+  for (let i=0;i<10;i++) notify(1)
   await act(async()=>{await vi.advanceTimersByTimeAsync(1000)})
-  expect(mocks.refresh).toHaveBeenCalledOnce()
+  expect(mocks.metadata).toHaveBeenCalledOnce()
   await act(async()=>{pending.resolve(true)})
   await cleanupReact()
   await vi.advanceTimersByTimeAsync(1000)
-  expect(mocks.refresh).toHaveBeenCalledOnce()
+  expect(mocks.metadata).toHaveBeenCalledOnce()
  } finally { vi.useRealTimers() }
 })
 

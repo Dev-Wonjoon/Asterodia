@@ -241,6 +241,10 @@ export interface MediaDetailDto extends MediaSummaryDto {
 }
 
 export interface MediaUnregisterResult {
+    remainingFileCount?: number
+    removedManagedFileCount?: number
+    removedFileIds?: number[]
+    unlinkedFileIds?: number[]
     mediaId: number
     parentRemoved: boolean
     revision: number | null

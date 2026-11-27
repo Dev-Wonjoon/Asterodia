@@ -21,6 +21,12 @@ import (
 	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
+func discoverInstagram(g *engine.GalleryDL, ctx context.Context, address, dir string) (engine.DownloadPlan, error) {
+	extractor := engine.NewInstagramExtractor(engine.ExtractorDependencies{GalleryDL: g, HTTPClient: g.HTTPClient,
+		Authenticated: g.CookieBrowser != "" || g.CookieFile != ""})
+	return extractor.Discover(ctx, engine.ExtractRequest{URL: address, WorkDir: dir})
+}
+
 type instagramRoundTripper func(*http.Request) (*http.Response, error)
 
 type instagramReader func([]byte) (int, error)
@@ -138,8 +144,8 @@ func TestInstagramEmbedDiscovery(t *testing.T) {
 			page, _ := url.Parse("https://www.instagram.com/")
 			client.Jar.SetCookies(page, []*http.Cookie{{Name: "sessionid", Value: "must-not-send"}})
 			g := engine.GalleryDL{Executable: "must-not-run.exe", HTTPClient: client}
-			d, err := g.Discover(t.Context(), address, "unused")
-			if err != nil || !d.InstagramEmbed {
+			d, err := discoverInstagram(&g, t.Context(), address, "unused")
+			if err != nil || d.Transfer != engine.TransferDirect {
 				t.Fatalf("임베드 조회 실패: %+v %v", d, err)
 			}
 			targets, err := d.Targets(address)
@@ -195,7 +201,7 @@ func TestInstagramEmbedRejectsIncompleteData(t *testing.T) {
 				post["display_url"] = "http://scontent.cdninstagram.com/photo.jpg"
 			}
 			g := engine.GalleryDL{Executable: "does-not-exist.exe", HTTPClient: instagramFixtureClient(t, instagramEmbedFixture(t, post, false), nil)}
-			d, err := g.Discover(t.Context(), embedOriginalURL, "")
+			d, err := discoverInstagram(&g, t.Context(), embedOriginalURL, "")
 			if err == nil || len(d.Files) != 0 {
 				t.Fatal("불완전한 임베드 결과를 허용했습니다", d, err)
 			}
@@ -220,8 +226,8 @@ func TestInstagramEmbedSimplePhoto(t *testing.T) {
 		return instagramResponse(r, http.StatusOK, photo), nil
 	})
 	g := engine.GalleryDL{Executable: "must-not-run.exe", HTTPClient: client}
-	d, err := g.Discover(t.Context(), embedOriginalURL, "unused")
-	if err != nil || !d.InstagramEmbed {
+	d, err := discoverInstagram(&g, t.Context(), embedOriginalURL, "unused")
+	if err != nil || d.Transfer != engine.TransferDirect {
 		t.Fatal("contextJSON=null인 Simple 사진 조회 실패", d, err)
 	}
 	targets, err := d.Targets(embedOriginalURL)
@@ -236,7 +242,7 @@ func TestInstagramEmbedSimplePhoto(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	paths, err := g.Download(t.Context(), embedOriginalURL, d, stage)
+	paths, err := d.Download(t.Context(), stage, nil)
 	if err != nil || len(paths) != 1 {
 		t.Fatal("Simple 사진 저장 실패", paths, err)
 	}
@@ -269,7 +275,7 @@ func TestInstagramEmbedSimpleRejectsPreviews(t *testing.T) {
 				page = strings.ReplaceAll(page, `"isRichEmbed":false`, `"isRichEmbed":true`)
 			}
 			g := engine.GalleryDL{Executable: "does-not-exist.exe", HTTPClient: instagramFixtureClient(t, []byte(page), nil)}
-			d, err := g.Discover(t.Context(), embedOriginalURL, "")
+			d, err := discoverInstagram(&g, t.Context(), embedOriginalURL, "")
 			if err == nil || len(d.Files) != 0 {
 				t.Fatal("불완전한 Simple 임베드를 허용했습니다", d, err)
 			}
@@ -285,7 +291,7 @@ func TestInstagramEmbedHTTPFailures(t *testing.T) {
 			t.Error("취소 후 HTTP 요청이 발생했습니다")
 			return nil, context.Canceled
 		})}}
-		if _, err := g.Discover(ctx, embedOriginalURL, ""); !errors.Is(err, context.Canceled) {
+		if _, err := discoverInstagram(&g, ctx, embedOriginalURL, ""); !errors.Is(err, context.Canceled) {
 			t.Fatal("취소 오류가 보존되지 않았습니다", err)
 		}
 	})
@@ -296,7 +302,7 @@ func TestInstagramEmbedHTTPFailures(t *testing.T) {
 				calls++
 				return instagramResponse(r, status, nil), nil
 			})}}
-			_, err := g.Discover(t.Context(), embedOriginalURL, "")
+			_, err := discoverInstagram(&g, t.Context(), embedOriginalURL, "")
 			want := map[int]error{401: engine.ErrAuthenticationRequired, 403: engine.ErrAccessDenied, 404: engine.ErrMediaUnavailable, 429: engine.ErrRateLimited}[status]
 			wantCalls := 2
 			if status == 429 {
@@ -315,7 +321,7 @@ func TestInstagramEmbedHTTPFailures(t *testing.T) {
 			response.Header.Set("Location", "https://www.instagram.com/accounts/login/")
 			return response, nil
 		})}}
-		_, err := g.Discover(t.Context(), embedOriginalURL, "")
+		_, err := discoverInstagram(&g, t.Context(), embedOriginalURL, "")
 		if !errors.Is(err, engine.ErrAuthenticationRequired) || calls != 2 {
 			t.Fatal("로그인 리다이렉트 분류 실패", calls, err)
 		}
@@ -349,8 +355,8 @@ func TestInstagramEmbedLive(t *testing.T) {
 		}
 		return response, err
 	})}}
-	d, err := g.Discover(t.Context(), address, stage)
-	if err != nil || !d.InstagramEmbed {
+	d, err := discoverInstagram(&g, t.Context(), address, stage)
+	if err != nil || d.Transfer != engine.TransferDirect {
 		t.Fatalf("실제 임베드 조회 실패: %v", err)
 	}
 	targets, err := d.Targets(address)
@@ -358,7 +364,7 @@ func TestInstagramEmbedLive(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Logf("비로그인 임베드 조회: %d개 미디어", len(targets))
-	paths, err := g.Download(t.Context(), address, d, stage)
+	paths, err := d.Download(t.Context(), stage, nil)
 	if err != nil || len(paths) != len(targets) {
 		t.Fatalf("실제 미디어 저장 실패: files=%d error=%v", len(paths), err)
 	}
@@ -441,11 +447,11 @@ func TestInstagramEmbedDownload(t *testing.T) {
 				return response, nil
 			})
 			g := engine.GalleryDL{Executable: "must-not-run.exe", HTTPClient: client}
-			d, err := g.Discover(ctx, embedOriginalURL, stage)
+			d, err := discoverInstagram(&g, ctx, embedOriginalURL, stage)
 			if err != nil {
 				t.Fatal(err)
 			}
-			paths, err := g.Download(ctx, embedOriginalURL, d, stage)
+			paths, err := d.Download(ctx, stage, nil)
 			if scenario != "success" {
 				if err == nil || len(paths) != 0 {
 					t.Fatal("실패한 묶음의 파일을 반환했습니다", paths, err)

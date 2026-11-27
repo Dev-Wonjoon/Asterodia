@@ -14,6 +14,12 @@ import (
 
 // Execute the same test binary as a deterministic gallery-dl CLI fixture.
 func TestMain(m *testing.M) {
+	if runManagedCookieFixture() {
+		return
+	}
+	if runBerrizCookieFixture() {
+		return
+	}
 	if len(os.Args) > 1 && os.Args[1] == "--config-ignore" && os.Getenv("ASTERODIA_GALLERYDL_FIXTURE") == "1" {
 		args := strings.Join(os.Args[1:], "\n")
 		if filter := os.Getenv("ASTERODIA_GALLERYDL_EXPECT_FILTER"); filter != "" && !strings.Contains(args, "--filter\n"+filter+"\n") {
@@ -126,7 +132,7 @@ func testGalleryDLInstagramAPISelection(t *testing.T) {
 				t.Fatal(err)
 			}
 			discovery, err := g.Discover(t.Context(), address, work)
-			if err != nil || len(discovery.Files) != 1 || discovery.InstagramEmbed {
+			if err != nil || len(discovery.Files) != 1 {
 				t.Fatalf("조회 실패: %+v %v", discovery, err)
 			}
 			stage, err := os.MkdirTemp(root, "download-")

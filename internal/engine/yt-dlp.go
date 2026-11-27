@@ -21,6 +21,7 @@ type Ytdlp struct {
 	Executable     string
 	JSRuntime      string
 	FFmpegLocation string
+	Auth           *ManagedAuth
 	CookieBrowser  string
 	CookieFile     string
 	NoPlaylist     bool
@@ -80,13 +81,11 @@ func (y *Ytdlp) Discover(
 	if y.JSRuntime != "" {
 		args = append(args, "--js-runtimes", y.JSRuntime)
 	}
-	auth, err := authArguments(y.CookieBrowser, y.CookieFile, workDir)
+	auth, finishAuth, err := prepareAuthentication(ctx, y.Auth, y.CookieBrowser, y.CookieFile, originalURL, workDir)
 	if err != nil {
 		return nil, err
 	}
-	if y.CookieFile != "" {
-		defer os.Remove(filepath.Join(workDir, "cookies.txt"))
-	}
+	defer finishAuth(false)
 	args = append(args, auth...)
 	if y.NoPlaylist {
 		args = append(args, "--no-playlist")
@@ -107,6 +106,9 @@ func (y *Ytdlp) Discover(
 		},
 	})
 
+	if err == nil {
+		err = finishAuth(true)
+	}
 	if err != nil {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, ErrStopUnconfirmed) || errors.Is(err, ErrOutputLimit) {
 			return nil, fmt.Errorf("yt-dlp 대상 조회 실패: %w", err)
@@ -303,13 +305,11 @@ func (y *Ytdlp) DownloadSingle(
 		request.Arguments = append(request.Arguments, "--ffmpeg-location", y.FFmpegLocation, "--remux-video", "mkv")
 	}
 
-	auth, err := authArguments(y.CookieBrowser, y.CookieFile, stageDir)
+	auth, finishAuth, err := prepareAuthentication(ctx, y.Auth, y.CookieBrowser, y.CookieFile, target.WebpageURL, stageDir)
 	if err != nil {
 		return "", err
 	}
-	if y.CookieFile != "" {
-		defer os.Remove(filepath.Join(stageDir, "cookies.txt"))
-	}
+	defer finishAuth(false)
 	request.Arguments = append(request.Arguments, auth...)
 	request.Arguments = append(request.Arguments, "--load-info-json", "-")
 	var savedJSON string
@@ -327,10 +327,8 @@ func (y *Ytdlp) DownloadSingle(
 		}
 		return "", fmt.Errorf("yt-dlp 다운로드 실패: %w", err)
 	}
-	if y.CookieFile != "" {
-		if err = os.Remove(filepath.Join(stageDir, "cookies.txt")); err != nil && !os.IsNotExist(err) {
-			return "", err
-		}
+	if err = finishAuth(true); err != nil {
+		return "", err
 	}
 
 	var saved struct {

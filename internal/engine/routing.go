@@ -11,6 +11,8 @@ var ErrInvalidURL = errors.New("올바른 HTTP 또는 HTTPS URL이 아닙니다"
 
 var galleryFirstHosts = [...]string{
 	"instagram.com",
+	"threads.com",
+	"threads.net",
 	"x.com",
 	"twitter.com",
 	"reddit.com",

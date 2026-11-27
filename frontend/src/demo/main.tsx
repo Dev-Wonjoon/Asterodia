@@ -53,7 +53,7 @@ function DemoApp({ reset }: { reset(): void }) {
                 <button className="demo-reset" aria-label={text('데모 초기화', 'Reset demo')} onClick={async () => {
                     if (await confirm({ title: text('데모 초기화', 'Reset demo'), message: text('변경한 샘플 데이터와 다운로드 진행을 초기화할까요?', 'Reset sample changes and download progress?'), confirmLabel: text('초기화', 'Reset') })) reset()
                 }}><RotateCcw size={16} /><span>{text('초기화', 'Reset')}</span></button>
-                <a className="demo-install" href="https://github.com/Dev-Wonjoon/Asterodia/releases/latest/download/StorageBucket-windows-amd64.exe">{text('앱 다운로드', 'Get the app')}<ArrowUpRight size={15} /></a>
+                <a className="demo-install" href="https://github.com/Dev-Wonjoon/Asterodia/releases/latest/download/Asterodia-windows-amd64.exe">{text('앱 다운로드', 'Get the app')}<ArrowUpRight size={15} /></a>
             </div>
         </header>
         <section className="demo-intro" aria-label={text('데모 안내', 'About this demo')}>

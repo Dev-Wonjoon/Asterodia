@@ -11,6 +11,17 @@ function model() { const value = createDemoModel(); models.push(value); return v
 afterEach(() => { models.splice(0).forEach(value => value.dispose()); vi.useRealTimers() })
 
 describe('Pages demo uses an isolated media backend', () => {
+    it('applies batched tags to current albums while preserving a conflicted album and unrelated tags', async () => {
+        const { media } = model()
+        const first = data(await media.get({ mediaId: 2 })), second = data(await media.get({ mediaId: 7 }))
+        const result = data(await media.bulkEdit!({ selection: [{ mediaId: 2, revision: first.revision }, { mediaId: 7, revision: second.revision + 1 }], addTags: ['batch'] }))
+        expect(result.updated.map(row => row.mediaId)).toEqual([2])
+        expect(result.failed.map(row => row.mediaId)).toEqual([7])
+        expect(data(await media.get({ mediaId: 2 })).tags.map(tag => tag.name)).toEqual([...first.tags.map(tag => tag.name), 'batch'])
+        expect(data(await media.get({ mediaId: 7 })).tags).toEqual(second.tags)
+        data(await media.bulkEdit!({ selection: [{ mediaId: 2, revision: result.updated[0].revision }], removeTags: ['batch'] }))
+        expect(data(await media.get({ mediaId: 2 })).tags).toEqual(first.tags)
+    })
     it('keeps favorite and tag edits searchable, rejects stale revisions, and returns detached values', async () => {
         const { media } = model()
         const initial = data(await media.get({ mediaId: 2 }))

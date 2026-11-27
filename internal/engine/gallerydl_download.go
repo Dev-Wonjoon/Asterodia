@@ -20,9 +20,6 @@ func (g *GalleryDL) Download(ctx context.Context, originalURL string, expected G
 	if err != nil {
 		return nil, err
 	}
-	if expected.InstagramEmbed {
-		return g.downloadInstagramEmbed(ctx, originalURL, expected, stageDir)
-	}
 	if len(expected.PinterestVideoURLs()) > 0 {
 		return nil, fmt.Errorf("Pinterest 스트리밍 영상은 yt-dlp 엔진으로 저장해야 합니다")
 	}
@@ -44,14 +41,12 @@ func (g *GalleryDL) Download(ctx context.Context, originalURL string, expected G
 	if err = os.Mkdir(out, 0700); err != nil {
 		return nil, err
 	}
-	auth, err := authArguments(g.CookieBrowser, g.CookieFile, stageDir)
+	auth, finishAuth, err := prepareAuthentication(ctx, g.Auth, g.CookieBrowser, g.CookieFile, originalURL, stageDir)
 	if err != nil {
 		return nil, err
 	}
-	if g.CookieFile != "" {
-		defer os.Remove(filepath.Join(stageDir, "cookies.txt"))
-	}
-	args := g.arguments()
+	defer finishAuth(false)
+	args := g.arguments(originalURL)
 	args = append(args, networkArguments(ctx)...)
 	args = append(args, "-o", "extractor.proxy-env=false", "-o", "extractor.ytdl.enabled=false")
 	if filter != "" {
@@ -69,6 +64,10 @@ func (g *GalleryDL) Download(ctx context.Context, originalURL string, expected G
 		}
 		return nil, fmt.Errorf("gallery-dl 다운로드 실패: %w\n%s", err, strings.TrimSpace(result.Stderr))
 	}
+	if err = finishAuth(true); err != nil {
+		return nil, err
+	}
+
 	entries, err = os.ReadDir(out)
 	if err != nil {
 		return nil, err

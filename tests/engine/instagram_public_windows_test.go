@@ -81,8 +81,8 @@ func TestInstagramPublicDiscovery(t *testing.T) {
 			g := engine.GalleryDL{Executable: "must-not-run.exe", HTTPClient: instagramPublicClient(t, instagramPublicPage(t, post))}
 			var trace []string
 			ctx := engine.WithOutputObserver(t.Context(), func(output engine.Output) { trace = append(trace, output.Text) })
-			d, err := g.Discover(ctx, embedOriginalURL, "")
-			if err != nil || !d.InstagramEmbed {
+			d, err := discoverInstagram(&g, ctx, embedOriginalURL, "")
+			if err != nil || d.Transfer != engine.TransferDirect {
 				t.Fatal("공개 HTML 조회 실패", err)
 			}
 			if len(trace) != 2 || !strings.Contains(trace[0], "Instagram 임베드 · 조회 실패") || !strings.Contains(trace[1], "Instagram 공개 HTML · 조회 성공") {
@@ -147,7 +147,7 @@ func TestInstagramPublicRejectsInvalidMetadata(t *testing.T) {
 				page = append(append([]byte(`<script type="application/json">`), raw...), []byte(`</script>`)...)
 			}
 			g := engine.GalleryDL{Executable: "does-not-exist.exe", HTTPClient: instagramPublicClient(t, page)}
-			d, err := g.Discover(t.Context(), embedOriginalURL, "")
+			d, err := discoverInstagram(&g, t.Context(), embedOriginalURL, "")
 			if err == nil || len(d.Files) != 0 {
 				t.Fatal("불완전하거나 다른 게시물의 공개 미디어가 허용됐습니다", mode)
 			}
@@ -156,7 +156,7 @@ func TestInstagramPublicRejectsInvalidMetadata(t *testing.T) {
 			}
 			var exhausted *engine.DiscoveryChainError
 			if !errors.As(err, &exhausted) || len(exhausted.Failures) != 3 || exhausted.Failures[0].Handler != "Instagram 임베드" ||
-				exhausted.Failures[1].Handler != "Instagram 공개 HTML" || exhausted.Failures[2].Handler != "gallery-dl" {
+				exhausted.Failures[1].Handler != "Instagram 공개 HTML" || exhausted.Failures[2].Handler != "CLI" {
 				t.Fatal("조회 방식별 실패 이력이 보존되지 않았습니다", err)
 			}
 		})
@@ -170,7 +170,7 @@ func TestInstagramPublicKeepsExactURLsAndRetriesCompletePreloaders(t *testing.T)
 	post["video_versions"] = []any{map[string]any{"url": embedVideoURL, "width": nil, "height": nil, "type": 101}}
 	page := append(instagramPublicPage(t, partial), instagramPublicPage(t, post)...)
 	g := engine.GalleryDL{Executable: "must-not-run.exe", HTTPClient: instagramPublicClient(t, page)}
-	d, err := g.Discover(t.Context(), embedOriginalURL, "")
+	d, err := discoverInstagram(&g, t.Context(), embedOriginalURL, "")
 	if err != nil || len(d.Files) != 1 || d.Files[0].URL != embedVideoURL {
 		t.Fatal("서명 주소가 바뀌거나 완성된 응답을 읽지 못했습니다", err)
 	}
@@ -198,7 +198,7 @@ func TestInstagramPublicStopsOnRateLimitSizeLimitAndCancellation(t *testing.T) {
 				return base.RoundTrip(r)
 			})
 			g := engine.GalleryDL{Executable: "must-not-run.exe", HTTPClient: client}
-			_, err := g.Discover(ctx, embedOriginalURL, "")
+			_, err := discoverInstagram(&g, ctx, embedOriginalURL, "")
 			want := map[string]error{"rate-limit": engine.ErrRateLimited, "too-large": engine.ErrOutputLimit, "cancelled": context.Canceled}[mode]
 			if err != want {
 				t.Fatal("조회 중단 이유가 보존되지 않았습니다", mode, err)
@@ -221,7 +221,7 @@ func TestInstagramPublicPhotoTransfer(t *testing.T) {
 		return base.RoundTrip(r)
 	})
 	g := engine.GalleryDL{Executable: "must-not-run.exe", HTTPClient: client}
-	d, err := g.Discover(t.Context(), embedOriginalURL, "")
+	d, err := discoverInstagram(&g, t.Context(), embedOriginalURL, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,7 +229,7 @@ func TestInstagramPublicPhotoTransfer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	paths, err := g.Download(t.Context(), embedOriginalURL, d, stage)
+	paths, err := d.Download(t.Context(), stage, nil)
 	if err != nil || len(paths) != 1 {
 		t.Fatal(paths, err)
 	}
@@ -251,7 +251,7 @@ func TestInstagramPublicSuppliedHTML(t *testing.T) {
 		t.Fatal(err)
 	}
 	g := engine.GalleryDL{Executable: "must-not-run.exe", HTTPClient: instagramPublicClient(t, page)}
-	d, err := g.Discover(t.Context(), "https://www.instagram.com/p/DgIhTYDyX9Y/", "")
+	d, err := discoverInstagram(&g, t.Context(), "https://www.instagram.com/p/DgIhTYDyX9Y/", "")
 	if err != nil || len(d.Files) != 1 {
 		t.Fatal("실제 첨부 HTML 처리 실패", err)
 	}

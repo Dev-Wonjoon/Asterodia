@@ -1,5 +1,6 @@
 .sb-viewer{position:fixed;inset:0;box-sizing:border-box;width:100vw;max-width:none;height:100dvh;max-height:none;margin:0;padding:0;border:0;background:#080b12;color:#f3f4f6;overflow:hidden;font:14px/1.5 system-ui,sans-serif}
-.sb-viewer[open]{display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;gap:12px}
+.sb-viewer[open]{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto auto;gap:12px}
+.sb-viewer>*{min-width:0}
 .sb-viewer::backdrop{background:#080b12}
 .sbv-header,.sbv-footer{display:flex;align-items:center;gap:12px;padding:12px 20px;flex-wrap:wrap}
 .sbv-header h2{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:16px;margin:0}

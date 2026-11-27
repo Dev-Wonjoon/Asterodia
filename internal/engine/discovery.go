@@ -17,6 +17,7 @@ var ErrUnsupportedURL = errors.New("설치된 엔진이 이 주소를 지원하�
 type MediaTarget struct {
 	TargetKey, PostKey, SourceURL, Kind, Title, ExternalID string
 	PlatformName, OwnerID, OwnerName                       string
+	Duration                                               *float64
 	FileIndex                                              int
 }
 
@@ -65,6 +66,9 @@ func (d GalleryDLDiscovery) Targets(originalURL string) ([]MediaTarget, error) {
 			targets = append(targets, MediaTarget{TargetKey: item.TargetKey, PostKey: strings.Join(parts[:2], ":"), SourceURL: originalURL, Kind: item.Kind, Title: item.Title, ExternalID: item.MediaID, PlatformName: "Instagram", OwnerID: item.OwnerID, OwnerName: item.OwnerName, FileIndex: item.FileIndex})
 		}
 		return targets, nil
+	}
+	if category == "threads" {
+		return d.threadsTargets(originalURL)
 	}
 	if len(d.Directories) > 1 {
 		return nil, fmt.Errorf("단일 게시글 링크가 필요합니다. 프로필·타임라인 전체 수집은 지원하지 않습니다")

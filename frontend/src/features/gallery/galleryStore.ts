@@ -403,7 +403,8 @@ export function createGalleryStore(
     async function mutate<T>(
         action: () => Promise<MediaResult<T>>,
         apply: (data: T) => void,
-        successNotice: string | null = translate("gallery.changesApplied")
+        successNotice: string | null = translate("gallery.changesApplied"),
+        deferredRefresh = false
     ): Promise<boolean> {
         if (snapshot.busy || snapshot.needsRefresh) {
             return false
@@ -449,6 +450,11 @@ export function createGalleryStore(
                 }
             })
 
+            if (deferredRefresh) {
+                publish({ ...snapshot, busy: false })
+                reconcile()
+                return true
+            }
             const loaded = await refresh(true)
 
             if (operationSession === session && !loaded) {
@@ -499,48 +505,60 @@ export function createGalleryStore(
         })
     }
 
-    function removed(result: MediaUnregisterResult) {
-        if (result.parentRemoved) {
-            const page = snapshot.list.page
-
-            const wasListed =
-                page.data.some((media) => media.id === result.mediaId) ||
-                (Object.keys(filter).length === 0 &&
-                    (!favoritesOnly ||
-                        (snapshot.detail.data?.id === result.mediaId &&
-                            snapshot.detail.data.isFavorite)))
-
-            const data = page.data.filter((media) => media.id !== result.mediaId)
-
-            const total = wasListed ? Math.max(0, page.total - 1) : page.total
-
-            publish({
-                ...snapshot,
-                list: {
-                    ...snapshot.list,
-                    page: {
-                        data,
-                        total,
-                        hasNextPage: data.length < total
-                    }
-                }
+    function removed(result: MediaUnregisterResult, requestedFiles: number[] = []) {
+        const global = new Set(result.removedFileIds ?? [])
+        const local = new Set(result.unlinkedFileIds ?? requestedFiles)
+        const page = snapshot.list.page
+        const data = page.data.filter(row => !(result.parentRemoved && row.id === result.mediaId)
+            && !(row.galleryFile && (global.has(row.galleryFile.id) || (row.id === result.mediaId && local.has(row.galleryFile.id)))))
+            .map(row => {
+                if (row.id !== result.mediaId) return row
+                const ids = global.size ? global : local
+                return { ...row, revision: result.revision ?? row.revision,
+                    fileCount: result.remainingFileCount ?? Math.max(0, row.fileCount - ids.size),
+                    ...(row.managedFileCount !== undefined && result.removedManagedFileCount !== undefined ? { managedFileCount: Math.max(0, row.managedFileCount - result.removedManagedFileCount) } : {}),
+                    cover: row.cover && ids.has(row.cover.fileId) ? null : row.cover }
             })
-        }
-
+        const removedRows = page.data.length - data.length
+        publish({ ...snapshot, list: { ...snapshot.list, nextOffset: Math.max(0, snapshot.list.nextOffset - removedRows),
+            page: { ...page, data, total: Math.max(0, page.total - removedRows) } } })
         if (result.parentRemoved && snapshot.detail.mediaId === result.mediaId) {
             detailToken++
-
-            publish({
-                ...snapshot,
-                detail: {
-                    mediaId: null,
-                    status: 'idle',
-                    data: null,
-                    offset: 0,
-                    error: null
-                }
-            })
+            publish({ ...snapshot, detail: { mediaId: null, status: 'idle', data: null, offset: 0, error: null } })
         }
+    }
+
+    // Confirmed writes are visible immediately. Reads can be superseded by a
+    // newer page/filter request; a stale reconciliation must not lock that view.
+    function reconcile() {
+        const own = session, token = listToken + 1
+        void loadList('background', true).then(loaded => {
+            if (own === session && listToken === token) publish({ ...snapshot, needsRefresh: !loaded,
+                ...(!loaded ? { notice: translate('gallery.changesWereAppliedButTheViewCouldNotReload') } : {}) })
+        })
+        if (snapshot.detail.mediaId !== null) void loadDetail(snapshot.detail.offset, true)
+    }
+
+    async function refreshMetadata(mediaIds: number[]): Promise<boolean> {
+        if (!api.metadata) return loadList('background')
+        const previous = snapshot.list, own = session, token = listToken
+        if (snapshot.busy || snapshot.needsRefresh || previous.refreshing || previous.loadingMore) return false
+        const rows = previous.page.data
+        if (!rows.length) return true
+        const ids = [...new Set(rows.map(row => row.id))]
+        const files = [...new Set(rows.flatMap(row => row.galleryFile ? [row.galleryFile.id] : []))]
+        for (let changedOffset = 0; changedOffset < mediaIds.length; changedOffset += 200) {
+          for (let offset = 0; offset < Math.max(ids.length, files.length); offset += 200) {
+            const result = await request(() => api.metadata!({ mediaIds: ids.slice(offset, offset + 200), fileIds: files.slice(offset, offset + 200), changedMediaIds: mediaIds.slice(changedOffset, changedOffset + 200) }))
+            if (!result.ok || own !== session || token !== listToken || snapshot.busy) return false
+            const metadata = new Map(result.data.media.map(row => [row.id, row]))
+            const fileMetadata = new Map(result.data.files.map(file => [file.id, file]))
+            publish({ ...snapshot, list: { ...snapshot.list, page: { ...snapshot.list.page,
+                data: snapshot.list.page.data.map(row => { const next = metadata.get(row.id); const file = row.galleryFile && fileMetadata.get(row.galleryFile.id)
+                    return next || file ? { ...row, ...next, ...(row.galleryFile ? { isPinned: row.isPinned, galleryFile: file ?? row.galleryFile } : {}) } : row }) } } })
+          }
+        }
+        return true
     }
 
     async function bulk(selection: MoveSelection[], action: GalleryBulkAction, progress: (done: number, total: number) => void): Promise<GalleryBulkResult | null> {
@@ -548,7 +566,7 @@ export function createGalleryStore(
         const grouped = new Map<number, MoveSelection>(), conflicts = new Set<number>()
         for (const item of selection) {
             const previous = grouped.get(item.mediaId)
-            if (previous && action.kind === 'unregister') {
+            if (previous) {
                 if (previous.revision !== item.revision) conflicts.add(item.mediaId)
                 // A collection selection includes its files. File-only selections
                 // stay file-only and share one revision-checked request per parent.
@@ -565,6 +583,36 @@ export function createGalleryStore(
         let uncertain = false
         publish({ ...snapshot, busy: true, writeError: null, notice: null })
         try {
+            if (api.bulkEdit && (action.kind === 'tags' || action.kind === 'favorite')) {
+                const valid = targets.filter(target => !conflicts.has(target.mediaId))
+                for (const target of targets.filter(target => conflicts.has(target.mediaId))) result.failed.push({ mediaId: target.mediaId, message: translate('gallery.thisPostChangedAfterSelectionRefreshAndSelectIt') })
+                for (let offset = 0; offset < valid.length; offset += 200) {
+                    const batch = valid.slice(offset, offset + 200)
+                    if (own !== session || operationFilter !== filter || uncertain) {
+                        result.failed.push(...batch.map(target => ({ mediaId: target.mediaId, message: translate('gallery.confirmThePreviousRequestResultBeforeRunningAgain') })))
+                        continue
+                    }
+                    const response = await request(() => api.bulkEdit!({ selection: batch.map(({ mediaId, revision }) => ({ mediaId, revision })),
+                        ...(action.kind === 'favorite' ? { isFavorite: action.value } : action.remove ? { removeTags: action.names } : { addTags: action.names }) }))
+                    if (response.ok) {
+                        result.succeeded.push(...response.data.updated.map(row => row.mediaId))
+                        result.failed.push(...response.data.failed.map(row => ({ mediaId: row.mediaId, message: translateError(row.error) })))
+                        if (own === session) for (const updated of response.data.updated) {
+                            const row = snapshot.list.page.data.find(row => row.id === updated.mediaId)
+                            if (row) edited({ ...row, revision: updated.revision, ...(action.kind === 'favorite' ? { isFavorite: action.value } : {}) })
+                        }
+                    } else {
+                        result.failed.push(...batch.map(row => ({ mediaId: row.mediaId, message: translateError(response.error) })))
+                        uncertain = response.error.code === 'TRANSPORT_ERROR'
+                    }
+                    if (own === session) progress(result.succeeded.length + result.failed.length, targets.length)
+                }
+                if (own === session) {
+                    publish({ ...snapshot, busy: false, needsRefresh: uncertain })
+                    if (!uncertain && result.succeeded.length) reconcile()
+                }
+                return result
+            }
             for (const target of targets) {
                 if (own !== session || operationFilter !== filter || uncertain) {
                     result.failed.push({ mediaId: target.mediaId, message: uncertain ? translate("gallery.confirmThePreviousRequestResultBeforeRunningAgain") : translate("gallery.theViewChangedSoTheActionWasNotRun") })
@@ -589,7 +637,7 @@ export function createGalleryStore(
                             ? api.unregisterFiles({ mediaId: target.mediaId, expectedRevision: target.revision, fileIds: target.fileIds })
                             : api.unregisterMedia({ mediaId: target.mediaId, expectedRevision: target.revision }))
                         if (!response.ok) return response
-                        if (own === session) removed(response.data)
+                        if (own === session) removed(response.data, target.fileIds)
                     } else {
                         const response = await api.edit({ mediaId: target.mediaId, expectedRevision: target.revision,
                             ...(action.kind === 'favorite' ? { isFavorite: action.value } : {
@@ -610,8 +658,12 @@ export function createGalleryStore(
                 if (own === session) progress(result.succeeded.length + result.failed.length, targets.length)
             }
             if (own === session && action.kind !== 'openFolders') {
-                const loaded = await refresh(true)
-                if (own === session) publish({ ...snapshot, needsRefresh: !loaded || uncertain })
+                if (action.kind === 'unregister' && !uncertain) {
+                    publish({ ...snapshot, busy: false }); reconcile()
+                } else {
+                    const loaded = await refresh(true)
+                    if (own === session) publish({ ...snapshot, needsRefresh: !loaded || uncertain })
+                }
             }
             return result
         } finally {
@@ -661,6 +713,7 @@ export function createGalleryStore(
         },
 
         loadMore: () => loadList('append'),
+        refreshMetadata,
 
         toggleAlbum(mediaId: number) {
             if (snapshot.busy || snapshot.needsRefresh || snapshot.list.refreshing) return Promise.resolve(false)
@@ -728,10 +781,10 @@ export function createGalleryStore(
         },
 
         unregisterFiles: (input: MediaUnregisterFilesRequest) =>
-            mutate(() => api.unregisterFiles(input), removed),
+            mutate(() => api.unregisterFiles(input), result => removed(result, input.fileIds), undefined, true),
 
         unregisterMedia: (input: MediaUnregisterRequest) =>
-            mutate(() => api.unregisterMedia(input), removed)
+            mutate(() => api.unregisterMedia(input), removed, undefined, true)
     }
 }
 

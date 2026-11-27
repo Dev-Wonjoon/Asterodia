@@ -1,3 +1,5 @@
+import type { CookieState } from "@contracts/cookie-api";
+import type { CookieState as CookieTransport } from "../../../bindings/github.com/Dev-Wonjoon/Asterodia/internal/settings/models";
 import { translate } from '@renderer/shared/i18n'
 import { Service as FileMoveService } from "../../../bindings/github.com/Dev-Wonjoon/Asterodia/internal/filemove";
 import { Service as UpdateService } from "../../../bindings/github.com/Dev-Wonjoon/Asterodia/internal/update";
@@ -26,7 +28,18 @@ async function response<T>(pending: Promise<Result>): Promise<T> {
     return value as T;
 }
 
+function cookieState(value: CookieTransport): CookieState {
+    return { ...value, groups: (value.groups ?? []).map(group => ({ ...group, entries: group.entries ?? [] })) };
+}
+
 const api: AppApi = {
+    cookies: {
+        list: async () => cookieState(await SettingsService.GetCookies()),
+        importFile: async () => { const value = await SettingsService.ImportCookies(); return value ? cookieState(value) : null; },
+        deleteEntry: async id => cookieState(await SettingsService.DeleteCookie(id)),
+        deleteSite: async site => cookieState(await SettingsService.DeleteCookieSite(site)),
+        setEnabled: async (site, enabled) => cookieState(await SettingsService.SetCookieSiteEnabled(site, enabled)),
+    },
     getContentFilters: async () => { const value = await SettingsService.GetContentFilters(); return { hiddenPlatforms: value.hiddenPlatforms ?? [], hiddenTags: value.hiddenTags ?? [] } },
     setContentFilters: async request => { const value = await SettingsService.SetContentFilters(wire(request)); return { hiddenPlatforms: value.hiddenPlatforms ?? [], hiddenTags: value.hiddenTags ?? [] } },
     updates: {
@@ -81,6 +94,8 @@ const api: AppApi = {
     },
     database: { import: () => response(DesktopService.ImportDatabase()) },
     media: {
+        bulkEdit: request => response(MediaService.BulkEdit(wire(request))),
+        metadata: request => response(MediaService.Metadata(wire(request))),
         exploreAlbum: request => response(MediaService.ExploreAlbum(wire(request))),
         albums: (request = {}) => response(MediaService.Albums(wire(request))),
         saveAlbum: request => response(MediaService.SaveAlbum(wire(request))),

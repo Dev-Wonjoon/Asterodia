@@ -23,7 +23,7 @@ export function formatTime(value) {
 }
 
 // Shared by the desktop WebView and the browser. Owns all listeners and timers.
-export function mountVideoPlayer(host, { src, kind = 'video', title = translate("media.videoTitle"), poster, onError, keyboardSeek = true, externalScreen = false, fullscreenAction } = {}) {
+export function mountVideoPlayer(host, { src, kind = 'video', title = translate("media.videoTitle"), poster, onError, keyboardSeek = true, externalScreen = false, fullscreenAction, repeatState } = {}) {
     const doc = host.ownerDocument, root = doc.createElement('section');
     root.className = 'sb-player' + (kind === 'audio' ? ' sbp-audio' : ''); bindAttribute(root, 'aria-label', () => title + translate("player.player")); root.tabIndex = 0;
     const node = (tag, className, text) => { const el = doc.createElement(tag); if (className) el.className = className; if (typeof text === 'function') bindText(el, text); else if (text) bindText(el, () => text); return el; };
@@ -81,10 +81,87 @@ export function mountVideoPlayer(host, { src, kind = 'video', title = translate(
     for (const value of [.25, .5, .75, 1, 1.25, 1.5, 1.75, 2]) { const option = node('option', '', value + '×'); option.value = String(value); option.selected = value === 1; rate.append(option); }
     on(rate, 'change', () => { video.playbackRate = Number(rate.value); }); controls.append(rate);
     const settings = node('div', 'sbp-settings'); settings.hidden = true;
+    const repeatPanel = node('div', 'sbp-settings sbp-repeat-panel'); repeatPanel.hidden = true;
+    const repeatPopover = typeof repeatPanel.showPopover === 'function';
+    if (repeatPopover) repeatPanel.setAttribute('popover', 'manual');
+    else repeatPanel.classList.add('sbp-repeat-inline');
+    let repeatMode = repeatState?.mode === 'one' ? 'one' : 'off';
+    let repeatStart = Number.isFinite(repeatState?.start) && repeatState.start >= 0 ? repeatState.start : null;
+    let repeatEnd = Number.isFinite(repeatState?.end) && repeatStart !== null && repeatState.end >= repeatStart + .1 ? repeatState.end : null;
+    if (repeatState?.mode === 'range' && repeatEnd !== null) repeatMode = 'range';
+    let repeatTimer;
+    const hasDuration = () => Number.isFinite(video.duration) && video.duration > 0;
+    const isRepeating = () => repeatMode !== 'off';
+    function scheduleRepeat() {
+        clearTimeout(repeatTimer);
+        if (destroyed || repeatMode !== 'range' || video.paused || video.ended || video.seeking || !hasDuration()) return;
+        const delay = Math.max(25, (repeatEnd - video.currentTime) / Math.max(.01, video.playbackRate) * 1000 + 10);
+        repeatTimer = setTimeout(() => { enforceRepeat(); syncTime(); scheduleRepeat(); }, Math.min(delay, 2147483647));
+    }
+    function enforceRepeat(ended = false) {
+        if (destroyed || !hasDuration()) return;
+        const range = repeatMode === 'range' && repeatStart !== null && repeatEnd !== null;
+        if ((ended && isRepeating()) || (range && !video.paused && (video.currentTime < repeatStart || video.currentTime >= repeatEnd))) {
+            video.currentTime = range ? repeatStart : 0;
+            if (ended) video.play()?.catch(() => { if (!destroyed) { bindText(message, () => translate('player.couldNotStartPlaybackTryAgain')); message.hidden = false; } });
+        }
+    }
+    function hideRepeatPanel() {
+        if (repeatPopover && !repeatPanel.hidden) repeatPanel.hidePopover();
+        repeatPanel.hidden = true; repeatButton.setAttribute('aria-expanded', 'false');
+    }
+    function positionRepeatPanel() {
+        if (!repeatPopover || repeatPanel.hidden) return;
+        const anchor = repeatButton.getBoundingClientRect(), win = doc.defaultView;
+        repeatPanel.style.inset = 'auto'; repeatPanel.style.margin = '0';
+        repeatPanel.style.maxHeight = Math.max(1, win.innerHeight - 24) + 'px';
+        const rect = repeatPanel.getBoundingClientRect();
+        repeatPanel.style.left = clamp(anchor.right - rect.width, 12, Math.max(12, win.innerWidth - rect.width - 12)) + 'px';
+        repeatPanel.style.top = Math.max(12, anchor.top - rect.height - 8) + 'px';
+    }
+    const repeatButton = button(() => translate('player.repeatPlayback'), '↻', () => {
+        settings.hidden = true; settingsButton.setAttribute('aria-expanded', 'false');
+        if (!repeatPanel.hidden) hideRepeatPanel();
+        else {
+            repeatPanel.hidden = false; repeatButton.setAttribute('aria-expanded', 'true');
+            if (repeatPopover) repeatPanel.showPopover();
+            positionRepeatPanel(); repeatOne.focus();
+        }
+        wake();
+    }, controls);
+    repeatButton.className = 'sbp-repeat-toggle'; repeatButton.setAttribute('aria-expanded', 'false');
+    const repeatOne = button(() => translate('player.repeatOne'), () => translate('player.repeatOne'), () => {
+        repeatMode = repeatMode === 'one' ? 'off' : 'one'; updateRepeat();
+    }, repeatPanel);
+    const points = node('div', 'sbp-repeat-points'); repeatPanel.append(points);
+    const pointA = button(() => translate('player.setRepeatStart'), () => translate('player.repeatStart'), () => {
+        if (!hasDuration() || !Number.isFinite(video.currentTime) || video.currentTime >= video.duration) { showFeedback(translate('player.invalidRepeatStart')); return; }
+        repeatStart = clamp(video.currentTime, 0, video.duration); repeatEnd = null; repeatMode = 'off'; updateRepeat();
+    }, points);
+    const pointB = button(() => translate('player.setRepeatEnd'), () => translate('player.repeatEnd'), () => {
+        if (!hasDuration() || repeatStart === null || !Number.isFinite(video.currentTime) || clamp(video.currentTime, 0, video.duration) < repeatStart + .1) { showFeedback(translate('player.invalidRepeatEnd')); return; }
+        repeatEnd = clamp(video.currentTime, 0, video.duration); repeatMode = 'range'; updateRepeat(); enforceRepeat();
+    }, points);
+    const clearRepeat = button(() => translate('player.clearRepeat'), () => translate('player.clearRepeat'), () => {
+        repeatMode = 'off'; repeatStart = repeatEnd = null; updateRepeat();
+    }, repeatPanel);
+    const repeatStatus = node('p', 'sbp-repeat-status'); repeatStatus.setAttribute('role', 'status'); repeatPanel.append(repeatStatus);
+    function updateRepeat() {
+        const available = hasDuration();
+        video.loop = repeatMode === 'one';
+        root.dataset.repeat = repeatMode;
+        repeatOne.disabled = pointA.disabled = !available; pointB.disabled = !available || repeatStart === null;
+        clearRepeat.disabled = repeatMode === 'off' && repeatStart === null && repeatEnd === null;
+        repeatOne.setAttribute('aria-pressed', String(repeatMode === 'one'));
+        repeatButton.classList.toggle('is-active', isRepeating());
+        const point = value => value === null ? '—' : formatTime(value) + '.' + Math.floor(value * 10 % 10);
+        bindText(repeatStatus, () => translate('player.repeatStatus.' + repeatMode) + (repeatStart === null ? '' : ' · A ' + point(repeatStart) + ' · B ' + point(repeatEnd)));
+        scheduleRepeat();
+    }
     const settingLabel = node('label', '', () => (translate("player.doubleClickTapSeekSeconds"))); const interval = node('input'); interval.type = 'number'; interval.min = '1'; interval.max = '300'; interval.step = '1'; interval.value = String(seconds);
     on(interval, 'change', () => { const n = Number(interval.value); if (Number.isInteger(n) && n >= 1 && n <= 300) { seconds = n; try { localStorage.setItem(preferenceKey, String(n)); } catch {} } interval.value = String(seconds); });
     settingLabel.append(interval); settings.append(settingLabel, node('small', '', () => (translate("player.leftSeeksBackwardRightSeeksForward"))));
-    const settingsButton = button(() => (translate("player.playerSettings")), '⚙', () => { settings.hidden = !settings.hidden; settingsButton.setAttribute('aria-expanded', String(!settings.hidden)); wake(); if (!settings.hidden) interval.focus(); }, controls);
+    const settingsButton = button(() => (translate("player.playerSettings")), '⚙', () => { hideRepeatPanel(); settings.hidden = !settings.hidden; settingsButton.setAttribute('aria-expanded', String(!settings.hidden)); wake(); if (!settings.hidden) interval.focus(); }, controls);
     icon(settingsButton, 'settings');
     settingsButton.setAttribute('aria-expanded', 'false');
     let expandedDialog = null;
@@ -134,6 +211,10 @@ export function mountVideoPlayer(host, { src, kind = 'video', title = translate(
         if (duration !== lastDuration) {
             lastDuration = duration; seek.disabled = !duration; seek.max = String(duration);
             for (const b of jumps.children) b.disabled = !duration;
+            if (duration && (repeatStart >= duration || repeatEnd > duration)) {
+                repeatMode = 'off'; repeatStart = repeatEnd = null;
+            }
+            updateRepeat();
         }
         if (video.paused !== lastPaused) {
             lastPaused = video.paused; icon(play, video.paused ? 'play' : 'pause');
@@ -182,14 +263,22 @@ export function mountVideoPlayer(host, { src, kind = 'video', title = translate(
     on(seek, 'input', () => { if (Number.isFinite(video.duration)) video.currentTime = clamp(Number(seek.value), 0, video.duration); sync(); });
     on(seek, 'pointermove', event => { const r = seek.getBoundingClientRect(); seek.title = formatTime(clamp((event.clientX - r.left) / Math.max(1, r.width), 0, 1) * Number(seek.max)); });
     for (const event of ['loadedmetadata', 'durationchange', 'ratechange', 'ended', 'emptied']) on(video, event, sync);
-    on(video, 'timeupdate', syncTime);
+    on(video, 'timeupdate', () => { enforceRepeat(); syncTime(); scheduleRepeat(); });
+    on(video, 'ended', () => { enforceRepeat(true); syncTime(); scheduleRepeat(); });
+    on(video, 'seeked', () => { enforceRepeat(); scheduleRepeat(); });
+    on(video, 'seeking', () => clearTimeout(repeatTimer));
+    on(video, 'ratechange', scheduleRepeat);
+    on(video, 'waiting', () => clearTimeout(repeatTimer));
+    on(video, 'emptied', () => { repeatMode = 'off'; repeatStart = repeatEnd = null; updateRepeat(); });
     on(video, 'volumechange', audioChanged);
-    on(video, 'play', () => { message.hidden = true; sync(); wake(); }); on(video, 'pause', () => { sync(); wake(); });
-    on(video, 'waiting', () => { bindText(message, () => translate("gallery.loading")); message.hidden = false; }); on(video, 'playing', () => { message.hidden = true; });
+    on(video, 'play', () => { message.hidden = true; enforceRepeat(); sync(); scheduleRepeat(); wake(); }); on(video, 'pause', () => { clearTimeout(repeatTimer); sync(); wake(); });
+    on(video, 'waiting', () => { bindText(message, () => translate("gallery.loading")); message.hidden = false; }); on(video, 'playing', () => { message.hidden = true; scheduleRepeat(); });
     on(video, 'error', error); on(root, 'pointermove', wake); on(root, 'focusin', wake);
+    on(doc.defaultView, 'resize', positionRepeatPanel);
     on(doc, 'fullscreenchange', () => { bindAttribute(fullscreen, 'aria-label', () => doc.fullscreenElement === root ? translate("player.exitFullscreen") : translate("player.fullscreen")); });
     on(root, 'keydown', event => {
         if (event.defaultPrevented || isComposing(event)) return;
+        if (event.key === 'Escape' && !repeatPanel.hidden) { event.preventDefault(); event.stopPropagation(); hideRepeatPanel(); repeatButton.focus(); return; }
         if (event.key === 'Escape' && !settings.hidden) { event.preventDefault(); event.stopPropagation(); settings.hidden = true; settingsButton.setAttribute('aria-expanded', 'false'); settingsButton.focus(); return; }
         if (event.target !== root && event.target !== video) return;
         const item = matchShortcut(event, 'player');
@@ -204,10 +293,11 @@ export function mountVideoPlayer(host, { src, kind = 'video', title = translate(
         if (id === 'player.mute') { video.muted = !video.muted; audioChanged(); }
         if (id === 'player.fullscreen') fullscreen.click();
     }
-    overlay.append(seek, controls); if (surface !== video) screen.append(surface); screen.append(video, feedback, message, overlay, settings); root.append(screen, jumps); host.append(root); sync(); wake();
+    overlay.append(seek, controls, repeatPanel); if (surface !== video) screen.append(surface); screen.append(video, feedback, message, overlay, settings); root.append(screen, jumps); host.append(root); sync(); wake();
     const stopLanguage = localizeWidget(root);
-    return { video, root, keyboardAction, attachSurface,
+    return { video, root, keyboardAction, attachSurface, isRepeating,
+        getRepeatState: () => ({ mode: repeatMode, start: repeatStart, end: repeatEnd }),
         getPerformance: () => performanceStats.sample(),
         cancelGestures() { clearTimeout(clickTimer); lastTap = null; touchStart = null; },
-        destroy() { stopLanguage(); performanceStats.destroy(); destroyed = true; leaveExpanded(); clearTimeout(clickTimer); clearTimeout(hideTimer); clearTimeout(feedbackTimer); listeners.forEach(remove => remove()); if (doc.fullscreenElement === root) doc.exitFullscreen()?.catch(() => {}); video.pause(); video.removeAttribute('src'); video.load(); root.remove(); } };
+        destroy() { stopLanguage(); performanceStats.destroy(); destroyed = true; leaveExpanded(); clearTimeout(repeatTimer); clearTimeout(clickTimer); clearTimeout(hideTimer); clearTimeout(feedbackTimer); listeners.forEach(remove => remove()); if (doc.fullscreenElement === root) doc.exitFullscreen()?.catch(() => {}); video.pause(); video.removeAttribute('src'); video.load(); root.remove(); } };
 }

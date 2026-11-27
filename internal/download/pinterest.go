@@ -50,14 +50,14 @@ func (r Runner) resolvePinterestVideos(ctx context.Context, discovery engine.Gal
 }
 
 func (r Runner) stagePinterest(ctx context.Context, attempt AttemptDiscovery) ([]string, error) {
-	requests := attempt.GalleryResult.PinterestVideoURLs()
+	requests := attempt.GalleryDLDiscovery.PinterestVideoURLs()
 	if r.Ytdlp == nil || len(requests) != len(attempt.galleryVideos) {
 		return nil, fmt.Errorf("Pinterest 영상 확정 정보가 일치하지 않습니다")
 	}
-	paths := make([]string, len(attempt.GalleryResult.Files))
-	direct := engine.GalleryDLDiscovery{Directories: attempt.GalleryResult.Directories}
+	paths := make([]string, len(attempt.GalleryDLDiscovery.Files))
+	direct := engine.GalleryDLDiscovery{Directories: attempt.GalleryDLDiscovery.Directories}
 	var positions []int
-	for i, file := range attempt.GalleryResult.Files {
+	for i, file := range attempt.GalleryDLDiscovery.Files {
 		if _, video := requests[i]; video {
 			target, ok := attempt.galleryVideos[i]
 			if !ok {

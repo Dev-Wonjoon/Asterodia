@@ -42,6 +42,31 @@ export function createDemoModel() {
     }
 
     const media: MediaApi = {
+        async bulkEdit(request) {
+            if (!request.selection.length || request.selection.length > 200 || new Set(request.selection.map(row => row.mediaId)).size !== request.selection.length
+                || [...(request.addTags ?? []), ...(request.removeTags ?? [])].some(name => !name.trim() || [...name.trim()].length > 100)
+                || (request.addTags?.length ?? 0) + (request.removeTags?.length ?? 0) > 100
+                || (!request.addTags?.length && !request.removeTags?.length && request.isFavorite === undefined)) return fail('INVALID_ARGUMENT')
+            const updated: { mediaId: number; revision: number }[] = []
+            const failed: import('@contracts/media-api').MediaBulkEditResult['failed'] = []
+            for (const target of request.selection) {
+                const item = find(target.mediaId)
+                if (!item || item.summary.revision !== target.revision) {
+                    const error = fail(item ? 'REVISION_CONFLICT' : 'NOT_FOUND')
+                    if (!error.ok) failed.push({ mediaId: target.mediaId, error: error.error })
+                    continue
+                }
+                const result = await media.edit({ mediaId: target.mediaId, expectedRevision: target.revision, isFavorite: request.isFavorite,
+                    tagChange: { addNames: request.addTags, removeIds: item.tags.filter(tag => request.removeTags?.map(name => name.trim()).includes(tag.name)).map(tag => tag.id) } })
+                if (result.ok) updated.push({ mediaId: target.mediaId, revision: result.data.revision })
+                else failed.push({ mediaId: target.mediaId, error: result.error })
+            }
+            return ok({ updated, failed })
+        },
+        async metadata(request) {
+            return ok({ media: request.mediaIds.flatMap(id => { const item = find(id); return item ? [summary(item)] : [] }),
+                files: request.fileIds.flatMap(id => { const value = file(id); return value ? [value] : [] }) })
+        },
         async list(request = {}) {
             let rows = items.filter(item => matches(item, request.filter) && (!request.favoritesOnly || item.summary.isFavorite))
             rows = rows.filter(item => !item.summary.parentId)

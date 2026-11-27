@@ -13,7 +13,10 @@ export type Unsubscribe = () => void;
 import type { FileMoveApi } from "./file-move-api";
 import type { ContentFilters } from './media-v2';
 
+import type { CookieApi } from "./cookie-api";
+
 export interface AppApi {
+    cookies: CookieApi;
     getContentFilters(): Promise<ContentFilters>;
     setContentFilters(value: ContentFilters): Promise<ContentFilters>;
     updates: UpdateApi;

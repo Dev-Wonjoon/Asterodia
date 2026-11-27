@@ -100,7 +100,9 @@ func applicationServices(
 		if err != nil || kind != engine.KindYtdlp {
 			return nil, err
 		}
-		return (&engine.Ytdlp{Executable: filepath.Join(paths.Bin, "yt-dlp.exe"), CookieBrowser: snapshot.CookieBrowser, CookieFile: snapshot.CookieFilePath, NoPlaylist: true}).Discover(ctx, url, dir)
+		exporter := &engine.Ytdlp{Executable: filepath.Join(paths.Bin, "yt-dlp.exe")}
+		auth := &engine.ManagedAuth{Store: config.CookieStore(), Browser: snapshot.CookieBrowser, Exporter: exporter}
+		return (&engine.Ytdlp{Executable: filepath.Join(paths.Bin, "yt-dlp.exe"), Auth: auth, NoPlaylist: true}).Discover(ctx, url, dir)
 	})
 	localImporter.UpdateGate = updateGate
 	downloader := download.NewService(db, config.GetDownloadPath, func(root string, options engine.Options) download.Runner {
@@ -109,7 +111,15 @@ func applicationServices(
 		if node, err := exec.LookPath("node"); err == nil {
 			jsRuntime = "node:" + node
 		}
-		return download.Runner{SecureNetwork: true, Storage: download.Storage{Root: root}, Ytdlp: &engine.Ytdlp{Executable: filepath.Join(paths.Bin, "yt-dlp.exe"), JSRuntime: jsRuntime, FFmpegLocation: filepath.Join(paths.Bin, "ffmpeg.exe"), CookieBrowser: snapshot.CookieBrowser, CookieFile: snapshot.CookieFilePath, NoPlaylist: options.Playlist == nil || !*options.Playlist}, GalleryDL: &engine.GalleryDL{Executable: filepath.Join(paths.Bin, "gallery-dl.exe"), CookieBrowser: snapshot.CookieBrowser, CookieFile: snapshot.CookieFilePath}}
+		exporter := &engine.Ytdlp{Executable: filepath.Join(paths.Bin, "yt-dlp.exe")}
+		auth := &engine.ManagedAuth{Store: config.CookieStore(), Browser: snapshot.CookieBrowser, Exporter: exporter}
+		ytdlp := &engine.Ytdlp{Executable: filepath.Join(paths.Bin, "yt-dlp.exe"), JSRuntime: jsRuntime, FFmpegLocation: filepath.Join(paths.Bin, "ffmpeg.exe"), Auth: auth, NoPlaylist: options.Playlist == nil || !*options.Playlist}
+		gallery := &engine.GalleryDL{Executable: filepath.Join(paths.Bin, "gallery-dl.exe"), Auth: auth}
+		extractors := engine.DefaultExtractors(engine.ExtractorDependencies{
+			Ytdlp: ytdlp, GalleryDL: gallery, Cookies: ytdlp,
+			AuthenticatedFor: auth.HasCookies,
+		})
+		return download.Runner{SecureNetwork: true, Storage: download.Storage{Root: root}, Ytdlp: ytdlp, GalleryDL: gallery, Extractors: extractors}
 	}, thumb.ScheduleMedia)
 	downloader.ConfigureImages(inspector)
 	web.ConfigureDownloader(downloader)

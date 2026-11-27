@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"image"
 	"image/png"
@@ -240,8 +241,9 @@ func TestFavicon(t *testing.T) {
 		t.Fatal("페이지의 favicon 연결이 없습니다")
 	}
 	code, headers, data := f.request(t, "GET", "/favicon.svg", nil)
-	if code != http.StatusOK || !strings.HasPrefix(headers.Get("Content-Type"), "image/svg+xml") || !bytes.Contains(data, []byte("<svg")) || !bytes.Contains(data, []byte("prefers-color-scheme")) {
-		t.Fatal("테마에 대응하는 SVG favicon 응답이 없습니다")
+	var vector struct{ XMLName xml.Name }
+	if code != http.StatusOK || !strings.HasPrefix(headers.Get("Content-Type"), "image/svg+xml") || xml.Unmarshal(data, &vector) != nil || vector.XMLName.Local != "svg" {
+		t.Fatal("유효한 SVG favicon 응답이 없습니다")
 	}
 	code, headers, data = f.request(t, "GET", "/favicon.ico", nil)
 	contentType := headers.Get("Content-Type")

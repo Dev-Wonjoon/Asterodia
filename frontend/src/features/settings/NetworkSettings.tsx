@@ -3,7 +3,7 @@ import { getApi } from '@renderer/shared/api'
 import { useState, useEffect } from 'react'
 import { SettingSection } from '@renderer/shared/components/ui/SettingSection'
 import { SettingRow } from '@renderer/shared/components/ui/SettingRow'
-import { Button } from '@renderer/shared/components/ui/Button'
+import { CookieSettings } from './CookieSettings'
 import { useToast } from '@renderer/shared/hooks/useToast'
 import { WebServerSettings } from './WebServerSettings'
 
@@ -17,14 +17,13 @@ const BROWSER_OPTIONS = [
 export const NetworkSettings = (): React.JSX.Element => {
     useLanguage()
     const [browser, setBrowser] = useState('')
-    const [cookieFile, setCookieFile] = useState('')
     const { showToast } = useToast()
     const [saving, setSaving] = useState(false)
 
     useEffect(() => {
         let active = true
-        void Promise.all([getApi().getCookieBrowser(), getApi().getCookieFilePath()])
-            .then(([browser, file]) => { if (active) { setBrowser(browser); setCookieFile(file) } })
+        void getApi().getCookieBrowser()
+            .then(browser => { if (active) setBrowser(browser) })
             .catch(() => { if (active) showToast(translate("settings.couldNotReadNetworkSettings"), 'error') })
         return () => { active = false }
     }, [showToast])
@@ -38,14 +37,6 @@ export const NetworkSettings = (): React.JSX.Element => {
 
     const handleBrowserChange = (value: string): void => {
         void save(async () => { if (await getApi().setCookieBrowser(value)) setBrowser(value) })
-    }
-
-    const handleSelectCookieFile = async (): Promise<void> => {
-        await save(async () => { const path = await getApi().setCookieFilePath(); if (path) setCookieFile(path) })
-    }
-
-    const handleClearCookieFile = (): void => {
-        void save(async () => { if (await getApi().clearCookieFilePath()) setCookieFile('') })
     }
 
     return (
@@ -74,20 +65,8 @@ export const NetworkSettings = (): React.JSX.Element => {
                     </select>
                 }
             />
-            <SettingRow
-                label={translate("settings.cookieFile")}
-                description={translate("settings.selectACookiesTxtFileInNetscapeFormat")}
-                value={cookieFile || translate("settings.notSet")}
-                action={
-                    <div className="flex gap-2">
-                        <Button disabled={saving} onClick={handleSelectCookieFile}>{translate("settings.select")}</Button>
-                        {cookieFile && (
-                            <Button disabled={saving} variant="ghost" onClick={handleClearCookieFile}>{translate("search.reset")}</Button>
-                        )}
-                    </div>
-                }
-            />
         </SettingSection>
+        <CookieSettings />
         </div>
     )
 }

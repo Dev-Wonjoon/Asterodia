@@ -1,16 +1,18 @@
 # Asterodia branding
 
-`asterodia.svg` is the original transparent, white Asterodia symbol supplied by
-the project owner. Application icons are generated from this source with no
-background. The dark background variant is not used.
+The current transparent color icon is supplied by the project owner in
+`asterodia-icons.zip`. `asterodia.svg`, `asterodia.ico`, `png/`, and `svg/` retain
+the supplied artwork and size variants. Older dark/monochrome files are archival;
+they are not used for the current application branding.
 
-Desktop, web and demo headers render the transparent shape in the current theme's
-foreground color. The browser favicon uses the same shape with a light/dark
-foreground selected by the browser's color scheme.
+Desktop, web, demo and homepage headers display the SVG as an image so its blue,
+gold and crystal colors remain intact in both light and dark themes. Favicons
+use the same transparent color SVG with the supplied ICO as a fallback.
 
-Windows ICO and macOS ICNS are generated from `build/appicon.png` by
-`wails3 task common:generate:icons`. PNG and ICO copies in the frontend and docs
-must retain transparency. IconComposer/Assets.car background templates are not used.
+`build/appicon.png` is the supplied 1024px PNG. `wails3 task common:generate:icons`
+generates macOS ICNS and then restores the supplied Windows ICO, preserving all
+10 resolutions (16, 20, 24, 32, 40, 48, 64, 96, 128 and 256px). No background is
+added. IconComposer/Assets.car background templates are not used.
 
 ## Compatibility
 

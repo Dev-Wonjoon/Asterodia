@@ -149,57 +149,14 @@ func objects(ctx context.Context, q queryer, stmt string, args ...any) ([]Object
 const summarySQL = `SELECT m.id,m.source_kind AS sourceKind,u.url AS requestUrl,m.source_title AS sourceTitle,m.custom_title AS customTitle,coalesce(nullif(m.custom_title,''),nullif(m.source_title,''),'제목 없음') AS title,m.revision,m.cover_mode AS coverMode,m.created_at AS createdAt,m.updated_at AS updatedAt,((SELECT count(*) FROM media_file WHERE media_id=m.id)+(SELECT count(*) FROM user_album_file WHERE album_id=m.id)) AS fileCount,(SELECT count(*) FROM media_file WHERE media_id=m.id AND storage_kind='app_managed') AS managedFileCount,EXISTS(SELECT 1 FROM user_album a WHERE a.media_id=m.id) AS isUserAlbum,EXISTS(SELECT 1 FROM instagram_profile_album ipa WHERE ipa.media_id=m.id) AS isProfileAlbum,EXISTS(SELECT 1 FROM favorite WHERE media_id=m.id) AS isFavorite FROM media m LEFT JOIN download_urls u ON u.id=m.request_url_id`
 
 func summary(ctx context.Context, q queryer, id int64) (Object, error) {
-	rows, err := objects(ctx, q, summarySQL+" WHERE m.id=?", id)
+	rows, err := summaries(ctx, q, []int64{id})
 	if err != nil {
 		return nil, err
 	}
 	if len(rows) == 0 {
 		return nil, sql.ErrNoRows
 	}
-	obj := rows[0]
-	obj["isFavorite"] = obj["isFavorite"] == int64(1)
-	var pinned bool
-	if err = q.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM gallery_pin WHERE media_id=?)", id).Scan(&pinned); err != nil {
-		return nil, err
-	}
-	obj["isPinned"] = pinned
-	obj["isUserAlbum"] = obj["isUserAlbum"] == int64(1)
-	obj["isProfileAlbum"] = obj["isProfileAlbum"] == int64(1)
-	var parent sql.NullInt64
-	var children int64
-	if err = q.QueryRowContext(ctx, "SELECT (SELECT parent_id FROM album_parent WHERE album_id=?),(SELECT count(*) FROM album_parent WHERE parent_id=?)", id, id).Scan(&parent, &children); err != nil {
-		return nil, err
-	}
-	obj["parentId"] = nil
-	if parent.Valid {
-		obj["parentId"] = parent.Int64
-	}
-	obj["childAlbumCount"] = children
-	covers, err := objects(ctx, q, `SELECT f.id AS fileId,coalesce(f.thumbnail_path,f.preview_path,CASE WHEN f.kind='image' THEN f.filepath END) AS path,f.kind,f.filepath,f.detected_format AS detectedFormat FROM media_file f WHERE f.media_id=? OR f.id IN (SELECT file_id FROM user_album_file WHERE album_id=?) ORDER BY CASE WHEN f.id=coalesce((SELECT cover_file_id FROM user_album WHERE media_id=?),(SELECT cover_file_id FROM media WHERE id=?)) THEN 0 ELSE 1 END,CASE WHEN f.thumbnail_path IS NOT NULL OR f.kind='image' THEN 0 ELSE 1 END,coalesce((SELECT position FROM user_album_file WHERE album_id=? AND file_id=f.id),f.position),f.id LIMIT 1`, id, id, id, id, id)
-	if obj["isUserAlbum"] == true {
-		var cover sql.NullInt64
-		if e := q.QueryRowContext(ctx, "SELECT cover_file_id FROM user_album WHERE media_id=?", id).Scan(&cover); e != nil {
-			return nil, e
-		}
-		if cover.Valid {
-			obj["coverMode"] = "manual"
-		}
-	}
-
-	if err != nil {
-		return nil, err
-	}
-	obj["cover"] = nil
-	obj["extension"] = ""
-	if len(covers) > 0 {
-		obj["extension"] = FileExtension(covers[0])
-		delete(covers[0], "filepath")
-		delete(covers[0], "detectedFormat")
-	}
-	if len(covers) > 0 && covers[0]["path"] != nil {
-		obj["cover"] = covers[0]
-	}
-	return obj, nil
+	return rows[0], nil
 }
 
 // FileExtension uses the original file, never its JPEG thumbnail or HTTP route.
@@ -669,7 +626,7 @@ func (s *Service) unregister(ctx context.Context, req UnregisterRequest, all boo
 		if err = tx.Commit(); err != nil {
 			return failure(err)
 		}
-		return api.Success(Object{"mediaId": req.MediaID, "parentRemoved": all, "revision": revision, "cleanupTaskId": nil})
+		return api.Success(Object{"mediaId": req.MediaID, "parentRemoved": all, "revision": revision, "cleanupTaskId": nil, "unlinkedFileIds": req.FileIDs})
 	}
 	clause := "media_id=?"
 	args := []any{req.MediaID}
@@ -692,7 +649,9 @@ func (s *Service) unregister(ctx context.Context, req UnregisterRequest, all boo
 		return failure(sql.ErrNoRows)
 	}
 	paths := []string{}
+	removedIDs := []int64{}
 	for _, row := range rows {
+		removedIDs = append(removedIDs, row["id"].(int64))
 		if row["storageKind"] == "app_managed" {
 			paths = append(paths, row["filepath"].(string))
 		}
@@ -740,7 +699,7 @@ func (s *Service) unregister(ctx context.Context, req UnregisterRequest, all boo
 	if err = tx.Commit(); err != nil {
 		return failure(err)
 	}
-	return api.Success(Object{"mediaId": req.MediaID, "parentRemoved": removed, "revision": revision, "cleanupTaskId": taskID})
+	return api.Success(Object{"mediaId": req.MediaID, "parentRemoved": removed, "revision": revision, "cleanupTaskId": taskID, "removedFileIds": removedIDs, "remainingFileCount": count, "removedManagedFileCount": len(paths)})
 }
 func (s *Service) Suggest(ctx context.Context, req SuggestRequest) api.Result {
 	limit, err := pageBounds(req.Limit, 0)

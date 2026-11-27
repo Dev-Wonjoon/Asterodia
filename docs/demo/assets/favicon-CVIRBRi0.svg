@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="260" height="260" viewBox="0 0 120 120">
+  <title>Asterodia</title>
+  <defs>
+    <radialGradient id="planet" cx="32%" cy="25%" r="85%">
+      <stop offset="0%" stop-color="#6498ee"/>
+      <stop offset="55%" stop-color="#315fbe"/>
+      <stop offset="100%" stop-color="#182e70"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffe7a7"/>
+      <stop offset="100%" stop-color="#dfa04d"/>
+    </linearGradient>
+    <linearGradient id="crystal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#b0d5ff"/>
+    </linearGradient>
+  </defs>
+  <!-- Rear orbit, occluded by the planet -->
+  <ellipse cx="60" cy="60" rx="54" ry="22" transform="rotate(-30 60 60)" fill="none" stroke="url(#gold)" stroke-width="7"/>
+  <circle cx="60" cy="60" r="40" fill="url(#planet)"/>
+  <path d="M60 25 L85 60 L60 95 L35 60 Z" fill="url(#crystal)"/>
+  <path d="M60 25 L85 60 L60 60 Z" fill="#a4caf5"/>
+  <path d="M60 60 L85 60 L60 95 Z" fill="#699bdc"/>
+  <path d="M35 60 L60 60 L60 95 Z" fill="#cfe4ff"/>
+  <!-- Front orbit -->
+  <path d="M6 60 A54 22 0 0 0 114 60" transform="rotate(-30 60 60)" fill="none" stroke="url(#gold)" stroke-width="7"/>
+  <circle cx="104" cy="35" r="8" fill="#ffe3a0"/>
+  <circle cx="102" cy="33" r="3" fill="#fff4d4"/>
+</svg>

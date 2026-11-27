@@ -320,3 +320,47 @@ it('returns focus from a removed player control after auto-next so consecutive k
     key('+', { ctrlKey: true }); expect(scale()).toBe('125%')
     key('ArrowRight'); await flush(); expect(viewer!.currentFile?.id).toBe(4)
 })
+
+it.each(['one', 'range'])('gives %s repeat priority over automatic next and resets it on manual navigation', async mode => {
+    const { getFile } = setup(2); await flush()
+    click(document.querySelector<HTMLInputElement>('.sbv-options input')!)
+    const video = document.querySelector('video')!
+    const panelButton = (label: string) => document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!
+    panelButton('반복 재생').click()
+    if (mode === 'one') button('한 영상 반복').click()
+    else {
+        video.currentTime = 100; panelButton('현재 위치를 시작점 A로 지정').click()
+        video.currentTime = 120; panelButton('현재 위치를 끝점 B로 지정').click()
+    }
+    video.dispatchEvent(new Event('ended')); await flush()
+    expect(getFile).toHaveBeenCalledTimes(1); expect(viewer!.currentFile?.id).toBe(2)
+    expect(video.currentTime).toBe(mode === 'one' ? 0 : 100)
+    if (mode === 'one') {
+        button('반복 해제').click(); video.dispatchEvent(new Event('ended')); await flush()
+        expect(viewer!.currentFile?.id).toBe(3)
+    } else {
+        click(button('다음 →')); await flush(); expect(viewer!.currentFile?.id).toBe(3)
+    }
+    click(button('← 이전')); await flush()
+    expect(document.querySelector<HTMLElement>('.sb-player')!.dataset.repeat).toBe('off')
+})
+
+it('keeps separate repeat settings across layouts and restores them after shared viewing', async () => {
+    setup(2); await flush(); click(button('2분할')); await flush(); await choose(1, 2)
+    const players = [...document.querySelectorAll<HTMLElement>('.sb-player')]
+    const action = (label: string, parent: ParentNode) => parent.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!.click()
+    action('반복 재생', players[0]); action('한 영상 반복', players[0])
+    expect(players[0].dataset.repeat).toBe('one'); expect(players[1].dataset.repeat).toBe('off')
+    const secondVideo = panes()[1].querySelector('video')!
+    action('반복 재생', players[1]); secondVideo.currentTime = 10; action('현재 위치를 시작점 A로 지정', players[1])
+    secondVideo.currentTime = 20; action('현재 위치를 끝점 B로 지정', players[1])
+    click(button('4분할')); await flush(); expect(players[0].isConnected).toBe(true)
+    expect(players[1].dataset.repeat).toBe('range')
+    select(1); click(button('같은 미디어')); await flush()
+    expect(document.querySelector<HTMLElement>('.sbv-shared-player .sb-player')!.dataset.repeat).toBe('range')
+    click(button('서로 다른 미디어')); await flush()
+    const restored = [...document.querySelectorAll<HTMLElement>('.sb-player')]
+    expect(restored.map(el => el.dataset.repeat)).toEqual(['one', 'range'])
+    expect(panes()[0].querySelector('video')!.loop).toBe(true)
+    expect(restored[1].querySelector('.sbp-repeat-status')!.textContent).toContain('A 0:10.0 · B 0:20.0')
+})

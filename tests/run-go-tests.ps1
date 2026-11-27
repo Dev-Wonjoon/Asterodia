@@ -11,6 +11,7 @@ $runId = [Guid]::NewGuid().ToString('N')
 $testFlags = @()
 if ($Race) { $testFlags += '-race' }
 $testGroups = @(
+    @{ Category = 'cookie-storage'; Package = './tests/cookies' }
     @{ Category = 'update'; Package = './tests/update' }
     @{ Category = 'licenses'; Package = './tests/licenses' }
     @{ Category = 'engine-notices'; Package = './internal/engine'; Pattern = '^TestEngineNotices' }
@@ -22,7 +23,7 @@ $testGroups = @(
     @{ Category = 'gallerydl-download'; Package = './tests/engine'; Pattern = '^TestGalleryDL(SaveImages|DownloadResults)$' }
     @{ Category = 'gallerydl-discovery'; Package = './tests/engine'; Pattern = '^TestGalleryDLDiscoverBluesky$' }
     @{ Category = 'ytdlp-download'; Package = './tests/engine'; Pattern = '^TestYtdlpDownload' }
-    @{ Category = 'engine-parsers'; Package = './tests/engine'; Pattern = '^Test(ParseGalleryDLDiscovery|GalleryDLInstagramTargetKey|GalleryDLCommonTargets|YtdlpTargetKeyCompatibility|Instagram.*|DiscoveryChain.*)$' }
+    @{ Category = 'engine-parsers'; Package = './tests/engine'; Pattern = '^Test(ParseGalleryDLDiscovery|GalleryDLInstagramTargetKey|GalleryDLCommonTargets|YtdlpTargetKeyCompatibility|Instagram.*|Threads.*|Extractor.*|Berriz.*|Cookie.*|DiscoveryChain.*)$' }
     @{ Category = 'integration'; Package = './tests/integration' }
     @{ Category = 'thumbnail'; Package = './tests/thumbnail' }
     @{ Category = 'webserver'; Package = './tests/webserver' }

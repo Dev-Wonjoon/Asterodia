@@ -2,7 +2,6 @@ package download
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -10,33 +9,24 @@ import (
 	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
 )
 
-type YtdlpEngine interface {
-	Discover(context.Context, string, string) (json.RawMessage, error)
-	DownloadSingle(context.Context, engine.YtdlpTarget, string, engine.Options) (string, error)
-}
-
-type GalleryDLDiscoverer interface {
-	Discover(context.Context, string, string) (engine.GalleryDLDiscovery, error)
-	Download(context.Context, string, engine.GalleryDLDiscovery, string) ([]string, error)
-}
+type YtdlpEngine = engine.YtdlpBackend
+type GalleryDLDiscoverer = engine.GalleryDLBackend
 
 type Runner struct {
 	SecureNetwork bool
 	Storage       Storage
 	Ytdlp         YtdlpEngine
 	GalleryDL     GalleryDLDiscoverer
+	Extractors    []engine.Extractor
 }
 
 type AttemptDiscovery struct {
-	Engine        engine.Kind
-	OriginalURL   string
-	Options       engine.Options
+	engine.DownloadPlan
 	stageDir      string
 	jobID         string
 	attemptID     string
-	YtdlpTargets  []engine.YtdlpTarget
-	GalleryResult engine.GalleryDLDiscovery
 	galleryVideos map[int]engine.YtdlpTarget
+	stage         func(context.Context, string, func(int, int)) ([]string, error)
 }
 
 func (r Runner) DiscoverAttempt(
@@ -47,75 +37,40 @@ func (r Runner) DiscoverAttempt(
 	if err := ctx.Err(); err != nil {
 		return AttemptDiscovery{}, err
 	}
-	kind, err := engine.Select(originalURL, options)
-	if err != nil {
+	if _, err := engine.Select(originalURL, options); err != nil {
 		return AttemptDiscovery{}, err
 	}
-
 	stageDir, err := r.Storage.PrepareStage(jobID, attemptID)
 	if err != nil {
 		return AttemptDiscovery{}, err
 	}
-	result := AttemptDiscovery{
-		Engine:      kind,
-		OriginalURL: originalURL,
-		Options:     options,
-		stageDir:    stageDir,
-		jobID:       jobID,
-		attemptID:   attemptID,
+	extractors := r.Extractors
+	if extractors == nil {
+		deps := engine.ExtractorDependencies{Ytdlp: r.Ytdlp, GalleryDL: r.GalleryDL}
+		// Backend-only callers retain the generic flow. The app explicitly
+		// registers site extractors with its HTTP/authentication dependencies.
+		extractors = []engine.Extractor{engine.NewGenericExtractor(deps)}
 	}
-
-	other := engine.KindGalleryDL
-	if kind == engine.KindGalleryDL {
-		other = engine.KindYtdlp
+	plan, err := engine.DiscoverWithExtractors(ctx, engine.ExtractRequest{URL: originalURL, WorkDir: stageDir, Options: options}, extractors)
+	if err != nil {
+		return AttemptDiscovery{}, err
 	}
-	chain := engine.RunDiscoveryChain(ctx, r.discoveryHandler(kind, result), r.discoveryHandler(other, result))
-	return chain.Value, chain.Err
-}
-
-func (r Runner) discoveryHandler(candidate engine.Kind, base AttemptDiscovery) engine.DiscoveryHandler[AttemptDiscovery] {
-	return engine.DiscoveryHandler[AttemptDiscovery]{Name: string(candidate), Handle: func(ctx context.Context) engine.DiscoveryStepResult[AttemptDiscovery] {
-		// Every handler starts from the request, never from a failed strategy's
-		// partial targets or transfer plan.
-		result := base
-		result.Engine = candidate
-		originalURL, stageDir, options := base.OriginalURL, base.stageDir, base.Options
-		var err error
-		switch candidate {
-		case engine.KindYtdlp:
-			if r.Ytdlp == nil {
-				err = engine.ErrUnsupportedURL
-				break
-			}
-			var raw json.RawMessage
-			raw, err = r.Ytdlp.Discover(ctx, originalURL, stageDir)
-			if err == nil {
-				result.YtdlpTargets, err = engine.ParseYtdlpTargets(raw, originalURL)
-			}
-		case engine.KindGalleryDL:
-			if r.GalleryDL == nil {
-				err = engine.ErrUnsupportedURL
-				break
-			}
-			result.GalleryResult, err = r.GalleryDL.Discover(ctx, originalURL, stageDir)
-			if err == nil {
-				result.galleryVideos, err = r.resolvePinterestVideos(ctx, result.GalleryResult, originalURL, stageDir, options)
-				if err != nil {
-					return engine.DiscoveryStepResult[AttemptDiscovery]{Decision: engine.DiscoveryStop, Value: result, Err: err}
-				}
-			}
-		}
-		decision := engine.DiscoveryHandled
+	result := AttemptDiscovery{DownloadPlan: plan, stageDir: stageDir, jobID: jobID, attemptID: attemptID, stage: plan.Download}
+	if plan.Engine == engine.KindGalleryDL {
+		result.galleryVideos, err = r.resolvePinterestVideos(ctx, plan.GalleryDLDiscovery, originalURL, stageDir, options)
 		if err != nil {
-			decision = engine.DiscoveryStop
-			if errors.Is(err, engine.ErrUnsupportedURL) && !errors.Is(err, engine.ErrRateLimited) &&
-				!errors.Is(err, engine.ErrOutputLimit) && !errors.Is(err, engine.ErrStopUnconfirmed) &&
-				!errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-				decision = engine.DiscoveryNext
+			return AttemptDiscovery{}, err
+		}
+		if len(result.galleryVideos) > 0 {
+			// Bind the composite executor now as well; later Runner changes must
+			// not change the tools used by this attempt.
+			snapshot := result
+			result.stage = func(ctx context.Context, _ string, _ func(int, int)) ([]string, error) {
+				return r.stagePinterest(ctx, snapshot)
 			}
 		}
-		return engine.DiscoveryStepResult[AttemptDiscovery]{Decision: decision, Value: result, Err: err}
-	}}
+	}
+	return result, nil
 }
 
 func (a AttemptDiscovery) StageDir() string {
@@ -170,59 +125,25 @@ func (r Runner) FreezeAndStageAttempt(
 }
 
 func (a AttemptDiscovery) targetInputs() ([]TargetInput, error) {
-	switch a.Engine {
-	case engine.KindYtdlp:
-		kind := "video"
-		if a.Options.Type == "audio" || a.Options.Quality == "audio" {
-			kind = "audio"
+	media, err := a.MediaTargets()
+	if err != nil {
+		if errors.Is(err, engine.ErrUnsupportedMediaFormat) {
+			return nil, err
 		}
-
-		targets := make([]TargetInput, 0, len(a.YtdlpTargets))
-		for _, target := range a.YtdlpTargets {
-			// Generic can delegate HTML pages to an embedded-media extractor.
-			// Validate the entire resolved list before freezing or saving any entry.
-			if err := target.ValidateDirectDownload(a.Options); err != nil {
-				return nil, err
-			}
-			targets = append(targets, TargetInput{
-				TargetKey: target.TargetKey,
-				SourceURL: target.WebpageURL,
-				Metadata: TargetMetadata{
-					Kind:         kind,
-					Title:        target.Title,
-					ExternalID:   target.ID,
-					PlatformName: target.ExtractorKey,
-					OwnerID:      target.OwnerID,
-					OwnerName:    target.OwnerName,
-					Duration:     target.Duration,
-				},
-			})
-		}
-		return targets, nil
-
-	case engine.KindGalleryDL:
-		if a.Options.Type == "audio" || (a.Options.Quality != "" && a.Options.Quality != "best") || a.Options.Extension != "" {
-			return nil, fmt.Errorf("%w: 선택된 엔진은 요청한 변환 옵션을 처리하지 못합니다", engine.ErrUnsupportedMediaFormat)
-		}
-		media, err := a.GalleryResult.Targets(a.OriginalURL)
-		if err != nil {
-			return nil, fmt.Errorf("%w: %v", ErrUnsupportedTargetDiscovery, err)
-		}
-		for _, target := range a.galleryVideos {
-			if err := target.ValidateDirectDownload(a.Options); err != nil {
-				return nil, err
-			}
-		}
-
-		targets := make([]TargetInput, 0, len(media))
-		for _, item := range media {
-			targets = append(targets, TargetInput{TargetKey: item.TargetKey, SourceURL: item.SourceURL, Metadata: TargetMetadata{Kind: item.Kind, Title: item.Title, ExternalID: item.ExternalID, PlatformName: item.PlatformName, OwnerID: item.OwnerID, OwnerName: item.OwnerName}})
-		}
-		return targets, nil
-
-	default:
-		return nil, fmt.Errorf("%w: %q", ErrUnsupportedTargetDiscovery, a.Engine)
+		return nil, fmt.Errorf("%w: %v", ErrUnsupportedTargetDiscovery, err)
 	}
+	for _, target := range a.galleryVideos {
+		if err := target.ValidateDirectDownload(a.Options); err != nil {
+			return nil, err
+		}
+	}
+	targets := make([]TargetInput, 0, len(media))
+	for _, item := range media {
+		targets = append(targets, TargetInput{TargetKey: item.TargetKey, SourceURL: item.SourceURL,
+			Metadata: TargetMetadata{Kind: item.Kind, Title: item.Title, ExternalID: item.ExternalID,
+				PlatformName: item.PlatformName, OwnerID: item.OwnerID, OwnerName: item.OwnerName, Duration: item.Duration}})
+	}
+	return targets, nil
 }
 
 type StagedFile struct {
@@ -238,53 +159,25 @@ func (r Runner) StageAttempt(ctx context.Context, attempt AttemptDiscovery) ([]S
 		return nil, fmt.Errorf("조회 시도에 작업 폴더가 없습니다")
 	}
 
-	var paths []string
-	switch attempt.Engine {
-	case engine.KindYtdlp:
-		if r.Ytdlp == nil || len(attempt.YtdlpTargets) == 0 {
-			return nil, fmt.Errorf("yt-dlp 엔진과 확정 대상이 필요합니다")
-		}
-		for i, target := range attempt.YtdlpTargets {
-			if err := ctx.Err(); err != nil {
-				return nil, err
-			}
-			itemDir, err := prepareStageItem(attempt.stageDir, i)
-			if err != nil {
-				return nil, fmt.Errorf("yt-dlp %d번째 대상: %w", i+1, err)
-			}
-			transferFrom(ctx).beginFile(i+1, len(attempt.YtdlpTargets))
-			path, err := r.Ytdlp.DownloadSingle(ctx, target, itemDir, attempt.Options)
-			if err != nil {
-				return nil, fmt.Errorf("yt-dlp 대상 %s 저장 실패: %w", target.TargetKey, err)
-			}
-			paths = append(paths, path)
-		}
-
-	case engine.KindGalleryDL:
-		var err error
-		if r.GalleryDL == nil {
-			return nil, fmt.Errorf("gallery-dl 엔진이 연결되지 않았습니다")
-		}
-		stopProgress := watchGalleryTransfer(ctx, attempt.stageDir, len(attempt.GalleryResult.Files))
+	if attempt.stage == nil {
+		return nil, fmt.Errorf("조회 결과에 연결된 다운로드 실행기가 필요합니다")
+	}
+	targets, err := attempt.MediaTargets()
+	if err != nil {
+		return nil, err
+	}
+	if attempt.Engine == engine.KindGalleryDL {
+		stopProgress := watchGalleryTransfer(ctx, attempt.stageDir, len(attempt.Files))
 		defer stopProgress()
-		if len(attempt.galleryVideos) > 0 {
-			paths, err = r.stagePinterest(ctx, attempt)
-		} else {
-			paths, err = r.GalleryDL.Download(ctx, attempt.OriginalURL, attempt.GalleryResult, attempt.stageDir)
-		}
-		if err != nil {
-			return nil, err
-		}
-		targets, e := attempt.GalleryResult.Targets(attempt.OriginalURL)
-		if e != nil {
-			return nil, e
-		}
-		if len(paths) != len(targets) {
-			return nil, fmt.Errorf("gallery-dl 저장 결과 수가 조회 대상 수와 다릅니다")
-		}
-
-	default:
-		return nil, fmt.Errorf("지원하지 않는 엔진: %q", attempt.Engine)
+	}
+	paths, err := attempt.stage(ctx, attempt.stageDir, func(position, total int) {
+		transferFrom(ctx).beginFile(position, total)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(paths) != len(targets) {
+		return nil, fmt.Errorf("저장 결과 수가 조회 대상 수와 다릅니다")
 	}
 
 	files := make([]StagedFile, 0, len(paths))

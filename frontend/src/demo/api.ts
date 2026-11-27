@@ -6,6 +6,7 @@ export const demo = createDemoModel()
 const unavailable = () => getLanguage() === 'ko'
     ? '이 기능은 데스크톱 앱에서 이용할 수 있습니다. 데모에서는 샘플 미디어를 정리하고 재생해 보세요.'
     : 'This feature is available in the desktop app. Try organizing and playing the sample media here.'
+const rejectNative = async (): Promise<never> => { throw new Error(unavailable()) }
 // Unsupported native operations always return a visible, local error; never a real request.
 function desktopOnly<T>(overrides: Partial<T> = {}): T {
     return new Proxy(overrides as T & object, { get(target, key) {
@@ -15,6 +16,11 @@ function desktopOnly<T>(overrides: Partial<T> = {}): T {
 }
 const api: AppApi = {
     media: demo.media, downloads: demo.downloads,
+    cookies: {
+        list: async () => ({ groups: [], warning: '' }),
+        importFile: rejectNative, deleteEntry: rejectNative,
+        deleteSite: rejectNative, setEnabled: rejectNative,
+    },
     localImport: desktopOnly<AppApi['localImport']>({ get: async () => ({ ok: true, data: { job: null, folders: [], total: 0, hasNextPage: false } }) }),
     fileMove: desktopOnly<AppApi['fileMove']>({ get: async () => ({ ok: true, data: null }) }),
     updates: desktopOnly(), mediaEdit: desktopOnly(), database: desktopOnly(), webServer: desktopOnly(),

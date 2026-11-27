@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/Dev-Wonjoon/Asterodia/internal/cookies"
 	"github.com/Dev-Wonjoon/Asterodia/internal/licenses"
 )
 
@@ -17,10 +18,12 @@ type Dialogs struct {
 	Reveal     func(string) error
 }
 type Service struct {
-	mu       sync.Mutex
-	filename string
-	values   map[string]json.RawMessage
-	dialogs  Dialogs
+	mu            sync.Mutex
+	filename      string
+	values        map[string]json.RawMessage
+	cookieStore   *cookies.Store
+	cookieWarning string
+	dialogs       Dialogs
 }
 type Snapshot struct{ DownloadPath, WorkingDirectory, CookieBrowser, CookieFilePath string }
 
@@ -36,6 +39,16 @@ func New(filename, defaultDownloads string, dialogs Dialogs) (*Service, error) {
 	}
 	if s.read("downloadPath") == "" {
 		s.values["downloadPath"], _ = json.Marshal(defaultDownloads)
+	}
+	s.cookieStore, err = cookies.Open(filepath.Join(filepath.Dir(filename), "cookies.dat"))
+	if err != nil {
+		s.cookieStore = cookies.Unavailable(filepath.Join(filepath.Dir(filename), "cookies.dat"))
+		s.cookieWarning = "store-unavailable"
+	}
+	if legacy := s.read("cookieFilePath"); legacy != "" && s.cookieWarning == "" && !s.cookieStore.Imported() {
+		if err := s.cookieStore.ImportFile(legacy); err != nil {
+			s.cookieWarning = "legacy-import-failed"
+		}
 	}
 	return s, nil
 }
@@ -178,12 +191,8 @@ func (s *Service) SetCookieFilePath() (*string, error) {
 	if err != nil || v == "" {
 		return nil, err
 	}
-	info, err := os.Stat(v)
-	if err != nil {
+	if err := s.cookieStore.ImportFile(v); err != nil {
 		return nil, err
-	}
-	if !filepath.IsAbs(v) || !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("쿠키 파일이 필요합니다")
 	}
 	if err = s.save("cookieFilePath", v); err != nil {
 		return nil, err
@@ -191,6 +200,9 @@ func (s *Service) SetCookieFilePath() (*string, error) {
 	return &v, nil
 }
 func (s *Service) ClearCookieFilePath() (bool, error) {
+	if err := s.cookieStore.ClearImported(); err != nil {
+		return false, err
+	}
 	err := s.save("cookieFilePath", "")
 	return err == nil, err
 }

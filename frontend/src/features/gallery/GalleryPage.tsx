@@ -138,7 +138,8 @@ export const GalleryPage = ({
     const requestGalleryRefresh = useRef(() => {})
     useEffect(() => {
         let timer: ReturnType<typeof setTimeout> | undefined
-        let pending = false, foreground = false, running = false, disposed = false
+        let pending = false, foreground = false, running = false, disposed = false, retryAvailable = true
+        const changedMedia = new Set<number>()
         const schedule = () => {
             if (disposed || timer !== undefined || running) return
             timer = setTimeout(() => {
@@ -152,21 +153,30 @@ export const GalleryPage = ({
             if (thumbnailBlocked.current || dirtyRef.current || current.busy || current.needsRefresh || current.list.refreshing || current.list.loadingMore) return
             pending = false; running = true
             // Cache notifications must not disable toolbar controls or reload the editor.
-            const refresh = foreground ? store.refresh() : store.refresh({ background: true })
+            const changed = [...changedMedia]
+            changedMedia.clear()
+            const refresh = foreground ? store.refresh() : store.refreshMetadata(changed)
             foreground = false
-            void Promise.resolve(refresh).finally(() => {
+            void Promise.resolve(refresh).then(loaded => {
+                if (loaded === false && !disposed && retryAvailable) {
+                    retryAvailable = false
+                    changed.forEach(id => changedMedia.add(id))
+                    pending = true
+                }
+            }).finally(() => {
                 running = false
                 if (pending) schedule()
             })
         }
         flushThumbnails.current = flush
         requestGalleryRefresh.current = () => {
-            pending = foreground = true
+            pending = foreground = retryAvailable = true
             if (timer !== undefined) { clearTimeout(timer); timer = undefined }
             flush()
         }
-        const unsubscribe = getApi().onMediaThumbnailUpdated(() => {
-            pending = true
+        const unsubscribe = getApi().onMediaThumbnailUpdated(mediaId => {
+            changedMedia.add(mediaId)
+            pending = retryAvailable = true
             schedule()
         })
         return () => {
@@ -537,9 +547,6 @@ export const GalleryPage = ({
             <div className="space-y-5 pb-6">
                 <header data-action-boundary className="flex flex-wrap items-center gap-3 bg-[var(--bg-app)]">
                     <h1 className="shrink-0 text-lg font-semibold">{title}</h1>
-                    <GallerySelectionBar count={selection.length + albumFileIds.length} groupCount={selection.length} fileCount={albumFileIds.length} total={list.status === 'ready' ? list.page.total : null} disabled={pageDisabled || pointerSelection.dragging}
-                        removalLabel={removalLabel(selectedRemovalCounts([...pointerSelection.entries.values()], list.page.data))}
-                        onAdd={() => albumControls.current?.addSelection()} onMove={gatherSelection} onMerge={() => { if (!pageDisabled) setMergeSelection(selectedTargets()) }} onClear={clearSelection} onBulk={onBulk} />
                     <MediaEditLauncher compact controlRef={mediaEditControls} disabled={state.busy || bulk.busy || moveBusy || albumDropBusy || draftDirty} />
 
                     <div data-gallery-toolbar className="ml-auto shrink-0"><GalleryToolbar count={selection.length + albumFileIds.length} disabled={state.busy || bulk.busy || moveBusy || albumDropBusy || draftDirty} actionDisabled={state.needsRefresh || list.status !== 'ready'} importDisabled={importBusy || state.needsRefresh} canImport={!favoritesOnly} hasImportResult={hasImportResult}
@@ -602,6 +609,15 @@ export const GalleryPage = ({
                 )}
 
                 {pointerSelection.rectangle && <div aria-hidden="true" className="pointer-events-none fixed z-50 border border-[var(--color-primary)] bg-[var(--color-primary)]/15" style={pointerSelection.rectangle} />}
+                <div className="relative isolate">
+                {/* A zero-height dock keeps selection changes from moving the cards during a drag. */}
+                <div data-gallery-selection-dock className="pointer-events-none sticky top-3 z-20 h-0">
+                    <div className="absolute inset-x-0 top-0 flex justify-center">
+                        <GallerySelectionBar count={selection.length + albumFileIds.length} groupCount={selection.length} fileCount={albumFileIds.length} total={list.status === 'ready' ? list.page.total : null} disabled={pageDisabled || pointerSelection.dragging}
+                            removalLabel={removalLabel(selectedRemovalCounts([...pointerSelection.entries.values()], list.page.data))}
+                            onAdd={() => albumControls.current?.addSelection()} onMove={gatherSelection} onMerge={() => { if (!pageDisabled) setMergeSelection(selectedTargets()) }} onClear={clearSelection} onBulk={onBulk} />
+                    </div>
+                </div>
                 <div ref={pointerSelection.gridRef} className={galleryGridClass + ' motion-gallery-grid min-h-32'} style={virtual.style}
                     onDragOver={event => { if (!event.defaultPrevented) event.dataTransfer.dropEffect = 'none' }}
                     onDrop={event => event.preventDefault()}>
@@ -697,6 +713,7 @@ export const GalleryPage = ({
                         {list.page.hasNextPage && !list.error && <button type="button" data-detail-trigger className={button} disabled={pageDisabled || list.loadingMore} onClick={() => { void store.loadMore() }}>{list.moreError ? translate("common.retry") : translate("gallery.loadMore")}</button>}
                     </div>
                 )}
+                </div>
             </div>
         </ListDetailLayout>
         </div>

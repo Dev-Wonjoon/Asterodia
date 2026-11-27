@@ -30,6 +30,17 @@ func listGallery(ctx context.Context, q queryer, req ListRequest, where string, 
 			seen[id] = true
 		}
 	}
+	// Collapsed explorer cards have one slot each. Avoid computing weighted
+	// positions and file counts for the entire library in this common view.
+	if req.AlbumCards && len(ids) == 0 && req.AnchorMediaID == 0 && req.GalleryView != "files" {
+		var filePins bool
+		if err := q.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM gallery_pin WHERE file_id IS NOT NULL)").Scan(&filePins); err != nil {
+			return failure(err)
+		}
+		if !filePins {
+			return listCollapsedGallery(ctx, q, req, where, args, limit)
+		}
+	}
 	raw, _ := json.Marshal(ids)
 	// Omitted visibility options retain the original API behavior for older clients.
 	hideFiles := req.ShowAlbumFiles != nil && !*req.ShowAlbumFiles
@@ -63,7 +74,7 @@ func listGallery(ctx context.Context, q queryer, req ListRequest, where string, 
 		automaticExpansion = "0"
 	}
 	forced := "(userAlbum=0 OR (profileAlbum=1 AND " + forceFiles + ")) AND visibleFiles>0 AND (" + forceFiles + " OR (" + automaticExpansion + "))"
-	cte := fmt.Sprintf(`WITH candidates AS (
+	cte := fmt.Sprintf(`WITH candidates AS MATERIALIZED (
         SELECT m.id,m.created_at,(SELECT created_at FROM gallery_pin WHERE media_id=m.id) AS pinnedAt,
           EXISTS(SELECT 1 FROM user_album WHERE media_id=m.id) AS userAlbum,
           EXISTS(SELECT 1 FROM instagram_profile_album WHERE media_id=m.id) AS profileAlbum,
@@ -95,7 +106,7 @@ func listGallery(ctx context.Context, q queryer, req ListRequest, where string, 
     ) `, visibleWhere, unpinnedWhere, visibleWhere, unpinnedWhere, unpinnedWhere, unpinnedWhere, where, pinEnabled, forced, forced, forced, viewWhere)
 	params := append([]any{string(raw)}, args...)
 	var total int64
-	if err := q.QueryRowContext(ctx, cte+"SELECT coalesce(sum(slots),0) FROM positioned", params...).Scan(&total); err != nil {
+	if err := q.QueryRowContext(ctx, cte+"SELECT coalesce(sum(slots),0) FROM albums", params...).Scan(&total); err != nil {
 		return failure(err)
 	}
 	offset := req.Offset
@@ -115,12 +126,36 @@ func listGallery(ctx context.Context, q queryer, req ListRequest, where string, 
 	if err != nil {
 		return failure(err)
 	}
+	summaryIDs := []int64{}
+	for _, slice := range slices {
+		summaryIDs = append(summaryIDs, slice["id"].(int64))
+	}
+	metadata, err := summaries(ctx, q, summaryIDs)
+	if err != nil {
+		return failure(err)
+	}
+	byID := map[int64]Object{}
+	for _, row := range metadata {
+		byID[row["id"].(int64)] = row
+	}
+	pinRows, err := objects(ctx, q, "SELECT file_id FROM gallery_pin WHERE file_id IS NOT NULL")
+	if err != nil {
+		return failure(err)
+	}
+	pinnedFiles := map[int64]bool{}
+	for _, pin := range pinRows {
+		pinnedFiles[pin["file_id"].(int64)] = true
+	}
 	data := []Object{}
 	for _, slice := range slices {
 		id := slice["id"].(int64)
-		album, err := summary(ctx, q, id)
-		if err != nil {
-			return failure(err)
+		original := byID[id]
+		album := Object{}
+		for key, value := range original {
+			album[key] = value
+		}
+		if original == nil {
+			return failure(domainError("NOT_FOUND"))
 		}
 		album["galleryPinned"] = slice["pinned"] == int64(1)
 		if slice["expanded"] == int64(0) || album["fileCount"].(int64) == 0 {
@@ -148,11 +183,7 @@ func listGallery(ctx context.Context, q queryer, req ListRequest, where string, 
 				delete(file, "originalOffset")
 			}
 			item["galleryFile"], item["galleryFileOffset"] = file, fileOffset
-			var pinned bool
-			if err = q.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM gallery_pin WHERE file_id=?)", file["id"]).Scan(&pinned); err != nil {
-				return failure(err)
-			}
-			item["isPinned"] = pinned
+			item["isPinned"] = pinnedFiles[file["id"].(int64)]
 			if slice["canCollapse"] == int64(0) {
 				item["galleryCanCollapse"] = false
 			}

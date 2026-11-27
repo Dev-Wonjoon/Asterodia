@@ -45,7 +45,7 @@ type instagramPublicMedia struct {
 	CarouselCount *int                       `json:"carousel_media_count"`
 }
 
-func (g *GalleryDL) discoverInstagramPublic(ctx context.Context, shortcode string) (GalleryDLDiscovery, error) {
+func (g *InstagramExtractor) discoverInstagramPublic(ctx context.Context, shortcode string) (GalleryDLDiscovery, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	response, err := g.instagramGETWithAgent(ctx, "https://www.instagram.com/p/"+shortcode+"/", false, instagramPublicUserAgent)
@@ -53,11 +53,11 @@ func (g *GalleryDL) discoverInstagramPublic(ctx context.Context, shortcode strin
 		return GalleryDLDiscovery{}, err
 	}
 	defer response.Body.Close()
-	page, err := io.ReadAll(io.LimitReader(response.Body, instagramEmbedHTMLLimit+1))
+	page, err := io.ReadAll(io.LimitReader(response.Body, publicMediaHTMLLimit+1))
 	if err != nil {
 		return GalleryDLDiscovery{}, err
 	}
-	if len(page) > instagramEmbedHTMLLimit {
+	if len(page) > publicMediaHTMLLimit {
 		return GalleryDLDiscovery{}, ErrOutputLimit
 	}
 	return parseInstagramPublic(page, shortcode)

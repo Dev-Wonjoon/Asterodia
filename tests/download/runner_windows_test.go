@@ -154,9 +154,9 @@ func TestRunnerDiscoverAttempt(t *testing.T) {
 					result.YtdlpTargets[0].TargetKey != "youtube:BaW_jenozKc" {
 					t.Fatalf("yt-dlp 대상 불일치: %+v", result.YtdlpTargets)
 				}
-			} else if len(result.GalleryResult.Files) != 1 ||
-				result.GalleryResult.Files[0].URL != "https://cdn.invalid/image.png?token=abc" {
-				t.Fatalf("gallery-dl 대상 불일치: %+v", result.GalleryResult.Files)
+			} else if len(result.GalleryDLDiscovery.Files) != 1 ||
+				result.GalleryDLDiscovery.Files[0].URL != "https://cdn.invalid/image.png?token=abc" {
+				t.Fatalf("gallery-dl 대상 불일치: %+v", result.GalleryDLDiscovery.Files)
 			}
 		})
 	}
@@ -560,7 +560,7 @@ func TestRunnerEngineFallback(t *testing.T) {
 				if (attempt.Engine == engine.KindYtdlp) != tc.galleryFirst {
 					t.Fatal("실제 선택 엔진 미반영", attempt.Engine)
 				}
-				if tc.galleryFirst && len(attempt.GalleryResult.Files) != 0 {
+				if tc.galleryFirst && len(attempt.GalleryDLDiscovery.Files) != 0 {
 					t.Fatal("실패한 조회의 일부 대상이 다른 엔진의 계획에 섞였습니다")
 				}
 			} else if !errors.Is(err, tc.primaryError) || ytCalls != 0 || galleryCalls != 1 {

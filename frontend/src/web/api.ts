@@ -30,6 +30,7 @@ function summary(row: MediaSummaryDto): MediaSummaryDto {
     return { ...row, cover: row.cover ? { ...row.cover, path: `/api/files/${row.cover.fileId}/thumbnail` } : null, galleryFile: row.galleryFile ? fileDTO(row.galleryFile) : undefined }
 }
 const media: MediaApi = {
+    bulkEdit: unavailable,
     exploreAlbum: value => result(async () => {
         const query = filterParameters(value.filter)
         query.set('limit', String(value.limit ?? 100)); query.set('offset', String(value.offset ?? 0))

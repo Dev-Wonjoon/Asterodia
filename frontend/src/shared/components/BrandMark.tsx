@@ -1,11 +1,7 @@
 import mark from '@renderer/assets/asterodia.svg?url'
 
-/** The transparent source keeps its shape; currentColor follows the active theme. */
+/** Preserve the supplied colors and transparency in either theme. */
 export function BrandMark({ className = 'size-6' }: { className?: string }) {
-    return <span aria-hidden="true" className={`inline-block shrink-0 bg-current ${className}`} style={{
-        maskImage: `url("${mark}")`, WebkitMaskImage: `url("${mark}")`,
-        maskSize: 'contain', WebkitMaskSize: 'contain',
-        maskRepeat: 'no-repeat', WebkitMaskRepeat: 'no-repeat',
-        maskPosition: 'center', WebkitMaskPosition: 'center',
-    }} />
+    return <img src={mark} alt="" aria-hidden="true" draggable={false}
+        width={24} height={24} className={`inline-block shrink-0 object-contain ${className}`} />
 }

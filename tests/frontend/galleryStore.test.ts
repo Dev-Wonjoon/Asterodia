@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { describe, it } from 'vitest'
+import { describe, it, vi } from 'vitest'
 import type { MediaApi } from '@contracts/media-api'
 import type {
     MediaDetailDto,
@@ -593,7 +593,7 @@ describe('gallery store', () => {
             true
         )
 
-        assert.equal(store.getSnapshot().detail.offset, 0)
+        await vi.waitFor(() => assert.equal(store.getSnapshot().detail.offset, 0))
         assert.deepEqual(calls.get, [0, 50, 50, 0])
         assert.equal(store.getSnapshot().detail.data!.revision, 1)
     })
@@ -838,7 +838,7 @@ describe('gallery store', () => {
 
             assert.equal(store.getSnapshot().detail.mediaId, null)
 
-            assert.equal(store.getSnapshot().needsRefresh, true)
+            await vi.waitFor(() => assert.equal(store.getSnapshot().needsRefresh, true))
         })
     })
 })

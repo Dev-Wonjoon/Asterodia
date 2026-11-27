@@ -23,6 +23,8 @@ import type {
 import type { MoveSelection } from './file-move-api'
 
 export interface MediaApi {
+    bulkEdit?(request: MediaBulkEditRequest): Promise<MediaResult<MediaBulkEditResult>>
+    metadata?(request: { mediaIds: number[]; fileIds: number[]; changedMediaIds?: number[] }): Promise<MediaResult<{ media: MediaSummaryDto[]; files: MediaFileDto[] }>>
 	exploreAlbum(request: AlbumExploreRequest): Promise<MediaResult<AlbumExplorePage>>
     mergeAlbum(request: { title: string; selection: MoveSelection[] }): Promise<MediaResult<MediaSummaryDto>>
     albums(request?: MediaDirectoryListRequest): Promise<MediaResult<MediaPage<MediaSummaryDto>>>
@@ -44,4 +46,15 @@ export interface MediaApi {
     unregisterMedia(request: MediaUnregisterRequest): Promise<MediaResult<MediaUnregisterResult>>
 
     suggest(request: MediaSuggestionRequest): Promise<MediaResult<string[]>>
+}
+
+export interface MediaBulkEditRequest {
+    selection: { mediaId: number; revision: number }[]
+    addTags?: string[]
+    removeTags?: string[]
+    isFavorite?: boolean
+}
+export interface MediaBulkEditResult {
+    updated: { mediaId: number; revision: number }[]
+    failed: { mediaId: number; error: { code: import('./media-v2').MediaErrorCode; message: string; context: Record<string, number> } }[]
 }

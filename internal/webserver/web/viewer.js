@@ -134,7 +134,7 @@ export function mountMediaViewer({ mediaId, fileId, getSequence, getFile, conten
     function capture(pane) {
         return { mediaId: pane.mediaId, sequence: pane.sequence, queue: pane.queue, file: pane.file,
             auto: pane.auto, shuffle: pane.shuffle, repeat: pane.repeat, state: { ...pane.state }, pendingSequence: pane.pendingSequence,
-            playbackState: pane.nativeMedia ? { time: pane.nativeMedia.currentTime, rate: pane.nativeMedia.playbackRate, volume: pane.nativeMedia.volume, muted: pane.nativeMedia.muted } : pane.playbackState };
+            playbackState: pane.nativeMedia ? { time: pane.nativeMedia.currentTime, rate: pane.nativeMedia.playbackRate, volume: pane.nativeMedia.volume, muted: pane.nativeMedia.muted, repeat: pane.player?.getRepeatState() } : pane.playbackState };
     }
     function createViewport(pane, r, own) {
         clearViewport(pane);
@@ -170,7 +170,8 @@ export function mountMediaViewer({ mediaId, fileId, getSequence, getFile, conten
             if (file.kind === 'video' || file.kind === 'audio' && panes.length === 1 && !group) {
                 r.player = mountVideoPlayer(r === group ? sharedHost : r.playback, { src: contentURL(file), kind: file.kind,
                     title: file.title || r.sequence?.title || translate('viewer.open'), poster: thumbnailURL(file) || previewURL(file),
-                    keyboardSeek: false, externalScreen: file.kind === 'video', fullscreenAction: toggleExpanded });
+                    keyboardSeek: false, externalScreen: file.kind === 'video', fullscreenAction: toggleExpanded,
+                    repeatState: !reset ? r.playbackState?.repeat : undefined });
                 r.nativeMedia = r.player.video;
                 if (file.kind === 'video') r.nativeMedia.preload = 'auto';
                 if (!reset && r.playbackState) {
@@ -179,7 +180,7 @@ export function mountMediaViewer({ mediaId, fileId, getSequence, getFile, conten
                     const restoreTime = () => { if (valid(r, own) && saved.time > 0) media.currentTime = Math.min(saved.time, Number.isFinite(media.duration) ? media.duration : saved.time); };
                     if (media.readyState >= 1) restoreTime(); else media.addEventListener('loadedmetadata', restoreTime, { once: true });
                 }
-                r.nativeMedia.addEventListener('ended', () => { if (valid(r, own) && r.auto && r.queue.hasNext) { r.queue.next(); void show(r, true); } });
+                r.nativeMedia.addEventListener('ended', () => { if (valid(r, own) && !r.player?.isRepeating() && r.auto && r.queue.hasNext) { r.queue.next(); void show(r, true); } });
                 r.nativeMedia.addEventListener('error', () => { if (valid(r, own)) message(r, () => translate('viewer.cannotPlayThisFileYouCanMoveToThe')); });
             }
             for (const pane of views(r)) createViewport(pane, r, own);

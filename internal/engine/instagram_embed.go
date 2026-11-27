@@ -5,19 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/Dev-Wonjoon/Asterodia/internal/netguard"
 	"html"
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 )
-
-const instagramEmbedHTMLLimit = 8 << 20
 
 // The minimal agent receives the embeddable payload; a full browser agent can
 // instead receive the Instagram app shell without contextJSON.
@@ -58,60 +54,12 @@ type instagramEmbedMedia struct {
 
 // Every request is anonymous, including when a caller supplies a client with a
 // cookie jar. Redirects stay within Instagram or its media CDN, respectively.
-func (g *GalleryDL) instagramGET(ctx context.Context, address string, media bool) (*http.Response, error) {
+func (g *InstagramExtractor) instagramGET(ctx context.Context, address string, media bool) (*http.Response, error) {
 	return g.instagramGETWithAgent(ctx, address, media, instagramEmbedUserAgent)
 }
 
-func (g *GalleryDL) instagramGETWithAgent(ctx context.Context, address string, media bool, agent string) (*http.Response, error) {
-	parsed, err := url.Parse(address)
-	if err != nil || !instagramEmbedURLAllowed(parsed, media) {
-		return nil, fmt.Errorf("Instagram 응답에 허용되지 않은 주소가 있습니다")
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
-	if err != nil {
-		return nil, err
-	}
-	request.Header.Set("User-Agent", agent)
-	request.Header.Set("Accept", "*/*")
-	if !media {
-		request.Header.Set("Accept", "text/html")
-	}
-	client := *netguard.NewClient()
-	client.Timeout = 0
-	defer client.CloseIdleConnections()
-	if g.HTTPClient != nil {
-		client = *g.HTTPClient
-	}
-	client.Jar = nil
-	previousRedirect := client.CheckRedirect
-	client.CheckRedirect = func(next *http.Request, via []*http.Request) error {
-		if strings.HasPrefix(next.URL.Path, "/accounts/login") {
-			return ErrAuthenticationRequired
-		}
-		if len(via) >= 5 || !instagramEmbedURLAllowed(next.URL, media) {
-			return fmt.Errorf("Instagram 리다이렉트 주소가 잘못되었습니다")
-		}
-		if previousRedirect != nil {
-			return previousRedirect(next, via)
-		}
-		return nil
-	}
-	response, err := client.Do(request)
-	if err != nil {
-		// Avoid including signed CDN URLs in diagnostic messages.
-		if e, ok := err.(*url.Error); ok {
-			err = e.Err
-		}
-		return nil, fmt.Errorf("Instagram 요청 실패: %w", err)
-	}
-	if response.StatusCode != http.StatusOK {
-		response.Body.Close()
-		if classified := galleryDLFailure("", fmt.Sprintf("HTTP %d", response.StatusCode)); classified != nil {
-			return nil, classified
-		}
-		return nil, fmt.Errorf("Instagram 요청 실패: HTTP %d", response.StatusCode)
-	}
-	return response, nil
+func (g *InstagramExtractor) instagramGETWithAgent(ctx context.Context, address string, media bool, agent string) (*http.Response, error) {
+	return anonymousMediaGET(ctx, g.HTTPClient, address, media, agent, "Instagram", instagramEmbedURLAllowed)
 }
 
 func instagramEmbedURLAllowed(address *url.URL, media bool) bool {
@@ -126,7 +74,7 @@ func instagramEmbedURLAllowed(address *url.URL, media bool) bool {
 	return strings.HasSuffix(host, ".cdninstagram.com") || strings.HasSuffix(host, ".fbcdn.net")
 }
 
-func (g *GalleryDL) discoverInstagramEmbed(ctx context.Context, shortcode string) (GalleryDLDiscovery, error) {
+func (g *InstagramExtractor) discoverInstagramEmbed(ctx context.Context, shortcode string) (GalleryDLDiscovery, error) {
 	if err := ctx.Err(); err != nil {
 		return GalleryDLDiscovery{}, err
 	}
@@ -137,11 +85,11 @@ func (g *GalleryDL) discoverInstagramEmbed(ctx context.Context, shortcode string
 		return GalleryDLDiscovery{}, err
 	}
 	defer response.Body.Close()
-	page, err := io.ReadAll(io.LimitReader(response.Body, instagramEmbedHTMLLimit+1))
+	page, err := io.ReadAll(io.LimitReader(response.Body, publicMediaHTMLLimit+1))
 	if err != nil {
 		return GalleryDLDiscovery{}, err
 	}
-	if len(page) > instagramEmbedHTMLLimit {
+	if len(page) > publicMediaHTMLLimit {
 		return GalleryDLDiscovery{}, ErrOutputLimit
 	}
 	simple := false
@@ -331,7 +279,7 @@ func (post *instagramEmbedMedia) discovery(shortcode string) (GalleryDLDiscovery
 	if err != nil {
 		return GalleryDLDiscovery{}, err
 	}
-	discovery := GalleryDLDiscovery{Directories: []json.RawMessage{directory}, InstagramEmbed: true}
+	discovery := GalleryDLDiscovery{Directories: []json.RawMessage{directory}}
 	for i, node := range nodes {
 		if node == nil || node.IsVideo == nil || !galleryDLNumericID.MatchString(galleryDLIdentifier(node.ID)) {
 			return GalleryDLDiscovery{}, fmt.Errorf("Instagram 임베드에 개별 미디어 정보가 없습니다")
@@ -364,96 +312,13 @@ func (post *instagramEmbedMedia) discovery(shortcode string) (GalleryDLDiscovery
 	return discovery, nil
 }
 
-func (g *GalleryDL) downloadInstagramEmbed(ctx context.Context, originalURL string, expected GalleryDLDiscovery, stageDir string) (paths []string, resultErr error) {
-	targets, err := expected.InstagramTargets(originalURL)
-	if err != nil {
+func (g *InstagramExtractor) downloadInstagramEmbed(ctx context.Context, originalURL string, expected GalleryDLDiscovery, stageDir string) ([]string, error) {
+	if _, err := expected.InstagramTargets(originalURL); err != nil {
 		return nil, err
 	}
-	if !filepath.IsAbs(stageDir) {
-		return nil, fmt.Errorf("작업 폴더는 절대 경로여야 합니다")
-	}
-	entries, err := os.ReadDir(stageDir)
-	if err != nil {
-		return nil, err
-	}
-	if len(entries) != 0 {
-		return nil, fmt.Errorf("작업 폴더가 비어 있어야 합니다")
-	}
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-	defer cancel()
-	var createdFiles, createdDirs []string
-	defer func() {
-		if resultErr != nil {
-			// Remove only files/directories created by this operation, never the stage itself.
-			for _, path := range createdFiles {
-				_ = os.Remove(path)
-			}
-			for _, dir := range createdDirs {
-				_ = os.Remove(dir)
-			}
-		}
-	}()
-	for i, target := range targets {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-		file := expected.Files[target.FileIndex]
-		metadata := decodeMetadata(file.Metadata)
-		dir := filepath.Join(stageDir, fmt.Sprintf("item-%04d", i+1))
-		if err := os.Mkdir(dir, 0700); err != nil {
-			return nil, err
-		}
-		createdDirs = append(createdDirs, dir)
-		path := filepath.Join(dir, "media."+metadataText(metadata, "extension"))
-		partial := path + ".part"
-		out, err := os.OpenFile(partial, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
-		if err != nil {
-			return nil, err
-		}
-		createdFiles = append(createdFiles, partial)
-		err = g.saveInstagramMedia(ctx, file.URL, metadataText(metadata, "extension"), out)
-		closeErr := out.Close()
-		if err != nil {
-			return nil, fmt.Errorf("Instagram %d번째 파일 저장 실패: %w", i+1, err)
-		}
-		if closeErr != nil {
-			return nil, closeErr
-		}
-		if err := os.Rename(partial, path); err != nil {
-			return nil, err
-		}
-		createdFiles = append(createdFiles, path)
-		paths = append(paths, path)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	return paths, nil
+	return downloadDirectMedia(ctx, originalURL, expected, stageDir, "Instagram", g.saveInstagramMedia)
 }
 
-func (g *GalleryDL) saveInstagramMedia(ctx context.Context, address, extension string, out io.Writer) error {
-	response, err := g.instagramGET(ctx, address, true)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-	prefix := make([]byte, 512)
-	n, err := io.ReadFull(response.Body, prefix)
-	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
-		return err
-	}
-	prefix = prefix[:n]
-	typeName := http.DetectContentType(prefix)
-	wantType := map[string]string{"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "mp4": "video/mp4"}[extension]
-	if n == 0 || wantType == "" || typeName != wantType {
-		return fmt.Errorf("Instagram 응답이 요청한 사진·영상 파일이 아닙니다")
-	}
-	written, err := io.Copy(out, io.MultiReader(bytes.NewReader(prefix), response.Body))
-	if err != nil {
-		return err
-	}
-	if response.ContentLength >= 0 && written != response.ContentLength {
-		return io.ErrUnexpectedEOF
-	}
-	return ctx.Err()
+func (g *InstagramExtractor) saveInstagramMedia(ctx context.Context, address, extension string, out io.Writer) error {
+	return saveAnonymousMedia(ctx, address, extension, out, g.instagramGET, "Instagram")
 }
