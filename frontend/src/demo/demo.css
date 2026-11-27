@@ -1,0 +1,58 @@
+html, body, #root { margin: 0; width: 100%; height: 100%; }
+body { font-family: Inter, 'Segoe UI', system-ui, sans-serif; }
+button, a, input, select { -webkit-tap-highlight-color: transparent; }
+button { cursor: pointer; }
+button:disabled { cursor: default; }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+.demo-app { display: flex; flex-direction: column; height: 100dvh; min-height: 480px; color: var(--text-main); background: var(--bg-app); }
+.demo-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 24px; border-bottom: 1px solid var(--border-line); background: var(--bg-sidebar); }
+.demo-brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: -.03em; }
+.demo-brand img { border-radius: 6px; }
+.demo-brand small { display: block; font-size: 9px; letter-spacing: .18em; color: var(--text-muted); }
+.demo-tools { display: flex; align-items: center; gap: 10px; }
+.demo-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; }
+.demo-icon svg { width: 18px; height: 18px; }
+.demo-icon:hover, .demo-reset:hover { background: var(--bg-hover); }
+.demo-reset, .demo-install { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 12px; border: 1px solid var(--border-line); border-radius: 9px; font-size: 12px; }
+.demo-install { background: var(--text-main); color: var(--bg-app); border-color: transparent; }
+.demo-intro { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 22px 28px; background: var(--bg-sidebar); border-bottom: 1px solid var(--border-line); }
+.demo-eyebrow { color: var(--color-primary); font-size: 10px; font-weight: 700; letter-spacing: .14em; margin-bottom: 6px; }
+.demo-intro h1 { font-size: clamp(18px, 2vw, 25px); font-weight: 650; letter-spacing: -.04em; margin: 0 0 7px; }
+.demo-intro p:last-child { font-size: 12px; color: var(--text-muted); max-width: 740px; line-height: 1.6; }
+.demo-play { display: flex; align-items: center; gap: 8px; flex-shrink: 0; padding: 11px 16px; background: var(--color-primary); color: white; border-radius: 10px; font-size: 12px; font-weight: 600; transition: opacity .2s; }
+.demo-play:disabled { opacity: .45; }
+.demo-workspace { display: flex; flex: 1; min-height: 0; }
+.demo-sidebar { width: 184px; flex-shrink: 0; display: flex; flex-direction: column; padding: 18px 12px; background: var(--bg-sidebar); border-right: 1px solid var(--border-line); }
+.demo-sidebar nav { display: flex; flex-direction: column; gap: 5px; }
+.demo-sidebar nav button { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 9px; font-size: 13px; color: var(--text-muted); text-align: left; }
+.demo-sidebar nav button span { white-space: nowrap; }
+.demo-sidebar nav button svg { width: 18px; height: 18px; }
+.demo-sidebar nav button:hover, .demo-sidebar nav button[aria-current] { background: var(--bg-hover); color: var(--color-primary); }
+.demo-sidebar small { margin-left: auto; }
+.demo-sidebar p { margin-top: auto; padding: 24px 12px 16px; line-height: 1.8; font-size: 11px; color: var(--text-muted); }
+.demo-sidebar > a { font-size: 11px; padding: 0 12px; color: var(--text-muted); }
+.demo-main { flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
+.demo-main > div { height: 100%; }
+.demo-download { flex-shrink: 0; border-top: 1px solid var(--border-line); background: var(--bg-sidebar); }
+@media (max-width: 760px) {
+    .demo-header { padding: 10px 14px; gap: 6px; }
+    .demo-brand { font-size: 13px; gap: 6px; }
+    .demo-tools { gap: 3px; }
+    .demo-reset { padding: 8px; }
+    .demo-reset span, .demo-install { display: none; }
+    .demo-intro { padding: 14px 16px; gap: 12px; flex-wrap: wrap; }
+    .demo-intro p:last-child { font-size: 11px; }
+    .demo-eyebrow { display: none; }
+    .demo-play { padding: 8px 12px; }
+    .demo-workspace { flex-direction: column; }
+    .demo-sidebar { width: 100%; padding: 5px 8px; border-right: 0; border-bottom: 1px solid var(--border-line); }
+    .demo-sidebar nav { flex-direction: row; }
+    .demo-sidebar nav button { flex: 1; justify-content: center; font-size: 11px; padding: 9px 5px; gap: 6px; }
+    .demo-sidebar nav button svg { width: 15px; height: 15px; }
+    .demo-sidebar > p, .demo-sidebar > a { display: none; }
+}
+@media (max-width: 440px) {
+    .demo-header { flex-wrap: wrap; }
+    .demo-tools { margin-left: auto; flex-wrap: wrap; }
+    .demo-sidebar nav button { flex-direction: column; gap: 4px; }
+}

@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["vite/client"],
+    "paths": {
+      "@renderer/shared/api": ["./src/demo/api.ts"],
+      "@renderer/shared/utils/media": ["./src/demo/media.ts"],
+      "@renderer/*": ["./src/*"],
+      "@contracts/*": ["./src/contracts/*"]
+    }
+  },
+  "include": ["src/demo", "src/**/*.d.ts"],
+  "exclude": []
+}

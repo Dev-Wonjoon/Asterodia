@@ -79,7 +79,7 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="size-5" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
               <span data-i18n="download">Windows x64 다운로드</span>
             </a>
-            <a href="#screenshots" class="rounded-xl border border-(--border-line) bg-(--bg-sidebar) px-6 py-3.5 font-semibold hover:bg-(--bg-hover)" data-i18n="seeApp">화면 둘러보기</a>
+            <a href="./demo/" class="rounded-xl border border-(--border-line) bg-(--bg-sidebar) px-6 py-3.5 font-semibold hover:bg-(--bg-hover)" data-i18n="tryDemo">데모 체험하기</a>
           </div>
           <p class="mt-4 text-sm">
             <a href="https://github.com/Dev-Wonjoon/StorageBucket/releases/latest/download/StorageBucket-windows-arm64.exe" class="font-semibold text-(--pages-accent) underline decoration-(--pages-link-underline) underline-offset-4 hover:decoration-current" data-i18n="downloadArm64">Windows ARM64 다운로드</a>
@@ -173,7 +173,7 @@
         <h2 class="mb-8 text-2xl font-bold tracking-tight sm:text-3xl" data-i18n="faqTitle">궁금한 점이 있나요?</h2>
         <details class="group border-t border-(--border-line) py-5">
           <summary class="cursor-pointer text-lg font-semibold" data-i18n="faq1Title">이 웹사이트에서 앱을 사용할 수 있나요?</summary>
-          <p class="mt-4 leading-relaxed text-(--text-muted)" data-i18n="faq1Description">이곳은 StorageBucket 소개와 다운로드를 위한 페이지입니다. 미디어 다운로드와 라이브러리 관리는 설치한 데스크톱 앱에서 이용할 수 있습니다.</p>
+          <p class="mt-4 leading-relaxed text-(--text-muted)" data-i18n="faq1Description">데모에서 샘플 미디어로 갤러리, 앨범, 태그와 다운로드 진행을 체험할 수 있습니다. 실제 미디어 다운로드와 PC 라이브러리 관리는 설치한 데스크톱 앱에서 이용하세요.</p>
         </details>
         <details class="border-t border-(--border-line) py-5">
           <summary class="cursor-pointer text-lg font-semibold" data-i18n="faq2Title">모바일에서도 라이브러리를 볼 수 있나요?</summary>
@@ -206,7 +206,7 @@
         skip: 'Skip to content', nav: 'Main navigation', navFeatures: 'Features', navStart: 'Get started',
         eyebrow: 'YOUR PERSONAL MEDIA LIBRARY', heroLine1: 'Collect. Organize.', heroLine2: 'Keep your favorite moments together.',
         heroDescription: 'Download images, videos, and audio. Organize them with tags and albums, then create GIFs and animated WebP images — all in StorageBucket.',
-        download: 'Download for Windows x64', downloadArm64: 'Download for Windows ARM64', seeApp: 'Explore the app', heroNote: 'Desktop app · Open source · MIT license',
+        download: 'Download for Windows x64', downloadArm64: 'Download for Windows ARM64', tryDemo: 'Try the live demo', heroNote: 'Desktop app · Open source · MIT license',
         galleryOpen: 'View full-size gallery screenshot', galleryAlt: 'StorageBucket gallery and download progress', galleryCaption: 'Your downloads and media library, at a glance.',
         featuresEyebrow: 'BEYOND THE DOWNLOAD', featuresTitle: 'Give your media a place of its own.',
         downloadTitle: 'From a link to your library', downloadDescription: 'Download media from supported URLs with yt-dlp and gallery-dl. Follow progress, inspect logs, and retry failed tasks.', downloadNote: 'Supported sites and formats depend on the external engines.',
@@ -220,7 +220,7 @@
         step2Title: 'Install external tools', step2Description: 'Follow the engine setup prompt on first launch. You can also install and update tools in Settings → Engine Management.',
         step3Title: 'Choose a download folder', step3Description: 'In Settings, choose where to save your downloaded media.',
         step4Title: 'Add a link or import a folder', step4Description: 'Paste a media URL or register an existing local folder to start filling your library.',
-        faqTitle: 'A few things to know', faq1Title: 'Can I use the app on this website?', faq1Description: 'This is the introduction and download page for StorageBucket. Downloading media and managing your library happen in the installed desktop app.',
+        faqTitle: 'A few things to know', faq1Title: 'Can I use the app on this website?', faq1Description: 'Try the gallery, albums, tags, and simulated download progress with sample media in the demo. Install the desktop app to download real media and manage your PC library.',
         faq2Title: 'Can I browse my library on mobile?', faq2Description: 'Use the app’s local web server with a separately configured Tailscale connection. The desktop app must remain running, and playable formats depend on your browser.',
         faq3Title: 'Which external tools does it use?', faq3Description: 'StorageBucket uses yt-dlp and gallery-dl for downloads, and FFmpeg, FFprobe, and ImageMagick for media processing. Installing or updating tools requires an internet connection.',
         readGuide: 'Read the full guide', footerLicense: 'An open source project under the MIT license', footerNav: 'Project links', releases: 'Releases', issues: 'Report an issue', license: 'License',
