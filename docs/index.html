@@ -3,7 +3,50 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="StorageBucket — 미디어 다운로드부터 정리와 편집까지, 한곳에서. 이미지·영상·오디오를 관리하는 데스크톱 앱입니다.">
+  <meta name="description" content="StorageBucket은 Windows용 무료 오픈 소스 미디어 다운로더입니다. 이미지·영상·오디오를 다운로드하고 Instagram 프로필 앨범, 태그·즐겨찾기로 정리하세요. 앱 다운로드와 웹 데모를 제공합니다.">
+  <link rel="canonical" href="https://dev-wonjoon.github.io/StorageBucket/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="StorageBucket">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:url" content="https://dev-wonjoon.github.io/StorageBucket/">
+  <meta property="og:title" content="StorageBucket — 이미지·영상 다운로드와 미디어 관리">
+  <meta property="og:description" content="Windows용 무료 오픈 소스 미디어 다운로더. 이미지·영상·오디오를 다운로드하고 Instagram 프로필 앨범과 태그로 정리하세요. 웹 데모로 먼저 체험할 수 있습니다.">
+  <meta property="og:image" content="https://dev-wonjoon.github.io/StorageBucket/images/img1.png">
+  <meta property="og:image:width" content="986">
+  <meta property="og:image:height" content="611">
+  <meta property="og:image:alt" content="StorageBucket의 미디어 갤러리와 다운로드 진행 화면">
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "@id": "https://dev-wonjoon.github.io/StorageBucket/#software",
+      "name": "StorageBucket",
+      "url": "https://dev-wonjoon.github.io/StorageBucket/",
+      "description": "Windows용 무료 오픈 소스 미디어 다운로더. 이미지·영상·오디오 다운로드, Instagram 프로필 앨범, 태그·즐겨찾기와 GIF·WebP 편집을 지원합니다.",
+      "applicationCategory": "MultimediaApplication",
+      "operatingSystem": "Windows",
+      "inLanguage": ["ko", "en"],
+      "isAccessibleForFree": true,
+      "license": "https://github.com/Dev-Wonjoon/StorageBucket/blob/main/LICENSE",
+      "downloadUrl": "https://github.com/Dev-Wonjoon/StorageBucket/releases/latest",
+      "screenshot": "https://dev-wonjoon.github.io/StorageBucket/images/img1.png",
+      "image": "https://dev-wonjoon.github.io/StorageBucket/assets/icon.png",
+      "sameAs": "https://github.com/Dev-Wonjoon/StorageBucket",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD",
+        "url": "https://github.com/Dev-Wonjoon/StorageBucket/releases/latest"
+      },
+      "featureList": [
+        "이미지·영상·오디오 다운로드",
+        "Instagram 프로필별 앨범에 다운로드 추가",
+        "태그·즐겨찾기·사용자 앨범과 미디어 검색",
+        "이미지 뷰어와 영상·오디오 재생",
+        "GIF·애니메이션 WebP 생성과 영상 자르기"
+      ]
+    }
+  </script>
   <meta name="theme-color" content="#f8fafc">
   <script>
     (() => {
@@ -36,7 +79,7 @@
       });
     })();
   </script>
-  <title>StorageBucket — 미디어를 한곳에</title>
+  <title>StorageBucket — 이미지·영상 다운로드와 미디어 관리</title>
   <link rel="icon" type="image/x-icon" href="./assets/favicon.ico">
   <link rel="stylesheet" href="./assets/tailwind.css">
 </head>
@@ -68,12 +111,12 @@
     <section class="overflow-hidden border-b border-(--border-line)">
       <div class="mx-auto grid max-w-7xl items-center gap-12 px-5 py-16 sm:px-8 sm:py-24 lg:grid-cols-[0.85fr_1.15fr] lg:gap-14 lg:px-12 lg:py-28">
         <div>
-          <p class="mb-5 text-sm font-semibold tracking-wider text-(--pages-accent)" data-i18n="eyebrow">나만의 미디어 라이브러리</p>
-          <h1 class="text-4xl leading-tight font-bold tracking-tight text-balance sm:text-5xl lg:text-[3.4rem]">
-            <span class="block" data-i18n="heroLine1">모으고, 정리하고.</span>
-            <span class="mt-2 block text-(--pages-accent)" data-i18n="heroLine2">좋아하는 순간을 한곳에.</span>
+          <p class="mb-5 text-sm font-semibold tracking-wider text-(--pages-accent)" data-i18n="eyebrow">Windows용 무료 미디어 다운로더</p>
+          <h1 class="text-4xl leading-tight font-bold tracking-tight text-balance break-keep sm:text-5xl lg:text-[3.4rem]">
+            <span class="block" data-i18n="heroLine1">이미지·영상 다운로드,</span>
+            <span class="mt-2 block text-(--pages-accent)" data-i18n="heroLine2">정리까지 한곳에서.</span>
           </h1>
-          <p class="mt-6 max-w-lg text-lg leading-relaxed text-pretty text-(--text-muted)" data-i18n="heroDescription">이미지, 영상, 오디오를 다운로드하고 태그와 앨범으로 정리하세요. GIF·WebP 편집까지 StorageBucket에서 이어집니다.</p>
+          <p class="mt-6 max-w-lg text-lg leading-relaxed text-pretty text-(--text-muted)" data-i18n="heroDescription">StorageBucket으로 이미지·영상·오디오를 다운로드하고 태그와 앨범으로 정리하세요. Windows용 무료 오픈 소스 앱으로 GIF·WebP 편집도 이어집니다.</p>
           <div class="mt-8 flex flex-wrap items-center gap-3">
             <a href="https://github.com/Dev-Wonjoon/StorageBucket/releases/latest/download/StorageBucket-windows-amd64.exe" class="inline-flex items-center gap-2 rounded-xl bg-(--pages-button-bg) px-6 py-3.5 font-semibold text-white hover:brightness-110">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="size-5" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -108,7 +151,7 @@
         <article class="border-t border-(--border-line) pt-6">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mb-5 size-7 text-(--pages-accent)" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
           <h3 class="text-xl font-semibold" data-i18n="organizeTitle">찾기 쉬운 나만의 분류</h3>
-          <p class="mt-3 leading-relaxed text-(--text-muted)" data-i18n="organizeDescription">PC에 있는 폴더도 가져오세요. 태그, 즐겨찾기, 사용자 앨범으로 묶고 제목·작성자·플랫폼으로 원하는 미디어를 찾을 수 있습니다.</p>
+          <p class="mt-3 leading-relaxed text-(--text-muted)" data-i18n="organizeDescription">PC 폴더를 가져오거나 Instagram 다운로드를 프로필별 앨범에 계속 모으세요. 태그·즐겨찾기와 제목·작성자·플랫폼 검색으로 원하는 미디어를 찾으세요.</p>
           <p class="mt-4 text-sm leading-relaxed text-(--text-muted)" data-i18n="organizeNote">폴더 가져오기는 파일을 원래 위치에 그대로 둡니다.</p>
         </article>
         <article class="border-t border-(--border-line) pt-6">
@@ -204,13 +247,13 @@
     (() => {
       const english = {
         skip: 'Skip to content', nav: 'Main navigation', navFeatures: 'Features', navStart: 'Get started',
-        eyebrow: 'YOUR PERSONAL MEDIA LIBRARY', heroLine1: 'Collect. Organize.', heroLine2: 'Keep your favorite moments together.',
-        heroDescription: 'Download images, videos, and audio. Organize them with tags and albums, then create GIFs and animated WebP images — all in StorageBucket.',
+        eyebrow: 'FREE MEDIA DOWNLOADER FOR WINDOWS', heroLine1: 'Download your media.', heroLine2: 'Keep it organized.',
+        heroDescription: 'Download images, videos, and audio with StorageBucket. Organize them with tags and albums, then create GIFs and animated WebP images in a free, open source Windows app.',
         download: 'Download for Windows x64', downloadArm64: 'Download for Windows ARM64', tryDemo: 'Try the live demo', heroNote: 'Desktop app · Open source · MIT license',
         galleryOpen: 'View full-size gallery screenshot', galleryAlt: 'StorageBucket gallery and download progress', galleryCaption: 'Your downloads and media library, at a glance.',
         featuresEyebrow: 'BEYOND THE DOWNLOAD', featuresTitle: 'Give your media a place of its own.',
         downloadTitle: 'From a link to your library', downloadDescription: 'Download media from supported URLs with yt-dlp and gallery-dl. Follow progress, inspect logs, and retry failed tasks.', downloadNote: 'Supported sites and formats depend on the external engines.',
-        organizeTitle: 'Find it your way', organizeDescription: 'Bring in folders already on your PC. Organize with tags, favorites, and user albums, then search by title, author, or platform.', organizeNote: 'Folder imports register files in their existing locations.',
+        organizeTitle: 'Find it your way', organizeDescription: 'Import PC folders or keep appending Instagram downloads to profile albums. Organize with tags and favorites, then search by title, author, or platform.', organizeNote: 'Folder imports register files in their existing locations.',
         editTitle: 'Keep just the scene you love', editDescription: 'Create GIFs and animated WebP images from videos. Trim and crop your scenes, and preview the output quality before saving.', editNote: 'Save edited results while preserving the originals.',
         screenshotsTitle: 'Make more of the moments you keep.', editorOpen: 'View full-size WebP editor screenshot', editorAlt: 'StorageBucket WebP editor with range and crop controls',
         editorEyebrow: 'GIF · WEBP', editorTitle: 'For the scenes worth keeping.', editorDescription: 'Choose a range, crop the image, and exclude unwanted frames. Check the preview before saving your result.',
@@ -235,6 +278,12 @@
       const description = document.querySelector('meta[name="description"]');
       const koreanDescription = description.content;
       const koreanTitle = document.title;
+      const ogTitle = document.querySelector('meta[property="og:title"]');
+      const ogDescription = document.querySelector('meta[property="og:description"]');
+      const ogLocale = document.querySelector('meta[property="og:locale"]');
+      const ogImageAlt = document.querySelector('meta[property="og:image:alt"]');
+      const koreanOgDescription = ogDescription.content;
+      const koreanOgImageAlt = ogImageAlt.content;
       const themeToggle = document.getElementById('theme-toggle');
       const renderThemeControl = () => {
         const isDark = document.documentElement.classList.contains('dark');
@@ -258,8 +307,12 @@
           else element.textContent = value;
         }
         document.documentElement.lang = isEnglish ? 'en' : 'ko';
-        document.title = isEnglish ? 'StorageBucket — Your media, together' : koreanTitle;
-        description.content = isEnglish ? 'StorageBucket — Download, organize, and edit your media in one place. A desktop app for images, videos, and audio.' : koreanDescription;
+        document.title = isEnglish ? 'StorageBucket — Media Downloader and Organizer for Windows' : koreanTitle;
+        description.content = isEnglish ? 'StorageBucket is a free, open source media downloader for Windows. Download images, videos, and audio, organize Instagram profile albums, and manage tags and favorites. Try the web demo or download the app.' : koreanDescription;
+        ogTitle.content = document.title;
+        ogDescription.content = isEnglish ? description.content : koreanOgDescription;
+        ogLocale.content = isEnglish ? 'en_US' : 'ko_KR';
+        ogImageAlt.content = isEnglish ? 'StorageBucket media gallery and download progress' : koreanOgImageAlt;
         document.getElementById('readme').href = 'https://github.com/Dev-Wonjoon/StorageBucket/blob/main/' + (isEnglish ? 'README.md' : 'README.ko.md');
         button.textContent = isEnglish ? '한국어' : 'English';
         button.setAttribute('aria-label', isEnglish ? '한국어로 전환' : 'Switch to English');
