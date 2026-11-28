@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -105,6 +106,17 @@ func TestWindowsExecutableSwapAndRelaunchPreservesData(t *testing.T) {
 	for _, name := range []string{"Asterodia.exe", "StorageBucket.exe", "StorageBucket-windows-amd64.exe"} {
 		t.Run(name, func(t *testing.T) { testWindowsExecutableSwapAndRelaunch(t, name) })
 	}
+	t.Run("normalized-temp-path", func(t *testing.T) {
+		root := filepath.Join(t.TempDir(), "MixedCase")
+		if err := os.MkdirAll(root, 0700); err != nil {
+			t.Fatal(err)
+		}
+		// Windows may return a canonical path even when the launcher used a
+		// differently cased path or an 8.3 alias for the temporary directory.
+		t.Setenv("TMP", strings.ToLower(root))
+		t.Setenv("TEMP", strings.ToLower(root))
+		testWindowsExecutableSwapAndRelaunch(t, "StorageBucket.exe")
+	})
 }
 
 func testWindowsExecutableSwapAndRelaunch(t *testing.T, entryName string) {
@@ -147,9 +159,17 @@ func testWindowsExecutableSwapAndRelaunch(t *testing.T, entryName string) {
 		case <-time.After(25 * time.Millisecond):
 		}
 	}
-	restarted, _ := os.ReadFile(filepath.Join(root, "restarted"))
-	if string(restarted) != target {
-		t.Fatalf("restart retained the legacy executable name: %s", restarted)
+	restarted, err := os.ReadFile(filepath.Join(root, "restarted"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantInfo, err := os.Stat(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotInfo, err := os.Stat(string(restarted))
+	if err != nil || !os.SameFile(wantInfo, gotInfo) {
+		t.Fatalf("restart did not use canonical executable: got %q, want %q: %v", restarted, target, err)
 	}
 	arguments, _ := os.ReadFile(filepath.Join(root, "launch-args.json"))
 	if string(arguments) != `["--launch-probe","value with spaces"]` {
