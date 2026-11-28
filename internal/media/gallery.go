@@ -11,6 +11,9 @@ import (
 // Page the weighted album list first, then read only each intersecting file slice.
 // Even a very large expanded album never loads all of its file objects into Go.
 func listGallery(ctx context.Context, q queryer, req ListRequest, where string, args []any, limit int) api.Result {
+	if !validGallerySort(req.Sort) {
+		return failure(domainError("INVALID_ARGUMENT"))
+	}
 	// Search and favorites can still find nested albums directly. The ordinary
 	// gallery displays roots, with children reached through the album explorer.
 	if !req.FavoritesOnly && req.Filter.Keyword == "" && len(req.Filter.Tags) == 0 && len(req.Filter.Platforms) == 0 && len(req.Filter.Authors) == 0 && req.Filter.CreatedFrom == nil && req.Filter.CreatedTo == nil {
@@ -105,6 +108,9 @@ func listGallery(ctx context.Context, q queryer, req ListRequest, where string, 
         FROM albums
     ) `, visibleWhere, unpinnedWhere, visibleWhere, unpinnedWhere, unpinnedWhere, unpinnedWhere, where, pinEnabled, forced, forced, forced, viewWhere)
 	params := append([]any{string(raw)}, args...)
+	if req.Sort != "" {
+		return listSortedGallery(ctx, q, req, cte, params, limit)
+	}
 	var total int64
 	if err := q.QueryRowContext(ctx, cte+"SELECT coalesce(sum(slots),0) FROM albums", params...).Scan(&total); err != nil {
 		return failure(err)
@@ -188,6 +194,11 @@ func listGallery(ctx context.Context, q queryer, req ListRequest, where string, 
 				item["galleryCanCollapse"] = false
 			}
 			data = append(data, item)
+		}
+	}
+	if req.Details {
+		if err = enrichGalleryRows(ctx, q, data); err != nil {
+			return failure(err)
 		}
 	}
 	return api.Success(Object{"data": data, "total": total, "hasNextPage": int64(offset+len(data)) < total, "offset": offset})

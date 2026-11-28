@@ -69,13 +69,17 @@
 }
 
 /* Album layout effects are started explicitly by the gallery expansion hook. */
+.gallery-header-switch { animation: gallery-header-in 180ms ease both; }
+.gallery-header-switch[data-gallery-header-mode=normal] { --gallery-menu-offset: -10px; }
+.gallery-header-switch[data-gallery-header-mode=selection] { --gallery-menu-offset: 10px; }
+@keyframes gallery-header-in { from { opacity: 0; transform: translateY(var(--gallery-menu-offset)); } to { opacity: 1; transform: translateY(0); } }
 .motion-gallery-scroll { scrollbar-gutter: stable; }
 .motion-gallery-moving { will-change: transform; }
 .motion-gallery-entering { will-change: transform, opacity; }
 
 @media (prefers-reduced-motion: reduce) {
     .motion-page, .motion-backdrop, .motion-menu, .motion-modal,
-    .motion-panel, .motion-selection, .animate-slide-up { animation: none; }
+    .motion-panel, .motion-selection, .animate-slide-up, .gallery-header-switch { animation: none; }
     :where(button), .motion-control, .motion-card, .motion-sidebar, .motion-progress { transition: none; }
     :where(button):enabled:active { transform: none; }
     .motion-progress-indeterminate { animation: none; transform: translateX(100%); }

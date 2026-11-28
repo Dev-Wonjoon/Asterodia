@@ -16,6 +16,8 @@ import type { ContentFilters } from './media-v2';
 import type { CookieApi } from "./cookie-api";
 
 export interface AppApi {
+    onMediaMetadataUpdated?(listener: () => void): Unsubscribe;
+    windowFullscreen?: { enter(): Promise<boolean>; exit(): Promise<void>; onExit(listener: () => void): () => void };
     cookies: CookieApi;
     getContentFilters(): Promise<ContentFilters>;
     setContentFilters(value: ContentFilters): Promise<ContentFilters>;

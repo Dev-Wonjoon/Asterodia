@@ -23,7 +23,9 @@ export function formatTime(value) {
 }
 
 // Shared by the desktop WebView and the browser. Owns all listeners and timers.
-export function mountVideoPlayer(host, { src, kind = 'video', title = translate("media.videoTitle"), poster, onError, keyboardSeek = true, externalScreen = false, fullscreenAction, repeatState } = {}) {
+import { createFullscreenController } from './fullscreen.js';
+
+export function mountVideoPlayer(host, { src, kind = 'video', title = translate("media.videoTitle"), poster, onError, keyboardSeek = true, externalScreen = false, fullscreenAction, windowFullscreen, repeatState } = {}) {
     const doc = host.ownerDocument, root = doc.createElement('section');
     root.className = 'sb-player' + (kind === 'audio' ? ' sbp-audio' : ''); bindAttribute(root, 'aria-label', () => title + translate("player.player")); root.tabIndex = 0;
     const node = (tag, className, text) => { const el = doc.createElement(tag); if (className) el.className = className; if (typeof text === 'function') bindText(el, text); else if (text) bindText(el, () => text); return el; };
@@ -61,7 +63,31 @@ export function mountVideoPlayer(host, { src, kind = 'video', title = translate(
     const controls = node('div', 'sbp-controls');
     let clickTimer, hideTimer, feedbackTimer, lastTap = null, touchStart = null, lastTouch = -Infinity, seconds = readSeekSeconds(), destroyed = false;
     function showFeedback(text) { bindText(feedback, () => text); feedback.classList.add('is-visible'); clearTimeout(feedbackTimer); feedbackTimer = setTimeout(() => feedback.classList.remove('is-visible'), 900); }
-    function wake() { root.classList.add('is-awake'); clearTimeout(hideTimer); if (!video.paused) hideTimer = setTimeout(() => root.classList.remove('is-awake'), 2500); }
+    let immersive = false, keyboardFocus = false, pointerHeld = false;
+    function hideControls() {
+        if (destroyed) return;
+        if (immersive && (pointerHeld || !settings.hidden || !repeatPanel.hidden || keyboardFocus && overlay.contains(doc.activeElement))) return;
+        // Mouse clicks must not leave focus inside controls that are about to hide.
+        if (immersive && overlay.contains(doc.activeElement)) root.focus({ preventScroll: true });
+        clearTimeout(hideTimer); root.classList.remove('is-awake');
+        if (immersive) { overlay.inert = true; overlay.setAttribute('aria-hidden', 'true'); }
+    }
+    function wake(fromKeyboard) {
+        if (destroyed) return;
+        if (typeof fromKeyboard === 'boolean') keyboardFocus = fromKeyboard;
+        root.classList.add('is-awake'); overlay.inert = false; overlay.removeAttribute('aria-hidden');
+        clearTimeout(hideTimer);
+        if (immersive || !video.paused) hideTimer = setTimeout(hideControls, immersive ? 2000 : 2500);
+    }
+    function setFullscreen(value) {
+        if (immersive === value) return;
+        immersive = value; root.classList.toggle('is-immersive', value);
+        // Fullscreen controls overlay the picture; they never reserve video height.
+        (value ? overlay : root).append(jumps);
+        bindAttribute(fullscreen, 'aria-label', () => translate(value ? 'player.exitFullscreen' : 'player.fullscreen'));
+        bindAttribute(fullscreen, 'title', () => translate(value ? 'player.exitFullscreen' : 'player.fullscreen'));
+        wake(false);
+    }
     function togglePlay() {
         if (video.paused) { const pending = video.play(); pending?.catch(() => { if (!destroyed) { bindText(message, () => translate("player.couldNotStartPlaybackTryAgain")); message.hidden = false; } }); }
         else video.pause();
@@ -168,8 +194,9 @@ export function mountVideoPlayer(host, { src, kind = 'video', title = translate(
     let previousOverflow = '';
     function leaveExpanded() {
         if (!expandedDialog) return;
+        fullscreenController.exit();
         const dialog = expandedDialog; expandedDialog = null;
-        root.classList.remove('is-expanded'); host.append(root); dialog.remove();
+        root.classList.remove('is-expanded'); setFullscreen(false); host.append(root); dialog.remove();
         doc.body.style.overflow = previousOverflow;
         bindAttribute(fullscreen, 'aria-label', () => translate("player.fullscreen")); if (!destroyed) fullscreen.focus({ preventScroll: true }); wake();
     }
@@ -179,16 +206,14 @@ export function mountVideoPlayer(host, { src, kind = 'video', title = translate(
         previousOverflow = doc.body.style.overflow; doc.body.style.overflow = 'hidden';
         expandedDialog = dialog; doc.body.append(dialog); dialog.append(root); root.classList.add('is-expanded');
         on(dialog, 'close', leaveExpanded);
-        dialog.showModal(); bindAttribute(fullscreen, 'aria-label', () => translate("player.exitFullscreen")); root.focus(); wake();
+        dialog.showModal(); setFullscreen(true); root.focus(); wake();
     }
+    const fullscreenController = createFullscreenController(doc, windowFullscreen, () => { if (expandedDialog) expandedDialog.close(); }, () => { bindText(message, () => translate('player.fullscreenFailed')); message.hidden = false; });
     const fullscreen = button(() => (translate("player.fullscreen")), '⛶', async () => {
         if (fullscreenAction) { fullscreenAction(); return; }
-        if (expandedDialog) { expandedDialog.close(); return; }
-        try {
-            if (doc.fullscreenElement === root) await doc.exitFullscreen();
-            else if (root.requestFullscreen) await root.requestFullscreen();
-            else expandInWindow();
-        } catch { if (!destroyed) expandInWindow(); }
+        if (expandedDialog) { fullscreenController.exit(); expandedDialog.close(); return; }
+        expandInWindow();
+        void fullscreenController.enter();
     }, controls);
     icon(fullscreen, 'fullscreen');
     const jumps = node('div', 'sbp-jumps'); bindAttribute(jumps, 'aria-label', () => translate("player.seek"));
@@ -238,6 +263,8 @@ export function mountVideoPlayer(host, { src, kind = 'video', title = translate(
     function attachSurface(target, { focus = () => root.focus({ preventScroll: true }), bounds = () => target.getBoundingClientRect() } = {}) {
         const owned = [];
         const listen = (event, fn) => owned.push(on(target, event, fn));
+        listen('pointermove', () => wake(false));
+        listen('pointerdown', () => wake(false));
         function sideAt(x) { const r = bounds(); return x < r.left + r.width / 2 ? -1 : 1; }
         listen('click', event => {
             if (performance.now() - lastTouch < 700 || event.detail > 1) return;
@@ -273,11 +300,16 @@ export function mountVideoPlayer(host, { src, kind = 'video', title = translate(
     on(video, 'volumechange', audioChanged);
     on(video, 'play', () => { message.hidden = true; enforceRepeat(); sync(); scheduleRepeat(); wake(); }); on(video, 'pause', () => { clearTimeout(repeatTimer); sync(); wake(); });
     on(video, 'waiting', () => { bindText(message, () => translate("gallery.loading")); message.hidden = false; }); on(video, 'playing', () => { message.hidden = true; scheduleRepeat(); });
-    on(video, 'error', error); on(root, 'pointermove', wake); on(root, 'focusin', wake);
+    on(video, 'error', error); on(root, 'pointermove', () => wake(false)); on(root, 'focusin', () => wake());
+    on(root, 'focusout', () => wake());
+    on(root, 'pointerdown', () => { pointerHeld = true; wake(false); });
+    const releasePointer = () => { if (pointerHeld) { pointerHeld = false; wake(false); } };
+    on(doc, 'pointerup', releasePointer); on(doc, 'pointercancel', releasePointer);
     on(doc.defaultView, 'resize', positionRepeatPanel);
-    on(doc, 'fullscreenchange', () => { bindAttribute(fullscreen, 'aria-label', () => doc.fullscreenElement === root ? translate("player.exitFullscreen") : translate("player.fullscreen")); });
+    on(doc, 'fullscreenchange', () => { bindAttribute(fullscreen, 'aria-label', () => immersive ? translate("player.exitFullscreen") : translate("player.fullscreen")); });
     on(root, 'keydown', event => {
         if (event.defaultPrevented || isComposing(event)) return;
+        wake(true);
         if (event.key === 'Escape' && !repeatPanel.hidden) { event.preventDefault(); event.stopPropagation(); hideRepeatPanel(); repeatButton.focus(); return; }
         if (event.key === 'Escape' && !settings.hidden) { event.preventDefault(); event.stopPropagation(); settings.hidden = true; settingsButton.setAttribute('aria-expanded', 'false'); settingsButton.focus(); return; }
         if (event.target !== root && event.target !== video) return;
@@ -288,6 +320,7 @@ export function mountVideoPlayer(host, { src, kind = 'video', title = translate(
         }
     });
     function keyboardAction(id) {
+        wake(true);
         if (id === 'player.play' || id === 'player.playAlternative') togglePlay();
         if (id === 'player.backward' || id === 'player.forward') jump(id === 'player.backward' ? -5 : 5);
         if (id === 'player.mute') { video.muted = !video.muted; audioChanged(); }
@@ -295,9 +328,9 @@ export function mountVideoPlayer(host, { src, kind = 'video', title = translate(
     }
     overlay.append(seek, controls, repeatPanel); if (surface !== video) screen.append(surface); screen.append(video, feedback, message, overlay, settings); root.append(screen, jumps); host.append(root); sync(); wake();
     const stopLanguage = localizeWidget(root);
-    return { video, root, keyboardAction, attachSurface, isRepeating,
+    return { video, root, keyboardAction, attachSurface, isRepeating, setFullscreen, wakeControls: wake,
         getRepeatState: () => ({ mode: repeatMode, start: repeatStart, end: repeatEnd }),
         getPerformance: () => performanceStats.sample(),
         cancelGestures() { clearTimeout(clickTimer); lastTap = null; touchStart = null; },
-        destroy() { stopLanguage(); performanceStats.destroy(); destroyed = true; leaveExpanded(); clearTimeout(repeatTimer); clearTimeout(clickTimer); clearTimeout(hideTimer); clearTimeout(feedbackTimer); listeners.forEach(remove => remove()); if (doc.fullscreenElement === root) doc.exitFullscreen()?.catch(() => {}); video.pause(); video.removeAttribute('src'); video.load(); root.remove(); } };
+        destroy() { stopLanguage(); performanceStats.destroy(); destroyed = true; fullscreenController.destroy(); leaveExpanded(); clearTimeout(repeatTimer); clearTimeout(clickTimer); clearTimeout(hideTimer); clearTimeout(feedbackTimer); listeners.forEach(remove => remove()); if (doc.fullscreenElement === root) doc.exitFullscreen()?.catch(() => {}); video.pause(); video.removeAttribute('src'); video.load(); root.remove(); } };
 }

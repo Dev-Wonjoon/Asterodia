@@ -12,10 +12,12 @@ import (
 )
 
 type BulkEditRequest struct {
-	Selection  []AlbumSelection `json:"selection"`
-	AddTags    []string         `json:"addTags"`
-	RemoveTags []string         `json:"removeTags"`
-	IsFavorite *bool            `json:"isFavorite"`
+	Selection       []AlbumSelection `json:"selection"`
+	AddTags         []string         `json:"addTags"`
+	RemoveTags      []string         `json:"removeTags"`
+	AddPlatforms    []string         `json:"addPlatforms"`
+	RemovePlatforms []string         `json:"removePlatforms"`
+	IsFavorite      *bool            `json:"isFavorite"`
 }
 
 // BulkEdit commits one bounded batch. Known conflicts are reported per item;
@@ -26,7 +28,7 @@ func (s *Service) BulkEdit(ctx context.Context, req BulkEditRequest) api.Result 
 		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
 	}
 	defer leave()
-	if len(req.Selection) == 0 || len(req.Selection) > 200 || len(req.AddTags)+len(req.RemoveTags) > 100 || (len(req.AddTags)+len(req.RemoveTags) == 0 && req.IsFavorite == nil) {
+	if len(req.Selection) == 0 || len(req.Selection) > 200 || len(req.AddTags)+len(req.RemoveTags) > 100 || (len(req.AddTags)+len(req.RemoveTags)+len(req.AddPlatforms)+len(req.RemovePlatforms) == 0 && req.IsFavorite == nil) {
 		return failure(domainError("INVALID_ARGUMENT"))
 	}
 	for _, names := range [][]string{req.AddTags, req.RemoveTags} {
@@ -64,6 +66,9 @@ func (s *Service) BulkEdit(ctx context.Context, req BulkEditRequest) api.Result 
 	}
 	now := time.Now().UnixMilli()
 	if len(ids) > 0 {
+		if err = changePlatforms(ctx, tx, ids, PlatformChange{AddNames: req.AddPlatforms, RemoveNames: req.RemovePlatforms}); err != nil {
+			return failure(err)
+		}
 		in := "(" + placeholders(len(ids)) + ")"
 		for _, name := range req.RemoveTags {
 			if _, err = tx.ExecContext(ctx, "DELETE FROM media_tag WHERE media_id IN "+in+" AND tag_id IN (SELECT id FROM tag WHERE name=?)", append(append([]any{}, ids...), strings.TrimSpace(name))...); err != nil {
@@ -93,8 +98,39 @@ func (s *Service) BulkEdit(ctx context.Context, req BulkEditRequest) api.Result 
 			return failure(err)
 		}
 	}
+
+	if len(ids) > 0 {
+		for _, spec := range []struct{ table, column, key string }{{"media_tag", "tag_id", "tags"}, {"media_platform", "platform_id", "platforms"}} {
+			dictionary := "tag"
+			if spec.key == "platforms" {
+				dictionary = "platform"
+			}
+			rows, e := objects(ctx, tx, "SELECT x.media_id AS mediaId,t.id,t.name FROM "+spec.table+" x JOIN "+dictionary+" t ON t.id=x."+spec.column+" WHERE x.media_id IN ("+placeholders(len(ids))+") ORDER BY t.name,t.id", ids...)
+			if e != nil {
+				return failure(e)
+			}
+			byID := map[int64][]Object{}
+			for _, row := range rows {
+				id := row["mediaId"].(int64)
+				delete(row, "mediaId")
+				byID[id] = append(byID[id], row)
+			}
+			for _, row := range updated {
+				values := byID[row["mediaId"].(int64)]
+				if values == nil {
+					values = []Object{}
+				}
+				row[spec.key] = values
+			}
+		}
+	}
 	if err = tx.Commit(); err != nil {
 		return failure(err)
 	}
-	return api.Success(Object{"updated": updated, "failed": failed})
+	visibilityChanged := false
+	if s.contentFilters != nil {
+		hidden := s.contentFilters()
+		visibilityChanged = len(hidden.HiddenTags) > 0 || len(hidden.HiddenPlatforms) > 0
+	}
+	return api.Success(Object{"updated": updated, "failed": failed, "visibilityChanged": visibilityChanged})
 }

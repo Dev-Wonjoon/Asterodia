@@ -1,12 +1,13 @@
 import { translate, bindText, bindAttribute, localizeWidget } from './i18n.js';
 import { mountVideoPlayer } from './player.js';
+import { createFullscreenController } from './fullscreen.js';
 import { createViewerQueue } from './viewer-queue.js';
 import { isTextInput, isComposing, matchShortcut, blockingDialog } from './shortcuts.js';
 import { mountViewerViewport } from './viewer-viewport.js';
 import { mountViewerPicker } from './viewer-picker.js';
 
 // Adapters keep desktop paths and browser endpoints outside the shared viewer.
-export function mountMediaViewer({ mediaId, fileId, getSequence, getFile, contentURL, previewURL, thumbnailURL, listMedia, getAlbum, onClose = () => {} }) {
+export function mountMediaViewer({ mediaId, fileId, getSequence, getFile, contentURL, previewURL, thumbnailURL, listMedia, getAlbum, windowFullscreen, onClose = () => {} }) {
     const doc = document, previousFocus = doc.activeElement, oldOverflow = doc.body.style.overflow;
     for (const media of doc.querySelectorAll('audio,video')) media.pause();
     const node = (tag, cls, value) => { const el = doc.createElement(tag); if (cls) el.className = cls; if (value) bindText(el, typeof value === 'function' ? value : () => value); return el; };
@@ -68,7 +69,8 @@ export function mountMediaViewer({ mediaId, fileId, getSequence, getFile, conten
     }
     function controls() {
         const r = resource(), queue = r?.queue;
-        previous.disabled = !queue?.hasPrevious || r?.loading; next.disabled = !queue?.hasNext || r?.loading;
+        header.hidden = status.hidden = footer.hidden = expanded;
+        previous.disabled = !queue?.hasPrevious || r?.loading; next.disabled = !(queue?.count > 1) || r?.loading;
         auto.disabled = shuffle.disabled = repeat.disabled = !queue?.count || r?.loading;
         auto.checked = Boolean(r?.auto); shuffle.checked = Boolean(r?.shuffle); repeat.checked = Boolean(r?.repeat);
         bindText(count, () => queue?.count ? (queue.index + 1) + ' / ' + queue.count : '0 / 0');
@@ -86,7 +88,10 @@ export function mountMediaViewer({ mediaId, fileId, getSequence, getFile, conten
         separate.disabled = linked.disabled = expanded || Boolean(r?.loading) || !r?.queue;
         linked.disabled ||= r?.file?.kind === 'audio';
         sharedHost.hidden = !group?.player;
+        group?.player?.setFullscreen(expanded);
         panes.forEach((pane, index) => {
+            pane.toolbar.hidden = pane.status.hidden = expanded;
+            pane.player?.setFullscreen(expanded && pane === active && !group);
             const current = group || pane;
             bindText(pane.title, () => (index + 1) + '. ' + (current.file?.title || (current.loading ? translate('gallery.loading') : translate('viewer.emptyPane'))));
             bindAttribute(pane.body, 'aria-label', () => translate('viewer.pane', { number: index + 1 }));
@@ -107,7 +112,7 @@ export function mountMediaViewer({ mediaId, fileId, getSequence, getFile, conten
         const pane = { serial: 0, dead: false, loading: false, mediaId, auto: false, shuffle: false, repeat: false, ...snapshot,
             state: { ...(snapshot?.state || freshState()) }, viewport: null, player: null, detachSurface: null };
         pane.root = node('section', 'sbv-pane');
-        const toolbar = node('div', 'sbv-pane-toolbar'); pane.title = node('h3'); toolbar.append(pane.title);
+        const toolbar = pane.toolbar = node('div', 'sbv-pane-toolbar'); pane.title = node('h3'); toolbar.append(pane.title);
         pane.choose = button(() => translate('viewer.chooseMedia'), () => openPicker(pane), toolbar, 'sbv-choose');
         pane.zoomOut = button(null, () => zoom(pane, -1), toolbar, 'sbv-zoom'); magnifier(pane.zoomOut, false, () => translate('viewer.zoomOut'));
         pane.scale = node('output', 'sbv-scale'); toolbar.append(pane.scale);
@@ -213,9 +218,9 @@ export function mountMediaViewer({ mediaId, fileId, getSequence, getFile, conten
     }
     function navigate(direction) {
         const r = resource();
-        if (!r?.queue || r.loading || (direction < 0 ? !r.queue.hasPrevious : !r.queue.hasNext)) return;
+        if (!r?.queue || r.loading || (direction < 0 ? !r.queue.hasPrevious : r.queue.count < 2)) return;
         const playing = Boolean(r.nativeMedia && !r.nativeMedia.paused);
-        focusPane(); if (direction < 0) r.queue.previous(); else r.queue.next();
+        focusPane(); if (direction < 0) r.queue.previous(); else { if (r.queue.hasNext) r.queue.next(); else r.queue.jump(0); }
         void show(r, playing);
     }
     function jumpToFile() {
@@ -304,16 +309,18 @@ export function mountMediaViewer({ mediaId, fileId, getSequence, getFile, conten
         expanded = false; dialog.classList.remove('sbv-expanded'); controls(); focusPane();
         for (const pane of panes) pane.viewport?.render();
     }
+    const fullscreenController = createFullscreenController(doc, windowFullscreen, leaveExpanded, () => { const r = resource(); if (r) message(r, () => translate('player.fullscreenFailed')); });
     function toggleExpanded() {
-        if (expanded) { if (doc.fullscreenElement === dialog) doc.exitFullscreen?.()?.catch(() => {}); leaveExpanded(); return; }
+        if (expanded) { fullscreenController.exit(); leaveExpanded(); return; }
         expanded = true; dialog.classList.add('sbv-expanded'); controls(); focusPane();
-        dialog.requestFullscreen?.()?.catch(() => {});
+        void fullscreenController.enter();
         for (const pane of panes) pane.viewport?.render();
     }
-    const fullscreenChanged = () => { if (!doc.fullscreenElement && expanded) leaveExpanded(); };
     const cancel = event => { if (picker) return; if (expanded) { event.preventDefault(); toggleExpanded(); } };
+    const pointermove = () => { if (expanded) resource()?.player?.wakeControls(false); };
     const keydown = event => {
         if (event.defaultPrevented || isComposing(event) || !dialog.contains(event.target) || blockingDialog(doc) !== dialog || isTextInput(event.target)) return;
+        if (expanded && event.key === 'Tab') resource()?.player?.wakeControls(true);
         // The minimap rectangle owns arrows while it has keyboard focus.
         if (event.target.closest?.('[data-minimap-control]') && !event.ctrlKey && !event.metaKey && !event.altKey && event.key.startsWith('Arrow')) return;
         const item = matchShortcut(event, 'viewer');
@@ -329,14 +336,14 @@ export function mountMediaViewer({ mediaId, fileId, getSequence, getFile, conten
         event.preventDefault(); event.stopImmediatePropagation();
         if (mediaKey.id === 'player.fullscreen') toggleExpanded(); else r.player.keyboardAction(mediaKey.id);
     };
-    doc.addEventListener('keydown', keydown, true); doc.addEventListener('fullscreenchange', fullscreenChanged); dialog.addEventListener('cancel', cancel);
+    doc.addEventListener('keydown', keydown, true); dialog.addEventListener('cancel', cancel); dialog.addEventListener('pointermove', pointermove);
     const stopLanguage = localizeWidget(dialog);
     function destroy() {
         if (destroyed) return; destroyed = true; picker?.destroy(); stopLanguage();
         if (group) { group.dead = true; group.serial++; stop(group); }
         for (const pane of panes) disposePane(pane);
-        doc.removeEventListener('keydown', keydown, true); doc.removeEventListener('fullscreenchange', fullscreenChanged); dialog.removeEventListener('cancel', cancel); dialog.removeEventListener('close', closed);
-        if (doc.fullscreenElement === dialog) doc.exitFullscreen?.()?.catch(() => {});
+        doc.removeEventListener('keydown', keydown, true); dialog.removeEventListener('cancel', cancel); dialog.removeEventListener('pointermove', pointermove); dialog.removeEventListener('close', closed);
+        fullscreenController.destroy();
         dialog.remove(); doc.body.style.overflow = oldOverflow;
         if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
     }

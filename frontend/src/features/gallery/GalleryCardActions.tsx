@@ -5,6 +5,7 @@ import { Ellipsis, FolderOpen, Pencil, Star, Pin, Tags, Trash2, Info, Play, List
 import { ActionContent } from '@renderer/shared/components/ui/ActionButton'
 
 interface GalleryCardActionsProps {
+    compact?: boolean
     keyboardShortcuts?: boolean
     primaryActions?: ReactNode
     title: string
@@ -35,6 +36,7 @@ interface GalleryCardActionsProps {
 }
 
 export function GalleryCardActions({
+    compact = false,
     keyboardShortcuts = false,
     primaryActions,
     title,
@@ -108,7 +110,7 @@ export function GalleryCardActions({
             ref={root}
             data-detail-trigger
             data-action-boundary
-            className="gallery-card-utilities relative flex flex-nowrap items-center gap-0.5 border-t border-[var(--border-line)] px-2 py-1.5 text-sm"
+            className={compact ? 'gallery-card-utilities relative flex items-center justify-center text-sm [&>label]:hidden [&>button:not([data-card-menu])]:hidden' : 'gallery-card-utilities relative flex flex-nowrap items-center gap-0.5 border-t border-[var(--border-line)] px-2 py-1.5 text-sm'}
             onClick={(event) => event.stopPropagation()}
             onKeyDown={(event) => {
                 if (!open) return

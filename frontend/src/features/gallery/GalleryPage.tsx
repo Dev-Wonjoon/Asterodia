@@ -27,6 +27,8 @@ import { getApi } from '@renderer/shared/api'
 import { LocalImportPanel, type LocalImportControls } from '@renderer/features/localimport/LocalImportPanel'
 import { GalleryToolbar } from './GalleryToolbar'
 import { GallerySelectionBar } from './GallerySelectionBar'
+import { useGalleryPreferences } from './useGalleryPreferences'
+import { GalleryDetailsHeading } from './GalleryDetailCells'
 import { GalleryBulkDialog } from './GalleryBulkDialog'
 import { useGalleryBulkActions, type BulkCommand } from './useGalleryBulkActions'
 import { ActionButton } from '@renderer/shared/components/ui/ActionButton'
@@ -66,7 +68,9 @@ export const GalleryPage = ({
     const generation = useRef(0)
     const [galleryView, setGalleryView] = useState<GalleryView>('all')
     const [showAlbumFiles, setShowAlbumFiles] = useState(false)
-    const { store, snapshot: state, openInFolder, downloads, contentVisibility } = useGalleryViewModel(favoritesOnly, filter, galleryView, showAlbumFiles)
+    const presentation = useGalleryPreferences()
+    const details = presentation.layout === 'details'
+    const { store, snapshot: state, openInFolder, downloads, contentVisibility } = useGalleryViewModel(favoritesOnly, filter, galleryView, showAlbumFiles, { sort: presentation.sort, descending: presentation.descending, details })
     const activeJobs = useMemo(() => !favoritesOnly && !filter && galleryView === 'all' ? downloads.activeJobs : [], [favoritesOnly, filter, galleryView, downloads.activeJobs])
     const [downloadDetailId, setDownloadDetailId] = useState<string | null>(null)
     useEffect(() => () => downloads.closeDetail(), [downloads.closeDetail])
@@ -99,10 +103,16 @@ export const GalleryPage = ({
         return items
     }, [state.list.page.data, activeJobs])
     const galleryKeys = useMemo(() => galleryItems.map(item => item.kind === 'media' ? galleryDisplayKey(item.media) : 'download:' + item.job.id), [galleryItems])
-    const virtual = useVirtualGallery(pointerSelection.gridRef, listScrollRef, galleryKeys, galleryGeometry)
+    const virtual = useVirtualGallery(pointerSelection.gridRef, listScrollRef, galleryKeys, galleryGeometry, presentation.layout)
     const keyboardFocus = useGalleryKeyboardFocus(pointerSelection.gridRef, state.list.page.data, virtual.indices.join(','))
     const selection = pointerSelection.groups
     const albumFileIds = pointerSelection.fileIds
+    const selectionActive = selection.length + albumFileIds.length > 0 || pointerSelection.dragging
+    const selectSort = (sort: import('@contracts/media-v2').GallerySort) => {
+        clearSelection()
+        presentation.update({ sort, descending: sort === 'registered' || sort === 'fileCreated' })
+        listScrollRef.current?.scrollTo({ top: 0 })
+    }
     const albumControls = useRef<AlbumControls>(null)
     const mediaEditControls = useRef<MediaEditControls>(null)
     const mediaEditRequest = useRef(0), mediaEditPending = useRef(false)
@@ -111,7 +121,7 @@ export const GalleryPage = ({
     const closeViewer = useCallback(() => setViewer(null), [])
     useLayoutEffect(() => setViewer(null), [contentVisibility?.key, contentVisibility?.showHidden])
 
-    const [tagCommand, setTagCommand] = useState<'addTags' | 'removeTags' | null>(null)
+    const [tagCommand, setTagCommand] = useState<'addTags' | 'removeTags' | 'addPlatforms' | 'removePlatforms' | null>(null)
     const importControls = useRef<LocalImportControls>(null)
     const moveControls = useRef<FileMoveControls>(null)
     const [importBusy, setImportBusy] = useState(false)
@@ -492,7 +502,7 @@ export const GalleryPage = ({
     }
     const onBulk = (command: BulkCommand) => {
         if (toolbarDisabled) return
-        if (command === 'addTags' || command === 'removeTags') setTagCommand(command)
+        if (command === 'addTags' || command === 'removeTags' || command === 'addPlatforms' || command === 'removePlatforms') setTagCommand(command)
         else void bulk.run(command)
     }
 
@@ -526,6 +536,29 @@ export const GalleryPage = ({
             onClose={closeDetail}
             listRef={listScrollRef}
             closeDisabled={state.busy || bulk.busy || moveBusy || albumDropBusy || tagCommand !== null}
+            listHeader={
+                <header data-action-boundary className="flex h-11 min-w-0 items-center gap-2 bg-[var(--bg-app)]">
+                    <h1 className="shrink-0 text-lg font-semibold">{title}</h1>
+                    <MediaEditLauncher compact controlRef={mediaEditControls} disabled={state.busy || bulk.busy || moveBusy || albumDropBusy || draftDirty} />
+                    <AlbumManager selection={selection} fileIds={albumFileIds} disabled={toolbarDisabled} controlRef={albumControls} showSelectionActions={false}
+                        onChanged={(id, deleted) => { if (deleted && store.getSnapshot().detail.mediaId === id) store.closeDetail(); void store.refresh() }} onClear={clearSelection} />
+                    <div data-gallery-selection-dock className="min-w-0 flex-1">
+                    {selectionActive ? <div key="selection" data-gallery-header-mode="selection" className="gallery-header-switch">
+                        <GallerySelectionBar active={pointerSelection.dragging} count={pointerSelection.dragging ? pointerSelection.entries.size : selection.length + albumFileIds.length} groupCount={selection.length} fileCount={albumFileIds.length} total={list.status === 'ready' ? list.page.total : null} disabled={pageDisabled || pointerSelection.dragging}
+                            recoveryDisabled={state.busy || bulk.busy || moveBusy || albumDropBusy || draftDirty || pointerSelection.dragging} onRefresh={() => { clearSelection(); void store.refresh() }}
+                            removalLabel={removalLabel(selectedRemovalCounts([...pointerSelection.entries.values()], list.page.data))}
+                            onAdd={() => albumControls.current?.addSelection()} onMove={gatherSelection} onMerge={() => { if (!pageDisabled) setMergeSelection(selectedTargets()) }} onClear={clearSelection} onBulk={onBulk} />
+                    </div> : <div key="normal" data-gallery-header-mode="normal" data-gallery-toolbar className="gallery-header-switch"><GalleryToolbar count={selection.length + albumFileIds.length} disabled={state.busy || bulk.busy || moveBusy || albumDropBusy || draftDirty} actionDisabled={state.needsRefresh || list.status !== 'ready'} importDisabled={importBusy || state.needsRefresh} canImport={!favoritesOnly} hasImportResult={hasImportResult}
+                        presentation={{ ...presentation, onLayout: layout => { clearSelection(); presentation.update({ layout }); listScrollRef.current?.scrollTo({ top: 0 }) }, onSort: selectSort, onDescending: descending => presentation.update({ descending }) }}
+                        galleryView={galleryView} showAlbumFiles={showAlbumFiles} viewDisabled={pageDisabled || tagCommand !== null}
+                        onViewChange={setGalleryView} onShowAlbumFilesChange={setShowAlbumFiles}
+                        editorDisabled={mediaEditLoading} onOpenEditor={() => { setMediaEditError(''); mediaEditControls.current?.open() }}
+                        onImport={() => importControls.current?.choose()} onRecentImport={() => importControls.current?.reopen()}
+                        onSelectAll={pointerSelection.all}
+                        onClear={clearSelection} onRefresh={() => { clearSelection(); void store.refresh() }} /></div>}
+                    </div>
+                </header>
+            }
             detail={
                 downloadDetailId !== null ? <DownloadDetailPane /> : state.detail.mediaId !== null ? (
                     <MediaDetailPane
@@ -545,25 +578,10 @@ export const GalleryPage = ({
             }
         >
             <div className="space-y-5 pb-6">
-                <header data-action-boundary className="flex flex-wrap items-center gap-3 bg-[var(--bg-app)]">
-                    <h1 className="shrink-0 text-lg font-semibold">{title}</h1>
-                    <MediaEditLauncher compact controlRef={mediaEditControls} disabled={state.busy || bulk.busy || moveBusy || albumDropBusy || draftDirty} />
-
-                    <div data-gallery-toolbar className="ml-auto shrink-0"><GalleryToolbar count={selection.length + albumFileIds.length} disabled={state.busy || bulk.busy || moveBusy || albumDropBusy || draftDirty} actionDisabled={state.needsRefresh || list.status !== 'ready'} importDisabled={importBusy || state.needsRefresh} canImport={!favoritesOnly} hasImportResult={hasImportResult}
-                        galleryView={galleryView} showAlbumFiles={showAlbumFiles} viewDisabled={pageDisabled || tagCommand !== null}
-                        onViewChange={setGalleryView} onShowAlbumFilesChange={setShowAlbumFiles}
-                        editorDisabled={mediaEditLoading} onOpenEditor={() => { setMediaEditError(''); mediaEditControls.current?.open() }}
-                        onImport={() => importControls.current?.choose()} onRecentImport={() => importControls.current?.reopen()}
-                        onSelectAll={pointerSelection.all}
-                        onClear={clearSelection} onRefresh={() => { clearSelection(); void store.refresh() }} /></div>
-                </header>
                 {contentVisibility && <ContentFilterNotice visibility={contentVisibility} disabled={pageDisabled || draftDirty || viewer !== null} />}
                 {mediaEditLoading && <p role="status" className="text-sm text-[var(--text-muted)]">{translate("gallery.loadingVideo")}</p>}
                 {mediaEditError && <p role="alert" className="text-sm text-red-500">{translateMessage(mediaEditError)}</p>}
                 {cardError && <p role="alert" className="text-sm text-red-500">{translateMessage(cardError)}</p>}
-
-                <AlbumManager selection={selection} fileIds={albumFileIds} disabled={toolbarDisabled} controlRef={albumControls} showSelectionActions={false}
-                    onChanged={(id, deleted) => { if (deleted && store.getSnapshot().detail.mediaId === id) store.closeDetail(); void store.refresh() }} onClear={clearSelection} />
 
                 {!favoritesOnly && <LocalImportPanel compact controlRef={importControls} onBusyChange={setImportBusy} onHasResultChange={setHasImportResult} disabled={draftDirty || state.busy || bulk.busy || moveBusy || albumDropBusy} onComplete={() => requestGalleryRefresh.current()} />}
                 <FileMovePanel compact controlRef={moveControls} onBusyChange={setMoveBusy} selection={selection} disabled={draftDirty || state.busy || bulk.busy || albumDropBusy || state.needsRefresh} onCreated={clearSelection} onChanged={() => requestGalleryRefresh.current()} />
@@ -572,7 +590,7 @@ export const GalleryPage = ({
                     <p role="status">{translate("gallery.succeededFailed", { succeeded: bulk.result.succeeded.length, failed: bulk.result.failed.length })}</p>
                     {bulk.result.failed.length > 0 && <><p className="mt-1 text-[var(--text-muted)]">{translate("gallery.failedItemsRemainSelectedIfThereAreConflictingChanges")}</p><ul className="mt-2 max-h-40 overflow-auto">{bulk.result.failed.map(item => <li key={item.mediaId}>{translate("gallery.post", { mediaId: item.mediaId, message: item.message })}</li>)}</ul></>}
                 </section>}
-                {tagCommand && <GalleryBulkDialog count={selection.length} remove={tagCommand === 'removeTags'} onClose={() => setTagCommand(null)} onApply={names => { const command = tagCommand; setTagCommand(null); if (!toolbarDisabled) void bulk.run(command, names) }} />}
+                {tagCommand && <GalleryBulkDialog count={selection.length} remove={tagCommand === 'removeTags' || tagCommand === 'removePlatforms'} kind={tagCommand.includes('Platforms') ? 'platforms' : 'tags'} onClose={() => setTagCommand(null)} onApply={names => { const command = tagCommand; setTagCommand(null); if (!toolbarDisabled) void bulk.run(command, names) }} />}
 
                 {state.notice && (
                     <p role="status" className="text-sm">
@@ -609,15 +627,8 @@ export const GalleryPage = ({
                 )}
 
                 {pointerSelection.rectangle && <div aria-hidden="true" className="pointer-events-none fixed z-50 border border-[var(--color-primary)] bg-[var(--color-primary)]/15" style={pointerSelection.rectangle} />}
+                {details && <GalleryDetailsHeading sort={presentation.sort} descending={presentation.descending} onSort={sort => sort === presentation.sort ? presentation.update({ descending: !presentation.descending }) : selectSort(sort)} />}
                 <div className="relative isolate">
-                {/* A zero-height dock keeps selection changes from moving the cards during a drag. */}
-                <div data-gallery-selection-dock className="pointer-events-none sticky top-3 z-20 h-0">
-                    <div className="absolute inset-x-0 top-0 flex justify-center">
-                        <GallerySelectionBar count={selection.length + albumFileIds.length} groupCount={selection.length} fileCount={albumFileIds.length} total={list.status === 'ready' ? list.page.total : null} disabled={pageDisabled || pointerSelection.dragging}
-                            removalLabel={removalLabel(selectedRemovalCounts([...pointerSelection.entries.values()], list.page.data))}
-                            onAdd={() => albumControls.current?.addSelection()} onMove={gatherSelection} onMerge={() => { if (!pageDisabled) setMergeSelection(selectedTargets()) }} onClear={clearSelection} onBulk={onBulk} />
-                    </div>
-                </div>
                 <div ref={pointerSelection.gridRef} className={galleryGridClass + ' motion-gallery-grid min-h-32'} style={virtual.style}
                     onDragOver={event => { if (!event.defaultPrevented) event.dataTransfer.dropEffect = 'none' }}
                     onDrop={event => event.preventDefault()}>
@@ -626,12 +637,13 @@ export const GalleryPage = ({
                         if (item.kind === 'download') {
                             const { job } = item
                             return <div key={'download:' + job.id} data-gallery-key={'download:' + job.id} style={virtual.slotStyle(index)}>
-                                <GalleryDownloadCard job={job} selected={downloadDetailId === job.id} disabled={disabled || moveBusy || tagCommand !== null} cancelling={downloads.cancellingIds.includes(job.id)} onOpen={() => { void openDownload(job.id) }} onCancel={() => downloads.cancelDownload(job.id)} />
+                                <GalleryDownloadCard details={details} job={job} selected={downloadDetailId === job.id} disabled={disabled || moveBusy || tagCommand !== null} cancelling={downloads.cancellingIds.includes(job.id)} onOpen={() => { void openDownload(job.id) }} onCancel={() => downloads.cancelDownload(job.id)} />
                             </div>
                         }
                         const { media } = item
                         return <div key={galleryDisplayKey(media)} data-gallery-key={galleryDisplayKey(media)} style={virtual.slotStyle(index)}>
                         <GalleryCard
+                            details={details}
                             key={media.galleryFile ? `album:${media.id}:file:${media.galleryFile.id}` : `album:${media.id}`}
                             media={media}
                             selected={pointerSelection.entries.has(gallerySelectionKey(media))}
@@ -654,12 +666,13 @@ export const GalleryPage = ({
                             onView={() => setViewer({ mediaId: media.id, fileId: media.galleryFile?.id })}
                             onOpen={!media.galleryFile ? () => { void openAlbum(media.id) } : undefined}
                             onDetails={() => { void selectDetail(media.id, media.galleryFileOffset) }}
-                            selection={!media.galleryFile && <label className="absolute right-2 top-2 z-10 flex size-7 items-center justify-center rounded-lg bg-[var(--bg-sidebar)] shadow-sm hover:bg-[var(--bg-hover)]" onClick={event => event.stopPropagation()}>
-                                <input type="checkbox" data-gallery-select className="peer absolute inset-0 m-0 size-full cursor-pointer opacity-0 disabled:cursor-default" aria-label={media.title + translate("gallery.suffix.select")} checked={pointerSelection.entries.has(gallerySelectionKey(media))} disabled={toolbarDisabled} onChange={() => {}} onClick={event => pointerSelection.select(media, event, true)} />
+                            selection={(!media.galleryFile || details) && <label className={(details ? 'absolute left-1 top-1/2 -translate-y-1/2 ' : 'absolute right-2 top-2 ') + 'z-10 flex size-7 items-center justify-center rounded-lg bg-[var(--bg-sidebar)] shadow-sm hover:bg-[var(--bg-hover)]'} onClick={event => event.stopPropagation()}>
+                                <input type="checkbox" data-gallery-select className="peer absolute inset-0 m-0 size-full cursor-pointer opacity-0 disabled:cursor-default" aria-label={(media.galleryFile?.title || media.galleryFile?.relativePath || media.galleryFile?.fileKey || media.title) + translate("gallery.suffix.select")} checked={pointerSelection.entries.has(gallerySelectionKey(media))} disabled={toolbarDisabled} onChange={() => {}} onClick={event => pointerSelection.select(media, event, true)} />
                                 <CardSelectionIcon selected={pointerSelection.entries.has(gallerySelectionKey(media))} />
                             </label>}
                         >
                             <GalleryCardActions
+                                compact={details}
                                 keyboardShortcuts
                                 primaryActions={<>
                                     <ActionButton className="gallery-card-action" icon={<Play />} label={translate("viewer.open")} disabled={pageDisabled || media.fileCount === 0} onClick={() => setViewer({ mediaId: media.id, fileId: media.galleryFile?.id })} />

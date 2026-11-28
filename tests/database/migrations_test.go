@@ -5,7 +5,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -57,6 +59,19 @@ func rawDB(t *testing.T, path string) *sql.DB {
 }
 func execDB(t *testing.T, db *sql.DB, query string, args ...any) {
 	t.Helper()
+	// Historical fixtures start from latestDB, then remove newer schema features.
+	// Keep additive v15 objects out of fixtures representing shipped older versions.
+	if match := regexp.MustCompile(`(?i)PRAGMA\s+user_version\s*=\s*(\d+)`).FindStringSubmatch(query); len(match) > 0 {
+		version, _ := strconv.Atoi(match[1])
+		if version < 16 {
+			if _, err := db.Exec(`DROP TRIGGER IF EXISTS file_metadata_insert;DROP TRIGGER IF EXISTS file_metadata_update;DROP VIEW IF EXISTS gallery_file_membership;DROP TABLE IF EXISTS file_metadata;DROP INDEX IF EXISTS idx_media_title_order;`); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if version < 15 {
+			stripV15Fixture(t, db)
+		}
+	}
 	if _, e := db.Exec(query, args...); e != nil {
 		t.Fatalf("SQL 실패: %v\n%s", e, query)
 	}
@@ -133,7 +148,7 @@ func TestV4MigrationProcessCrash(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if countDB(t, db, "PRAGMA user_version") != 14 || countDB(t, db, "SELECT count(*) FROM media_file WHERE media_id=7 AND directory_id IS NOT NULL AND length(file_uuid)=36 AND length(filename_token)=8") != 1 {
+	if countDB(t, db, "PRAGMA user_version") != 16 || countDB(t, db, "SELECT count(*) FROM media_file WHERE media_id=7 AND directory_id IS NOT NULL AND length(file_uuid)=36 AND length(filename_token)=8") != 1 {
 		t.Fatal("v4 이관 재시작 실패")
 	}
 	assertHealthyDB(t, db)
@@ -153,5 +168,31 @@ func TestUnknownFTSPrefixTableIsRejected(t *testing.T) {
 	db = rawDB(t, path)
 	if countDB(t, db, "SELECT count(*) FROM media_fts_custom WHERE value='keep'") != 1 {
 		t.Fatal("미확인 데이터 유실")
+	}
+}
+
+func stripV15Fixture(t *testing.T, db *sql.DB) {
+	t.Helper()
+	var exists int
+	if err := db.QueryRow("SELECT count(*) FROM sqlite_master WHERE name='media_platform' AND type='table'").Scan(&exists); err != nil {
+		t.Fatal(err)
+	}
+	if exists == 0 {
+		return
+	}
+	var view string
+	if err := db.QueryRow("SELECT sql FROM sqlite_master WHERE name='search_source' AND type='view'").Scan(&view); err == nil {
+		if at := strings.Index(view, "UNION SELECT mp.media_id,'platform',p.name"); at >= 0 {
+			if _, err = db.Exec("DROP VIEW search_source;" + strings.TrimSpace(view[:at]) + ";"); err != nil {
+				t.Fatal(err)
+			}
+		}
+	} else if err != sql.ErrNoRows {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`DROP VIEW IF EXISTS media_platform_sources;DROP TRIGGER IF EXISTS manual_platform_insert;DROP TRIGGER IF EXISTS manual_platform_delete;DROP TABLE media_platform;
+ DROP INDEX IF EXISTS idx_file_thumbnail_path;DROP INDEX IF EXISTS idx_file_preview_path;DROP INDEX IF EXISTS idx_download_target_media;DROP INDEX IF EXISTS idx_media_tag_reverse;
+ DROP INDEX IF EXISTS idx_edit_source_file;DROP INDEX IF EXISTS idx_move_media_state;DROP INDEX IF EXISTS idx_import_folder_state;`); err != nil {
+		t.Fatal(err)
 	}
 }

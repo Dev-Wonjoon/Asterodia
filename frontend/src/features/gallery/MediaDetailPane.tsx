@@ -7,6 +7,7 @@ import { useToast } from '@renderer/shared/hooks/useToast'
 import { MediaPreview } from '@renderer/shared/components/media/MediaPreview'
 import { MediaPlayer } from '@renderer/shared/components/media/MediaPlayer'
 import { MEDIA_PAGE_SIZE, type GallerySnapshot, type GalleryStore } from './galleryStore'
+import { MediaPlatformEditor } from './MediaPlatformEditor'
 import { MediaThumbnailStatus } from './MediaThumbnailStatus'
 import { MediaEditLauncher } from '../mediaedit/MediaEditLauncher'
 import { ActionButton } from '@renderer/shared/components/ui/ActionButton'
@@ -318,6 +319,8 @@ export function MediaDetailPane({
                         </div>
                     </form>
 
+                    <MediaPlatformEditor key={data.id} values={data.platforms ?? []} disabled={disabled}
+                        onChange={platformChange => store.edit({ mediaId: data.id, expectedRevision: data.revision, platformChange })} />
                     <form
                         className="space-y-2"
                         onSubmit={(event) => {
@@ -392,7 +395,7 @@ export function MediaDetailPane({
                                     {onAddFiles && <ActionButton icon={<ListPlus />} label={translate("gallery.album.add")} disabled={disabled || hasDraft} onClick={() => onAddFiles([file.id])} />}
                                     {onGatherFiles && <ActionButton icon={<FolderInput />} label={translate("gallery.collectInOneFolder")} disabled={disabled} onClick={() => onGatherFiles([file.id])} />}
                                 </div>
-                                {(file.kind === 'video' || file.kind === 'audio') && <MediaPlayer key={`${file.id}:${data.revision}`} path={file.filepath} kind={file.kind} title={file.title ?? file.fileKey} poster={file.thumbnailPath} />}
+                                {(file.kind === 'video' || file.kind === 'audio') && <MediaPlayer windowFullscreen={getApi().windowFullscreen} key={`${file.id}:${data.revision}`} path={file.filepath} kind={file.kind} title={file.title ?? file.fileKey} poster={file.thumbnailPath} />}
                                 {file.kind !== 'video' && file.kind !== 'audio' && <MediaPreview
                                     path={file.kind === 'image' ? file.filepath : file.previewPath ?? file.thumbnailPath}
                                     fallbackPath={file.kind === 'image' ? file.previewPath ?? file.thumbnailPath : null}
@@ -499,9 +502,9 @@ export function MediaDetailPane({
                             <button
                                 type="button"
                                 className={button}
-                                disabled={disabled || !data.files.hasNextPage}
+                                disabled={disabled || data.files.total <= MEDIA_PAGE_SIZE}
                                 onClick={() =>
-                                    void store.loadDetail(detail.offset + MEDIA_PAGE_SIZE)
+                                    void store.loadDetail(data.files.hasNextPage ? detail.offset + MEDIA_PAGE_SIZE : 0)
                                 }
                             >{translate("gallery.nextFiles")}</button>
                         </div>

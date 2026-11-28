@@ -227,7 +227,7 @@ func TestV11PinMigrationRollsBackAndPreservesAlbumData(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer upgraded.Close()
-	if countDB(t, upgraded, "PRAGMA user_version") != 14 || countDB(t, upgraded, "SELECT count(*) FROM user_album_file WHERE file_id=1") != 1 || countDB(t, upgraded, "SELECT count(*) FROM gallery_pin") != 0 {
+	if countDB(t, upgraded, "PRAGMA user_version") != 16 || countDB(t, upgraded, "SELECT count(*) FROM user_album_file WHERE file_id=1") != 1 || countDB(t, upgraded, "SELECT count(*) FROM gallery_pin") != 0 {
 		t.Fatal("migration lost existing data")
 	}
 	assertHealthyDB(t, upgraded)

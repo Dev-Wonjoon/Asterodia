@@ -99,7 +99,11 @@ func explorerFileFilter(f Filter) (string, []any) {
 		column string
 	}{{f.Platforms, "pl.name"}, {f.Authors, "coalesce(p.owner_name,p.owner_id)"}} {
 		if len(group.values) > 0 {
-			where = append(where, group.column+" IN ("+placeholders(len(group.values))+")")
+			clause := group.column + " IN (" + placeholders(len(group.values)) + ")"
+			if group.column == "pl.name" {
+				clause = "EXISTS(SELECT 1 FROM platform ep WHERE ep.name IN (" + placeholders(len(group.values)) + ") AND (ep.id=f.platform_id OR EXISTS(SELECT 1 FROM media_platform mp WHERE mp.platform_id=ep.id AND mp.media_id IN (m.id,mem.albumId))))"
+			}
+			where = append(where, clause)
 			for _, value := range group.values {
 				args = append(args, value)
 			}

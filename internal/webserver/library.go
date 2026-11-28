@@ -23,6 +23,11 @@ func publicSummary(row map[string]any) map[string]any {
 	}
 	result["parentId"] = row["parentId"]
 	result["childAlbumCount"] = row["childAlbumCount"]
+	for _, key := range []string{"byteSize", "fileCreatedAt", "platformNames", "tagNames"} {
+		if value, ok := row[key]; ok {
+			result[key] = value
+		}
+	}
 	return result
 }
 
@@ -108,7 +113,7 @@ func (s *Service) list(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "앨범을 확인하세요", 400)
 		return
 	}
-	result := s.library.List(ctx, media.ListRequest{Limit: limit, Offset: offset, Filter: filter, Gallery: r.URL.Query().Get("gallery") == "1", AlbumCards: r.URL.Query().Get("albumCards") == "1", ExpandedMediaIDs: expanded, AnchorMediaID: int64(anchor)})
+	result := s.library.List(ctx, media.ListRequest{Limit: limit, Offset: offset, Filter: filter, Gallery: r.URL.Query().Get("gallery") == "1", AlbumCards: r.URL.Query().Get("albumCards") == "1", ExpandedMediaIDs: expanded, AnchorMediaID: int64(anchor), Sort: r.URL.Query().Get("sort"), Descending: r.URL.Query().Get("descending") == "1", Details: r.URL.Query().Get("details") == "1", GalleryView: r.URL.Query().Get("galleryView")})
 	if apiError(w, r, result) {
 		return
 	}

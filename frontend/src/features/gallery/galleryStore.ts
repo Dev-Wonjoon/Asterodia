@@ -52,7 +52,7 @@ export const GALLERY_PAGE_SIZE = 24
 
 export type GalleryBulkAction =
     | { kind: 'favorite'; value: boolean }
-    | { kind: 'tags'; names: string[]; remove: boolean }
+    | { kind: 'tags' | 'platforms'; names: string[]; remove: boolean }
     | { kind: 'unregister' }
     | { kind: 'openFolders'; open: (path: string) => Promise<void> }
 
@@ -90,6 +90,9 @@ export function createGalleryStore(
         albumCards?: boolean
         galleryView?: GalleryView
         showAlbumFiles?: boolean
+        sort?: import('@contracts/media-v2').GallerySort
+        descending?: boolean
+        details?: boolean
     } = {}
 ) {
     const favoritesOnly = options.favoritesOnly ?? false
@@ -244,6 +247,8 @@ export function createGalleryStore(
                     offset,
                     favoritesOnly,
                     filter: requestedFilter,
+                    ...(options.sort && (options.sort !== 'registered' || !options.descending) ? { sort: options.sort, descending: options.descending } : {}),
+                    ...(options.details ? { details: true } : {}),
                     ...(expandAlbums ? { gallery: true, expandedMediaIds: requestedExpanded,
                         ...(options.albumCards ? { albumCards: true } : {}),
                         ...(options.galleryView !== undefined ? { galleryView: options.galleryView } : {}),
@@ -561,6 +566,37 @@ export function createGalleryStore(
         return true
     }
 
+    async function editMetadata(input: MediaEditRequest): Promise<boolean> {
+        if (snapshot.busy || snapshot.needsRefresh || !api.bulkEdit) return false
+        const current = snapshot.detail.data?.id === input.mediaId ? snapshot.detail.data : snapshot.list.page.data.find(row => row.id === input.mediaId)
+        if (!current || current.revision !== input.expectedRevision) return false
+        const tags = snapshot.detail.data?.id === input.mediaId ? snapshot.detail.data.tags : []
+        const removeTags = (input.tagChange?.removeIds ?? []).map(id => tags.find(tag => tag.id === id)?.name)
+        if (removeTags.some(name => !name)) return false
+        cancelReads()
+        const own = session
+        publish({ ...snapshot, busy: true, writeError: null, notice: null })
+        try {
+            const result = await request(() => api.bulkEdit!({ selection: [{ mediaId: input.mediaId, revision: input.expectedRevision }],
+                addTags: input.tagChange?.addNames, removeTags: removeTags as string[],
+                addPlatforms: input.platformChange?.addNames, removePlatforms: input.platformChange?.removeNames, isFavorite: input.isFavorite }))
+            if (own !== session) return result.ok
+            const update = result.ok ? result.data.updated.find(row => row.mediaId === input.mediaId) : undefined
+            if (!result.ok || !update) {
+                const error = result.ok ? result.data.failed[0]?.error : result.error
+                publish({ ...snapshot, busy: false, writeError: error ?? null, needsRefresh: error?.code === 'REVISION_CONFLICT' || error?.code === 'TRANSPORT_ERROR' })
+                return false
+            }
+            edited({ ...current, revision: update.revision, ...(input.isFavorite !== undefined ? { isFavorite: input.isFavorite } : {}) })
+            const detail = snapshot.detail.data
+            publish({ ...snapshot, busy: false, detail: detail?.id === input.mediaId && detail.revision === input.expectedRevision
+                ? { ...snapshot.detail, data: { ...detail, revision: update.revision, ...(update.tags ? { tags: update.tags } : {}), ...(update.platforms ? { platforms: update.platforms } : {}), ...(input.isFavorite !== undefined ? { isFavorite: input.isFavorite } : {}) } }
+                : snapshot.detail })
+            if (filter.keyword || filter.tags?.length || filter.platforms?.length || options.details || options.sort === 'tag' || options.sort === 'platform' || (result.ok && result.data.visibilityChanged && !filter.showHidden)) void loadList('background', true)
+            return true
+        } finally { if (own === session && snapshot.busy) publish({ ...snapshot, busy: false }) }
+    }
+
     async function bulk(selection: MoveSelection[], action: GalleryBulkAction, progress: (done: number, total: number) => void): Promise<GalleryBulkResult | null> {
         if (snapshot.busy || snapshot.needsRefresh || !selection.length) return null
         const grouped = new Map<number, MoveSelection>(), conflicts = new Set<number>()
@@ -581,9 +617,10 @@ export function createGalleryStore(
         const result: GalleryBulkResult = { succeeded: [], failed: [] }
         const folders = new Set<string>()
         let uncertain = false
+        let metadataNeedsRefresh = Boolean(filter.keyword || filter.tags?.length || filter.platforms?.length || filter.authors?.length || options.details || options.sort === 'tag' || options.sort === 'platform')
         publish({ ...snapshot, busy: true, writeError: null, notice: null })
         try {
-            if (api.bulkEdit && (action.kind === 'tags' || action.kind === 'favorite')) {
+            if (api.bulkEdit && (action.kind === 'tags' || action.kind === 'platforms' || action.kind === 'favorite')) {
                 const valid = targets.filter(target => !conflicts.has(target.mediaId))
                 for (const target of targets.filter(target => conflicts.has(target.mediaId))) result.failed.push({ mediaId: target.mediaId, message: translate('gallery.thisPostChangedAfterSelectionRefreshAndSelectIt') })
                 for (let offset = 0; offset < valid.length; offset += 200) {
@@ -593,14 +630,27 @@ export function createGalleryStore(
                         continue
                     }
                     const response = await request(() => api.bulkEdit!({ selection: batch.map(({ mediaId, revision }) => ({ mediaId, revision })),
-                        ...(action.kind === 'favorite' ? { isFavorite: action.value } : action.remove ? { removeTags: action.names } : { addTags: action.names }) }))
+                        ...(action.kind === 'favorite' ? { isFavorite: action.value } : action.kind === 'platforms' ? action.remove ? { removePlatforms: action.names } : { addPlatforms: action.names } : action.remove ? { removeTags: action.names } : { addTags: action.names }) }))
                     if (response.ok) {
                         result.succeeded.push(...response.data.updated.map(row => row.mediaId))
                         result.failed.push(...response.data.failed.map(row => ({ mediaId: row.mediaId, message: translateError(row.error) })))
-                        if (own === session) for (const updated of response.data.updated) {
-                            const row = snapshot.list.page.data.find(row => row.id === updated.mediaId)
-                            if (row) edited({ ...row, revision: updated.revision, ...(action.kind === 'favorite' ? { isFavorite: action.value } : {}) })
+                        if (own === session) {
+                            const updates = new Map(response.data.updated.map(row => [row.mediaId, row]))
+                            const data = snapshot.list.page.data.flatMap(row => {
+                                const update = updates.get(row.id)
+                                if (!update) return [row]
+                                if (favoritesOnly && action.kind === 'favorite' && !action.value) return []
+                                return [{ ...row, revision: update.revision, ...(action.kind === 'favorite' ? { isFavorite: action.value } : {}) }]
+                            })
+                            const detail = snapshot.detail.data
+                            const detailUpdate = detail && updates.get(detail.id)
+                            publish({ ...snapshot, detail: detail && detailUpdate ? { ...snapshot.detail, data: { ...detail, revision: detailUpdate.revision,
+                                ...(detailUpdate.tags ? { tags: detailUpdate.tags } : {}), ...(detailUpdate.platforms ? { platforms: detailUpdate.platforms } : {}),
+                                ...(action.kind === 'favorite' ? { isFavorite: action.value } : {}) } } : snapshot.detail,
+                                list: { ...snapshot.list, page: { ...snapshot.list.page, data,
+                                total: Math.max(0, snapshot.list.page.total - (snapshot.list.page.data.length - data.length)) } } })
                         }
+                        metadataNeedsRefresh ||= Boolean(response.data.visibilityChanged && !filter.showHidden)
                     } else {
                         result.failed.push(...batch.map(row => ({ mediaId: row.mediaId, message: translateError(response.error) })))
                         uncertain = response.error.code === 'TRANSPORT_ERROR'
@@ -609,7 +659,7 @@ export function createGalleryStore(
                 }
                 if (own === session) {
                     publish({ ...snapshot, busy: false, needsRefresh: uncertain })
-                    if (!uncertain && result.succeeded.length) reconcile()
+                    if (!uncertain && result.succeeded.length && metadataNeedsRefresh) reconcile()
                 }
                 return result
             }
@@ -640,7 +690,7 @@ export function createGalleryStore(
                         if (own === session) removed(response.data, target.fileIds)
                     } else {
                         const response = await api.edit({ mediaId: target.mediaId, expectedRevision: target.revision,
-                            ...(action.kind === 'favorite' ? { isFavorite: action.value } : {
+                            ...(action.kind === 'favorite' ? { isFavorite: action.value } : action.kind === 'platforms' ? { platformChange: action.remove ? { removeNames: action.names } : { addNames: action.names } } : {
                                 tagChange: action.remove
                                     ? { removeIds: current.data.tags.filter(tag => action.names.includes(tag.name)).map(tag => tag.id) }
                                     : { addNames: action.names }
@@ -765,6 +815,9 @@ export function createGalleryStore(
         },
 
         edit: (input: MediaEditRequest): Promise<boolean> => {
+            const metadataOnly = Object.keys(input).every(key => ['mediaId','expectedRevision','tagChange','platformChange','isFavorite'].includes(key)) && (input.tagChange || input.platformChange || input.isFavorite !== undefined)
+            const base = snapshot.detail.data?.id === input.mediaId ? snapshot.detail.data : snapshot.list.page.data.find(row => row.id === input.mediaId)
+            if (metadataOnly && api.bulkEdit && base && (!(input.tagChange?.removeIds?.length) || snapshot.detail.data?.id === input.mediaId)) return editMetadata(input)
             const favoriteOnly =
                 input.isFavorite !== undefined &&
                 Object.keys(input).every((key) =>

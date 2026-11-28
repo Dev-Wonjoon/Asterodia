@@ -67,6 +67,9 @@ export interface SearchSuggestionPage {
 }
 
 export interface MediaListRequest {
+    sort?: GallerySort
+    descending?: boolean
+    details?: boolean
     limit?: number
     offset?: number
     favoritesOnly?: boolean
@@ -80,6 +83,8 @@ export interface MediaListRequest {
 }
 
 export type GalleryView = 'all' | 'albums' | 'files'
+export type GallerySort = 'name' | 'registered' | 'fileCreated' | 'platform' | 'tag'
+export type GalleryLayout = 'cards' | 'details'
 
 export interface MediaGetRequest {
     mediaId: number
@@ -92,6 +97,7 @@ export interface MediaEditRequest {
     expectedRevision: number
     customTitle?: string | null
     cover?: { mode: 'auto' } | { mode: 'manual'; fileId: number }
+    platformChange?: { addNames?: string[]; removeNames?: string[] }
     tagIds?: number[]
     tagChange?: {
         addNames?: string[]
@@ -112,6 +118,10 @@ export interface MediaUnregisterFilesRequest extends MediaUnregisterRequest {
 }
 
 export interface MediaSummaryDto {
+    byteSize?: number | null
+    fileCreatedAt?: number | null
+    platformNames?: string[]
+    tagNames?: string[]
 	extension?: string | null
 	parentId?: number | null
 	childAlbumCount?: number
@@ -219,6 +229,7 @@ export interface MediaPage<T> {
 }
 
 export interface MediaDetailDto extends MediaSummaryDto {
+    platforms?: { id: number; name: string }[]
     files: MediaPage<MediaFileDto>
     tags: {
         id: number

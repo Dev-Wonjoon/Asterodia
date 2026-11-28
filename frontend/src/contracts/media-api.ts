@@ -50,11 +50,14 @@ export interface MediaApi {
 
 export interface MediaBulkEditRequest {
     selection: { mediaId: number; revision: number }[]
+    addPlatforms?: string[]
+    removePlatforms?: string[]
     addTags?: string[]
     removeTags?: string[]
     isFavorite?: boolean
 }
 export interface MediaBulkEditResult {
-    updated: { mediaId: number; revision: number }[]
+    visibilityChanged?: boolean
+    updated: { mediaId: number; revision: number; tags?: {id:number;name:string}[]; platforms?: {id:number;name:string}[] }[]
     failed: { mediaId: number; error: { code: import('./media-v2').MediaErrorCode; message: string; context: Record<string, number> } }[]
 }

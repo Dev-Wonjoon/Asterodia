@@ -6,7 +6,7 @@ import { useConfirm } from '@renderer/shared/hooks/useConfirm'
 import type { GalleryBulkAction, GalleryBulkResult, GalleryStore } from './galleryStore'
 import { prepareRemoval, removalConfirmation } from './galleryRemoval'
 
-export type BulkCommand = 'favorite' | 'unfavorite' | 'addTags' | 'removeTags' | 'openFolders' | 'unregister'
+export type BulkCommand = 'favorite' | 'unfavorite' | 'addTags' | 'removeTags' | 'addPlatforms' | 'removePlatforms' | 'openFolders' | 'unregister'
 
 export function useGalleryBulkActions(store: GalleryStore, selection: MoveSelection[], onSuccess: (ids: number[], command: BulkCommand) => void) {
     const { confirm } = useConfirm()
@@ -60,7 +60,7 @@ export function useGalleryBulkActions(store: GalleryStore, selection: MoveSelect
             const action: GalleryBulkAction = command === 'unregister' ? { kind: 'unregister' }
                 : command === 'openFolders' ? { kind: 'openFolders', open: path => getApi().showItemInFolder(path) }
                 : command === 'favorite' || command === 'unfavorite' ? { kind: 'favorite', value: command === 'favorite' }
-                : { kind: 'tags', names, remove: command === 'removeTags' }
+                : { kind: command === 'addPlatforms' || command === 'removePlatforms' ? 'platforms' : 'tags', names, remove: command === 'removeTags' || command === 'removePlatforms' }
             if (own !== generation.current) return
             setResult(null); setProgress({ done: 0, total: targets.length })
             const outcome = await store.bulk(targets, action, (done, total) => {

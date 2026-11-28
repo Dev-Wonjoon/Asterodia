@@ -4,7 +4,8 @@ import { DownloadThumbnail } from '../download/components/DownloadThumbnail'
 import { canCancelDownload, downloadPlatform, downloadStatus } from '../download/downloadPresentation'
 import { DownloadProgress } from '../download/components/DownloadProgress'
 
-export function GalleryDownloadCard({ job, selected, disabled, cancelling, onOpen, onCancel }: {
+export function GalleryDownloadCard({ job, selected, disabled, cancelling, onOpen, onCancel, details = false }: {
+    details?: boolean
     job: DownloadJobDto
     selected: boolean
     disabled: boolean
@@ -14,6 +15,11 @@ export function GalleryDownloadCard({ job, selected, disabled, cancelling, onOpe
 }) {
     useLanguage()
     const title = job.title || downloadPlatform(job.url)
+    if (details) return <article data-detail-trigger className="flex h-16 min-w-[1184px] items-center gap-4 border-b border-[var(--border-line)] bg-[var(--bg-sidebar)] px-3">
+        <button type="button" className="min-w-0 flex-1 truncate text-left text-sm" disabled={disabled} onClick={onOpen}>{title}</button>
+        <span role="status" className="text-xs text-[var(--text-muted)]">{cancelling ? translate('gallery.cancelling') : downloadStatus(job)}</span>
+        {canCancelDownload(job) && <button type="button" className="text-sm" disabled={disabled || cancelling} onClick={onCancel}>{translate('gallery.cancelDownload')}</button>}
+    </article>
     return <article data-detail-trigger className={'overflow-hidden rounded-xl border bg-[var(--bg-sidebar)] ' + (selected ? 'border-[var(--color-primary)]' : 'border-[var(--border-line)]')} aria-label={title + translate("gallery.downloadJob")}>
         <DownloadThumbnail url={job.url} localPath={job.thumbnailPath} title={title} fullWidth />
         <button type="button" aria-label={title + translate("gallery.downloadDetails")} aria-pressed={selected} disabled={disabled} onClick={onOpen} className="block w-full space-y-2 p-3 text-left disabled:opacity-50">

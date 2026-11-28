@@ -6,6 +6,7 @@ import { SettingRow } from '@renderer/shared/components/ui/SettingRow'
 import { UpdateSettings } from './UpdateSettings'
 import { LanguageSelect } from '@renderer/shared/i18n/LanguageSelect'
 import { WorkingDirectorySettings } from './WorkingDirectorySettings'
+import { ThumbnailCacheSettings } from './ThumbnailCacheSettings'
 import { ContentFiltersSettings } from './ContentFiltersSettings'
 
 export const GeneralSettings = (): React.JSX.Element => {
@@ -49,6 +50,6 @@ export const GeneralSettings = (): React.JSX.Element => {
                     <p className="break-all">{translate("settings.backupBeforeMerge", { path: importResult.backupPath })}</p>
                 </div>
             )}
-        </SettingSection><ContentFiltersSettings disabled={importing} /></div>
+        </SettingSection><ThumbnailCacheSettings /><ContentFiltersSettings disabled={importing} /></div>
     )
 }

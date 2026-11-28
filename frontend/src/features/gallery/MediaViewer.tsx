@@ -17,7 +17,7 @@ export function MediaViewer({ mediaId, fileId, onClose }: { mediaId: number; fil
     useLanguage()
     useEffect(() => {
         const api = getApi().media
-        const viewer = mountMediaViewer({ mediaId, fileId,
+        const viewer = mountMediaViewer({ mediaId, fileId, windowFullscreen: getApi().windowFullscreen,
             getSequence: (id: number) => unwrap(api.sequence({ mediaId: id })),
             getFile: (id: number) => unwrap(api.readFile({ fileId: id })),
             listMedia: ({ keyword, offset }: { keyword: string; offset: number }) => unwrap(api.list({ limit: 50, offset, filter: { keyword } })),

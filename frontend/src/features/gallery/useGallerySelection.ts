@@ -130,7 +130,7 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
         if (button && !button.hasAttribute('data-card-select') || event.target.closest('article') && !card) return
         if (card && !gridRef.current?.contains(card)) return
         const root = scrollRef.current
-        if (!root) return
+        if (!root || !root.contains(event.target)) return
         const bounds = root.getBoundingClientRect()
         if (root.clientWidth > 0 && (event.clientX < bounds.left + root.clientLeft || event.clientX >= bounds.left + root.clientLeft + root.clientWidth)) return
         if (root.clientHeight > 0 && (event.clientY < bounds.top + root.clientTop || event.clientY >= bounds.top + root.clientTop + root.clientHeight)) return
@@ -150,7 +150,6 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
         if (blocked.current && albumDragRef.current) endAlbumDrag()
     })
     useEffect(() => {
-        const root = scrollRef.current
         function move(event: globalThis.PointerEvent) {
             const own = gesture.current
             if (!own || event.pointerId !== own.id || blocked.current) return
@@ -173,6 +172,7 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
             stop()
         }
         function click(event: globalThis.MouseEvent) {
+            const root = scrollRef.current
             if (!event.detail || !(event.target instanceof Node) || !root?.contains(event.target)) return
             if (suppressClick.current || suppressRepeatedClick.current && event.detail > 1) {
                 event.preventDefault(); event.stopImmediatePropagation(); return
@@ -182,7 +182,7 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
         // Native HTML dragging ends the pointer stream with pointercancel after
         // dragstart. Only cancel a marquee here; the album drag is still active.
         function cancelPointer() { if (gesture.current) stop(true) }
-        function lost(event: globalThis.PointerEvent) { if (gesture.current?.active && gesture.current.id === event.pointerId && event.target === root) stop(true) }
+        function lost(event: globalThis.PointerEvent) { if (gesture.current?.active && gesture.current.id === event.pointerId && event.target === scrollRef.current) stop(true) }
         function escape(event: KeyboardEvent) {
             if (event.defaultPrevented || isComposing(event)) return
             if (event.key === 'Escape' && albumDragRef.current) { event.preventDefault(); event.stopPropagation(); endAlbumDrag(); return }
@@ -198,8 +198,9 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
         window.addEventListener('pointercancel', cancelPointer); window.addEventListener('blur', cancelPointer); window.addEventListener('keydown', escape, true)
         window.addEventListener('dragend', endAlbumDrag)
         window.addEventListener('lostpointercapture', lost)
-        // Listen on the scroll pane, including empty space below the card grid.
-        root?.addEventListener('pointerdown', onPointerDown)
+        // Resolve the current scroll pane for each gesture, including after a
+        // layout refresh replaces its DOM node. Only events inside it can start selection.
+        window.addEventListener('pointerdown', onPointerDown)
         window.addEventListener('click', click, true); window.addEventListener('dblclick', click, true)
         return () => {
             cancelAnimationFrame(frame.current); gesture.current = null
@@ -207,7 +208,7 @@ export function useGallerySelection(items: MediaSummaryDto[], blocked: RefObject
             window.removeEventListener('pointercancel', cancelPointer); window.removeEventListener('blur', cancelPointer); window.removeEventListener('keydown', escape, true)
             window.removeEventListener('dragend', endAlbumDrag)
             window.removeEventListener('lostpointercapture', lost)
-            root?.removeEventListener('pointerdown', onPointerDown)
+            window.removeEventListener('pointerdown', onPointerDown)
             window.removeEventListener('click', click, true); window.removeEventListener('dblclick', click, true)
         }
     }, [])

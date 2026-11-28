@@ -4,6 +4,7 @@ import { flushSync } from 'react-dom'
 
 export function ListDetailLayout({
     children,
+    listHeader,
     detail,
     detailKey,
     detailLabel,
@@ -12,6 +13,7 @@ export function ListDetailLayout({
     listRef
 }: {
     children: ReactNode
+    listHeader?: ReactNode
     detail?: ReactNode
     detailKey?: string | number | null
     detailLabel: string
@@ -102,12 +104,13 @@ export function ListDetailLayout({
             className="relative flex h-full min-h-0 min-w-0 overflow-hidden"
         >
             <div
-                ref={listRef}
-                data-keyboard-region tabIndex={-1}
                 inert={open && overlay}
-                className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 md:p-6"
+                className="flex min-h-0 min-w-0 flex-1 flex-col"
             >
-                {children}
+                {listHeader && <div data-list-header className="z-10 shrink-0 bg-[var(--bg-app)] px-4 pt-4 md:px-6 md:pt-6">{listHeader}</div>}
+                <div ref={listRef} data-keyboard-region tabIndex={-1} className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 md:p-6">
+                    {children}
+                </div>
             </div>
             {open && (
                 <>

@@ -28,7 +28,11 @@ export type ThumbnailResult<T> =
           }
       }
 
+export interface ThumbnailCacheUsage { files:number; bytes:number; unusedFiles:number; unusedBytes:number; removedFiles:number; removedBytes:number }
+
 export interface ThumbnailApi {
+    cacheUsage?(): Promise<ThumbnailResult<ThumbnailCacheUsage>>
+    clearUnusedCache?(): Promise<ThumbnailResult<ThumbnailCacheUsage>>
     get(request: ThumbnailRequest): Promise<ThumbnailResult<ThumbnailStatusDto>>
 
     retry(request: ThumbnailRequest): Promise<ThumbnailResult<ThumbnailStatusDto>>

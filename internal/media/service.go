@@ -21,6 +21,7 @@ type Service struct {
 	db             *sql.DB
 	searchMu       sync.Mutex
 	searchCancel   context.CancelFunc
+	metadataCancel context.CancelFunc
 	searchWG       sync.WaitGroup
 }
 
@@ -39,6 +40,9 @@ type Filter struct {
 	CreatedTo       *int64   `json:"createdTo"`
 }
 type ListRequest struct {
+	Details          bool    `json:"details"`
+	Sort             string  `json:"sort"`
+	Descending       bool    `json:"descending"`
 	Limit            int     `json:"limit"`
 	Offset           int     `json:"offset"`
 	FavoritesOnly    bool    `json:"favoritesOnly"`
@@ -68,9 +72,10 @@ type EditRequest struct {
 		AddNames  []string `json:"addNames"`
 		RemoveIDs []int64  `json:"removeIds"`
 	} `json:"tagChange"`
-	IsFavorite *bool `json:"isFavorite"`
-	IsPinned   *bool `json:"isPinned"`
-	PinFileID  int64 `json:"pinFileId"`
+	PlatformChange *PlatformChange `json:"platformChange"`
+	IsFavorite     *bool           `json:"isFavorite"`
+	IsPinned       *bool           `json:"isPinned"`
+	PinFileID      int64           `json:"pinFileId"`
 }
 type UnregisterRequest struct {
 	MediaID          int64   `json:"mediaId"`
@@ -194,7 +199,8 @@ func filterSQL(req ListRequest) (string, []any, error) {
 	}
 	if f.Keyword != "" {
 		where = append(where, `(instr(lower(coalesce(m.custom_title,'')||' '||coalesce(m.source_title,'')),lower(?))>0 OR EXISTS(SELECT 1 FROM media_tag mt JOIN tag t ON t.id=mt.tag_id WHERE mt.media_id=m.id AND instr(lower(t.name),lower(?))>0) OR EXISTS(SELECT 1 FROM media_file f LEFT JOIN profiles p ON p.id=f.profile_id LEFT JOIN platform pl ON pl.id=f.platform_id WHERE (f.media_id=m.id OR f.id IN (SELECT file_id FROM user_album_file WHERE album_id=m.id)) AND instr(lower(coalesce(f.title,'')||' '||coalesce(p.owner_name,'')||' '||coalesce(pl.name,'')),lower(?))>0))`)
-		args = append(args, f.Keyword, f.Keyword, f.Keyword)
+		where[len(where)-1] = "(" + where[len(where)-1] + " OR EXISTS(SELECT 1 FROM media_platform_sources mp JOIN platform ep ON ep.id=mp.platform_id WHERE mp.media_id=m.id AND instr(lower(ep.name),lower(?))>0))"
+		args = append(args, f.Keyword, f.Keyword, f.Keyword, f.Keyword)
 	}
 	if f.CreatedFrom != nil {
 		where = append(where, "m.created_at>=?")
@@ -211,7 +217,7 @@ func filterSQL(req ListRequest) (string, []any, error) {
 		}
 	}
 	if len(f.hiddenPlatforms) > 0 {
-		where = append(where, "NOT EXISTS(SELECT 1 FROM media_file f JOIN platform p ON p.id=f.platform_id WHERE (f.media_id IN "+visibilityAncestors+" OR f.id IN (SELECT file_id FROM user_album_file WHERE album_id IN "+visibilityAncestors+")) AND p.name IN ("+placeholders(len(f.hiddenPlatforms))+"))")
+		where = append(where, "NOT EXISTS(SELECT 1 FROM media_platform_sources mp JOIN platform p ON p.id=mp.platform_id WHERE mp.media_id IN "+visibilityAncestors+" AND p.name IN ("+placeholders(len(f.hiddenPlatforms))+"))")
 		for _, value := range f.hiddenPlatforms {
 			args = append(args, value)
 		}
@@ -232,7 +238,7 @@ func filterSQL(req ListRequest) (string, []any, error) {
 	for _, group := range []struct {
 		values []string
 		clause string
-	}{{f.Platforms, "EXISTS(SELECT 1 FROM media_file f JOIN platform p ON p.id=f.platform_id WHERE (f.media_id=m.id OR f.id IN (SELECT file_id FROM user_album_file WHERE album_id=m.id)) AND p.name IN (%s))"}, {f.Authors, "EXISTS(SELECT 1 FROM media_file f JOIN profiles p ON p.id=f.profile_id WHERE (f.media_id=m.id OR f.id IN (SELECT file_id FROM user_album_file WHERE album_id=m.id)) AND coalesce(p.owner_name,p.owner_id) IN (%s))"}} {
+	}{{f.Platforms, "EXISTS(SELECT 1 FROM media_platform_sources mp JOIN platform p ON p.id=mp.platform_id WHERE mp.media_id=m.id AND p.name IN (%s))"}, {f.Authors, "EXISTS(SELECT 1 FROM media_file f JOIN profiles p ON p.id=f.profile_id WHERE (f.media_id=m.id OR f.id IN (SELECT file_id FROM user_album_file WHERE album_id=m.id)) AND coalesce(p.owner_name,p.owner_id) IN (%s))"}} {
 		if len(group.values) > 0 {
 			where = append(where, fmt.Sprintf(group.clause, placeholders(len(group.values))))
 			for _, v := range group.values {
@@ -325,6 +331,11 @@ func (s *Service) Get(ctx context.Context, req GetRequest) api.Result {
 		return failure(err)
 	}
 	obj["tags"] = tags
+	platforms, err := objects(ctx, tx, "SELECT p.id,p.name FROM media_platform mp JOIN platform p ON p.id=mp.platform_id WHERE mp.media_id=? ORDER BY p.name,p.id", req.MediaID)
+	if err != nil {
+		return failure(err)
+	}
+	obj["platforms"] = platforms
 	favorites, err := objects(ctx, tx, "SELECT id,created_at AS createdAt FROM favorite WHERE media_id=?", req.MediaID)
 	if err != nil {
 		return failure(err)
@@ -478,6 +489,11 @@ func (s *Service) Edit(ctx context.Context, req EditRequest) api.Result {
 			_, err = tx.ExecContext(ctx, "UPDATE media SET cover_mode=?,cover_file_id=? WHERE id=?", req.Cover.Mode, fileID, req.MediaID)
 		}
 		if err != nil {
+			return failure(err)
+		}
+	}
+	if req.PlatformChange != nil {
+		if err = changePlatforms(ctx, tx, []any{req.MediaID}, *req.PlatformChange); err != nil {
 			return failure(err)
 		}
 	}

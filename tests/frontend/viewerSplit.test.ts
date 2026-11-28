@@ -281,9 +281,34 @@ it('preserves the initial autoplay request when splitting during an asynchronous
 it('keeps fullscreen scoped to the selected pane and retranslates the controls', async () => {
     setup(); await flush(); click(button('2분할')); await flush(); select(1); key('f')
     expect(viewer!.dialog.classList.contains('sbv-expanded')).toBe(true)
+    for (const selector of ['.sbv-header', '.sbv-footer', '.sbv-status', '.sbv-pane-toolbar', '.sbv-pane-status']) {
+        expect([...viewer!.dialog.querySelectorAll<HTMLElement>(selector)].every(element => element.hidden)).toBe(true)
+    }
     const escape = new Event('cancel', { cancelable: true }); viewer!.dialog.dispatchEvent(escape)
     expect(escape.defaultPrevented).toBe(true); expect(viewer!.dialog.classList.contains('sbv-expanded')).toBe(false); expect(document.activeElement).toBe(surface(1))
+    expect(viewer!.dialog.querySelector<HTMLElement>('.sbv-header')!.hidden).toBe(false)
+    expect(panes()).toHaveLength(2)
     setLanguage('en'); expect(button('Four panes')).toBeTruthy(); expect(button('Choose/replace media')).toBeTruthy()
+})
+
+it('wakes fullscreen video controls from the separate video surface without resetting playback', async () => {
+    vi.useFakeTimers(); setup(2); await flush(); select(0)
+    const video = document.querySelector('video')!, controls = document.querySelector<HTMLElement>('.sb-player')!
+    video.currentTime = 42; key('f')
+    expect(controls.classList.contains('is-immersive')).toBe(true)
+    expect(controls.querySelector('.sbp-overlay .sbp-jumps')).not.toBeNull()
+    await vi.advanceTimersByTimeAsync(2100)
+    expect(controls.classList.contains('is-awake')).toBe(false)
+    video.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))
+    expect(controls.classList.contains('is-awake')).toBe(true)
+    await vi.advanceTimersByTimeAsync(2100)
+    surface().dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))
+    expect(controls.classList.contains('is-awake')).toBe(true)
+    expect(video.currentTime).toBe(42)
+    expect(HTMLMediaElement.prototype.play).toHaveBeenCalledOnce()
+    const escape = new Event('cancel', { cancelable: true }); viewer!.dialog.dispatchEvent(escape)
+    expect(controls.classList.contains('is-immersive')).toBe(false)
+    expect(video.currentTime).toBe(42)
 })
 
 it('supports remapped zoom commands without retaining the old default binding', async () => {

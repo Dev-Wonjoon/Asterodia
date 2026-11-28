@@ -69,6 +69,11 @@ func applicationServices(
 	catalog.UpdateGate = updateGate
 	updates.SetDatabase(db)
 	catalog.StartSearchIndex()
+	catalog.StartFileMetadata(func() {
+		if app := application.Get(); app != nil {
+			app.Event.Emit("media:metadata-updated", struct{}{})
+		}
+	})
 	web := webserver.NewService(catalog, webserver.DefaultAddress)
 	web.ConfigureAccessCode(config.GetWebRequireCode(), config.SetWebRequireCode)
 	web.ConfigureContentFilters(config.SetContentFilters)
@@ -78,6 +83,7 @@ func applicationServices(
 		}
 	})
 	inspector := engine.LocalInspector{FFprobe: filepath.Join(paths.Bin, "ffprobe.exe"), FFmpeg: filepath.Join(paths.Bin, "ffmpeg.exe"), ImageMagick: filepath.Join(paths.Bin, "imagemagick", "magick.exe"), Cache: paths.Cache}
+	thumb.UpdateGate = updateGate
 	thumb.ConfigureImages(inspector)
 	importInspector := inspector
 	importInspector.InspectionThreads = 1
@@ -243,4 +249,5 @@ func init() {
 		"engine:install-progress",
 	)
 	application.RegisterEvent[int64]("media:thumbnail-updated")
+	application.RegisterEvent[struct{}]("media:metadata-updated")
 }

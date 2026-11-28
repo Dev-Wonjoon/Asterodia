@@ -14,10 +14,10 @@
     !define INFO_PRODUCTNAME "Asterodia"
 !endif
 !ifndef INFO_PRODUCTVERSION
-    !define INFO_PRODUCTVERSION "2.3.5"
+    !define INFO_PRODUCTVERSION "2.3.6"
 !endif
 !ifndef INFO_NUMERICVERSION
-    !define INFO_NUMERICVERSION "2.3.5.0"
+    !define INFO_NUMERICVERSION "2.3.6.0"
 !endif
 !ifndef INFO_COPYRIGHT
     !define INFO_COPYRIGHT "(c) 2025, My Company"

@@ -1,3 +1,4 @@
+import { Window } from "@wailsio/runtime";
 import type { CookieState } from "@contracts/cookie-api";
 import type { CookieState as CookieTransport } from "../../../bindings/github.com/Dev-Wonjoon/Asterodia/internal/settings/models";
 import { translate } from '@renderer/shared/i18n'
@@ -33,6 +34,12 @@ function cookieState(value: CookieTransport): CookieState {
 }
 
 const api: AppApi = {
+    onMediaMetadataUpdated: listener => Events.On('media:metadata-updated', () => listener()),
+    windowFullscreen: {
+        enter: async () => { if (await Window.IsFullscreen()) return false; await Window.Fullscreen(); return true; },
+        exit: () => Window.UnFullscreen(),
+        onExit: listener => Events.On('common:WindowUnFullscreen', () => listener()),
+    },
     cookies: {
         list: async () => cookieState(await SettingsService.GetCookies()),
         importFile: async () => { const value = await SettingsService.ImportCookies(); return value ? cookieState(value) : null; },
@@ -137,6 +144,8 @@ const api: AppApi = {
         cleanup: (request) => response(DownloadService.Cleanup(request)),
     },
     thumbnails: {
+        cacheUsage: () => response(ThumbnailService.CacheUsage()),
+        clearUnusedCache: () => response(ThumbnailService.ClearUnusedCache()),
         get: (request) => response(ThumbnailService.Get(request)),
         retry: (request) => response(ThumbnailService.Retry(request)),
     },

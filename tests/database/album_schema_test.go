@@ -438,10 +438,10 @@ func TestV10AlbumMigrationPreservesFilesAndBackup(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer upgraded.Close()
-	if countDB(t, upgraded, "PRAGMA user_version") != 14 || textDB(t, upgraded, "SELECT file_uuid FROM media_file WHERE id=7") != identity {
+	if countDB(t, upgraded, "PRAGMA user_version") != 16 || textDB(t, upgraded, "SELECT file_uuid FROM media_file WHERE id=7") != identity {
 		t.Fatal("migration lost identity")
 	}
-	backup := rawDB(t, textDB(t, upgraded, "SELECT backup_path FROM migration_run WHERE target_version=14"))
+	backup := rawDB(t, textDB(t, upgraded, "SELECT backup_path FROM migration_run WHERE target_version=16"))
 	if countDB(t, backup, "PRAGMA user_version") != 10 {
 		t.Fatal("backup not preserved")
 	}

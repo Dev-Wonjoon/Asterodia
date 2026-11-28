@@ -44,6 +44,9 @@ func (s *Service) Close() {
 	if s.searchCancel != nil {
 		s.searchCancel()
 	}
+	if s.metadataCancel != nil {
+		s.metadataCancel()
+	}
 	s.searchMu.Unlock()
 	s.searchWG.Wait()
 }

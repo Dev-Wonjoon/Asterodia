@@ -15,8 +15,11 @@ export function useVirtualGallery(
     gridRef: RefObject<HTMLDivElement | null>,
     scrollRef: RefObject<HTMLDivElement | null>,
     keys: string[],
-    geometryRef?: RefObject<GalleryGeometry | null>
+    geometryRef?: RefObject<GalleryGeometry | null>,
+    mode: 'cards' | 'details' = 'cards'
 ) {
+    const details = mode === 'details', gap = details ? 0 : GAP
+    const measuredMode = useRef(mode)
     const [layout, setLayout] = useState<Layout>({ width: 260, columns: 1, pitch: 320, start: 0, end: 8, retained: [] })
     const current = useRef(layout)
     const latestKeys = useRef(keys); latestKeys.current = keys
@@ -35,17 +38,18 @@ export function useVirtualGallery(
         const width = grid.getBoundingClientRect().width || grid.clientWidth
         // Hidden galleries retain their geometry and scroll position for explorer return.
         if (width <= 0) return
-        const columns = Math.max(1, Math.floor((width + GAP) / (260 + GAP)))
-        const cardWidth = Math.min(320, (width - (columns - 1) * GAP) / columns)
+        const columns = details ? 1 : Math.max(1, Math.floor((width + gap) / (260 + gap)))
+        const cardWidth = details ? width : Math.min(320, (width - (columns - 1) * gap) / columns)
         const previous = current.current
-        const resized = Math.abs(width - previous.width) > 0.5
+        const resized = Math.abs(width - previous.width) > 0.5 || measuredMode.current !== mode
+        measuredMode.current = mode
         if (resized) heights.current.clear()
         let height = resized ? 0 : previous.pitch - GAP
         for (const slot of grid.querySelectorAll<HTMLElement>(':scope > [data-gallery-key]')) {
             const value = slot.getBoundingClientRect().height
             if (value > 0) { height = Math.max(height, value); heights.current.set(slot.dataset.galleryKey!, value) }
         }
-        const pitch = (height || cardWidth * 9 / 16 + 156) + GAP
+        const pitch = details ? 64 : (height || cardWidth * 9 / 16 + 156) + gap
         const gridTop = grid.getBoundingClientRect().top - root.getBoundingClientRect().top + root.scrollTop - root.clientTop
         // Preserve the visible card when width, language or card height changes.
         if (root.scrollTop > gridTop && (resized || Math.abs(pitch - previous.pitch) > 0.5)) {
@@ -76,9 +80,9 @@ export function useVirtualGallery(
         const grid = gridRef.current, index = positionsRef.current.get(key)
         if (!grid || !origin || index === undefined) return null
         const { width, columns, pitch } = current.current
-        const slotWidth = (width + GAP) / columns
+        const slotWidth = (width + gap) / columns
         return new DOMRect(origin.left + index % columns * slotWidth, origin.top + Math.floor(index / columns) * pitch,
-            Math.min(320, slotWidth - GAP), heights.current.get(key) ?? pitch - GAP)
+            details ? width : Math.min(320, slotWidth - gap), details ? 64 : heights.current.get(key) ?? pitch - gap)
     }
     if (geometryRef) geometryRef.current = { bounds }
 
@@ -136,7 +140,7 @@ export function useVirtualGallery(
             document.removeEventListener('focusin', rememberFocus); grid.removeEventListener('focusout', leaveFocus)
             grid.removeEventListener('dragstart', dragStart, true); window.removeEventListener('dragend', dragEnd)
         }
-    }, [gridRef, scrollRef, renderedKey])
+    }, [gridRef, scrollRef, renderedKey, mode])
 
     function focus(key: string) {
         const root = scrollRef.current, grid = gridRef.current, box = bounds(key)
@@ -149,10 +153,10 @@ export function useVirtualGallery(
         const slot = [...grid.querySelectorAll<HTMLElement>(':scope > [data-gallery-key]')].find(node => node.dataset.galleryKey === key)
         slot?.querySelector<HTMLButtonElement>('[data-card-focus]:not(:disabled)')?.focus({ preventScroll: true })
     }
-    const style: CSSProperties = { position: 'relative', display: 'block', height: Math.max(0, Math.ceil(keys.length / layout.columns) * layout.pitch - GAP), overflowAnchor: 'none' }
+    const style: CSSProperties = { position: 'relative', display: 'block', minWidth: details ? 1184 : undefined, height: Math.max(0, Math.ceil(keys.length / layout.columns) * layout.pitch - gap), overflowAnchor: 'none' }
     function slotStyle(index: number): CSSProperties {
-        const slotWidth = (layout.width + GAP) / layout.columns
-        return { position: 'absolute', left: index % layout.columns * slotWidth, top: Math.floor(index / layout.columns) * layout.pitch, width: Math.min(320, slotWidth - GAP) }
+        const slotWidth = (layout.width + gap) / layout.columns
+        return { position: 'absolute', left: index % layout.columns * slotWidth, top: Math.floor(index / layout.columns) * layout.pitch, width: details ? layout.width : Math.min(320, slotWidth - gap) }
     }
     return { indices, columns: layout.columns, style, slotStyle, focus }
 }

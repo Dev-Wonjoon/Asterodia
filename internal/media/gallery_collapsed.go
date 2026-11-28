@@ -24,7 +24,7 @@ func listCollapsedGallery(ctx context.Context, q queryer, req ListRequest, where
 	if int64(offset) >= total {
 		offset = max(0, (int(total)-1)/limit*limit)
 	}
-	page, err := objects(ctx, q, `SELECT m.id FROM media m LEFT JOIN gallery_pin p ON p.media_id=m.id WHERE `+where+` ORDER BY p.created_at IS NOT NULL DESC,p.created_at DESC,m.created_at DESC,m.id DESC LIMIT ? OFFSET ?`, append(append([]any{}, args...), limit, offset)...)
+	page, err := objects(ctx, q, `SELECT m.id FROM media m LEFT JOIN gallery_pin p ON p.media_id=m.id WHERE `+where+` ORDER BY p.created_at IS NOT NULL DESC,p.created_at DESC,`+collapsedGalleryOrder(req)+` LIMIT ? OFFSET ?`, append(append([]any{}, args...), limit, offset)...)
 	if err != nil {
 		return failure(err)
 	}
@@ -45,6 +45,11 @@ func listCollapsedGallery(ctx context.Context, q queryer, req ListRequest, where
 		row := byID[id]
 		row["galleryPinned"] = row["isPinned"]
 		data = append(data, row)
+	}
+	if req.Details {
+		if err = enrichGalleryRows(ctx, q, data); err != nil {
+			return failure(err)
+		}
 	}
 	return api.Success(Object{"data": data, "total": total, "hasNextPage": int64(offset+len(data)) < total, "offset": offset})
 }

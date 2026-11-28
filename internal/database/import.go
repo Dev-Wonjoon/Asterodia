@@ -442,7 +442,7 @@ func (m *merge) run() error {
 			}
 		}
 	}
-	for _, table := range []string{"media_tag", "favorite"} {
+	for _, table := range []string{"media_tag", "media_platform", "favorite"} {
 		for _, r := range m.data[table] {
 			row := clone(r)
 			old, e := integer(row["media_id"])
@@ -455,6 +455,11 @@ func (m *merge) run() error {
 			delete(row, "id")
 			if e = m.remap(row, "media_id", "media"); e != nil {
 				return e
+			}
+			if table == "media_platform" {
+				if e = m.remap(row, "platform_id", "platform"); e != nil {
+					return e
+				}
 			}
 			if table == "media_tag" {
 				if e = m.remap(row, "tag_id", "tag"); e != nil {

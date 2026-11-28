@@ -34,6 +34,8 @@ type Status struct {
 	CanRetry bool    `json:"canRetry"`
 }
 type Service struct {
+	cacheMu        sync.Mutex
+	UpdateGate     *api.UpdateGate
 	preview        func(context.Context, string, string) (json.RawMessage, error)
 	previewMu      sync.Mutex
 	db             *sql.DB

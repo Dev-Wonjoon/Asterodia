@@ -24,3 +24,14 @@
 .sbp-external-screen .sbp-message{position:relative;inset:auto}
 .sbp-external-screen .sbp-feedback{top:auto;bottom:100%;z-index:3;font-size:14px}
 .sbp-external-screen .sbp-settings{bottom:100%;top:auto;max-height:50vh}
+
+/* Fullscreen chrome floats over the video, including seek shortcuts. */
+.sb-player.is-immersive{background:transparent;overflow:visible}
+.sb-player.is-immersive .sbp-screen{background:transparent}
+.sb-player.is-immersive .sbp-overlay{opacity:0;visibility:hidden;pointer-events:none;background:linear-gradient(transparent,#000e);padding:36px 16px 12px;transition:opacity .18s,visibility .18s}
+.sb-player.is-immersive.is-awake .sbp-overlay{opacity:1;visibility:visible;pointer-events:auto}
+.sb-player.is-immersive .sbp-jumps{box-sizing:border-box;width:100%;max-width:1000px;margin:0 auto;background:transparent}
+.sb-player.is-immersive .sbp-settings{pointer-events:auto}
+.sb-player.is-immersive .sbp-artwork{pointer-events:auto}
+.sb-player.is-immersive:not(.is-awake),.sb-player.is-immersive:not(.is-awake) *{cursor:none!important}
+@media(prefers-reduced-motion:reduce){.sb-player.is-immersive .sbp-overlay{transition:none}}

@@ -29,7 +29,9 @@ var schemaV10SQL = schemaV9SQL
 var schemaV11SQL = schemaV10SQL + albumDDL + albumSearchDDL()
 var schemaV12SQL = schemaV11SQL + galleryPinDDL
 var schemaV13SQL = schemaV12SQL + albumHierarchyDDL
-var schemaSQL = schemaV13SQL + instagramProfileAlbumDDL
+var schemaV14SQL = schemaV13SQL + instagramProfileAlbumDDL
+var schemaV15SQL = schemaV14SQL + manualPlatformDDL()
+var schemaSQL = schemaV15SQL + fileMetadataDDL
 
 func Open(ctx context.Context, filename string) (*sql.DB, error) {
 	return OpenWithOptions(ctx, filename, MigrationOptions{BackupDirectory: filepath.Join(filepath.Dir(filename), "backups")})

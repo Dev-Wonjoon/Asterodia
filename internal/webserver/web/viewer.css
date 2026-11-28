@@ -69,8 +69,13 @@
 .sb-viewer .sbv-pane .sbp-timeline{min-height:16px;height:16px}
 .sb-viewer .sbv-pane .sbp-jumps{grid-template-columns:repeat(8,minmax(0,1fr));gap:2px;padding:4px}
 .sb-viewer .sbv-pane .sbp-jumps button{min-height:26px;padding:2px 0;font-size:11px}
-.sbv-expanded .sbv-stage{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+.sb-viewer.sbv-expanded[open]{grid-template-rows:minmax(0,1fr);gap:0;background:#000}
+.sbv-expanded .sbv-stage{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);padding:0;gap:0}
+.sbv-expanded .sbv-pane{position:relative;border:0;border-radius:0;box-shadow:none}
 .sbv-expanded .sbv-pane:not(.is-selected){display:none}
+.sbv-expanded .sbv-video,.sbv-expanded .sbv-shared-player{position:absolute;inset:auto 0 0;margin:0;z-index:3;pointer-events:none}
+.sbv-expanded .sbv-pane.has-audio .sbv-video{inset:0}
+.sbv-expanded:has(.sb-player.is-immersive:not(.is-awake)),.sbv-expanded:has(.sb-player.is-immersive:not(.is-awake)) *{cursor:none!important}
 .sbv-picker{box-sizing:border-box;width:min(760px,94vw);max-height:88dvh;padding:16px;border:1px solid #64748b;border-radius:12px;background:#111827;color:#f3f4f6;font:14px/1.5 system-ui,sans-serif}
 .sbv-picker::backdrop{background:#000a}
 .sbv-picker[open]{display:flex;flex-direction:column;gap:12px}

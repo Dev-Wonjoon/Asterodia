@@ -3,11 +3,13 @@ import type { DragEvent, MouseEvent, ReactNode } from 'react'
 import type { MediaSummaryDto } from '@contracts/media-v2'
 import { MediaPreview } from '@renderer/shared/components/media/MediaPreview'
 import { Music2, Pin } from 'lucide-react'
+import { GalleryDetailCells, detailColumns } from './GalleryDetailCells'
 
 export const galleryGridClass = 'gallery-grid grid items-start gap-4'
 
 /** The desktop and HTTP clients render this same card. Actions depend on the client. */
-export function GalleryCard({ media, previewPath, resolveUrl, selected, active, selection, disabled, viewDisabled, onView, onOpen, onDetails, onSelect, selectionKey, onAlbumDragStart, onAlbumDragEnd, onAlbumDragOver, onAlbumDragLeave, onAlbumDrop, albumDropActive, children }: {
+export function GalleryCard({ media, previewPath, resolveUrl, selected, active, selection, disabled, viewDisabled, onView, onOpen, onDetails, onSelect, selectionKey, onAlbumDragStart, onAlbumDragEnd, onAlbumDragOver, onAlbumDragLeave, onAlbumDrop, albumDropActive, children, details = false }: {
+    details?: boolean
     media: MediaSummaryDto
     previewPath: string | null
     resolveUrl?: (path: string | null | undefined) => string | null
@@ -75,11 +77,17 @@ export function GalleryCard({ media, previewPath, resolveUrl, selected, active, 
         data-album-drop-id={onAlbumDrop ? media.id : undefined} data-drop-active={albumDropActive || undefined}
         onClick={event => { if (onSelect && event.detail < 2 && !viewDisabled && !(event.target as Element).closest('button,input,label,a,[data-action-boundary]')) onSelect(event) }}
         onDoubleClick={event => { if ((onSelect || onOpen) && !viewDisabled && (onOpen || media.fileCount > 0) && !event.ctrlKey && !event.metaKey && !event.shiftKey && !(event.target as Element).closest('input,label,[data-action-boundary],button:not([data-card-select])')) (onOpen ?? onView)() }}
-        className={'motion-card relative min-w-0 rounded-xl border bg-[var(--bg-sidebar)] text-left ' + (onSelect ? 'select-none ' : '') + (albumDropActive || selected ? 'border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]' : active ? 'border-[var(--color-primary)]' : 'border-[var(--border-line)]')}>
+        style={details ? { gridTemplateColumns: detailColumns } : undefined}
+        className={(details ? 'relative grid h-16 min-w-[1184px] items-center border-b bg-[var(--bg-sidebar)] text-left ' : 'motion-card relative min-w-0 rounded-xl border bg-[var(--bg-sidebar)] text-left ') + (onSelect ? 'select-none ' : '') + (albumDropActive || selected ? 'border-[var(--color-primary)] ring-2 ring-inset ring-[var(--color-primary)]' : active ? 'border-[var(--color-primary)]' : 'border-[var(--border-line)]')}>
         {albumDropActive && <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-[var(--bg-app)]/80 p-3">
             <span className="rounded-lg bg-[var(--color-primary)] px-3 py-2 text-sm font-semibold text-white">{translate("gallery.album.add")}</span>
         </div>}
         {selection}
+        {details ? <GalleryDetailCells disabled={viewDisabled} media={media} previewPath={previewPath} resolveUrl={resolveUrl} onClick={event => {
+            if (viewDisabled) return
+            if (!onSelect || event.detail === 0 && !event.ctrlKey && !event.shiftKey && !event.metaKey) (onOpen ?? onView)()
+            else if (event.detail < 2) onSelect(event)
+        }}>{children}</GalleryDetailCells> : <>
         {media.isPinned && <span title={translate("gallery.pinned")} aria-label={translate("gallery.pinned")} className="pointer-events-none absolute left-2 top-2 z-10 flex size-7 items-center justify-center rounded bg-[var(--bg-sidebar)] text-[var(--color-primary)] shadow-sm"><Pin className="size-4" fill="currentColor" aria-hidden="true" /></span>}
         <button type="button" data-card-select data-card-focus disabled={viewDisabled || (!onSelect && !onOpen && media.fileCount === 0)} aria-label={onOpen ? translate('explorer.openAlbum', { name: title }) : title + (onSelect ? translate("gallery.selectDoubleClickToView") : translate("gallery.view"))} onClick={event => { if (!onSelect || event.detail === 0 && !event.ctrlKey && !event.shiftKey && !event.metaKey) (onOpen ?? onView)(); else if (event.detail < 2) onSelect(event) }}
             className="block w-full overflow-hidden rounded-t-xl text-left disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]">
@@ -100,5 +108,6 @@ export function GalleryCard({ media, previewPath, resolveUrl, selected, active, 
             </p>
         </div>
         {children}
+        </>}
     </article>
 }

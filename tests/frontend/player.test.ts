@@ -83,6 +83,42 @@ it('expands the entire player with its jump buttons when native fullscreen is un
     expect(player!.root.parentElement).toBe(document.body)
 })
 
+it('overlays fullscreen controls, hides them on idle, and wakes them on pointer movement', async () => {
+    const video = setup()
+    button('전체화면').click()
+    const overlay = player!.root.querySelector<HTMLElement>('.sbp-overlay')!
+    expect(overlay.querySelector('.sbp-jumps')).not.toBeNull()
+    await vi.advanceTimersByTimeAsync(2100)
+    expect(player!.root.classList.contains('is-awake')).toBe(false)
+    expect(overlay.inert).toBe(true)
+    video.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))
+    expect(player!.root.classList.contains('is-awake')).toBe(true)
+    expect(overlay.inert).toBe(false)
+    button('전체화면 종료').click(); await vi.advanceTimersByTimeAsync(0)
+    expect(player!.root.querySelector(':scope > .sbp-jumps')).not.toBeNull()
+    expect(overlay.inert).toBe(false)
+})
+
+it('keeps fullscreen controls available for keyboard focus, dragging, and an open settings menu', async () => {
+    setup(); button('전체화면').click()
+    player!.root.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
+    button('재생').focus()
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(player!.root.classList.contains('is-awake')).toBe(true)
+    player!.root.focus()
+    const seek = document.querySelector('.sbp-timeline')!
+    seek.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(player!.root.classList.contains('is-awake')).toBe(true)
+    document.dispatchEvent(new PointerEvent('pointerup'))
+    button('플레이어 설정').click()
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(player!.root.classList.contains('is-awake')).toBe(true)
+    button('플레이어 설정').click()
+    await vi.advanceTimersByTimeAsync(2100)
+    expect(player!.root.classList.contains('is-awake')).toBe(false)
+})
+
 
 const audioKey = 'asterodia:player-audio:v1'
 function changeVolume(value: string) {

@@ -11,6 +11,8 @@ const page = <T>(rows: T[], offset = 0, limit = 50) => ({ data: rows.slice(offse
 export function createDemoModel() {
     let { items, files } = createSeed()
     let nextId = 100, nextTag = 10
+    const classifications = new Map<number, {id:number;name:string}[]>()
+    const platformNames = (id:number) => classifications.get(id) ?? []
     const jobs = new Map<string, DownloadJobDto>()
     const timers = new Map<string, ReturnType<typeof setInterval>>()
     const pending = new Map<string, (result: DownloadResponse<DownloadRunDto>) => void>()
@@ -18,7 +20,10 @@ export function createDemoModel() {
     const find = (id: number) => items.find(item => item.summary.id === id)
     const file = (id: number) => files.find(value => value.id === id)
     const summary = (item: DemoItem): MediaSummaryDto => ({ ...item.summary, fileCount: item.fileIds.length,
-        managedFileCount: item.fileIds.length, childAlbumCount: items.filter(other => other.summary.parentId === item.summary.id).length })
+        managedFileCount: item.fileIds.length, childAlbumCount: items.filter(other => other.summary.parentId === item.summary.id).length,
+        byteSize: item.fileIds.reduce((sum,id) => sum + (file(id)?.filesize ?? 0), 0),
+        fileCreatedAt: item.fileIds.length ? Math.min(...item.fileIds.map(id => (file(id)?.createdAt ?? item.summary.createdAt) - 7*86400000)) : null,
+        platformNames: [...new Set([item.platform, ...platformNames(item.summary.id).map(value => value.name)])].filter(Boolean).sort(), tagNames: item.tags.map(tag => tag.name).sort() })
     const touch = (item: DemoItem) => {
         item.summary.revision++
         item.summary.updatedAt = Date.now()
@@ -29,10 +34,10 @@ export function createDemoModel() {
     const matches = (item: DemoItem, filter?: MediaFilter) => {
         if (!filter) return true
         const tags = item.tags.map(tag => tag.name.toLowerCase())
-        const text = [item.summary.title, item.author, item.platform, ...tags].join(' ').toLowerCase()
+        const text = [item.summary.title, item.author, item.platform, ...platformNames(item.summary.id).map(value => value.name), ...tags].join(' ').toLowerCase()
         return (!filter.keyword || text.includes(filter.keyword.toLowerCase())) &&
             (!filter.tags?.length || (filter.tagMode === 'or' ? filter.tags.some(tag => tags.includes(tag.toLowerCase())) : filter.tags.every(tag => tags.includes(tag.toLowerCase())))) &&
-            (!filter.platforms?.length || filter.platforms.includes(item.platform)) && (!filter.authors?.length || filter.authors.includes(item.author)) &&
+            (!filter.platforms?.length || filter.platforms.some(name => name === item.platform || platformNames(item.summary.id).some(value => value.name === name))) && (!filter.authors?.length || filter.authors.includes(item.author)) &&
             (!filter.createdFrom || item.summary.createdAt >= filter.createdFrom) && (!filter.createdTo || item.summary.createdAt <= filter.createdTo)
     }
     const albumFiles = (item: DemoItem, visited = new Set<number>()): number[] => {
@@ -46,8 +51,8 @@ export function createDemoModel() {
             if (!request.selection.length || request.selection.length > 200 || new Set(request.selection.map(row => row.mediaId)).size !== request.selection.length
                 || [...(request.addTags ?? []), ...(request.removeTags ?? [])].some(name => !name.trim() || [...name.trim()].length > 100)
                 || (request.addTags?.length ?? 0) + (request.removeTags?.length ?? 0) > 100
-                || (!request.addTags?.length && !request.removeTags?.length && request.isFavorite === undefined)) return fail('INVALID_ARGUMENT')
-            const updated: { mediaId: number; revision: number }[] = []
+                || (!request.addTags?.length && !request.removeTags?.length && !request.addPlatforms?.length && !request.removePlatforms?.length && request.isFavorite === undefined)) return fail('INVALID_ARGUMENT')
+            const updated: import('@contracts/media-api').MediaBulkEditResult['updated'] = []
             const failed: import('@contracts/media-api').MediaBulkEditResult['failed'] = []
             for (const target of request.selection) {
                 const item = find(target.mediaId)
@@ -57,8 +62,9 @@ export function createDemoModel() {
                     continue
                 }
                 const result = await media.edit({ mediaId: target.mediaId, expectedRevision: target.revision, isFavorite: request.isFavorite,
+                    platformChange: { addNames: request.addPlatforms, removeNames: request.removePlatforms },
                     tagChange: { addNames: request.addTags, removeIds: item.tags.filter(tag => request.removeTags?.map(name => name.trim()).includes(tag.name)).map(tag => tag.id) } })
-                if (result.ok) updated.push({ mediaId: target.mediaId, revision: result.data.revision })
+                if (result.ok) updated.push({ mediaId: target.mediaId, revision: result.data.revision, tags: item.tags, platforms: platformNames(target.mediaId) })
                 else failed.push({ mediaId: target.mediaId, error: result.error })
             }
             return ok({ updated, failed })
@@ -78,9 +84,17 @@ export function createDemoModel() {
                 const showFiles = request.galleryView === 'files' || (isAlbum(item) && (request.showAlbumFiles || expanded.has(card.id)))
                 const fileRows = showFiles ? item.fileIds.flatMap((id, index) => {
                     const value = file(id)
-                    return value ? [{ ...card, galleryFile: value, galleryFileOffset: index, galleryCanCollapse: true }] : []
+                    return value ? [{ ...card, galleryFile: value, galleryFileOffset: index, galleryCanCollapse: true, byteSize: value.filesize, fileCreatedAt: value.createdAt - 7*86400000 }] : []
                 }) : []
                 return request.galleryView === 'files' ? fileRows : [card, ...fileRows]
+            })
+            if (request.sort) result.sort((a,b) => {
+                const pinned = Number(!!b.isPinned) - Number(!!a.isPinned); if (pinned) return pinned
+                const key = (row: MediaSummaryDto): string | number | null => request.sort === 'name' ? row.galleryFile?.title || row.title : request.sort === 'registered' ? row.galleryFile?.createdAt ?? row.createdAt : request.sort === 'fileCreated' ? row.fileCreatedAt ?? null : request.sort === 'platform' ? row.platformNames?.[0] ?? null : row.tagNames?.[0] ?? null
+                const left=key(a),right=key(b)
+                if (left===null || right===null) return Number(left===null)-Number(right===null)
+                const compared=typeof left==='number' && typeof right==='number' ? left-right : String(left).localeCompare(String(right),undefined,{sensitivity:'base'})
+                return compared*(request.descending ? -1 : 1) || b.id-a.id || (b.galleryFile?.id ?? 0)-(a.galleryFile?.id ?? 0)
             })
             return ok(page(result, request.offset, request.limit))
         },
@@ -88,7 +102,7 @@ export function createDemoModel() {
             const item = find(request.mediaId)
             if (!item) return fail('NOT_FOUND')
             return ok({ ...summary(item), files: page(item.fileIds.flatMap(id => file(id) ? [file(id)!] : []), request.fileOffset, request.fileLimit),
-                tags: item.tags, favorite: item.summary.isFavorite ? { id: item.summary.id, createdAt: item.summary.createdAt } : null,
+                tags: item.tags, platforms: platformNames(item.summary.id), favorite: item.summary.isFavorite ? { id: item.summary.id, createdAt: item.summary.createdAt } : null,
                 localFolder: null, locations: [] })
         },
         async sequence({ mediaId }) {
@@ -122,6 +136,14 @@ export function createDemoModel() {
                     const existing = items.flatMap(row => row.tags).find(tag => tag.name === clean)
                     item.tags.push(existing ? { ...existing } : { id: nextTag++, name: clean })
                 }
+            }
+            if (request.platformChange) {
+                const values = platformNames(item.summary.id).filter(value => !request.platformChange!.removeNames?.includes(value.name))
+                for (const name of request.platformChange.addNames ?? []) if (name.trim() && !values.some(value => value.name === name.trim())) {
+                    const known = [...classifications.values()].flat().find(value => value.name === name.trim())
+                    values.push(known ?? { id: nextTag++, name: name.trim() })
+                }
+                classifications.set(item.summary.id, values)
             }
             touch(item)
             return ok(summary(item))
@@ -195,12 +217,13 @@ export function createDemoModel() {
             return ok({ mediaId: item.summary.id, parentRemoved: true, revision: null, cleanupTaskId: null })
         },
         async suggest(request) {
-            const values = request.kind === 'tag' ? items.flatMap(item => item.tags.map(tag => tag.name)) : items.map(item => item[request.kind])
+            const values = request.kind === 'tag' ? items.flatMap(item => item.tags.map(tag => tag.name)) : request.kind === 'platform' ? [...items.map(item => item.platform), ...[...classifications.values()].flat().map(value => value.name)] : items.map(item => item.author)
             return ok([...new Set(values)].filter(value => value.toLowerCase().includes(request.text.toLowerCase())).slice(0, request.limit ?? 10))
         },
         async searchSuggest(request) {
             const values = items.filter(item => matches(item, request.filter) && (!request.favoritesOnly || item.summary.isFavorite)).flatMap(item => [
-                { kind: 'title' as const, value: item.summary.title }, { kind: 'author' as const, value: item.author }, { kind: 'platform' as const, value: item.platform }, ...item.tags.map(tag => ({ kind: 'tag' as const, value: tag.name }))])
+                { kind: 'title' as const, value: item.summary.title }, { kind: 'author' as const, value: item.author }, { kind: 'platform' as const, value: item.platform },
+                ...platformNames(item.summary.id).map(platform => ({ kind: 'platform' as const, value: platform.name })), ...item.tags.map(tag => ({ kind: 'tag' as const, value: tag.name }))])
             const unique = values.filter((value, index, rows) => value.value && (!request.kind || value.kind === request.kind) && value.value.toLowerCase().includes(request.text.toLowerCase()) && rows.findIndex(other => other.kind === value.kind && other.value === value.value) === index)
             return ok({ ...page(unique, request.offset, request.limit ?? 10), revision: 1, indexed: true })
         },

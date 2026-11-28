@@ -100,6 +100,10 @@ func MediaMiddleware(db *sql.DB, previewCache string) func(http.Handler) http.Ha
 			// External originals can change at the same path after a rescan. Use
 			// nanosecond validators instead of replaying a cached old file for 60s.
 			w.Header().Set("Cache-Control", "private, no-cache")
+			// Generated thumbnails are content-addressed; changed sources get a new URL.
+			if rel, e := filepath.Rel(filepath.Join(filepath.Dir(previewCache), "thumbnails"), path); e == nil && filepath.Base(rel) == rel && previewCacheName.MatchString(rel) {
+				w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+			}
 			etag := fmt.Sprintf(`"%x-%x"`, info.Size(), info.ModTime().UnixNano())
 			w.Header().Set("ETag", etag)
 			if video && r.Method == http.MethodGet && info.Size() > maxVideoResponseBytes {

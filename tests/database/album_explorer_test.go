@@ -158,10 +158,10 @@ func TestV12AlbumHierarchyMigrationRollbackBackupAndImport(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer upgraded.Close()
-	if countDB(t, upgraded, "PRAGMA user_version") != 14 || countDB(t, upgraded, "SELECT count(*) FROM user_album_file") != 1 {
+	if countDB(t, upgraded, "PRAGMA user_version") != 16 || countDB(t, upgraded, "SELECT count(*) FROM user_album_file") != 1 {
 		t.Fatal("migration lost membership")
 	}
-	backup := rawDB(t, textDB(t, upgraded, "SELECT backup_path FROM migration_run WHERE target_version=14"))
+	backup := rawDB(t, textDB(t, upgraded, "SELECT backup_path FROM migration_run WHERE target_version=16"))
 	defer backup.Close()
 	if countDB(t, backup, "PRAGMA user_version") != 12 {
 		t.Fatal("backup version")
