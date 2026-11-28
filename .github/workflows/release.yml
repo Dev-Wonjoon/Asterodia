@@ -83,8 +83,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           # A separate name lets full CI safely fall back after a failed transfer.
+          # Keep the verified CI input format; package adds legacy aliases later.
           name: reused-ci-windows-amd64
-          path: .test-data/reused-ready/
+          path: .test-data/reused-ci/amd64/
           if-no-files-found: error
           retention-days: 7
           compression-level: 0

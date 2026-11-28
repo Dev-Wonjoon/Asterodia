@@ -60,6 +60,25 @@ try {
         $legacyHash = (Get-FileHash -LiteralPath (Join-Path $output $legacy) -Algorithm SHA256).Hash.ToLowerInvariant()
         if ($legacyHash -cne $hash -or $lines -cnotcontains "$hash  $legacy") { throw "Legacy alias must contain identical verified bytes: $arch" }
     }
+    # Exercise the actual CI-reuse upload path through the final packaging gate.
+    # Reuse validation creates legacy aliases; they belong only in final output.
+    $workflowText = Get-Content -LiteralPath (Join-Path $testRepository '.github/workflows/release.yml') -Raw
+    $uploadPath = [regex]::Match($workflowText, 'name: reused-ci-windows-amd64\s+path:\s*([^\r\n]+)')
+    if (-not $uploadPath.Success) { throw 'CI-reuse artifact upload path is missing.' }
+    $handoffRoot = Join-Path $caseRoot 'ci-reuse-handoff'
+    $reuseInput = Join-Path $handoffRoot '.test-data/reused-ci'
+    New-Item -ItemType Directory -Force -Path $reuseInput | Out-Null
+    Copy-Item -LiteralPath (Join-Path $inputs 'amd64') -Destination $reuseInput -Recurse
+    & $verify -InputDirectory $reuseInput -OutputDirectory (Join-Path $handoffRoot '.test-data/reused-ready') -Tag "v$version" -Architectures amd64
+    $uploadedDirectory = [IO.Path]::GetFullPath((Join-Path $handoffRoot $uploadPath.Groups[1].Value.Trim()))
+    if (-not $uploadedDirectory.StartsWith($handoffRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Upload fixture path escaped the test workspace.' }
+    $packageInput = Join-Path $handoffRoot 'package-input'
+    New-Item -ItemType Directory -Force -Path $packageInput | Out-Null
+    Copy-Item -LiteralPath $uploadedDirectory -Destination (Join-Path $packageInput 'amd64') -Recurse
+    Copy-Item -LiteralPath (Join-Path $inputs 'arm64') -Destination $packageInput -Recurse
+    $packageOutput = Join-Path $handoffRoot 'package-output'
+    & $verify -InputDirectory $packageInput -OutputDirectory $packageOutput -Tag "v$version"
+    if ([IO.File]::ReadAllText((Join-Path $packageOutput 'SHA256SUMS')) -cne [IO.File]::ReadAllText((Join-Path $output 'SHA256SUMS'))) { throw 'Reused CI produced different release checksums.' }
     foreach ($extendedVersion in @('2.2.6a', '2.2.6.1', '2.2.6.1a')) {
         $extendedRoot = Join-Path $caseRoot $extendedVersion
         New-Item -ItemType Directory -Force -Path $extendedRoot | Out-Null
