@@ -14,12 +14,21 @@ const historyCleanupPending = "history_cleanup_pending"
 // The service mutex must be held. Active/recoverable records count towards the
 // limit, but are never evicted; an all-protected history may temporarily exceed it.
 func (s *Service) pruneHistory(ctx context.Context, keepDraft string) error {
+	// Retain the five newest batch groups as complete units; never evict active
+	// jobs or unresolved publication proofs from older groups.
+	if _, err := s.store.db.ExecContext(ctx, `DELETE FROM media_edit_job AS old WHERE json_extract(request_json,'$.batch.id') IN (
+	 SELECT json_extract(request_json,'$.batch.id') FROM media_edit_job WHERE json_type(request_json,'$.batch')='object'
+	 GROUP BY json_extract(request_json,'$.batch.id') ORDER BY max(created_at) DESC LIMIT -1 OFFSET 5
+	 ) AND state IN ('completed','failed','cancelled','interrupted') AND (state='completed' OR proof_json IS NULL) AND id<>?
+ AND NOT EXISTS(SELECT 1 FROM media_edit_job sibling WHERE json_extract(sibling.request_json,'$.batch.id')=json_extract(old.request_json,'$.batch.id') AND (sibling.state IN ('pending','running','verifying','publishing','stop_unconfirmed') OR sibling.state<>'completed' AND sibling.proof_json IS NOT NULL))`, s.activeID); err != nil {
+		return err
+	}
 	var count int
-	if err := s.store.db.QueryRowContext(ctx, "SELECT count(*) FROM media_edit_job").Scan(&count); err != nil {
+	if err := s.store.db.QueryRowContext(ctx, "SELECT count(*) FROM media_edit_job WHERE json_type(request_json,'$.batch') IS NULL").Scan(&count); err != nil {
 		return err
 	}
 	ids, err := s.store.ids(ctx, "media_edit_job", `WHERE state IN ('completed','failed','cancelled','interrupted')
-        AND id<>? AND (state='completed' OR preview=1 OR proof_json IS NULL)
+        AND json_type(request_json,'$.batch') IS NULL AND id<>? AND (state='completed' OR preview=1 OR proof_json IS NULL)
         ORDER BY created_at ASC,rowid ASC LIMIT ?`, s.activeID, max(0, count-maxEditJobs))
 	if err != nil {
 		return err

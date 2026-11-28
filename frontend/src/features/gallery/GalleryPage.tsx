@@ -1,3 +1,4 @@
+import { BatchConvertPanel } from '../mediaedit/BatchConvertPanel'
 import { canEditMedia } from '../mediaedit/canEditMedia'
 import { translateError, translateMessage, translate, useLanguage } from '@renderer/shared/i18n'
 import { useGallerySelection, gallerySelectionKey, galleryDisplayKey, albumDragType } from './useGallerySelection'
@@ -65,6 +66,7 @@ export const GalleryPage = ({
 } = {}): React.JSX.Element => {
     useLanguage()
     const { confirm } = useConfirm()
+    const [conversion, setConversion] = useState<{ selection: MoveSelection[]; mode: 'convert' | 'webp' } | null>(null)
     const generation = useRef(0)
     const [galleryView, setGalleryView] = useState<GalleryView>('all')
     const [showAlbumFiles, setShowAlbumFiles] = useState(false)
@@ -528,6 +530,7 @@ export const GalleryPage = ({
         <>
         {explorerId !== null && <AlbumExplorer mediaId={explorerId} onClose={() => setExplorerId(null)} onChanged={() => { void store.refresh() }} />}
         <div hidden={explorerId !== null} inert={explorerId !== null} className="h-full">
+        {conversion && <BatchConvertPanel selection={conversion.selection} initialMode={conversion.mode} onClose={() => setConversion(null)} onChanged={() => requestGalleryRefresh.current()} />}
         {viewer && <MediaViewer mediaId={viewer.mediaId} fileId={viewer.fileId} onClose={closeViewer} />}
         {mergeSelection && <FolderMergeDialog selection={mergeSelection} onClose={() => setMergeSelection(null)} onChanged={() => { clearSelection(); void store.refresh() }} onStarted={(jobId, error) => moveControls.current?.track(jobId, error)} />}
         <ListDetailLayout
@@ -539,6 +542,7 @@ export const GalleryPage = ({
             listHeader={
                 <header data-action-boundary className="flex h-11 min-w-0 items-center gap-2 bg-[var(--bg-app)]">
                     <h1 className="shrink-0 text-lg font-semibold">{title}</h1>
+                    <button type="button" className="shrink-0 rounded-lg border border-[var(--border-line)] px-2 py-1.5 text-sm disabled:opacity-40" disabled={state.busy || draftDirty} onClick={() => setConversion({ selection: selectedTargets(), mode: 'convert' })}>{translate('conversion.title')}</button>
                     <MediaEditLauncher compact controlRef={mediaEditControls} disabled={state.busy || bulk.busy || moveBusy || albumDropBusy || draftDirty} />
                     <AlbumManager selection={selection} fileIds={albumFileIds} disabled={toolbarDisabled} controlRef={albumControls} showSelectionActions={false}
                         onChanged={(id, deleted) => { if (deleted && store.getSnapshot().detail.mediaId === id) store.closeDetail(); void store.refresh() }} onClear={clearSelection} />
@@ -547,7 +551,7 @@ export const GalleryPage = ({
                         <GallerySelectionBar active={pointerSelection.dragging} count={pointerSelection.dragging ? pointerSelection.entries.size : selection.length + albumFileIds.length} groupCount={selection.length} fileCount={albumFileIds.length} total={list.status === 'ready' ? list.page.total : null} disabled={pageDisabled || pointerSelection.dragging}
                             recoveryDisabled={state.busy || bulk.busy || moveBusy || albumDropBusy || draftDirty || pointerSelection.dragging} onRefresh={() => { clearSelection(); void store.refresh() }}
                             removalLabel={removalLabel(selectedRemovalCounts([...pointerSelection.entries.values()], list.page.data))}
-                            onAdd={() => albumControls.current?.addSelection()} onMove={gatherSelection} onMerge={() => { if (!pageDisabled) setMergeSelection(selectedTargets()) }} onClear={clearSelection} onBulk={onBulk} />
+                            onAdd={() => albumControls.current?.addSelection()} onMove={gatherSelection} onMerge={() => { if (!pageDisabled) setMergeSelection(selectedTargets()) }} onClear={clearSelection} onBulk={onBulk} onConvert={mode => { if (!pageDisabled) setConversion({ selection: selectedTargets(), mode }) }} />
                     </div> : <div key="normal" data-gallery-header-mode="normal" data-gallery-toolbar className="gallery-header-switch"><GalleryToolbar count={selection.length + albumFileIds.length} disabled={state.busy || bulk.busy || moveBusy || albumDropBusy || draftDirty} actionDisabled={state.needsRefresh || list.status !== 'ready'} importDisabled={importBusy || state.needsRefresh} canImport={!favoritesOnly} hasImportResult={hasImportResult}
                         presentation={{ ...presentation, onLayout: layout => { clearSelection(); presentation.update({ layout }); listScrollRef.current?.scrollTo({ top: 0 }) }, onSort: selectSort, onDescending: descending => presentation.update({ descending }) }}
                         galleryView={galleryView} showAlbumFiles={showAlbumFiles} viewDisabled={pageDisabled || tagCommand !== null}

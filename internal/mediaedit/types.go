@@ -3,6 +3,7 @@ package mediaedit
 import "github.com/Dev-Wonjoon/Asterodia/internal/engine"
 
 type PrepareRequest struct {
+	Batch          bool    `json:"batch,omitempty"`
 	QuickVideo     bool    `json:"quickVideo,omitempty"`
 	OriginalFrames bool    `json:"originalFrames,omitempty"`
 	FullSource     bool    `json:"fullSource,omitempty"`
@@ -18,6 +19,7 @@ type PrepareRequest struct {
 	Kind           string  `json:"kind"`
 }
 type CreateRequest struct {
+	Batch           *BatchOptions           `json:"batch,omitempty"`
 	OutputDirectory string                  `json:"outputDirectory,omitempty"`
 	AlbumIDs        []int64                 `json:"albumIds,omitempty"`
 	TagNames        []string                `json:"tagNames,omitempty"`

@@ -95,6 +95,12 @@ func (s *Service) Assets() http.Handler {
 			} else if j.Options.Kind == "webp" {
 				contentType = "image/webp"
 			}
+			if j.Options.Batch != nil && j.Options.Batch.Mode == "convert" {
+				contentType = mime.TypeByExtension(filepath.Ext(path))
+				if contentType == "" {
+					contentType = "application/octet-stream"
+				}
+			}
 		} else {
 			http.NotFound(w, r)
 			return

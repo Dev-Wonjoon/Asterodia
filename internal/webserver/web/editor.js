@@ -1914,8 +1914,8 @@ export function mountMediaEditor(host, options) {
             const value = await unwrap(api.list());
             if (dead)
                 return;
-            sessions = value.sessions;
-            jobs = value.jobs;
+            sessions = value.sessions.filter(item => !item.options.batch);
+            jobs = value.jobs.filter(item => !item.options.batch);
             for (const [id, previous] of previewJobs) {
                 const latest = jobs.find(job => job.id === previous.id);
                 if (latest) previewJobs.set(id, latest);

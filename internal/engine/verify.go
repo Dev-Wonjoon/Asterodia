@@ -13,12 +13,18 @@ import (
 func VerifyMedia(ctx context.Context, ffmpeg, path, kind string) error {
 	demuxer := ""
 	switch strings.ToLower(filepath.Ext(path)) {
-	case ".mp4":
+	case ".mp4", ".mov", ".m4a":
 		demuxer = "mov"
-	case ".mkv":
+	case ".mkv", ".webm":
 		demuxer = "matroska"
 	case ".mp3":
 		demuxer = "mp3"
+	case ".ogg", ".opus":
+		demuxer = "ogg"
+	case ".flac":
+		demuxer = "flac"
+	case ".wav":
+		demuxer = "wav"
 	default:
 		return fmt.Errorf("검증을 지원하지 않는 미디어 형식입니다")
 	}

@@ -16,7 +16,14 @@ beforeEach(() => {
     vi.useFakeTimers(); localStorage.clear(); observers = []
     vi.stubGlobal('IntersectionObserver', class {
         record: typeof observers[number]
-        constructor(callback: typeof observers[number]['callback']) { this.record = { callback, active: false }; observers.push(this.record) }
+        constructor(callback: typeof observers[number]['callback'], options: IntersectionObserverInit) {
+            this.record = { callback, active: false }; observers.push(this.record)
+            Object.defineProperties(options.root!, {
+                clientHeight: { configurable: true, value: 400 },
+                scrollHeight: { configurable: true, value: 800 },
+                scrollTop: { configurable: true, writable: true, value: 400 },
+            })
+        }
         observe() { this.record.active = true }
         disconnect() { this.record.active = false }
     })

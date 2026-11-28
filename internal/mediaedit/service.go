@@ -69,6 +69,9 @@ func (s *Service) signal() {
 }
 
 func (s *Service) Prepare(ctx context.Context, req PrepareRequest) api.Result {
+	if req.Batch {
+		return invalid("일괄 변환 API에서 작업을 등록하세요")
+	}
 	leaveUpdate, updateAllowed := s.UpdateGate.Enter()
 	if !updateAllowed {
 		return api.Failure("UPDATE_RESTARTING", api.UpdateBlocked)
@@ -297,7 +300,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) api.Result {
 	if s.closed || s.halted || s.done == nil {
 		return api.Failure("NOT_READY", "편집 서비스를 사용할 준비가 되지 않았습니다")
 	}
-	if !validID(req.RequestID) || !validID(req.SessionID) || (req.Kind != "gif" && req.Kind != "webp" && req.Kind != "trim") {
+	if req.Batch != nil || !validID(req.RequestID) || !validID(req.SessionID) || (req.Kind != "gif" && req.Kind != "webp" && req.Kind != "trim") {
 		return invalid("편집 요청을 확인하세요")
 	}
 	if err := normalizeOutput(&req); err != nil {

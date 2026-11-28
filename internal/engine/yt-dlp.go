@@ -52,7 +52,11 @@ func (target YtdlpTarget) ValidateDirectDownload(options Options) error {
 	if err != nil {
 		return err
 	}
-	_, _, err = selectYtdlpFormats(info.Formats, options.Type == "audio" || options.Quality == "audio", height, true)
+	_, flexible, err := downloadOutputFormat(options)
+	if err != nil {
+		return err
+	}
+	_, _, err = selectYtdlpFormats(info.Formats, options.Type == "audio" || options.Quality == "audio", height, true, flexible)
 	return err
 }
 
@@ -135,6 +139,7 @@ func selectYtdlpFormats(
 	audio bool,
 	maxHeight int,
 	canMerge bool,
+	flexible bool,
 ) ([]ytdlpDirectFormat, string, error) {
 	var videoOnly, audioOnly, combined *ytdlpDirectFormat
 	for i := range formats {
@@ -142,9 +147,12 @@ func selectYtdlpFormats(
 		if format.VideoCodec == "none" {
 			// MP3 extraction can use any supported audio source. Keep MP4
 			// video merges on M4A to preserve their existing codec selection.
-			if audio || format.Ext == "m4a" {
+			if audio || flexible || format.Ext == "m4a" {
 				audioOnly = format
 			}
+			continue
+		}
+		if !audio && !flexible && format.Ext != "mp4" {
 			continue
 		}
 		if !audio && maxHeight > 0 &&
@@ -192,18 +200,24 @@ func (y *Ytdlp) DownloadSingle(
 	}
 
 	audio := options.Type == "audio" || options.Quality == "audio"
+	output, advanced, err := downloadOutputFormat(options)
+	if err != nil {
+		return "", err
+	}
+	if advanced {
+		if err = (VideoEditor{FFmpeg: y.FFmpegLocation}).CheckFormat(ctx, output); err != nil {
+			return "", err
+		}
+	}
 	extension := "mp4"
 	if audio {
 		extension = "mp3"
 		if !filepath.IsAbs(y.FFmpegLocation) {
-			return "", fmt.Errorf("MP3 추출에는 FFmpeg 절대 경로가 필요합니다")
+			return "", fmt.Errorf("오디오 추출에는 FFmpeg 절대 경로가 필요합니다")
 		}
 	}
-	if !audio && options.Extension == "mkv" {
+	if !audio && !advanced && output.Extension == "mkv" {
 		extension = "mkv"
-	}
-	if options.Extension != "" && options.Extension != extension {
-		return "", fmt.Errorf("이 다운로드 유형은 %s 확장자를 사용합니다", extension)
 	}
 
 	if target.downloadInfo == "" {
@@ -216,12 +230,18 @@ func (y *Ytdlp) DownloadSingle(
 	}
 
 	selected, selector, err := selectYtdlpFormats(
-		info.Formats, audio, maxHeight, filepath.IsAbs(y.FFmpegLocation),
+		info.Formats, audio, maxHeight, filepath.IsAbs(y.FFmpegLocation), advanced,
 	)
 	if err != nil {
 		return "", err
 	}
 
+	if advanced {
+		extension = selected[0].Ext
+		if len(selected) > 1 {
+			extension = "mkv"
+		}
+	}
 	info.Formats = selected
 	payload, err := json.Marshal(info)
 	if err != nil {
@@ -290,7 +310,7 @@ func (y *Ytdlp) DownloadSingle(
 			"--ffmpeg-location", y.FFmpegLocation,
 		)
 	}
-	if audio {
+	if audio && !advanced {
 		request.Arguments = append(request.Arguments,
 			"--extract-audio", "--audio-format", "mp3", "--no-keep-video",
 		)
@@ -298,7 +318,7 @@ func (y *Ytdlp) DownloadSingle(
 	if merge {
 		request.Arguments = append(request.Arguments, "--merge-output-format", extension)
 	}
-	if !audio && extension == "mkv" && !merge {
+	if !audio && !advanced && extension == "mkv" && !merge {
 		if !filepath.IsAbs(y.FFmpegLocation) {
 			return "", fmt.Errorf("MKV 변환에는 FFmpeg 절대 경로가 필요합니다")
 		}
@@ -366,6 +386,23 @@ func (y *Ytdlp) DownloadSingle(
 		return "", fmt.Errorf("작업 폴더에는 %s 한 개만 있어야 합니다", filename)
 	}
 
+	if advanced {
+		converted := filepath.Join(stageDir, "converted."+output.Extension)
+		duration := 0.0
+		if target.Duration != nil {
+			duration = *target.Duration
+		}
+		if err = (VideoEditor{FFmpeg: y.FFmpegLocation}).Convert(ctx, path, converted, output, duration, nil); err != nil {
+			return "", err
+		}
+		if err = os.Remove(path); err != nil {
+			return "", err
+		}
+		path = filepath.Join(stageDir, "media."+output.Extension)
+		if err = os.Rename(converted, path); err != nil {
+			return "", err
+		}
+	}
 	return path, nil
 }
 
@@ -452,7 +489,7 @@ func buildYtdlpDownloadInfo(raw json.RawMessage, target YtdlpTarget) (string, er
 		format := ytdlpDirectFormat(candidate.plainFormat)
 		format.raw = decodeMetadata(rawFormat)
 		drm := string(candidate.HasDRM)
-		hasVideo := format.Ext == "mp4" && format.VideoCodec != "none"
+		hasVideo := (format.Ext == "mp4" || format.Ext == "webm" || format.Ext == "mkv" || format.Ext == "mov") && format.VideoCodec != "none"
 		audioOnly := false
 		switch format.Ext {
 		case "m4a", "mp4", "webm", "opus", "mp3", "ogg", "oga", "wav", "flac", "aac":

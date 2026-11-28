@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,6 +15,7 @@ import (
 	"github.com/Dev-Wonjoon/Asterodia/internal/api"
 	"github.com/Dev-Wonjoon/Asterodia/internal/download"
 	"github.com/Dev-Wonjoon/Asterodia/internal/engine"
+	"github.com/Dev-Wonjoon/Asterodia/internal/mediaedit"
 )
 
 type waitingGallery struct {
@@ -83,6 +85,37 @@ func downloadToken(t *testing.T, f *fixture) string {
 		t.Fatal(code, string(body))
 	}
 	return access.CSRF
+}
+
+func TestWebDownloadFormatsDoNotRequireEditingPermission(t *testing.T) {
+	f := newFixture(t)
+	configureWebDownloads(t, f)
+	ffmpeg, err := exec.LookPath("ffmpeg.exe")
+	if err != nil {
+		t.Fatal(err)
+	}
+	editor := mediaedit.NewService(f.db, filepath.Join(f.root, "edit-cache"), engine.VideoEditor{FFmpeg: ffmpeg}, func() string { return f.root }, nil)
+	t.Cleanup(editor.Close)
+	f.server.ConfigureEditor(editor)
+	status(t, f.server.Start())
+	if code, _, _ := f.request(t, "GET", "/api/download/formats", nil); code != 403 {
+		t.Fatal(code)
+	}
+	status(t, f.server.SetDownloading(true))
+	if state := status(t, f.server.Status()); state.Editing {
+		t.Fatal("editing permission changed")
+	}
+	code, _, body := f.request(t, "GET", "/api/download/formats", nil)
+	var result struct {
+		OK   bool
+		Data []engine.OutputFormat
+	}
+	if err = json.Unmarshal(body, &result); err != nil || code != 200 || !result.OK || len(result.Data) < 7 {
+		t.Fatal(code, string(body), err)
+	}
+	if code, _, _ := f.request(t, "GET", "/api/edit/list", nil); code != 403 {
+		t.Fatal("download permission enabled editing", code)
+	}
 }
 func TestWebDownloadPermissionsOriginAndRequestValidation(t *testing.T) {
 	f := newFixture(t)

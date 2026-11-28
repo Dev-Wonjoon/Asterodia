@@ -183,9 +183,12 @@ func normalizeRequestURL(original string) (string, error) {
 }
 
 func initialOptionsJSON(options engine.Options) (string, error) {
-	audio := options.Type == "audio" || options.Quality == "audio"
-	if (audio && options.Extension != "" && options.Extension != "mp3") || (!audio && options.Extension == "mp3") {
-		return "", errors.New("미디어 종류와 확장자가 일치하지 않습니다")
+	kind := options.Type
+	if options.Quality == "audio" {
+		kind = "audio"
+	}
+	if _, err := engine.NormalizeFormat(engine.FormatOptions{Type: kind, Extension: options.Extension, VideoCodec: options.VideoCodec, AudioCodec: options.AudioCodec}); err != nil {
+		return "", err
 	}
 	switch options.Type {
 	case "", "video", "audio":
@@ -196,11 +199,6 @@ func initialOptionsJSON(options engine.Options) (string, error) {
 	case "", "best", "8k", "4k", "2k", "1080", "720", "480", "audio":
 	default:
 		return "", errors.New("지원하지 않는 다운로드 화질입니다")
-	}
-	switch options.Extension {
-	case "", "mp4", "mp3", "mkv":
-	default:
-		return "", errors.New("지원하지 않는 다운로드 확장자입니다")
 	}
 	data, err := json.Marshal(options)
 	if err != nil {

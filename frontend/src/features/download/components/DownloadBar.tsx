@@ -1,3 +1,4 @@
+import { MediaFormatFields, useOutputFormats } from '../../mediaedit/MediaFormatFields'
 import { translate, translateMessage, useLanguage } from '@renderer/shared/i18n'
 import {
     useEffect,
@@ -21,6 +22,8 @@ interface EnginePreview {
 
 export function DownloadBar(): React.JSX.Element {
     useLanguage()
+    const [optionsOpen, setOptionsOpen] = useState(false)
+    const { formats, error: formatError } = useOutputFormats(optionsOpen)
     const [url, setUrl] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [preview, setPreview] = useState<EnginePreview | null>(null)
@@ -135,15 +138,15 @@ export function DownloadBar(): React.JSX.Element {
             onSubmit={handleSubmit}
             className="relative mx-auto flex w-full max-w-4xl gap-3"
         >
-            <details ref={optionsRef} className="shrink-0">
+            <details ref={optionsRef} onToggle={event => setOptionsOpen(event.currentTarget.open)} className="shrink-0">
                 <summary className="cursor-pointer rounded-xl border border-[var(--border-line)] px-3 py-2.5 text-sm" aria-label={translate("download.downloadOptions")}>{translate("download.options")}</summary>
                 <div className="absolute left-0 top-full z-30 mt-2 max-h-[calc(100dvh-6rem)] w-64 space-y-3 overflow-y-auto rounded-xl border border-[var(--border-line)] bg-[var(--bg-sidebar)] p-4 shadow-xl">
                     <p className="text-xs text-[var(--text-muted)]">{translate("download.instagramSavesPhotosAndVideosTogetherInTheirOriginal")}</p>
                     <label className="block text-sm">{translate("download.type")}<select aria-label={translate("download.downloadType")} value={options.type} onChange={(event) => {
                             const audio = event.target.value === 'audio'
-                            setOptions({ ...options, type: audio ? 'audio' : 'video', quality: audio ? 'audio' : 'best', extension: audio ? 'mp3' : undefined })
+                            setOptions({ ...options, type: audio ? 'audio' : 'video', quality: audio ? 'audio' : 'best', extension: audio ? 'mp3' : undefined, videoCodec: undefined, audioCodec: undefined })
                         }} className="mt-1 w-full rounded border border-[var(--border-line)] bg-[var(--bg-app)] p-2">
-                            <option value="video">{translate("media.video")}</option><option value="audio">{translate("download.audioMp3")}</option>
+                            <option value="video">{translate("media.video")}</option><option value="audio">{translate("conversion.audio")}</option>
                         </select>
                     </label>
                     {options.type !== 'audio' && <>
@@ -151,11 +154,15 @@ export function DownloadBar(): React.JSX.Element {
                                 {['best', '8k', '4k', '2k', '1080', '720', '480'].map(value => <option key={value} value={value}>{value === 'best' ? translate("download.bestQuality") : value}</option>)}
                             </select>
                         </label>
-                        <label className="block text-sm">{translate("download.format")}<select aria-label={translate("download.downloadFormat")} value={options.extension ?? ''} onChange={(event) => setOptions({ ...options, extension: (event.target.value || undefined) as 'mp4' | 'mkv' | undefined })} className="mt-1 w-full rounded border border-[var(--border-line)] bg-[var(--bg-app)] p-2">
-                                <option value="">{translate("download.auto")}</option><option value="mp4">MP4</option><option value="mkv">MKV</option>
-                            </select>
-                        </label>
                     </>}
+                    <MediaFormatFields value={{ type: options.type === 'audio' ? 'audio' : 'video', extension: options.extension, videoCodec: options.videoCodec, audioCodec: options.audioCodec }}
+                        formats={formats.length ? formats : [
+                            { type: 'video', extension: 'mp4', videoCodecs: [], audioCodecs: [] },
+                            { type: 'video', extension: 'mkv', videoCodecs: [], audioCodecs: [] },
+                            { type: 'audio', extension: 'mp3', videoCodecs: [], audioCodecs: [] },
+                        ]} auto containerLabel={translate('download.downloadFormat')}
+                        onChange={format => setOptions({ ...options, extension: format.extension, videoCodec: format.videoCodec, audioCodec: format.audioCodec })} />
+                    {formatError && <p role="status" className="text-xs text-[var(--text-muted)]">{translate('conversion.additionalFormatsNeedFFmpeg')}</p>}
                     <label className="flex gap-2 text-sm"><input type="checkbox" checked={Boolean(options.playlist)} onChange={(event) => setOptions({ ...options, playlist: event.target.checked })} />{translate("download.includePlaylist")}</label>
                 </div>
             </details>

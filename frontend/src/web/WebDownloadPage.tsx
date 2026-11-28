@@ -1,3 +1,4 @@
+import { MediaFormatFields, useOutputFormats } from '../features/mediaedit/MediaFormatFields'
 import { useEffect, useRef, useState } from 'react'
 import type { DownloadJobDto, DownloadJobOptions, DownloadPageDto, DownloadResponse } from '@contracts/download-api'
 import { translate, translateError, translateMessage, useLanguage } from '@renderer/shared/i18n'
@@ -15,6 +16,7 @@ export function WebDownloadPage({ onGallery }: { onGallery(): void }) {
     const [url, setURL] = useState(''), [options, setOptions] = useState<DownloadJobOptions>({ type: 'video', quality: 'best', playlist: false })
     const [enabled, setEnabled] = useState(false), [checked, setChecked] = useState(false), [page, setPage] = useState(empty)
     const [offset, setOffset] = useState(0), [refresh, setRefresh] = useState(0), [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState('')
+    const { formats, error: formatError } = useOutputFormats(enabled, webDownloads.formats)
     const [readError, setReadError] = useState('')
     const mounted = useRef(false), locked = useRef(false), readRevision = useRef(0)
     useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
@@ -70,14 +72,23 @@ export function WebDownloadPage({ onGallery }: { onGallery(): void }) {
             }}>
                 <label className="block space-y-2"><span>{translate('download.downloadUrl')}</span><input type="url" required value={url} disabled={!enabled || !!busy} onChange={event => setURL(event.target.value)} placeholder={translate('download.pasteADownloadLink')} className={control + ' w-full'} /></label>
                 <div className="flex flex-wrap items-end gap-3">
-                    <label className="grid gap-1 text-sm">{translate('download.type')}<select aria-label={translate('download.downloadType')} className={control} disabled={!enabled || !!busy} value={options.type} onChange={event => setOptions({ type: event.target.value === 'audio' ? 'audio' : 'video', quality: event.target.value === 'audio' ? 'audio' : 'best', playlist: options.playlist, extension: event.target.value === 'audio' ? 'mp3' : undefined })}><option value="video">{translate('media.video')}</option><option value="audio">{translate('download.audioMp3')}</option></select></label>
+                    <label className="grid gap-1 text-sm">{translate('download.type')}<select aria-label={translate('download.downloadType')} className={control} disabled={!enabled || !!busy} value={options.type} onChange={event => setOptions({ type: event.target.value === 'audio' ? 'audio' : 'video', quality: event.target.value === 'audio' ? 'audio' : 'best', playlist: options.playlist, extension: event.target.value === 'audio' ? 'mp3' : undefined })}><option value="video">{translate('media.video')}</option><option value="audio">{translate('conversion.audio')}</option></select></label>
                     {options.type !== 'audio' && <>
                         <label className="grid gap-1 text-sm">{translate('download.quality')}<select aria-label={translate('download.downloadQuality')} className={control} disabled={!enabled || !!busy} value={options.quality} onChange={event => setOptions({ ...options, quality: event.target.value as DownloadJobOptions['quality'] })}>{['best', '8k', '4k', '2k', '1080', '720', '480'].map(value => <option key={value} value={value}>{value === 'best' ? translate('download.bestQuality') : value}</option>)}</select></label>
-                        <label className="grid gap-1 text-sm">{translate('download.format')}<select aria-label={translate('download.downloadFormat')} className={control} disabled={!enabled || !!busy} value={options.extension ?? ''} onChange={event => setOptions({ ...options, extension: (event.target.value || undefined) as DownloadJobOptions['extension'] })}><option value="">{translate('download.auto')}</option><option value="mp4">MP4</option><option value="mkv">MKV</option></select></label>
                     </>}
+                    <fieldset disabled={!enabled || !!busy} className="grid grid-cols-2 items-end gap-3 sm:grid-cols-3">
+                        <MediaFormatFields value={{ type: options.type === 'audio' ? 'audio' : 'video', extension: options.extension, videoCodec: options.videoCodec, audioCodec: options.audioCodec }}
+                            formats={formats.length ? formats : [
+                                { type: 'video', extension: 'mp4', videoCodecs: [], audioCodecs: [] },
+                                { type: 'video', extension: 'mkv', videoCodecs: [], audioCodecs: [] },
+                                { type: 'audio', extension: 'mp3', videoCodecs: [], audioCodecs: [] },
+                            ]} auto containerLabel={translate('download.downloadFormat')}
+                            onChange={format => setOptions({ ...options, extension: format.extension, videoCodec: format.videoCodec, audioCodec: format.audioCodec })} />
+                    </fieldset>
                     <label className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" disabled={!enabled || !!busy} checked={!!options.playlist} onChange={event => setOptions({ ...options, playlist: event.target.checked })} />{translate('download.includePlaylist')}</label>
                     <button type="submit" className={control + ' bg-[var(--color-primary)] font-semibold'} disabled={!enabled || !!busy || !url.trim()}>{busy === 'new' ? translate('download.processing') : translate('web.download.start')}</button>
                 </div>
+                {formatError && <p className="text-xs text-[var(--text-muted)]">{translate('conversion.additionalFormatsNeedFFmpeg')}</p>}
                 <p className="text-xs text-[var(--text-muted)]">{translate('download.instagramSavesPhotosAndVideosTogetherInTheirOriginal')}</p>
             </form>
             {(error || readError) && <p role="alert" className="break-words text-sm text-red-500">{translateMessage(error || readError)}</p>}

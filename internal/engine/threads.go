@@ -64,7 +64,7 @@ func (g *ThreadsExtractor) Discover(ctx context.Context, req ExtractRequest) (Do
 		return DownloadPlan{}, err
 	}
 	if req.Options.Type == "audio" || req.Options.Quality == "audio" ||
-		(req.Options.Quality != "" && req.Options.Quality != "best") || req.Options.Extension != "" {
+		(req.Options.Quality != "" && req.Options.Quality != "best") || req.Options.Extension != "" || req.Options.VideoCodec != "" || req.Options.AudioCodec != "" {
 		return DownloadPlan{}, fmt.Errorf("%w: Threads는 최고 화질·자동 형식으로 원본 사진과 영상을 함께 저장합니다", ErrUnsupportedMediaFormat)
 	}
 	public := publicDiscoveryHandler("Threads 공개 HTML", func(ctx context.Context) (DownloadPlan, error) {

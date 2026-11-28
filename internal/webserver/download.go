@@ -30,7 +30,7 @@ func (s *Service) downloadRoutes(mux *http.ServeMux) {
 
 func (s *Service) downloadAPI(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
-	enabled, service, csrf := s.downloading, s.downloader, s.csrf
+	enabled, service, csrf, editor := s.downloading, s.downloader, s.csrf, s.editor
 	s.mu.Unlock()
 	if !enabled || service == nil {
 		http.Error(w, "PC에서 모바일 다운로드를 허용하세요", 403)
@@ -39,6 +39,12 @@ func (s *Service) downloadAPI(w http.ResponseWriter, r *http.Request) {
 	var result api.Result
 	if r.Method == http.MethodGet || r.Method == http.MethodHead {
 		switch r.URL.Path {
+		case "/api/download/formats":
+			if editor == nil {
+				result = api.Failure("NOT_READY", "설정에서 FFmpeg를 설치하거나 설치 상태를 확인하세요")
+			} else {
+				result = editor.Formats(r.Context())
+			}
 		case "/api/download/list":
 			offset, err := integer(r, "offset", 0)
 			if err != nil || offset < 0 {

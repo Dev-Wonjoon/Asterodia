@@ -1,3 +1,6 @@
+import { BatchConvertPanel } from '../mediaedit/BatchConvertPanel'
+import { getApi } from '@renderer/shared/api'
+import type { MoveSelection } from '@contracts/file-move-api'
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowLeft, ArrowRight, ArrowUp, ChevronDown, Folder, Menu, RefreshCw } from 'lucide-react'
@@ -53,7 +56,7 @@ function ExplorerMenu({ disabled, children }: { disabled: boolean; children: (ru
     </>
 }
 
-export function AlbumExplorer({ mediaId, onClose, onChanged }: { mediaId: number; onClose: () => void; onChanged: () => void }) {
+export function AlbumExplorer({ mediaId, onClose, onChanged, allowReveal = true, allowConversion = true }: { mediaId: number; onClose: () => void; onChanged: () => void; allowReveal?: boolean; allowConversion?: boolean }) {
     const visibility = useContentVisibility()
     const [history, setHistory] = useState([{ id: mediaId, key: 0 }]), [index, setIndex] = useState(0)
     const sequence = useRef(0), snapshots = useRef(new Map<number, ExplorerSnapshot>())
@@ -61,10 +64,11 @@ export function AlbumExplorer({ mediaId, onClose, onChanged }: { mediaId: number
     const navigate = (id: number) => { if (id === visit.id) return; setHistory(previous => [...previous.slice(0, index + 1), { id, key: ++sequence.current }]); setIndex(index + 1) }
     const back = () => { if (index) setIndex(index - 1); else onClose() }
     return <AlbumExplorerView key={visit.key} visibility={visibility} mediaId={visit.id} initial={snapshots.current.get(visit.key)} remember={snapshot => snapshots.current.set(visit.key, snapshot)}
-        onNavigate={navigate} onBack={back} canForward={index < history.length - 1} onForward={() => setIndex(index + 1)} onClose={onClose} onChanged={onChanged} />
+        allowReveal={allowReveal} allowConversion={allowConversion} onNavigate={navigate} onBack={back} canForward={index < history.length - 1} onForward={() => setIndex(index + 1)} onClose={onClose} onChanged={onChanged} />
 }
 
-function AlbumExplorerView({ visibility, mediaId, initial, remember, onNavigate, onBack, canForward, onForward, onClose, onChanged }: {
+function AlbumExplorerView({ visibility, mediaId, initial, remember, onNavigate, onBack, canForward, onForward, onClose, onChanged, allowReveal, allowConversion }: {
+    allowReveal: boolean; allowConversion: boolean
     visibility: ReturnType<typeof useContentVisibility>
     mediaId: number; initial?: ExplorerSnapshot; remember: (snapshot: ExplorerSnapshot) => void
     onNavigate: (id: number) => void; onBack: () => void; canForward: boolean; onForward: () => void; onClose: () => void; onChanged: () => void
@@ -76,6 +80,9 @@ function AlbumExplorerView({ visibility, mediaId, initial, remember, onNavigate,
     const reader = useAlbumExplorer({ mediaId, filter: { ...search.filter, showHidden: visibility.showHidden }, recursive, sort: preferences.sort, descending: preferences.descending }, visibility.key, initial?.count)
     const { page } = reader
     const [selected, setSelected] = useState(new Set(initial?.selected ?? [])), [viewer, setViewer] = useState<{ mediaId: number; fileId: number } | null>(null)
+    const [conversion, setConversion] = useState<MoveSelection[] | null>(null)
+    const [conversionLoading, setConversionLoading] = useState(false)
+    const [conversionError, setConversionError] = useState('')
     const [action, setAction] = useState<ExplorerAction | null>(null)
     const root = useRef<HTMLDivElement>(null), list = useRef<HTMLDivElement>(null), anchor = useRef<string | null>(null), restore = useRef(initial), previousKey = useRef(reader.key), focused = useRef(initial?.focused)
     const snapshot = useRef<ExplorerSnapshot>({ scrollTop: initial?.scrollTop ?? 0, selected: [], count: 0, filter: search.filter, recursive })
@@ -99,7 +106,25 @@ function AlbumExplorerView({ visibility, mediaId, initial, remember, onNavigate,
     const entries = page?.data ?? [], targets = entries.filter(entry => selected.has(entryKey(entry)))
     const editable = targets.length === 1 && targets[0].kind === 'album' && targets[0].album.isUserAlbum ? targets[0].album : targets.length === 0 && page?.album.isUserAlbum ? page.album : null
     const removableFiles = page?.album.isUserAlbum && targets.length > 0 && targets.every(entry => entry.kind === 'file' && entry.albumId === mediaId)
-    const blocked = reader.loading || reader.loadingMore || !!action || !!viewer
+    const blocked = reader.loading || reader.loadingMore || !!action || !!viewer || !!conversion || conversionLoading
+    async function openConverter() {
+        if (blocked) return
+        setConversionLoading(true); setConversionError('')
+        try {
+            const grouped = new Map<number, MoveSelection>()
+            for (const entry of targets) {
+                if (entry.kind === 'album') { grouped.set(entry.album.id, { mediaId: entry.album.id, revision: entry.album.revision }); continue }
+                const owner = entry.file.mediaId
+                const existing = grouped.get(owner)
+                if (existing) { if (existing.fileIds) existing.fileIds.push(entry.file.id); continue }
+                const detail = await getApi().media.get({ mediaId: owner, fileLimit: 1, fileOffset: 0 })
+                if (!detail.ok) throw new Error(translate('conversion.requestFailed'))
+                grouped.set(owner, { mediaId: owner, revision: detail.data.revision, fileIds: [entry.file.id] })
+            }
+            setConversion([...grouped.values()])
+        } catch { setConversionError(translate('conversion.requestFailed')) }
+        finally { setConversionLoading(false) }
+    }
     function select(entry: AlbumEntry, event: Pick<MouseEvent, 'ctrlKey' | 'metaKey' | 'shiftKey'>) {
         const key = entryKey(entry)
         setSelected(previous => {
@@ -157,6 +182,8 @@ function AlbumExplorerView({ visibility, mediaId, initial, remember, onNavigate,
     }
     const preview = (entry: AlbumEntry, large = false) => entry.kind === 'album' ? <Folder aria-hidden="true" className={large ? 'mx-auto h-24 w-24 text-amber-400' : 'size-5 shrink-0 text-amber-400'} /> : <MediaPreview path={entry.file.thumbnailPath ?? entry.file.previewPath ?? (entry.file.kind === 'image' ? entry.file.filepath : null)} title={entryTitle(entry)} className={large ? 'aspect-video w-full rounded object-contain' : 'size-8 shrink-0 rounded object-cover'} />
     return <section aria-label={translate('explorer.title')} onKeyDown={keydown} className="flex h-full min-h-0 flex-col">
+        {conversion && <BatchConvertPanel selection={conversion} allowReveal={allowReveal} onClose={() => setConversion(null)} onChanged={() => { reader.refresh(); onChanged() }} />}
+        {conversionError && <p role="alert">{conversionError}</p>}
         {viewer && <MediaViewer {...viewer} onClose={closeViewer} />}
         {action && page && <AlbumExplorerDialog action={action} current={page.album} onClose={() => setAction(null)} onSaved={(album, deleted) => {
             setAction(null); setSelected(new Set()); onChanged()
@@ -170,6 +197,7 @@ function AlbumExplorerView({ visibility, mediaId, initial, remember, onNavigate,
                 <button type="button" className={button} aria-label={translate('explorer.up')} disabled={blocked} onClick={() => { const parent = page?.breadcrumbs[page.breadcrumbs.length - 2]; if (parent) onNavigate(parent.id); else onClose() }}><ArrowUp className="size-4" /></button>
                 <nav aria-label={translate('explorer.path')} className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto whitespace-nowrap text-sm"><button type="button" disabled={blocked} className="shrink-0 underline" onClick={onClose}>{translate('navigation.gallery')}</button>{page?.breadcrumbs.map((item, index) => <span key={item.id} className="inline-flex shrink-0 items-center gap-2"><span aria-hidden="true">/</span><button type="button" className="max-w-56 truncate" title={item.title} aria-current={index === page.breadcrumbs.length - 1 ? 'page' : undefined} disabled={blocked || item.id === mediaId} onClick={() => onNavigate(item.id)}>{item.title}</button></span>)}</nav>
                 <button type="button" className={button} aria-label={translate('common.refresh')} disabled={blocked} onClick={reader.refresh}><RefreshCw className="size-4" /></button>
+                {allowConversion && <button type="button" className={button} disabled={blocked} onClick={() => void openConverter()}>{translate('conversion.title')}</button>}
                 <ExplorerMenu disabled={!!action || !!viewer}>{run => <div className="divide-y divide-[var(--border-line)]">
                     <fieldset className="space-y-3 pb-3">
                         <legend className="mb-2 text-xs font-semibold text-[var(--text-muted)]">{translate('explorer.view')}</legend>

@@ -19,7 +19,13 @@ beforeEach(() => {
     vi.resetAllMocks()
     observers.clear()
     vi.stubGlobal('IntersectionObserver', class {
-        constructor(public callback: IntersectionObserverCallback) {}
+        constructor(public callback: IntersectionObserverCallback, options: IntersectionObserverInit) {
+            Object.defineProperties(options.root!, {
+                clientHeight: { configurable: true, value: 400 },
+                scrollHeight: { configurable: true, value: 800 },
+                scrollTop: { configurable: true, writable: true, value: 400 },
+            })
+        }
         observe() { observers.add(this) }
         disconnect() { observers.delete(this) }
     })

@@ -1,4 +1,6 @@
 import { canEditMedia } from '../features/mediaedit/canEditMedia'
+import { BatchConvertPanel } from '../features/mediaedit/BatchConvertPanel'
+import type { MoveSelection } from '@contracts/file-move-api'
 import { translateError, translateMessage, translate, useLanguage } from '@renderer/shared/i18n'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { ChevronDown, ChevronUp, Play, RefreshCw } from 'lucide-react'
@@ -45,9 +47,12 @@ export function WebGalleryPage({ title, filter, emptyMessage, onExplorerChange }
     const editor = useRef<MediaEditControls>(null), serial = useRef(0)
     const [editEnabled, setEditEnabled] = useState(false), [editBusy, setEditBusy] = useState(false), [error, setError] = useState('')
     const [viewer, setViewer] = useState<{ mediaId: number; fileId?: number } | null>(null)
+    const [conversionSelection, setConversionSelection] = useState<Record<string, MoveSelection>>({})
+    const [conversion, setConversion] = useState<MoveSelection[] | null>(null)
     const closeViewer = useCallback(() => setViewer(null), [])
     const [anchor, setAnchor] = useState<{ id: number; top: number } | null>(null)
     const filterKey = JSON.stringify({ ...filter, ...(visibility.showHidden ? { showHidden: true } : {}) })
+    useEffect(() => setConversionSelection({}), [filterKey, visibility.key])
     useLayoutEffect(() => setViewer(null), [visibility.key, visibility.showHidden])
     useEffect(() => {
         store.setFilter(JSON.parse(filterKey)); void store.refresh()
@@ -94,7 +99,8 @@ export function WebGalleryPage({ title, filter, emptyMessage, onExplorerChange }
         void Promise.resolve(store.toggleAlbum(media.id)).then(changed => { if (changed === false) cancelMotion() }, cancelMotion)
     }
     return <>
-        {explorerId !== null && <AlbumExplorer mediaId={explorerId} onClose={() => setExplorerId(null)} onChanged={() => { void store.refresh() }} />}
+        {conversion && <BatchConvertPanel selection={conversion} allowReveal={false} onClose={() => setConversion(null)} onChanged={() => { void store.refresh() }} />}
+        {explorerId !== null && <AlbumExplorer allowReveal={false} allowConversion={editEnabled} mediaId={explorerId} onClose={() => setExplorerId(null)} onChanged={() => { void store.refresh() }} />}
         <div hidden={explorerId !== null} inert={explorerId !== null} className="h-full">
         <MediaEditLauncher compact controlRef={editor} allowReveal={false} disabled={!editEnabled} />
         {viewer && <MediaViewer {...viewer} onClose={closeViewer} />}
@@ -116,6 +122,7 @@ export function WebGalleryPage({ title, filter, emptyMessage, onExplorerChange }
                 <header className="flex flex-wrap items-center justify-between gap-3">
                     <h1 className="text-lg font-semibold">{title}</h1>
                     <div className="flex items-center gap-2">
+                        {editEnabled && <button type="button" className={button} disabled={busy} onClick={() => setConversion(Object.values(conversionSelection))}>{translate('conversion.title')} ({Object.keys(conversionSelection).length})</button>}
                         <ActionButton icon={<RefreshCw />} label={translate("common.refresh")} disabled={busy} onClick={() => void store.refresh()} />
                         {editEnabled && <GalleryActionMenu label={translate("gallery.menu")}><button type="button" role="menuitem" disabled={editBusy} onClick={() => void openEditor()} className="w-full rounded px-3 py-2 text-left text-sm hover:bg-[var(--bg-hover)]">{translate("gallery.editor.createAnimation")}</button></GalleryActionMenu>}
                     </div>
@@ -133,6 +140,10 @@ export function WebGalleryPage({ title, filter, emptyMessage, onExplorerChange }
                         selected={selectedKey === (media.galleryFile ? `file:${media.galleryFile.id}` : `media:${media.id}`)}
                         onSelect={() => setSelectedKey(media.galleryFile ? `file:${media.galleryFile.id}` : `media:${media.id}`)}
                         previewPath={media.galleryFile?.thumbnailPath ?? media.cover?.path ?? null} resolveUrl={toMediaUrl}
+                        selection={editEnabled && <label className="absolute right-2 top-2 z-10 rounded bg-[var(--bg-sidebar)] p-2" onClick={event => event.stopPropagation()}><input type="checkbox" aria-label={translate('conversion.selectItem', { title: media.title })} checked={Boolean(conversionSelection[galleryDisplayKey(media)])} disabled={busy} onChange={event => {
+                            const checked = event.target.checked
+                            setConversionSelection(previous => { const next = { ...previous }; const key = galleryDisplayKey(media); if (checked) next[key] = { mediaId: media.id, revision: media.revision, ...(media.galleryFile ? { fileIds: [media.galleryFile.id] } : {}) }; else delete next[key]; return next })
+                        }} /></label>}
                         onView={() => openViewer(media)} onOpen={!media.galleryFile ? () => {
                             galleryPosition.current = { scroll: root.current?.scrollTop ?? 0, focus: document.activeElement instanceof HTMLElement ? document.activeElement : null }
                             store.closeDetail(); setExplorerId(media.id)

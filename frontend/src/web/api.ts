@@ -82,6 +82,10 @@ async function editRequest(name: string, value?: unknown, read = false, attempt 
     return response.json()
 }
 const mediaEdit: MediaEditApi = {
+    formats: () => editRequest('formats', undefined, true),
+    batch: value => editRequest('batch', value),
+    retryBatch: value => editRequest('batch-retry', value),
+    cancelBatch: value => editRequest('batch-cancel', value),
     outputOptions: value => editRequest('output-options', value, true),
     overview: value => editRequest('overview', value, true),
     frames: value => editRequest('frames', value), frameStatus: value => editRequest('frames', value, true), selection: value => editRequest('selection', value), resources: value => editRequest('resources', value),

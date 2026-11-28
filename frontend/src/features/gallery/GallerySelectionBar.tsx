@@ -3,7 +3,8 @@ import { ListPlus, X, RefreshCw } from 'lucide-react'
 import { GalleryActionMenu } from './GalleryToolbar'
 import type { BulkCommand } from './useGalleryBulkActions'
 
-export function GallerySelectionBar({ count, groupCount, fileCount, total, disabled, removalLabel, onAdd, onMove, onMerge, onClear, onBulk, active = false, onRefresh, recoveryDisabled }: {
+export function GallerySelectionBar({ count, groupCount, fileCount, total, disabled, removalLabel, onAdd, onMove, onMerge, onClear, onBulk, onConvert, active = false, onRefresh, recoveryDisabled }: {
+    onConvert?(mode: 'convert' | 'webp'): void
     onRefresh?(): void; recoveryDisabled?: boolean
     active?: boolean
     count: number; groupCount: number; fileCount: number; total: number | null; disabled: boolean
@@ -24,6 +25,7 @@ export function GallerySelectionBar({ count, groupCount, fileCount, total, disab
             <button type="button" className={button} aria-label={translate('gallery.album.add')} title={translate('gallery.album.add')} disabled={disabled} onClick={onAdd}><ListPlus className="size-4" aria-hidden="true" /><span className={label}>{translate("gallery.album.add")}</span></button>
         </div>
         <div className="shrink-0"><GalleryActionMenu label={translate("gallery.selectionActions")} visibleLabel disabled={disabled}>
+            {onConvert && <><button type="button" role="menuitem" className={item} onClick={() => onConvert('convert')}>{translate('conversion.convert')}</button><button type="button" role="menuitem" className={item} onClick={() => onConvert('webp')}>{translate('conversion.webp')}</button></>}
             <button type="button" role="menuitem" className={item} onClick={onMove}>{translate('gallery.collectInOneFolder')}</button>
             <button type="button" role="menuitem" className={item} onClick={onMerge}>{translate('gallery.merge')}</button>
             <button type="button" role="menuitem" className={item + ' text-red-500'} onClick={() => onBulk('unregister')}>{removalLabel}</button>

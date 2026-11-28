@@ -23,7 +23,9 @@ export interface DownloadOptions {
     type?: 'video' | 'audio'
     quality?: VideoQuality
     playlist?: boolean
-    extension?: 'mp4' | 'mp3' | 'mkv'
+    extension?: string
+    videoCodec?: string
+    audioCodec?: string
     skipExisting?: boolean
     excludeIds?: string[]
 }

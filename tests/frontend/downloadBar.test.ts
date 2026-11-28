@@ -8,6 +8,14 @@ import { cleanupReact, deferred, mount } from './reactHarness'
 
 const vm = vi.hoisted(() => ({ startDownload: vi.fn(), previewEngine: vi.fn(), ready: true, halted: null as string | null }))
 vi.mock('@renderer/features/download/useDownloadViewModel', () => ({ useDownloadViewModel: () => vm }))
+vi.mock('@renderer/shared/api', () => ({ getApi: () => ({ mediaEdit: { formats: async () => ({ ok: true, data: [
+    { type: 'video', extension: 'mp4', videoCodecs: ['copy', 'h264', 'hevc', 'av1'], audioCodecs: ['copy', 'aac', 'mp3'] },
+    { type: 'video', extension: 'mkv', videoCodecs: ['copy', 'h264', 'hevc', 'vp9', 'av1'], audioCodecs: ['copy', 'aac', 'opus'] },
+    { type: 'video', extension: 'webm', videoCodecs: ['vp9', 'av1'], audioCodecs: ['opus', 'vorbis'] },
+    { type: 'audio', extension: 'mp3', videoCodecs: [], audioCodecs: ['mp3'] },
+    { type: 'audio', extension: 'm4a', videoCodecs: [], audioCodecs: ['aac'] },
+    { type: 'audio', extension: 'flac', videoCodecs: [], audioCodecs: ['flac'] },
+] }) } }) }))
 
 beforeEach(() => {
     vi.useFakeTimers(); vi.resetAllMocks(); setLanguage('ko')
@@ -57,6 +65,22 @@ it('keeps video quality choices available and sends the chosen quality and conta
     expect(vm.startDownload).toHaveBeenCalledExactlyOnceWith('https://example.com/video', { type: 'video', quality: '1080', extension: 'mkv', playlist: false })
     await select('다운로드 종류', 'audio'); await select('다운로드 종류', 'video')
     expect(document.querySelector<HTMLSelectElement>('[aria-label="다운로드 화질"]')!.value).toBe('best')
+})
+
+it('offers compatible video codecs and audio containers from the installed engine', async () => {
+    await mount(h(DownloadBar))
+    await act(async () => { const details = document.querySelector('details')!; details.open = true; details.dispatchEvent(new Event('toggle', { bubbles: true })) })
+    await select('다운로드 형식', 'webm')
+    const video = document.querySelector<HTMLSelectElement>('[aria-label="영상 코덱"]')!
+    expect([...video.options].map(item => item.value)).toEqual(['', 'vp9', 'av1'])
+    await select('영상 코덱', 'av1')
+    await paste(document.querySelector('input[data-download-url]')!, 'https://example.com/video')
+    await submit()
+    expect(vm.startDownload).toHaveBeenLastCalledWith('https://example.com/video', expect.objectContaining({ extension: 'webm', videoCodec: 'av1', audioCodec: 'opus' }))
+    await select('다운로드 종류', 'audio'); await select('다운로드 형식', 'flac')
+    await paste(document.querySelector('input[data-download-url]')!, 'https://example.com/audio')
+    await submit()
+    expect(vm.startDownload).toHaveBeenLastCalledWith('https://example.com/audio', expect.objectContaining({ type: 'audio', extension: 'flac' }))
 })
 
 it('closes options on an outside pointer, window blur, and Escape, while allowing option controls', async () => {

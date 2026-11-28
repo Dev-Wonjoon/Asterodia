@@ -6,7 +6,7 @@ import { canEditMedia } from '../../frontend/src/features/mediaedit/canEditMedia
 import { setLanguage } from '@renderer/shared/i18n'
 import { cleanupReact, clickButton, deferred, mount } from './reactHarness'
 
-const api = vi.hoisted(() => ({ status: vi.fn(), list: vi.fn(), start: vi.fn(), retry: vi.fn(), cancel: vi.fn(), cleanup: vi.fn() }))
+const api = vi.hoisted(() => ({ formats: vi.fn(), status: vi.fn(), list: vi.fn(), start: vi.fn(), retry: vi.fn(), cancel: vi.fn(), cleanup: vi.fn() }))
 vi.mock('../../frontend/src/web/download-api', () => ({ webDownloads: api }))
 const ok = (data: unknown) => ({ ok: true, data })
 const empty = { data: [], activeJobs: [], limit: 50, offset: 0, hasNextPage: false }
@@ -20,6 +20,13 @@ async function typeURL(value: string) {
 beforeEach(() => {
     vi.useFakeTimers(); vi.resetAllMocks(); setLanguage('ko')
     api.status.mockResolvedValue({ enabled: true, csrf: 'token' }); api.list.mockResolvedValue(ok(empty))
+    api.formats.mockResolvedValue(ok([
+        { type: 'video', extension: 'mp4', videoCodecs: ['copy', 'h264'], audioCodecs: ['copy', 'aac'] },
+        { type: 'video', extension: 'mkv', videoCodecs: ['copy', 'h264'], audioCodecs: ['copy', 'aac'] },
+        { type: 'video', extension: 'webm', videoCodecs: ['vp9', 'av1'], audioCodecs: ['opus', 'vorbis'] },
+        { type: 'audio', extension: 'mp3', videoCodecs: [], audioCodecs: ['mp3'] },
+        { type: 'audio', extension: 'flac', videoCodecs: [], audioCodecs: ['flac'] },
+    ]))
     for (const method of [api.start, api.retry, api.cancel, api.cleanup]) method.mockResolvedValue(ok({ accepted: true }))
 })
 afterEach(async () => { await cleanupReact(); vi.useRealTimers() })
@@ -61,6 +68,18 @@ it('starts a URL download with selected options, prevents duplicates, and clears
     expect(input.value).toBe('https://example.com/other')
     await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
     expect(document.querySelector('[role=alert]')!.textContent).toBe(message)
+})
+
+it('submits codec and container selections using download permission independently of editing', async () => {
+    await mount(h(WebDownloadPage, { onGallery: vi.fn() }))
+    const select = async (label: string, value: string) => {
+        const element = document.querySelector<HTMLSelectElement>(`[aria-label="${label}"]`)!
+        await act(async () => { element.value = value; element.dispatchEvent(new Event('change', { bubbles: true })) })
+    }
+    await select('다운로드 형식', 'webm'); await select('영상 코덱', 'av1')
+    await typeURL('https://example.com/video'); await clickButton('다운로드 시작')
+    expect(api.start).toHaveBeenLastCalledWith('https://example.com/video', expect.objectContaining({ extension: 'webm', videoCodec: 'av1', audioCodec: 'opus' }))
+    expect(api.formats).toHaveBeenCalledOnce()
 })
 
 it('shows real transfer progress, cancellation, retries, cleanup, and gallery navigation', async () => {

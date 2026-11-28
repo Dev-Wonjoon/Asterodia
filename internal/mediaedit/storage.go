@@ -91,11 +91,16 @@ func (s *Service) render(ctx context.Context, id string) (err error) {
 	} else if j.Options.Kind == "webp" {
 		ext = ".webp"
 	}
+	if j.Options.Batch != nil && j.Options.Batch.Mode == "convert" {
+		ext = "." + j.Options.Batch.Format.Extension
+	}
 	stagedRel := filepath.Join(workRel, "output"+ext)
 	staged := filepath.Join(actual, stagedRel)
 	count := 0
 	expectedDuration := 0.0
-	if j.Options.Kind != "trim" && v.Options.QuickVideo {
+	if j.Options.Batch != nil {
+		expectedDuration, err = s.renderBatch(ctx, j, v, staged)
+	} else if j.Options.Kind != "trim" && v.Options.QuickVideo {
 		pin, path, e := s.source(ctx, v.ID)
 		if e != nil {
 			return e
@@ -193,11 +198,11 @@ func (s *Service) render(ctx context.Context, id string) (err error) {
 	if err = s.store.state("media_edit_job", id, "verifying", ""); err != nil {
 		return err
 	}
-	metadata, frames, err := s.editor.Verify(ctx, staged)
+	metadata, frames, err := s.verifyOutput(ctx, j, staged)
 	if err != nil {
 		return err
 	}
-	if j.Options.Kind != "trim" && ((j.Options.Kind == "gif" && frames != count) || *metadata.Width != j.Options.Crop.Width || *metadata.Height != j.Options.Crop.Height) {
+	if j.Options.Batch == nil && j.Options.Kind != "trim" && ((j.Options.Kind == "gif" && frames != count) || *metadata.Width != j.Options.Crop.Width || *metadata.Height != j.Options.Crop.Height) {
 		return fmt.Errorf("GIF 프레임 또는 크롭 결과가 일치하지 않습니다")
 	}
 	if j.Options.Kind == "trim" && (*metadata.Duration < expectedDuration-0.2 || *metadata.Duration > expectedDuration+0.3) {
@@ -207,7 +212,7 @@ func (s *Service) render(ctx context.Context, id string) (err error) {
 		expected := expectedDuration
 		if frames == 1 && *metadata.Duration == 0 {
 			metadata.Duration = &expected
-		} else if diff := math.Abs(*metadata.Duration - expected); diff > max(0.025, 1/float64(v.Options.FPS)+0.002) {
+		} else if diff := math.Abs(*metadata.Duration - expected); diff > max(0.025, 1/float64(outputFPS(j, v))+0.002) {
 			return fmt.Errorf("WebP 재생 시간이 일치하지 않습니다")
 		}
 	}
@@ -360,6 +365,9 @@ func (s *Service) commit(ctx context.Context, j Job, v Session, resultUUID, path
 	if j.Options.Kind == "trim" {
 		title = v.Title + " · 잘라낸 영상"
 	}
+	if j.Options.Batch != nil && j.Options.Batch.Mode == "convert" {
+		title = v.Title + " · " + strings.ToUpper(j.Options.Batch.Format.Extension)
+	}
 	res, err := tx.ExecContext(ctx, "INSERT INTO media(source_kind,source_title,created_at,updated_at)VALUES('edited',?,?,?)", title, now(), now())
 	if err != nil {
 		return err
@@ -372,7 +380,11 @@ func (s *Service) commit(ctx context.Context, j Job, v Session, resultUUID, path
 	if err != nil {
 		return err
 	}
-	res, err = tx.ExecContext(ctx, `INSERT INTO media_file(media_id,file_key,file_uuid,storage_kind,filepath,directory_id,kind,position,filesize,hash_algorithm,content_hash,duration,detected_format,width,height,frame_count,created_at)VALUES(?,?,?,'app_managed',?,?,?,0,?,'sha256',?,?,?,?,?,?,?)`, mediaID, "edit:"+j.ID, resultUUID, path, dirID, metadata.Kind, proof.Size, proof.Hash, metadata.Duration, metadata.Format, metadata.Width, metadata.Height, frames, now())
+	var frameCount any
+	if frames > 0 {
+		frameCount = frames
+	}
+	res, err = tx.ExecContext(ctx, `INSERT INTO media_file(media_id,file_key,file_uuid,storage_kind,filepath,directory_id,kind,position,filesize,hash_algorithm,content_hash,duration,detected_format,width,height,frame_count,created_at)VALUES(?,?,?,'app_managed',?,?,?,0,?,'sha256',?,?,?,?,?,?,?)`, mediaID, "edit:"+j.ID, resultUUID, path, dirID, metadata.Kind, proof.Size, proof.Hash, metadata.Duration, metadata.Format, metadata.Width, metadata.Height, frameCount, now())
 	if err != nil {
 		return err
 	}
@@ -451,7 +463,7 @@ func (s *Service) recover() error {
 		if err == nil {
 			var metadata engine.LocalMetadata
 			var frames int
-			metadata, frames, err = s.editor.Verify(ctx, path)
+			metadata, frames, err = s.verifyOutput(ctx, j, path)
 			if err == nil {
 				err = s.commit(ctx, j, v, resultUUID, path, proof, metadata, frames)
 			}

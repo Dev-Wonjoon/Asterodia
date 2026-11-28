@@ -71,6 +71,12 @@ func (s *Service) work(ctx context.Context) {
 				if errors.Is(err, errGIFFrameTiming) {
 					message = errGIFFrameTiming.Error()
 				}
+				if errors.Is(err, errBatchStart) {
+					message = errBatchStart.Error()
+				}
+				if errors.Is(err, errBatchNoAudio) {
+					message = errBatchNoAudio.Error()
+				}
 				if errors.Is(err, context.Canceled) {
 					state, message = "cancelled", ""
 				}

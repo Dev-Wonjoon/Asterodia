@@ -5,7 +5,7 @@ export type DownloadEngineKind = 'yt-dlp' | 'gallery-dl'
 
 export type DownloadJobOptions = Pick<
     DownloadOptions,
-    'type' | 'quality' | 'playlist' | 'extension'
+    'type' | 'quality' | 'playlist' | 'extension' | 'videoCodec' | 'audioCodec'
 >
 
 export type DownloadState =

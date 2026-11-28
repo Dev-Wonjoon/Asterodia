@@ -19,6 +19,11 @@ var assets embed.FS
 func main() {
 	// The swap helper must run before acquiring the data lock or opening the DB.
 	updater.HandleHelperMode()
+	if relaunched, err := desktop.RelaunchAsterodia(); err != nil {
+		log.Fatal(err)
+	} else if relaunched {
+		return
+	}
 	paths, err := desktop.ResolvePaths(desktop.DataDirectoryOverride())
 	if err != nil {
 		log.Fatal(err)

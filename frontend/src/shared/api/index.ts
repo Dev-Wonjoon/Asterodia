@@ -56,6 +56,10 @@ const api: AppApi = {
         restart: () => response(UpdateService.Restart()),
     },
     mediaEdit: {
+        formats: () => response(MediaEditService.Formats()),
+        batch: request => response(MediaEditService.Batch(wire(request))),
+        retryBatch: request => response(MediaEditService.RetryBatch(request)),
+        cancelBatch: request => response(MediaEditService.CancelBatch(request)),
         outputOptions: request => response(MediaEditService.OutputOptions(wire(request))),
         overview: request => response(MediaEditService.Overview(wire(request))),
         frames: request => response(MediaEditService.Frames(wire(request))),

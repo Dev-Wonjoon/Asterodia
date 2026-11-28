@@ -14,6 +14,9 @@ import (
 
 // Execute the same test binary as a deterministic gallery-dl CLI fixture.
 func TestMain(m *testing.M) {
+	if runConversionDownloadFixture() {
+		return
+	}
 	if runManagedCookieFixture() {
 		return
 	}

@@ -74,7 +74,7 @@ func (p DownloadPlan) MediaTargets() ([]MediaTarget, error) {
 		return nil, ErrUnsupportedURL
 	}
 	if p.Options.Type == "audio" || p.Options.Quality == "audio" ||
-		(p.Options.Quality != "" && p.Options.Quality != "best") || p.Options.Extension != "" {
+		(p.Options.Quality != "" && p.Options.Quality != "best") || p.Options.Extension != "" || p.Options.VideoCodec != "" || p.Options.AudioCodec != "" {
 		return nil, fmt.Errorf("%w: 선택된 추출기는 요청한 변환 옵션을 처리하지 못합니다", ErrUnsupportedMediaFormat)
 	}
 	return p.GalleryDLDiscovery.Targets(p.OriginalURL)

@@ -15,10 +15,12 @@ const (
 )
 
 type Options struct {
-	Type      string `json:"type,omitempty"`
-	Quality   string `json:"quality,omitempty"`
-	Extension string `json:"extension,omitempty"`
-	Playlist  *bool  `json:"playlist,omitempty"`
+	VideoCodec string `json:"videoCodec,omitempty"`
+	AudioCodec string `json:"audioCodec,omitempty"`
+	Type       string `json:"type,omitempty"`
+	Quality    string `json:"quality,omitempty"`
+	Extension  string `json:"extension,omitempty"`
+	Playlist   *bool  `json:"playlist,omitempty"`
 }
 
 type BinaryStatus struct {

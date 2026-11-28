@@ -3,6 +3,7 @@ package update_test
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -24,6 +25,12 @@ func init() {
 		return
 	}
 	updater.HandleHelperMode()
+	if relaunched, err := desktop.RelaunchAsterodia(); err != nil {
+		_ = os.WriteFile(filepath.Join(root, "probe-error.txt"), []byte(err.Error()), 0600)
+		os.Exit(1)
+	} else if relaunched {
+		os.Exit(0)
+	}
 	if err := runUpdateProbe(root); err != nil {
 		_ = os.WriteFile(filepath.Join(root, "probe-error.txt"), []byte(err.Error()), 0600)
 		os.Exit(1)
@@ -51,14 +58,28 @@ func (p probeProvider) Download(_ context.Context, _ *updater.Release, dst io.Wr
 }
 
 func runUpdateProbe(root string) error {
-	unlock, err := desktop.AcquireLock(filepath.Join(root, "data.lock"))
+	if err := os.MkdirAll(filepath.Join(root, "data"), 0700); err != nil {
+		return err
+	}
+	unlock, err := desktop.AcquireLibraryLock(filepath.Join(root, "data"))
 	if err != nil {
 		return err
 	}
 	defer unlock()
 	marker := filepath.Join(root, "swap-started")
 	if _, err = os.Stat(marker); err == nil {
-		return os.WriteFile(filepath.Join(root, "restarted"), []byte("ok"), 0600)
+		executable, err := os.Executable()
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(filepath.Join(root, "restarted"), []byte(executable), 0600)
+	}
+	arguments, err := json.Marshal(os.Args[1:])
+	if err != nil {
+		return err
+	}
+	if err = os.WriteFile(filepath.Join(root, "launch-args.json"), arguments, 0600); err != nil {
+		return err
 	}
 	bytes, err := os.ReadFile(filepath.Join(root, "payload.exe"))
 	if err != nil {
@@ -81,7 +102,16 @@ func runUpdateProbe(root string) error {
 }
 
 func TestWindowsExecutableSwapAndRelaunchPreservesData(t *testing.T) {
-	root := t.TempDir()
+	for _, name := range []string{"Asterodia.exe", "StorageBucket.exe", "StorageBucket-windows-amd64.exe"} {
+		t.Run(name, func(t *testing.T) { testWindowsExecutableSwapAndRelaunch(t, name) })
+	}
+}
+
+func testWindowsExecutableSwapAndRelaunch(t *testing.T, entryName string) {
+	root := filepath.Join(t.TempDir(), "portable library")
+	if err := os.MkdirAll(root, 0700); err != nil {
+		t.Fatal(err)
+	}
 	self, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
@@ -92,15 +122,15 @@ func TestWindowsExecutableSwapAndRelaunchPreservesData(t *testing.T) {
 	}
 	updated := append(append([]byte(nil), original...), []byte("\nAsterodia update probe\n")...)
 	target := filepath.Join(root, "Asterodia.exe")
-	for file, data := range map[string][]byte{"Asterodia.exe": original, "payload.exe": updated, "asterodia.db": []byte("existing library"), "config.json": []byte("existing settings")} {
+	for file, data := range map[string][]byte{entryName: original, "payload.exe": updated, "asterodia.db": []byte("existing library"), "config.json": []byte("existing settings")} {
 		if err = os.WriteFile(filepath.Join(root, file), data, 0700); err != nil {
 			t.Fatal(err)
 		}
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 25*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, target)
-	cmd.Env = append(os.Environ(), "ASTERODIA_UPDATE_PROBE_ROOT="+root)
+	cmd := exec.CommandContext(ctx, filepath.Join(root, entryName), "--launch-probe", "value with spaces")
+	cmd.Env = append(os.Environ(), "ASTERODIA_UPDATE_PROBE_ROOT="+root, "ASTERODIA_DATA_DIR="+root)
 	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: 0x08000000} // CREATE_NO_WINDOW
 	if output, err := cmd.CombinedOutput(); err != nil {
 		failure, _ := os.ReadFile(filepath.Join(root, "probe-error.txt"))
@@ -116,6 +146,14 @@ func TestWindowsExecutableSwapAndRelaunchPreservesData(t *testing.T) {
 			t.Fatalf("new app did not relaunch: %s", failure)
 		case <-time.After(25 * time.Millisecond):
 		}
+	}
+	restarted, _ := os.ReadFile(filepath.Join(root, "restarted"))
+	if string(restarted) != target {
+		t.Fatalf("restart retained the legacy executable name: %s", restarted)
+	}
+	arguments, _ := os.ReadFile(filepath.Join(root, "launch-args.json"))
+	if string(arguments) != `["--launch-probe","value with spaces"]` {
+		t.Fatalf("legacy launch lost arguments: %s", arguments)
 	}
 	actual, err := os.ReadFile(target)
 	if err != nil {

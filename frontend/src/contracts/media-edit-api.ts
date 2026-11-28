@@ -1,5 +1,7 @@
 import type { WebServerResult } from './webserver-api';
+import type { BatchOptions, BatchRequest, BatchResult, OutputFormat } from './conversion';
 export interface EditPrepare {
+    batch?: boolean;
     quickVideo?: boolean;
     originalFrames?: boolean;
     fullSource?: boolean;
@@ -59,6 +61,7 @@ export interface EditPage {
     error: string;
 }
 export interface EditCreate {
+    batch?: BatchOptions;
     outputDirectory?: string;
     albumIds?: number[];
     tagNames?: string[];
@@ -68,7 +71,7 @@ export interface EditCreate {
     trimEnd?: number;
     requestId: string;
     sessionId: string;
-    kind: 'gif' | 'webp' | 'trim';
+    kind: 'gif' | 'webp' | 'trim' | 'convert';
     crop: {
         x: number;
         y: number;
@@ -112,6 +115,10 @@ export interface EditJob {
     createdAt: number;
 }
 export interface MediaEditApi {
+    formats(): Promise<WebServerResult<OutputFormat[]>>;
+    batch(request: BatchRequest): Promise<WebServerResult<BatchResult>>;
+    retryBatch(request: { id: string }): Promise<WebServerResult<EditJob>>;
+    cancelBatch(request: { id: string }): Promise<WebServerResult<null>>;
     outputOptions(request: { keyword?: string; offset?: number }): Promise<WebServerResult<{
         directory: string;
         albums: { id: number; title: string }[];

@@ -58,7 +58,7 @@ func Select(rawURL string, options Options) (Kind, error) {
 		options.Type == "audio" ||
 		options.Quality == "audio" ||
 		(options.Quality != "" && options.Quality != "best") ||
-		options.Extension != "" {
+		options.Extension != "" || options.VideoCodec != "" || options.AudioCodec != "" {
 		return KindYtdlp, nil
 	}
 

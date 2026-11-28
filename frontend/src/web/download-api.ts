@@ -1,5 +1,6 @@
 import type { DownloadJobDto, DownloadJobOptions, DownloadPageDto, DownloadResponse } from '@contracts/download-api'
 import { translate } from '@renderer/shared/i18n'
+import type { OutputFormat } from '@contracts/conversion'
 
 let csrf = ''
 async function call<T>(name: string, value?: unknown, read = false): Promise<T> {
@@ -13,6 +14,7 @@ async function call<T>(name: string, value?: unknown, read = false): Promise<T> 
     return response.json()
 }
 export const webDownloads = {
+    formats: () => call<DownloadResponse<OutputFormat[]>>('formats', undefined, true),
     async status() { const access = await call<{ enabled: boolean; csrf: string }>('status', undefined, true); csrf = access.csrf; return access },
     list: (offset = 0) => call<DownloadResponse<DownloadPageDto>>('list?offset=' + offset, undefined, true),
     start: (url: string, options: DownloadJobOptions) => call<DownloadResponse<DownloadJobDto>>('enqueue', { url, options }),

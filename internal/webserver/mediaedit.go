@@ -47,6 +47,8 @@ func (s *Service) editAPI(w http.ResponseWriter, r *http.Request) {
 	var result api.Result
 	if r.Method == "GET" || r.Method == "HEAD" {
 		switch r.URL.Path {
+		case "/api/edit/formats":
+			result = editor.Formats(r.Context())
 		case "/api/edit/output-options":
 			offset, err := integer(r, "offset", 0)
 			if err != nil {
@@ -118,6 +120,28 @@ func (s *Service) editAPI(w http.ResponseWriter, r *http.Request) {
 			return true
 		}
 		switch r.URL.Path {
+		case "/api/edit/batch":
+			var req mediaedit.BatchRequest
+			if !decode(&req) {
+				return
+			}
+			if req.OutputDirectory != "" {
+				http.Error(w, "출력 폴더는 PC에서 선택하세요", 400)
+				return
+			}
+			result = editor.Batch(r.Context(), req)
+		case "/api/edit/batch-retry":
+			var req mediaedit.Request
+			if !decode(&req) {
+				return
+			}
+			result = editor.RetryBatch(r.Context(), req)
+		case "/api/edit/batch-cancel":
+			var req mediaedit.Request
+			if !decode(&req) {
+				return
+			}
+			result = editor.CancelBatch(r.Context(), req)
 		case "/api/edit/frames":
 			var req mediaedit.FramesRequest
 			if !decode(&req) {
@@ -194,6 +218,12 @@ func (s *Service) editAPI(w http.ResponseWriter, r *http.Request) {
 // Physical PC paths stay local even though desktop and mobile share job types.
 func publicEditResult(result api.Result) api.Result {
 	switch data := result.Data.(type) {
+	case mediaedit.BatchResult:
+		data.Jobs = append([]mediaedit.Job{}, data.Jobs...)
+		for i := range data.Jobs {
+			data.Jobs[i].Options.OutputDirectory = ""
+		}
+		result.Data = data
 	case mediaedit.Job:
 		data.Options.OutputDirectory = ""
 		result.Data = data
